@@ -1,12 +1,11 @@
 #!/usr/bin/env python
-"""Django's command-line utility for administrative tasks."""
+"""Django management entry point. / Django 관리 명령 진입점."""
 import os
 import sys
 
 
 def main():
-    """Run administrative tasks."""
-    # Select the Django settings module. / Django가 사용할 설정 모듈을 지정합니다.
+    """Dispatch CLI commands to Django. / CLI 명령을 Django에 전달합니다."""
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
     try:
         from django.core.management import execute_from_command_line
@@ -16,8 +15,6 @@ def main():
             "available on your PYTHONPATH environment variable? Did you "
             "forget to activate a virtual environment?"
         ) from exc
-    # Dispatch commands such as runserver and migrate to Django.
-    # 터미널 인자의 runserver, migrate 등의 명령을 Django에 전달합니다.
     execute_from_command_line(sys.argv)
 
 

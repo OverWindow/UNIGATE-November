@@ -14,8 +14,12 @@ Unigate는 대학 편입과 한국어 교육을 위한 웹 서비스입니다.
   실행 환경 및 패키지 관리: 루트 README에 명시된 Node.js 24와 npm을 사용합니다. 동일한 의존성 설치를 위해 `unigate_frontend/package-lock.json`을 버전 관리하고 `npm ci`를 사용합니다. 의존성 버전은 `package.json`과 잠금 파일을 참고합니다.
 - Backend: Python 3.13 and Django 5.2, with the project configuration in `backend/config/`. Dependencies are pinned in `backend/requirements.txt`. Use the local `backend/.venv/` virtual environment.
   백엔드: Python 3.13과 Django 5.2를 사용하며 프로젝트 설정은 `backend/config/`에 있습니다. 의존성 버전은 `backend/requirements.txt`에 고정하고 `backend/.venv/` 가상환경을 사용합니다.
-- Database: PostgreSQL connection settings read from process environment variables or `backend/.env.development` / `backend/.env.production`, selected by `DJANGO_ENV` (development by default); see the matching `.example` files. Production requires explicit credentials and hosts and disallows DEBUG=True. No database server is provisioned and no migrations have been applied. Django default auth, admin, contenttypes, and sessions apps are enabled; there are no business models or APIs yet.
-  데이터베이스: PostgreSQL 연결 정보는 프로세스 환경 변수 또는 `backend/.env.development`, `backend/.env.production`에서 읽습니다. `DJANGO_ENV`로 선택하며 기본값은 `development`입니다. 공유용 설정은 각 `.example` 파일을 참고합니다. 운영 환경은 접속 정보와 허용 호스트를 명시해야 하며 `DEBUG=True`를 허용하지 않습니다. DB 서버는 아직 준비되지 않았고 마이그레이션도 적용하지 않았습니다. Django 기본 인증·관리자·콘텐츠 타입·세션 앱은 활성화되어 있지만 업무용 모델과 API는 아직 없습니다.
+- Docker: `backend/Dockerfile` runs Gunicorn with `gunicorn.conf.py` as a non-root user on HTTP 8000, defaulting to `DJANGO_ENV=production`. Build with `docker build -t unigate-backend ./backend` from the repository root and supply production environment variables at runtime. Gunicorn is pinned for non-Windows installs; Windows development still uses runserver. HTTPS, static file hosting, frontend proxy routing, PostgreSQL provisioning, and migrations remain separate deployment steps.
+  Docker: `backend/Dockerfile`은 `gunicorn.conf.py`를 사용하는 Gunicorn을 일반 사용자 권한으로 HTTP 8000에서 실행하며 기본 환경은 production입니다. 저장소 루트에서 이미지를 빌드하고 운영 환경 변수는 실행 시 주입합니다. Gunicorn은 Windows 외 환경에 버전을 고정해 설치하며 Windows 개발은 runserver를 사용합니다. HTTPS·정적 파일 호스팅·프론트엔드 프록시·DB 준비·마이그레이션은 별도 배포 단계입니다.
+- Database: PostgreSQL connection settings read from process environment variables or `backend/.env.development` / `backend/.env.production`, selected by `DJANGO_ENV` (development by default); see the matching `.example` files. Production requires explicit credentials and hosts and disallows DEBUG=True. A local PostgreSQL 17 container named `test-db` is provisioned at `127.0.0.1:5433` with database `unigate_test` and volume `test-db-data`. Credentials are stored in the Git-ignored `backend/.env.test-db`; Django does not load this file automatically. No migrations have been applied. Django default auth, admin, contenttypes, and sessions apps are enabled; there are no business models or APIs yet.
+  데이터베이스: PostgreSQL 연결 정보는 프로세스 환경 변수 또는 `backend/.env.development`, `backend/.env.production`에서 읽습니다. `DJANGO_ENV`로 선택하며 기본값은 `development`입니다. 공유용 설정은 각 `.example` 파일을 참고합니다. 운영 환경은 접속 정보와 허용 호스트를 명시해야 하며 `DEBUG=True`를 허용하지 않습니다. 로컬 PostgreSQL 17 컨테이너 `test-db`를 `127.0.0.1:5433`에 준비했으며 DB는 `unigate_test`, 볼륨은 `test-db-data`입니다. 인증 정보는 Git에서 제외되는 `backend/.env.test-db`에 있으며 Django가 이 파일을 자동으로 읽지는 않습니다. 마이그레이션은 적용하지 않았습니다. Django 기본 인증·관리자·콘텐츠 타입·세션 앱은 활성화되어 있지만 업무용 모델과 API는 아직 없습니다.
+- Frontend Docker: `unigate_frontend/Dockerfile` builds with Node.js 24 and serves static files through unprivileged Nginx on HTTP 8080. `nginx.conf` handles SPA fallback and caching; `.dockerignore` excludes local artifacts and environment files. HTTPS and backend proxy routing require deployment-specific configuration.
+  프론트엔드 Docker: Node.js 24로 빌드하고 일반 사용자 권한의 Nginx로 HTTP 8080에서 정적 파일을 제공합니다. `nginx.conf`는 SPA fallback과 캐시를 처리하며 `.dockerignore`는 로컬 생성물과 환경 파일을 제외합니다. HTTPS와 백엔드 프록시는 배포 환경에 맞게 별도 설정해야 합니다.
 - The frontend and backend are managed in one Git repository at the project root.
   프론트엔드와 백엔드는 프로젝트 루트의 하나의 Git 저장소에서 관리합니다.
 
@@ -27,8 +31,11 @@ unigate-main/
 |-- DESIGN.md                 # Homepage-based visual guidelines and official logo reference / 홈페이지 기반 디자인 지침 및 공식 로고 참고
 |-- README.md                 # Project overview and local development instructions / 프로젝트 개요 및 로컬 개발 안내
 |-- .gitignore                # Excludes dependencies, builds, secrets, and Python artifacts / 의존성·빌드 결과·비밀 정보·Python 생성 파일 제외
-|-- backend/                  # Django project: config/, manage.py, requirements.txt, .env.development.example, .env.production.example / Django 프로젝트 설정·관리 명령·의존성·환경별 예시 파일
+|-- backend/                  # Django project, Dockerfile, gunicorn.conf.py, requirements.txt, environment examples / Django 프로젝트·운영 서버·의존성·환경 예시
 `-- unigate_frontend/
+    |-- Dockerfile            # Production static server image / 운영용 정적 서버 이미지
+    |-- nginx.conf            # SPA routing and static caching / SPA 라우팅 및 정적 캐시
+    |-- .dockerignore         # Docker build exclusions / Docker 빌드 제외 항목
     |-- package.json          # Frontend dependencies and npm scripts / 프론트엔드 의존성 및 npm 명령
     |-- package-lock.json     # Dependency lockfile / 의존성 버전 잠금 파일
     |-- vite.config.js        # Vite configuration with the React plugin / React 플러그인을 포함한 Vite 설정
@@ -91,5 +98,13 @@ There is currently no frontend test script. From `backend/`, run `.venv/Scripts/
 - Before adding a library or dependency, evaluate whether existing functionality can meet the need.
   라이브러리나 의존성을 추가하기 전에 기존 기능으로 요구사항을 충족할 수 있는지 검토합니다.
 
-- When writing or updating code comments and docstrings, prefer including both English and Korean where practical. Keep both versions concise and consistent in meaning; avoid unnecessary comments and preserve tool-required directives.
-  코드 주석과 독스트링을 작성하거나 수정할 때는 가능한 한 영어와 한국어를 함께 작성합니다. 두 언어의 의미를 일치시키고 간결하게 유지하며, 불필요한 주석은 추가하지 않고 도구가 요구하는 지시문 형식은 보존합니다.
+## Comment Style / 주석 작성 방식
+
+- Prefer one short comment per logical block or function. Do not annotate every line or repeat names and operations that the code already makes clear.
+  기능 블록이나 함수 단위로 짧게 설명합니다. 줄마다 주석을 달거나 코드에서 명확한 이름·동작을 그대로 반복하지 않습니다.
+- Explain intent, constraints, non-obvious behavior, and important ordering. Keep setup tutorials and lengthy background explanations in README rather than source comments.
+  의도·제약·이해하기 어려운 동작·중요한 실행 순서를 설명합니다. 설치 안내나 긴 배경 설명은 소스 주석 대신 README에 작성합니다.
+- Where useful, pair concise English and Korean in one short line or a two-line block. Bilingual comments are preferred, but do not add redundant comments just to translate obvious code.
+  필요한 주석에는 간결한 영어와 한국어를 짧은 한 줄 또는 두 줄 블록으로 병기합니다. 다국어 작성을 위해 자명한 코드에 불필요한 주석을 추가하지 않습니다.
+- Avoid duplicate explanations in file headers, docstrings, and inline comments. Use brief section labels only when they help navigate longer files; preserve tool-required directives.
+  파일 머리말·독스트링·인라인 주석에 같은 설명을 중복하지 않습니다. 긴 파일을 탐색하는 데 도움이 될 때만 짧은 구역 제목을 사용하고, 도구가 요구하는 지시문은 보존합니다.

@@ -4,14 +4,12 @@ import reactLogo from './assets/react.svg'
 import viteLogo from './assets/vite.svg'
 import './App.css'
 
+// Starter UI with a local counter. / 로컬 카운터를 포함한 시작 화면입니다.
 function App() {
-  // Store the demo counter in local component state.
-  // 예제 카운터 값을 이 컴포넌트의 상태로 관리합니다.
   const [count, setCount] = useState(0)
 
   return (
     <>
-      {/* Starter illustration and interactive counter. / 시작 화면 이미지와 클릭 카운터입니다. */}
       <section id="center">
         <div className="hero">
           <img src={heroImg} className="base" width="170" height="179" alt="" />
@@ -27,7 +25,6 @@ function App() {
         <button
           type="button"
           className="counter"
-          // Derive the next value from the previous state. / 이전 상태를 기준으로 다음 값을 계산합니다.
           onClick={() => setCount((count) => count + 1)}
         >
           Count is {count}
@@ -36,7 +33,6 @@ function App() {
 
       <div className="ticks"></div>
 
-      {/* Documentation and community links. / 개발 문서와 커뮤니티 링크를 표시합니다. */}
       <section id="next-steps">
         <div id="docs">
           <svg className="icon" role="presentation" aria-hidden="true">

@@ -1,0 +1,35 @@
+# Credentials and local environment files / 인증 정보 및 로컬 환경 파일
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+
+# Local environments and Python caches / 로컬 가상환경 및 Python 캐시
+**/.venv
+**/venv
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.coverage
+**/.coverage.*
+**/htmlcov
+
+# Generated files and local data / 생성 파일 및 로컬 데이터
+**/*.log
+**/*.sqlite3
+**/*.sqlite3-*
+staticfiles/
+media/
+build/
+dist/
+**/*.egg-info
+
+# Repository, editor, and build metadata / 저장소·편집기·빌드 메타데이터
+**/.git
+**/.idea
+**/.vscode
+**/.DS_Store
+Dockerfile
+.dockerignore
