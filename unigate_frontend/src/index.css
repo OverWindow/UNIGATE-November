@@ -1,3 +1,4 @@
+/* Shared colors, fonts, and base typography. / 공통 색상·글꼴·기본 글자 스타일을 정의합니다. */
 :root {
   --text: #6b6375;
   --text-h: #08060d;
@@ -30,6 +31,7 @@
   }
 }
 
+/* Follow the user's dark-mode preference. / 사용자 환경의 다크 모드 설정을 따릅니다. */
 @media (prefers-color-scheme: dark) {
   :root {
     --text: #9ca3af;
@@ -54,6 +56,7 @@ body {
   margin: 0;
 }
 
+/* Constrain the app width while filling at least the small viewport height. / 앱 너비를 제한하고 최소한 작은 뷰포트 높이를 채웁니다. */
 #root {
   width: 1126px;
   max-width: 100%;
@@ -66,6 +69,7 @@ body {
   box-sizing: border-box;
 }
 
+/* Shared heading typography. / 제목에 공통 글꼴과 색상을 적용합니다. */
 h1,
 h2 {
   font-family: var(--heading);
@@ -95,6 +99,7 @@ p {
   margin: 0;
 }
 
+/* Monospace text for inline code and the counter. / 인라인 코드와 카운터에 고정폭 글꼴을 사용합니다. */
 code,
 .counter {
   font-family: var(--mono);

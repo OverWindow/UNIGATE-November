@@ -17,6 +17,8 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 
+# Map /admin/ to Django admin; business API routes will be added separately.
+# /admin/ 요청을 Django 관리자에 연결합니다. 업무용 API 경로는 추후 별도로 추가합니다.
 urlpatterns = [
     path('admin/', admin.site.urls),
 ]

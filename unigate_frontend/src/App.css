@@ -1,3 +1,4 @@
+/* Counter button interactions. / 카운터 버튼의 기본·호버·키보드 포커스 스타일입니다. */
 .counter {
   font-size: 16px;
   padding: 5px 10px;
@@ -17,6 +18,7 @@
   }
 }
 
+/* Layer and tilt the starter illustration and logos. / 시작 이미지와 로고를 겹치고 기울여 배치합니다. */
 .hero {
   position: relative;
 
@@ -56,6 +58,7 @@
   }
 }
 
+/* Center the primary content and adjust spacing on smaller screens. / 주요 콘텐츠를 중앙에 배치하고 작은 화면의 간격을 조정합니다. */
 #center {
   display: flex;
   flex-direction: column;
@@ -70,6 +73,7 @@
   }
 }
 
+/* Show link sections side by side, stacking them on smaller screens. / 링크 영역은 가로로 배치하고 작은 화면에서는 세로로 쌓습니다. */
 #next-steps {
   display: flex;
   border-top: 1px solid var(--border);
@@ -104,6 +108,7 @@
   }
 }
 
+/* Shared link buttons and wrapping behavior. / 링크 버튼의 공통 스타일과 줄바꿈 동작입니다. */
 #next-steps ul {
   list-style: none;
   padding: 0;
@@ -161,6 +166,7 @@
   }
 }
 
+/* Draw decorative edge markers with pseudo-elements. / 가상 요소로 양쪽 가장자리 장식을 그립니다. */
 .ticks {
   position: relative;
   width: 100%;

@@ -17,14 +17,20 @@ from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
+# backend 폴더를 기준으로 파일 경로를 구성합니다.
 BASE_DIR = Path(__file__).resolve().parent.parent
+# Select only the requested environment file; default to development.
+# 선택한 환경 파일만 읽으며, 미지정 시 development를 사용합니다.
 DJANGO_ENV = os.environ.get("DJANGO_ENV", "development")
 if DJANGO_ENV not in {"development", "production"}:
     raise ImproperlyConfigured("DJANGO_ENV must be development or production.")
 
 # Process environment variables take precedence over the selected file.
+# 서버나 터미널에 설정한 환경 변수가 파일의 값보다 우선합니다.
 load_dotenv(BASE_DIR / f".env.{DJANGO_ENV}", override=False)
 
+# Require explicit production settings instead of falling back to development defaults.
+# 운영 환경은 개발 기본값으로 대체하지 않고 필수 설정을 명시하도록 합니다.
 if DJANGO_ENV == "production":
     required = (
         "DJANGO_SECRET_KEY", "DJANGO_ALLOWED_HOSTS", "POSTGRES_DB",
@@ -36,9 +42,11 @@ if DJANGO_ENV == "production":
 
 
 # Quick-start development settings - unsuitable for production
+# 개발용 설정은 그대로 운영에 사용하지 말고 아래 배포 점검 문서를 확인합니다.
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
+# 비밀 키는 환경 변수로 관리하며 로그나 저장소에 노출하지 않습니다.
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "")
 if not SECRET_KEY or SECRET_KEY == "replace-with-a-random-secret-key":
     raise ImproperlyConfigured(
@@ -46,10 +54,13 @@ if not SECRET_KEY or SECRET_KEY == "replace-with-a-random-secret-key":
     )
 
 # SECURITY WARNING: don't run with debug turned on in production!
+# 운영 환경에서는 상세 오류 화면이 노출되지 않도록 DEBUG 활성화를 차단합니다.
 DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() == "true"
 if DJANGO_ENV == "production" and DEBUG:
     raise ImproperlyConfigured("DJANGO_DEBUG must be False in production.")
 
+# Parse allowed request hosts; this does not configure CORS.
+# 허용할 요청 호스트를 쉼표로 구분해 읽습니다. CORS 허용 설정과는 별개입니다.
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,[::1]").split(",")
@@ -58,6 +69,7 @@ ALLOWED_HOSTS = [
 
 
 # Application definition
+# 기본 관리자·인증·세션 등 프로젝트에서 사용하는 Django 앱을 등록합니다.
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -68,6 +80,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 ]
 
+# Apply shared security, session, and authentication processing around each view.
+# 뷰 실행 전후에 보안·세션·인증 등의 공통 요청 처리를 적용합니다.
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -78,8 +92,12 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+# Route incoming request paths through config/urls.py.
+# 들어온 요청 경로는 config/urls.py에서 처리할 뷰에 연결합니다.
 ROOT_URLCONF = 'config.urls'
 
+# Keep Django templates for the admin interface, even with a React frontend.
+# 프론트엔드가 React여도 관리자 화면에는 Django 템플릿이 필요합니다.
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -95,10 +113,14 @@ TEMPLATES = [
     },
 ]
 
+# Entry point used by the default Django development server.
+# Django 기본 개발 서버가 불러오는 WSGI 애플리케이션 진입점입니다.
 WSGI_APPLICATION = 'config.wsgi.application'
 
 
 # Database
+# PostgreSQL 접속 설정입니다. DB 서버·계정·데이터베이스 자체는 별도로 준비해야 합니다.
+# Provision the PostgreSQL server, user, and database separately.
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
@@ -114,6 +136,8 @@ DATABASES = {
 
 
 # Password validation
+# 비밀번호의 사용자 정보 유사성·최소 길이·흔한 값·숫자 전용 여부를 검증합니다.
+# Check similarity, minimum length, common passwords, and numeric-only passwords.
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -133,6 +157,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 # Internationalization
+# Django 기본 언어는 한국어, 시간대는 서울로 설정합니다.
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
 LANGUAGE_CODE = 'ko-kr'
@@ -141,17 +166,21 @@ TIME_ZONE = 'Asia/Seoul'
 
 USE_I18N = True
 
+# Use timezone-aware datetimes. / 시간대 정보가 포함된 날짜·시간을 사용합니다.
 USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
+# 관리자 화면 등에 필요한 CSS·JavaScript·이미지의 URL 경로를 설정합니다.
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
 
 # Default primary key field type
+# 모델에 기본 키를 따로 지정하지 않으면 큰 정수형 자동 증가 ID를 사용합니다.
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Destination for collectstatic output. / collectstatic 명령으로 정적 파일을 모으는 폴더입니다.
 STATIC_ROOT = BASE_DIR / "staticfiles"
