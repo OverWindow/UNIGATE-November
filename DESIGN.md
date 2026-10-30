@@ -2,6 +2,8 @@
 
 ## Purpose and Source
 
+Write and maintain this document exclusively in English. This documentation requirement does not change the frontend language support requirements below.
+
 Read this document before changing frontend design. Preserve the visual identity of Unigate while making interfaces clear and usable for university transfer applicants and Korean language learners.
 
 Reference: [Unigate homepage](https://www.unigate.kr/), reviewed on October 30, 2026. The observations below come from the rendered homepage, its DOM styles, and its original logo asset. Implementation recommendations are identified separately; they are not claims about a complete existing design system.
