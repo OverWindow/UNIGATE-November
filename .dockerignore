@@ -1,0 +1,12 @@
+**/.venv
+**/node_modules
+**/.next
+**/out
+**/__pycache__
+**/*.pyc
+**/.env*
+**/*.sqlite3*
+**/data
+.git
+exports
+**/*.log

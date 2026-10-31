@@ -25,7 +25,7 @@ Reference: [Unigate homepage](https://www.unigate.kr/), reviewed on October 30, 
 - Keep user-facing text localizable, including validation messages, placeholders, alternative text, and accessibility labels. Preserve the UNIGATE brand name across languages.
 - Set the document language to match the active interface language and use locale-aware formatting for dates and numbers where applicable.
 - Verify affected layouts in all three languages at narrow and wide viewport widths before completing frontend design changes.
-- These are required capabilities for future implementation; this document does not imply that language switching or translations are already implemented.
+- The frontend implements language switching and translations for all three languages.
 
 ## Observed Colors
 
@@ -52,7 +52,7 @@ font-family: Pretendard, ui-sans-serif, system-ui, -apple-system,
   "Malgun Gothic", sans-serif;
 ```
 
-The declaration was verified; successful loading of a particular font file was not independently verified. The local frontend does not yet configure Pretendard.
+The declaration was verified; successful loading of a particular font file was not independently verified. The local frontend loads Pretendard from the original CDN with the system fallbacks below.
 
 - Use bold, compact headings and comfortable line spacing for explanatory text.
 - At the inspected viewport, the hero heading was 30px/700, major section headings were 36px/700, card headings were 18px/700, and action labels were 16px/600.
@@ -124,7 +124,7 @@ Example usage:
 
 ## Applying This Reference
 
-- Implement the visual language in the existing React/Vite frontend using its current styling approach. The reference site's framework or utility classes do not require adding those dependencies here.
+- Implement the visual language in the Next.js App Router frontend using TypeScript and Tailwind CSS v4. The user approved migrating from React/Vite and retaining the source homepage.
 - Prefer shared color, spacing, and radius tokens as the interface grows.
 - Keep the original branding consistent across marketing pages and learning interfaces while adapting density to the user's task.
 - Before completing a design change, check logo proportions, readable contrast, responsive layout, text overflow, and interaction states.

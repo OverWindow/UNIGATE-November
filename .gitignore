@@ -11,7 +11,7 @@ coverage/
 !.env.example
 !.env.*.example
 
-# Python / Django artifacts (reserved for future backend work)
+# Python / Django artifacts
 __pycache__/
 *.py[cod]
 .venv/
@@ -29,3 +29,11 @@ backend/staticfiles/
 Thumbs.db
 .idea/
 
+
+# Next.js generated files
+.next/
+out/
+*.tsbuildinfo
+
+# Survey exports contain personal information
+/exports/
