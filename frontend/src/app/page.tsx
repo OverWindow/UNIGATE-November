@@ -5,6 +5,7 @@ import Features from "@/components/Features";
 import Hero from "@/components/Hero";
 import Partners from "@/components/Partners";
 import Pricing from "@/components/Pricing";
+import TransferIntroduction from "@/components/TransferIntroduction";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -18,6 +19,7 @@ export default function Home() {
     <>
       <ScrollUp />
       <Hero />
+      <TransferIntroduction />
       <Features />
       <AboutSectionOne />
       <Pricing />

@@ -5,6 +5,8 @@ export const educationTypes = [
 
 export const surveyTranslations = {
   ko: {
+    introTitle: "한국 대학 편입학, UNIGATE와 함께 준비하세요",
+    introDescription: "한국 대학으로의 편입학을 목표로 한국어와 전공 학습을 준비해 보세요. 편입학에 관심이 있다면 정보를 신청하고 안내를 받아보세요.",
     button: "편입학 정보 받기",
     title: "한국 대학 편입학 정보를 받아보세요",
     description: "신청하시면 몇 주 후 편입학 관련 안내 PDF를 입력하신 이메일로 보내드립니다.",
@@ -22,6 +24,8 @@ export const surveyTranslations = {
     choices: { high_school_graduate: "고졸 (대학 진학 이력 없음)", universitas: "Universitas (종합대학교)", institut: "Institut (분야별 전문대학교)", sekolah_tinggi: "Sekolah Tinggi (단과대학)", politeknik: "Politeknik (폴리테크닉)", akademi: "Akademi (전문대학)", akademi_komunitas: "Akademi Komunitas (커뮤니티 아카데미)", other: "기타", unknown: "모름" },
   },
   en: {
+    introTitle: "Prepare for transfer to a Korean university with UNIGATE",
+    introDescription: "Prepare your Korean language and major studies with the goal of transferring to a Korean university. If you are interested in transferring, sign up to receive information and guidance.",
     button: "Get Transfer Information", title: "Plan your transfer to a Korean university",
     description: "Sign up and we will email you a PDF guide to university transfer in a few weeks.",
     email: "Email", emailPlaceholder: "Enter your email address", age: "Age", agePlaceholder: "For example: 20",
@@ -37,6 +41,8 @@ export const surveyTranslations = {
     choices: { high_school_graduate: "High school graduate", universitas: "Universitas", institut: "Institut", sekolah_tinggi: "Sekolah Tinggi", politeknik: "Politeknik", akademi: "Akademi", akademi_komunitas: "Akademi Komunitas", other: "Other", unknown: "Not sure" },
   },
   id: {
+    introTitle: "Persiapkan transfer ke universitas di Korea bersama UNIGATE",
+    introDescription: "Persiapkan kemampuan bahasa Korea dan pembelajaran bidang studi Anda untuk melanjutkan kuliah melalui jalur transfer ke universitas di Korea. Jika Anda tertarik, daftar untuk menerima informasi dan panduan transfer.",
     button: "Dapatkan Informasi Transfer", title: "Rencanakan transfer ke universitas di Korea",
     description: "Daftar sekarang. Panduan transfer universitas dalam format PDF akan dikirim ke email Anda dalam beberapa minggu.",
     email: "Email", emailPlaceholder: "Masukkan alamat email Anda", age: "Usia", agePlaceholder: "Contoh: 20",

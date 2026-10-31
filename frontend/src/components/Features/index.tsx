@@ -4,7 +4,6 @@ import SectionTitle from "../Common/SectionTitle";
 import SingleFeature from "./SingleFeature";
 import { useTranslation } from "@/lib/i18n/LanguageContext";
 import { ScrollReveal } from "@/hooks/useInView";
-import TransferRequest from "@/components/TransferRequest";
 
 const Features = () => {
   const t = useTranslation();
@@ -36,7 +35,6 @@ const Features = () => {
           </div>
         </div>
 
-        <TransferRequest />
         <div className="mt-16 h-px w-full bg-black/10" />
       </div>
     </section>
