@@ -2,7 +2,7 @@
 
 - Frontend: Next.js App Router, React, TypeScript, and Tailwind CSS v4; static export to `frontend/out/`. Supports Indonesian (default), Korean, and English.
 - Tooling: Node.js 24, npm, TypeScript, and Oxlint. Keep `frontend/package-lock.json` tracked and use `npm ci`.
-- Backend: Python 3.13, Django 5.2, and SQLite at `backend/data/db.sqlite3`. Use `backend/.venv/` and pinned requirements files.
+- Backend: Python 3.13, Django 5.2, and PostgreSQL 16 (local Docker container `unigate-test-db`). Use `backend/.venv/` and pinned requirements files.
 - Deployment: Separate Docker images for frontend (Nginx) and backend (Gunicorn).
 
 ## Project Structure
@@ -19,8 +19,7 @@ unigate-main/
     |-- config/     # Django settings and routes
     |-- surveys/    # Survey model, API, and export command
     |-- migration/  # App migrations
-    |-- deploy/     # Container startup and database preparation
-    `-- data/       # SQLite database
+    `-- deploy/     # Container startup and database preparation
 ```
 
 ## Working Guidelines

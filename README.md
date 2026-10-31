@@ -1,7 +1,7 @@
 # Unigate
 
 대학 편입·한국어 교육 서비스입니다. Next.js + TypeScript + Tailwind CSS 홈페이지가 구현되어 있으며 한국어·영어·인도네시아어를 지원합니다.
-백엔드는 Python 3.13 + Django 5.2 + SQLite 최소 구성입니다. 관리자·인증·세션·콘텐츠 타입 앱은 제외되어 있으며, 편입학 정보 신청 모달과 기존 SQLite 설문 응답 테이블을 연결하는 API가 있습니다.
+백엔드는 Python 3.13 + Django 5.2 + PostgreSQL 구성입니다. Django 관리자·인증·세션·콘텐츠 타입 앱을 포함하며, 편입학 정보 신청 모달과 PostgreSQL 설문 응답 테이블을 연결하는 API가 있습니다.
 
 ## 프로젝트 구조
 
@@ -14,13 +14,12 @@ unigate-main/
 │  ├─ nginx.conf      # 정적 파일 서버 설정
 │  ├─ package.json
 │  └─ package-lock.json
-├─ backend/           # Django + SQLite
+├─ backend/           # Django + PostgreSQL
 │  ├─ config/         # 설정, URL, WSGI/ASGI 진입점
 │  ├─ surveys/        # 설문 모델·API 및 테스트
 │  ├─ migration/      # 앱별 마이그레이션 (surveys/ 등)
-│  ├─ data/           # 로컬 SQLite DB (Git 제외), .gitkeep
 │  ├─ manage.py
-│  ├─ export-surveys.cmd # Windows 설문 CSV 내보내기 실행 파일
+│  ├─ export-surveys     # Linux 설문 CSV 내보내기 실행 파일
 │  ├─ .env.example    # 환경별 예시 파일 안내
 │  ├─ .env.development.example # 개발 환경 설정 예시
 │  ├─ .env.production.example  # 운영 환경 설정 예시
@@ -80,7 +79,15 @@ React·CSS 파일을 수정하고 저장하면 화면에 반영됩니다. 서버
 
 ## 백엔드 개발 실행
 
-Python 3.13을 사용합니다. 별도 DB 서버나 SQLite 설치는 필요 없습니다.
+Python 3.13과 PostgreSQL 16을 사용합니다. 로컬 DB는 Docker 컨테이너 `unigate-test-db`이며, 데이터는 `unigate-test-db-pg16` 볼륨에 저장합니다.
+
+```powershell
+docker start unigate-test-db
+```
+
+로컬 연결은 `127.0.0.1:5433`, DB 이름은 `unigate_test`, 사용자는 `unigate`입니다.
+`backend/.env.development`에 `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`를 설정합니다.
+기존 컨테이너와 볼륨을 재사용하며 재생성하거나 초기화하지 않습니다. 비밀번호는 Git에 저장하지 않습니다.
 프로젝트 루트에서 최초 한 번 실행합니다.
 
 ```powershell
@@ -112,7 +119,7 @@ python --version
 파일이 없어도 프로세스 환경 변수만으로 실행할 수 있지만 비밀 키가 없거나, 운영 호스트가 비어 있거나 `*`를 포함하면 실행을 거부합니다.
 일반 `.env` 및 `.example` 파일은 자동으로 읽지 않으며, 다른 환경 파일로 대체하지 않습니다.
 UTF-8(BOM 포함 가능)을 사용하며 `${...}` 변수 보간은 하지 않습니다. 특수문자가 있는 값은 작은따옴표로 감쌀 수 있습니다.
-파일을 수정한 뒤 서버를 재시작하세요. 두 환경의 SQLite 경로는 모두 `backend/data/db.sqlite3`로 유지됩니다.
+파일을 수정한 뒤 서버를 재시작하세요. 개발·운영 DB 연결은 각 환경의 `DB_*` 값으로 분리합니다. 필수 접속값이 없으면 시작을 거부합니다.
 
 다음은 파일 설정을 완료한 뒤 `backend/`에서 실행하는 PowerShell 명령입니다.
 
@@ -134,48 +141,24 @@ set "DJANGO_ENV=development"
 운영 서비스에는 `DJANGO_ENV=production`을 설정합니다. 이 값은 운영 서버 자체를 구성하지는 않습니다.
 
 `manage.py migrate`는 설문 응답 테이블 `survey_responses`와 마이그레이션 이력을 준비합니다.
-반복 실행해도 이미 적용된 마이그레이션을 다시 적용하지 않습니다. 사용자·권한·세션·관리자 로그 테이블은 생성하지 않습니다.
+반복 실행해도 이미 적용된 마이그레이션을 다시 적용하지 않습니다. Django 기본 사용자·권한·세션·관리자 로그 테이블도 생성하며 기존 신청 데이터는 유지합니다.
 
 마이그레이션은 `backend/migration/<앱 이름>/`에 보관합니다. 현재 설정은 `MIGRATION_MODULES = {"surveys": "migration.surveys"}`입니다.
 모델 변경 후 `manage.py makemigrations surveys`로 파일을 생성하고, `manage.py migrate`로 적용합니다.
 검증은 `manage.py check`, `manage.py makemigrations --check --dry-run`, `manage.py test surveys config.test_settings`로 실행합니다.
 환경 파일 로딩 테스트만 실행하려면 `.venv\Scripts\python.exe -m unittest config.test_settings`를 사용합니다. 실제 환경 파일 대신 테스트용 값을 사용합니다.
-테스트는 별도 테스트 DB를 사용하며 실제 설문 DB에 테스트 응답을 저장하지 않습니다.
+테스트는 Django가 생성·삭제하는 `test_<DB_NAME>` PostgreSQL DB를 사용하며 실제 설문 DB에 테스트 응답을 저장하지 않습니다. 테스트 계정에는 CREATEDB 권한이 필요합니다. 운영 환경 설정으로 테스트하지 마세요.
 
-### SQLite SQL 셸
-
-이 로컬 환경에는 SQLite 3.54.1 CLI를 `backend/.venv/Scripts/sqlite3.exe`에 설치했습니다.
-[SQLite 공식 Windows x64 도구](https://www.sqlite.org/download.html)의 SHA3-256 체크섬을 검증한 배포본입니다.
-실행 파일은 Git에서 제외됩니다. 다른 PC나 가상환경을 재생성한 경우 공식 도구에서 `sqlite3.exe`를 다시 설치해야 합니다.
-Python의 SQLite 모듈과 별도 도구이며 `pip install -r requirements.txt`로 설치되지 않습니다.
-
-환경 파일 설정을 마친 뒤 `backend/`에서 CMD로 실행합니다.
-
-```cmd
-.venv\Scripts\activate.bat
-sqlite3 --version
-python manage.py dbshell
-```
-
-조회만 할 때는 `python manage.py dbshell -- -readonly`로 접속할 수 있습니다.
-가상환경 활성화가 `Scripts`를 PATH에 추가하므로 시스템 PATH 수정은 필요 없습니다.
-PowerShell에서 가상환경을 활성화하지 않고 사용할 때는 현재 세션에서 다음처럼 실행합니다.
+### PostgreSQL SQL 셸
 
 ```powershell
-$env:PATH = "$(Resolve-Path .venv/Scripts);$env:PATH"
-.\.venv\Scripts\python.exe manage.py dbshell -- -readonly
+docker exec -it unigate-test-db psql -U unigate -d unigate_test
 ```
 
-접속 후 다음 명령으로 목록과 구조를 확인합니다. `.quit`로 종료합니다.
-
-```sql
-.tables
-.schema survey_responses
-SELECT COUNT(*) FROM survey_responses;
-.quit
-```
-
-`dbshell`은 Django 설정의 `backend/data/db.sqlite3`에 연결하며 마이그레이션을 자동 적용하지 않습니다.
+`\dt`로 테이블 목록, `\d survey_responses`로 구조를 확인하고 `\q`로 종료합니다.
+로컬 `manage.py dbshell`을 사용하려면 별도로 PostgreSQL 클라이언트 `psql`을 PATH에 설치해야 합니다.
+로컬 DB에는 신청 테이블, 마이그레이션 이력, 인증·관리자·세션·콘텐츠 타입 테이블을 생성합니다.
+신청 테이블이 없으면 기존 `surveys` 마이그레이션으로 생성하며, 기존 테이블에 무조건 `--fake`를 적용하지 않습니다.
 
 ### 설문 응답 모델
 
@@ -198,13 +181,43 @@ SELECT COUNT(*) FROM survey_responses;
 DB 제약조건은 나이 범위, 허용된 학력·대학 유형, 공백만 있는 이메일·희망 대학을 검사합니다.
 이메일 형식 검증은 모델 계층에서 수행합니다. 커리큘럼 아래 편입학 정보 신청 모달이 설문 API를 통해 이 테이블에 저장합니다.
 
-개발 서버 주소는 `http://127.0.0.1:8000/`입니다. 루트와 `/admin/`은 404이며, 신청 API는 `/api/` 아래에 있습니다.
+개발 서버 주소는 `http://127.0.0.1:8000/`입니다. 루트는 404이며, 관리자 화면은 `/admin/`, 신청 API는 `/api/` 아래에 있습니다.
 `Ctrl+C`로 서버를 종료합니다. 다음 실행부터는 환경 변수를 설정하고 `runserver`만 실행하면 됩니다.
 
 `python-dotenv`로 선택한 환경 파일을 읽으며, `backend/.env.example`은 분리된 예시 파일을 안내하는 용도입니다.
 `DJANGO_ENV=production`은 디버그를 끄며, 비밀 키와 명시적인 허용 호스트 설정이 필요합니다.
 운영 Docker·Gunicorn 및 마이그레이션 전 백업은 아래 배포 절을 참고하세요. 공개 HTTPS는 플랫폼에서 설정하며 `runserver`는 개발용입니다.
-배포 시 `backend/data/`를 영구 저장소에 연결하고 SQLite 백업·복구 방법을 마련해야 합니다.
+배포 시 별도 PostgreSQL 서비스에 연결하고 DB 백업·복구 방법을 마련해야 합니다.
+
+## Django 관리자
+
+로컬 `http://127.0.0.1:8000/admin/` 또는 운영 백엔드 도메인의 `/admin/`에서 로그인합니다. 프론트 도메인이 아닙니다.
+최초 관리자 계정은 `backend/`에서 대화형으로 생성하세요. 사용자명·비밀번호를 코드나 환경 예시에 넣지 않습니다.
+
+```powershell
+.\.venv\Scripts\python.exe manage.py createsuperuser
+```
+
+운영에서는 백엔드 컨테이너 터미널의 `/app/backend`에서 `python manage.py createsuperuser`를 실행합니다.
+계정은 환경별 DB에 저장되므로 로컬 계정이 운영으로 복사되지 않습니다.
+일반 직원은 활성 상태와 Staff 권한, 해당 모델의 조회·추가·수정·삭제 권한이 필요합니다.
+
+신청 목록에서 이메일·희망 대학으로 검색하고 학력·신청일로 필터링할 수 있습니다. ID와 신청 시각은 읽기 전용이며, 수정·삭제는 권한 확인 후 처리하고 관리자 작업 이력을 남깁니다.
+기존 신청 데이터는 마이그레이션으로 수정·삭제하지 않습니다. 관리 화면에서 직접 삭제하면 실제 응답이 삭제됩니다.
+운영 로그인에는 HTTPS 및 신뢰 프록시 설정이 필요합니다. CSRF 보호와 보안 세션 쿠키를 유지합니다.
+
+추가 기본 테이블:
+
+| 테이블 | 용도 |
+|---|---|
+| `django_content_type` | 모델 정보 |
+| `auth_permission` | 모델별 권한 |
+| `auth_group`, `auth_group_permissions` | 그룹 및 그룹 권한 |
+| `auth_user`, `auth_user_groups`, `auth_user_user_permissions` | 사용자 및 소속·권한 연결 |
+| `django_session` | 로그인 세션 |
+| `django_admin_log` | 관리자 작업 이력 |
+
+관리자 테스트는 별도 테스트 DB의 합성 계정·신청 데이터만 사용합니다. 기존 전체 백엔드 테스트 명령에 포함됩니다.
 
 ## 프론트엔드 Docker 실행
 
@@ -229,7 +242,7 @@ Docker는 `.env` 파일을 복사하지 않으므로 반드시 `--build-arg`를 
 
 - `frontend/package-lock.json`은 커밋하고 `npm ci`로 의존성을 설치합니다.
 - 의존성·빌드 결과·실제 `.env*` 파일은 커밋하지 않습니다. 환경 설정을 공유할 때는 비밀 값 없는 `.example` 파일을 사용합니다.
-- 가상환경·SQLite DB와 부속 파일은 Git에서 제외합니다. `backend/media/`, `backend/staticfiles/` 제외 규칙은 향후 작업용이며 해당 기능은 아직 없습니다.
+- 가상환경과 실제 환경 파일은 Git에서 제외합니다. 관리자 정적 파일 수집 결과인 `backend/staticfiles/`도 제외합니다. `backend/media/`는 향후 업로드용 제외 규칙입니다.
 - 백엔드 구현이나 폴더 구조가 변경되면 `AGENTS.md`와 이 문서도 함께 갱신합니다.
 
 ## 홈페이지 이식 정보
@@ -279,23 +292,31 @@ HTTP 개발 환경에서는 localhost와 127.0.0.1을 섞지 말고 두 서비�
 
 ## 설문 응답 CSV 내보내기
 
-`backend/` 폴더에서 PowerShell 또는 CMD로 실행합니다. 프로젝트 루트에서는 먼저 `cd backend`를 실행하세요. 백엔드 가상환경과 환경 설정은 필요하지만, Django·프론트엔드 서버를 켜거나 SQLite CLI를 설치할 필요는 없습니다.
+Linux 또는 Docker 컨테이너에서 실행합니다. Django·프론트엔드 서버를 켤 필요는 없지만 PostgreSQL은 실행 중이어야 합니다.
+Docker 이미지에는 실행 권한이 포함됩니다. Linux에 소스를 직접 내려받았다면 최초 한 번 `chmod +x backend/export-surveys`를 실행하세요.
 
-```powershell
-# exports/에 한국 날짜·시간이 포함된 파일 생성
-.\export-surveys.cmd
+```sh
+# backend/ 폴더에서 기본 경로로 내보내기
+./export-surveys
 
-# 저장 경로 지정 (공백이 있으면 따옴표 사용)
-.\export-surveys.cmd --output "C:\Users\khyun\Downloads\survey_responses.csv"
+# Docker 컨테이너에서는 어느 폴더에서든 실행 가능
+/app/backend/export-surveys --output "/tmp/survey responses.csv"
 
 # 기존 CSV 교체를 명시적으로 허용
-.\export-surveys.cmd --output "C:\Users\khyun\Downloads\survey_responses.csv" --overwrite
+/app/backend/export-surveys --output "/tmp/survey responses.csv" --overwrite
 
 # 옵션 안내
-.\export-surveys.cmd --help
+/app/backend/export-surveys --help
 ```
 
-프로젝트 루트에서 바로 실행하려면 `.\backend\export-surveys.cmd`를 사용합니다. 실행 파일은 자신의 위치를 기준으로 가상환경과 `manage.py`를 찾으므로 다른 폴더에서도 절대 경로로 실행할 수 있습니다.
+실행 파일은 자신의 위치를 기준으로 `manage.py`를 찾습니다. `backend/.venv/bin/python`이 있으면 사용하고, 없으면 PATH의 `python3`를 사용합니다. Docker에는 필요한 Python과 패키지가 설치되어 있습니다. 실행한 폴더는 바꾸지 않습니다.
+Windows 로컬에서는 `backend/`에서 다음 명령을 사용합니다.
+
+```powershell
+.\.venv\Scripts\python.exe manage.py export_surveys
+```
+
+Docker의 기본 출력 경로는 `/app/exports/`입니다. 파일은 컨테이너 안에 생성되므로 필요한 파일을 컨테이너 교체 전에 외부로 복사하세요. PC로 자동 다운로드되지는 않습니다.
 
 기본 경로는 항상 프로젝트 루트의 `exports/survey_responses_날짜_시간.csv`입니다. `--output`의 상대 경로는 명령을 실행한 현재 폴더 기준이며, 없는 상위 폴더는 생성합니다. 출력 파일 확장자는 `.csv`여야 합니다. 같은 파일이 있으면 기본적으로 중단하며, `--overwrite`를 지정한 경우에도 내보내기가 끝난 뒤에만 기존 파일을 교체합니다. 성공 시 파일 경로와 건수만 출력하고, 실패 시 0이 아닌 종료 코드를 반환합니다.
 
@@ -305,7 +326,7 @@ CSV는 Excel에서 한글을 읽을 수 있도록 **UTF-8 BOM**으로 저장합�
 
 `DJANGO_ENV`와 환경 파일 선택 규칙은 서버 실행 때와 같습니다. 새 테이블·API·워커나 추가 라이브러리는 사용하지 않습니다. 내부 명령은 `backend/`에서 `.venv\Scripts\python.exe manage.py export_surveys`로 직접 실행할 수도 있습니다.
 
-내보내기 테스트는 `backend/`에서 실행합니다.
+내보내기 테스트는 `backend/`에서 실행합니다. Linux 실행 파일 테스트는 Linux 컨테이너에서 `python manage.py test surveys.test_export`로 실행합니다. Windows에서는 해당 실행 파일 테스트만 건너뜁니다.
 
 ```powershell
 .\.venv\Scripts\python.exe manage.py test surveys.test_export
@@ -320,7 +341,7 @@ CSV는 Excel에서 한글을 읽을 수 있도록 **UTF-8 BOM**으로 저장합�
 
 ```text
 브라우저 → 프론트 공개 도메인 → Nginx :8080 (정적 파일)
-브라우저 → 백엔드 공개 도메인 → Gunicorn :8000 → 영구 디스크 SQLite
+브라우저 → 백엔드 공개 도메인 → Gunicorn :8000 → PostgreSQL 서비스
 ```
 
 프론트 Nginx는 API 요청을 전달하지 않습니다. 브라우저가 빌드 시 지정한 백엔드 URL을 직접 호출하며, 백엔드는 허용된 프론트 origin에 CORS 응답을 제공합니다. CSRF 보호는 유지합니다.
@@ -334,12 +355,11 @@ CSV는 Excel에서 한글을 읽을 수 있도록 **UTF-8 BOM**으로 저장합�
 | 서비스 포트 | 8000, 백엔드 전용 공개 HTTPS ingress로 연결 |
 | 공개 접근 | 브라우저가 접근 가능한 별도 HTTPS 도메인 |
 | UID / GID | 1000 / 1000 |
-| 영구 디스크 마운트 | `/app/backend/data` |
 | 레플리카 / 배포 방식 | 1 / Recreate |
 | Health Check | `/api/health/` |
 | 시작 명령 | 이미지 기본값 사용 |
 
-Cloudtype 계정에서 Dockerfile 서비스의 지정 경로 마운트, 재배포 후 동일 디스크 유지, SQLite 파일 잠금 지원을 확인해야 합니다. 현재 계정에서의 지원 여부와 실제 배포는 아직 확인하지 않았습니다. 연결된 디렉터리에 UID/GID 1000의 읽기·쓰기 권한이 필요합니다. 전체 `/app` 대신 정확히 `/app/backend/data`에 연결하세요. 마운트 검사는 임시 저장소와 영구 저장소를 구별하지 못하므로 Cloudtype 설정에서도 영구성을 확인해야 합니다.
+먼저 같은 프로젝트·배포환경에 PostgreSQL 서비스를 생성합니다. DB 서비스의 연결 정보에서 내부 호스트와 포트를 확인하고 백엔드 환경 변수에 등록합니다. 백엔드 컨테이너에는 데이터 디스크를 연결하지 않습니다. DB 서비스의 볼륨을 유지하고 서비스를 삭제하지 마세요.
 
 | 백엔드 환경 변수 | 값 |
 |---|---|
@@ -353,7 +373,21 @@ Cloudtype 계정에서 Dockerfile 서비스의 지정 경로 마운트, 재배�
 
 이미지에는 dotenv 파일을 포함하지 않고 프로세스 환경 변수를 사용합니다. 백엔드 공개 도메인은 플랫폼 HTTPS ingress로 연결하세요. 전달 헤더를 신뢰할 때는 ingress를 우회한 프로세스 직접 접근을 차단하세요. 플랫폼 상태 검사 Host가 허용 목록에 없다면 400을 반환하므로 정확한 호스트를 확인해 추가합니다. `/api/health/`는 HTTP 리다이렉트 예외입니다.
 
-백엔드 시작은 `backend/deploy/start.sh` → `prepare_database.py` → Gunicorn 순서입니다. 저장소·쓰기 권한을 확인하고, 미적용 마이그레이션이 있을 때 기존 DB를 `data/backups/`에 백업한 다음 적용합니다. 실패하면 서버를 시작하지 않습니다. Recreate와 레플리카 1을 유지해 이전 서버의 쓰기와 마이그레이션이 겹치지 않게 하세요. 코드 롤백은 DB 롤백이 아니며 파괴적인 스키마 변경은 사전 검토해야 합니다.
+추가 PostgreSQL 환경 변수:
+
+| 변수 | 값 |
+|---|---|
+| `DB_NAME` | 생성한 DB 이름 |
+| `DB_USER` | DB 사용자 |
+| `DB_PASSWORD` | 런타임 시크릿으로 등록한 비밀번호 |
+| `DB_HOST` | PostgreSQL 내부 호스트 |
+| `DB_PORT` | PostgreSQL 연결 포트 (보통 5432) |
+| `DB_SSLMODE` | 서버의 TLS 정책에 맞게 설정; 기본 `prefer`, TLS 필수 연결은 `require` |
+
+백엔드는 `deploy/start.sh`에서 `python manage.py migrate --noinput` → `python manage.py collectstatic --noinput` → Gunicorn 순서로 시작합니다. 관리자 CSS·JS는 WhiteNoise가 같은 백엔드 도메인의 `/static/`에서 제공합니다.
+마이그레이션이나 정적 파일 수집에 실패하면 서버를 시작하지 않습니다. `exec`로 Gunicorn을 실행하여 컨테이너 종료 신호를 직접 전달합니다.
+기존 인증·관리자·세션 테이블을 삭제하거나 초기화하지 않습니다. 레플리카 1과 Recreate를 유지합니다.
+마이그레이션 전 DB 백업은 운영자가 별도로 수행해야 합니다. 자동 파일 백업은 없습니다.
 
 ### 프론트 서비스 설정
 
@@ -369,21 +403,17 @@ Dockerfile path는 `Dockerfile`, Dockerfile text는 빈칸으로 둡니다. Star
 
 브라우저에서 접근 가능한 백엔드 공개 HTTPS 주소를 빌드 인자로 전달하세요. 런타임 환경변수만 등록하면 정적 파일에 반영되지 않습니다.
 플랫폼에서 Docker 빌드 인자를 전달하는 방법을 확인하거나, 해당 인자로 미리 빌드한 이미지를 배포하세요.
-두 서비스 모두 HTTPS 및 HTTP→HTTPS 전환을 설정합니다. 프론트에는 Django 비밀 키나 SQLite 디스크를 연결하지 않습니다.
+두 서비스 모두 HTTPS 및 HTTP→HTTPS 전환을 설정합니다. 프론트에는 Django 비밀 키나 DB 접속 정보를 연결하지 않습니다.
 백엔드 상태는 백엔드 도메인의 `/api/health/`에서 확인합니다.
 
-프론트 재배포는 백엔드 시작·마이그레이션·DB에 영향을 주지 않습니다. 백엔드를 재배포할 때 기존 영구 디스크를 재사용하며 개발 DB를 업로드하거나 운영 디스크를 초기화하지 않습니다.
+프론트 재배포는 백엔드 마이그레이션·DB에 영향을 주지 않습니다. 백엔드 재배포에도 동일한 PostgreSQL 서비스와 DB를 사용합니다.
 
 ### 백업과 복구
 
-`data/backups/`는 같은 디스크이므로 서버/디스크 장애 대비 백업이 아닙니다. 마이그레이션이 없는 재배포에는 새 백업이 생기지 않습니다. 정기 백업과 외부 저장소 복사는 별도로 운영해야 하며 자동 스케줄러는 포함하지 않았습니다. 컨테이너 터미널에서 수동 백업하려면:
-
-```sh
-cd /app/backend
-python -c "import sqlite3,datetime,pathlib; p=pathlib.Path('data/backups'); p.mkdir(exist_ok=True); target=p/('manual-'+datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')+'.sqlite3'); src=sqlite3.connect('file:data/db.sqlite3?mode=ro',uri=True); dst=sqlite3.connect(target); src.backup(dst); dst.close(); src.close(); print(target)"
-```
-
-완성된 백업을 접근이 제한된 외부 저장소로 복사하고 보존 기간을 관리하세요. 응답 개인정보가 포함되므로 공개 링크나 Git에 올리지 않습니다. 복구는 서비스를 완전히 중지하고 현재 DB도 보존한 다음, 검증한 백업으로 복원하고 그 DB와 호환되는 코드로 실행합니다. 활성 연결이 없는 상태에서 SQLite journal/WAL 부속 파일 처리까지 확인해야 합니다. Cloudtype 코드 롤백은 DB를 자동 복원하지 않습니다. 운영 데이터를 개발 PC의 DB로 덮어쓰지 마세요.
+PostgreSQL의 `pg_dump -Fc`로 백업하고 `pg_restore`로 복원합니다. 연결 정보는 환경 변수 또는 접근 제한된 암호 파일로 전달하고 비밀번호를 명령줄·로그에 출력하지 않습니다.
+완성된 백업은 접근이 제한된 외부 저장소에 복사하고 보존 기간을 관리하세요. 개인정보가 포함되므로 Git이나 공개 링크에 올리지 않습니다.
+복원은 먼저 별도 빈 DB에서 검증합니다. 운영 복구 시 쓰기를 중단하고 현재 DB도 백업한 후 검증한 DB로 전환합니다.
+Cloudtype 코드 롤백은 DB를 자동 복원하지 않습니다. 기존 DB를 지우거나 덮어쓰는 복원은 별도 승인이 필요합니다.
 
 ### 로컬 배포 검증
 
@@ -394,6 +424,6 @@ docker build -t unigate-backend-test backend
 docker build --build-arg NEXT_PUBLIC_BACKEND_URL=https://api.example.com -t unigate-frontend-test frontend
 ```
 
-이미지 빌드 후 별도 테스트 네트워크·볼륨에서 두 서비스를 실행해 홈페이지, CSRF 제출, 각각의 재배포 후 연결과 데이터 보존을 확인하세요. 실제 로컬/운영 DB는 테스트에 사용하지 않습니다.
+이미지 빌드 후 별도 PostgreSQL 테스트 DB에 연결하여 두 서비스를 실행해 홈페이지, CSRF 제출, 각각의 재배포 후 연결과 데이터 보존을 확인하세요. 실제 로컬/운영 DB는 테스트에 사용하지 않습니다.
 
 실제 Cloudtype에서도 별도 검증 환경에서 저장→재배포→동일 응답 확인을 완료한 뒤 운영하세요. 외부 백업·보존 기간·복원 훈련은 별도로 운영해야 합니다. HSTS는 전체 공개 도메인의 HTTPS를 확인한 후 플랫폼 또는 프론트 Nginx에서 적용할 정책을 결정하세요. 현재 Django `check --deploy`에서는 HSTS 미설정 경고가 남습니다.
