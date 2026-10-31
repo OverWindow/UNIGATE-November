@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
-from django.db import DatabaseError, connection
+from django.db import DatabaseError
 from django.utils import timezone
 
 from surveys.models import SurveyResponse
@@ -47,10 +47,6 @@ class Command(BaseCommand):
                 raise CommandError("Output already exists. Choose another path or pass --overwrite.")
             if output.is_dir():
                 raise CommandError("Output must be a CSV file, not a directory.")
-            if connection.vendor == "sqlite" and not connection.is_in_memory_db():
-                if not Path(connection.settings_dict["NAME"]).is_file():
-                    raise CommandError("SQLite database does not exist. Prepare the database before exporting.")
-
             output.parent.mkdir(parents=True, exist_ok=True)
             count = 0
             with tempfile.NamedTemporaryFile(

@@ -23,7 +23,9 @@ class EnvironmentSettingsTests(unittest.TestCase):
             selected.append(path.name)
             return load_dotenv(stream=io.StringIO(files.get(path.name, "")), **kwargs)
 
-        with patch.dict(os.environ, environment or {}, clear=True):
+        defaults = {"DB_NAME": "synthetic", "DB_USER": "test", "DB_PASSWORD": "test",
+                    "DB_HOST": "127.0.0.1", "DB_PORT": "5433"}
+        with patch.dict(os.environ, defaults | (environment or {}), clear=True):
             with patch("dotenv.load_dotenv", side_effect=load_file):
                 settings = runpy.run_path(str(BASE_DIR / "config" / "settings.py"))
         return settings, selected
@@ -37,7 +39,7 @@ class EnvironmentSettingsTests(unittest.TestCase):
         self.assertEqual(settings["SECRET_KEY"], "test-${LITERAL}-#value")
         self.assertEqual(settings["DJANGO_ENV"], "development")
         self.assertTrue(settings["DEBUG"])
-        self.assertEqual(settings["DATABASES"]["default"]["NAME"], BASE_DIR / "data/db.sqlite3")
+        self.assertEqual(settings["DATABASES"]["default"]["NAME"], "synthetic")
 
     def test_production_file_and_hosts(self):
         settings, selected = self.read_settings({"DJANGO_ENV": "production"}, {
@@ -46,7 +48,7 @@ class EnvironmentSettingsTests(unittest.TestCase):
         self.assertEqual(selected, [".env.production"])
         self.assertFalse(settings["DEBUG"])
         self.assertEqual(settings["ALLOWED_HOSTS"], ["example.com", "www.example.com"])
-        self.assertEqual(settings["DATABASES"]["default"]["NAME"], BASE_DIR / "data/db.sqlite3")
+        self.assertEqual(settings["DATABASES"]["default"]["NAME"], "synthetic")
 
     def test_process_values_override_file(self):
         settings, _ = self.read_settings({
@@ -89,3 +91,16 @@ class EnvironmentSettingsTests(unittest.TestCase):
         self.assertEqual(settings["CSRF_COOKIE_SAMESITE"], "None")
         self.assertTrue(settings["SECURE_SSL_REDIRECT"])
         self.assertEqual(settings["SECURE_SSL_HOST"], "example.com")
+
+    def test_postgresql_connection_values(self):
+        settings, _ = self.read_settings({"DJANGO_SECRET_KEY": "test", "DB_NAME": "explicit",
+                                          "DB_SSLMODE": "require"})
+        database = settings["DATABASES"]["default"]
+        self.assertEqual(database["ENGINE"], "django.db.backends.postgresql")
+        self.assertEqual(database["NAME"], "explicit")
+        self.assertEqual(database["OPTIONS"]["sslmode"], "require")
+
+    def test_missing_connection_values_fail(self):
+        for variable in ("DB_NAME", "DB_USER", "DB_PASSWORD", "DB_HOST", "DB_PORT"):
+            with self.subTest(variable=variable), self.assertRaises(ImproperlyConfigured):
+                self.read_settings({"DJANGO_SECRET_KEY": "test", variable: ""})

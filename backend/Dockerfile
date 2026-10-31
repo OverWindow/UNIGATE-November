@@ -5,7 +5,7 @@ WORKDIR /app/backend
 COPY requirements*.txt ./
 RUN pip install --no-cache-dir -r requirements-production.txt
 COPY . ./
-RUN mkdir -p /app/backend/data && chown -R unigate:unigate /app
+RUN chmod 755 /app/backend/export-surveys && chown -R unigate:unigate /app
 USER unigate
 EXPOSE 8000
 ENTRYPOINT ["sh", "/app/backend/deploy/start.sh"]

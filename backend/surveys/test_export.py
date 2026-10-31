@@ -13,8 +13,8 @@ from unittest.mock import patch
 from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.db import DatabaseError
-from django.test import TestCase, SimpleTestCase, override_settings
+from django.db import DatabaseError, connection
+from django.test import TestCase, TransactionTestCase, override_settings
 
 from .models import SurveyResponse
 
@@ -133,19 +133,8 @@ class ExportSurveysTests(ExportFilesMixin, TestCase):
 
     def test_rejects_non_csv_path(self):
         with self.assertRaisesMessage(CommandError, ".csv extension"):
-            call_command("export_surveys", output=str(self.folder / "db.sqlite3"))
-        self.assertFalse((self.folder / "db.sqlite3").exists())
-
-    def test_missing_database_is_not_created(self):
-        missing = self.folder / "missing.sqlite3"
-        from django.db import connection
-        with patch.dict(connection.settings_dict, NAME=str(missing)), patch.object(
-            connection, "is_in_memory_db", return_value=False
-        ):
-            with self.assertRaisesMessage(CommandError, "does not exist"):
-                self.export()
-        self.assertFalse(missing.exists())
-        self.assertFalse(self.output.exists())
+            call_command("export_surveys", output=str(self.folder / "invalid.txt"))
+        self.assertFalse((self.folder / "invalid.txt").exists())
 
     def test_export_spans_multiple_chunks(self):
         SurveyResponse.objects.bulk_create([
@@ -159,42 +148,30 @@ class ExportSurveysTests(ExportFilesMixin, TestCase):
         self.assertEqual(ids, sorted(set(ids)))
 
 
-@skipUnless(os.name == "nt", "Windows command launcher")
-class ExportLauncherTests(ExportFilesMixin, SimpleTestCase):
+@skipUnless(os.name == "posix", "Linux executable launcher")
+class ExportLauncherTests(ExportFilesMixin, TransactionTestCase):
     def test_launcher_from_another_directory_and_exit_codes(self):
         project = Path(settings.BASE_DIR).parent
         # A minimal independent settings module keeps subprocesses away from the real database and secrets.
         module = self.folder / "export_cli_settings.py"
         module.write_text(
+            "import json, os\n"
             "SECRET_KEY = 'synthetic-export-test'\n"
             "INSTALLED_APPS = ['surveys']\n"
-            "MIGRATION_MODULES = {'surveys': 'migration.surveys'}\n"
             "USE_TZ = True\nDEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'\n"
             f"from pathlib import Path\nBASE_DIR = Path({str(self.folder / 'backend')!r})\n"
-            f"DATABASES = {{'default': {{'ENGINE': 'django.db.backends.sqlite3', 'NAME': {str(self.folder / 'test.sqlite3')!r}}}}}\n",
+            "DATABASES = {'default': json.loads(os.environ['EXPORT_TEST_DATABASE'])}\n",
             encoding="utf-8",
         )
         environment = os.environ.copy()
-        environment.update(DJANGO_SETTINGS_MODULE="export_cli_settings", PYTHONPATH=str(self.folder), PYTHONIOENCODING="utf-8")
-        migrated = subprocess.run(
-            [str(Path(settings.BASE_DIR) / ".venv/Scripts/python.exe"),
-             str(Path(settings.BASE_DIR) / "manage.py"), "migrate", "--noinput"],
-            env=environment, capture_output=True, timeout=30,
-        )
-        self.assertEqual(migrated.returncode, 0, migrated.stderr.decode("utf-8", errors="replace"))
-        fixture = self.folder / "synthetic.json"
-        fixture.write_text(json.dumps([{
-            "model": "surveys.surveyresponse", "pk": 1,
-            "fields": {"email": "cli-test@example.com", "age": 21, "education_type": "politeknik",
-                       "desired_university": "테스트 대학교", "created_at": "2026-10-30T18:00:00Z"},
-        }], ensure_ascii=False), encoding="utf-8")
-        loaded = subprocess.run(
-            [str(Path(settings.BASE_DIR) / ".venv/Scripts/python.exe"),
-             str(Path(settings.BASE_DIR) / "manage.py"), "loaddata", str(fixture)],
-            env=environment, capture_output=True, timeout=30,
-        )
-        self.assertEqual(loaded.returncode, 0, loaded.stderr.decode("utf-8", errors="replace"))
-        launcher = Path(settings.BASE_DIR) / "export-surveys.cmd"
+        environment.update(DJANGO_SETTINGS_MODULE="export_cli_settings", PYTHONPATH=str(self.folder),
+                           PYTHONIOENCODING="utf-8",
+                           EXPORT_TEST_DATABASE=json.dumps(connection.settings_dict))
+        # TransactionTestCase makes synthetic rows visible to the child process in the test DB.
+        SurveyResponse.objects.create(pk=1, email="cli-test@example.com", age=21,
+                                      education_type="politeknik", desired_university="테스트 대학교",
+                                      created_at=datetime(2026, 10, 30, 18, tzinfo=dt_timezone.utc))
+        launcher = Path(settings.BASE_DIR) / "export-surveys"
 
         def run(*arguments):
             return subprocess.run([str(launcher), *arguments], cwd=self.folder, env=environment,
