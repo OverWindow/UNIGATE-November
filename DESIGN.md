@@ -107,7 +107,7 @@ The reference follows this order: navigation, hero, four-semester curriculum, te
 
 ## Official Logo Asset
 
-- Local file: [`unigate_frontend/public/brand/unigate-logo.svg`](unigate_frontend/public/brand/unigate-logo.svg).
+- Local file: [`frontend/public/brand/unigate-logo.svg`](frontend/public/brand/unigate-logo.svg).
 - Frontend URL: `/brand/unigate-logo.svg`.
 - Original source: [Unigate logo-2.svg](https://www.unigate.kr/images/logo/logo-2.svg).
 - Downloaded on October 30, 2026 and retained without modification.
