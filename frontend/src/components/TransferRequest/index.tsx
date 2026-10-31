@@ -8,6 +8,7 @@ import { educationTypes, surveyTranslations } from "@/lib/i18n/survey";
 type Field = "email" | "age" | "education_type" | "desired_university";
 type Status = "idle" | "submitting" | "success" | "failure" | "uncertain" | "invalid";
 const fields: Field[] = ["email", "age", "education_type", "desired_university"];
+const backendUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000").replace(/\/$/, "");
 const inputClass = "mt-2 w-full min-w-0 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-base text-black outline-none transition placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/15 aria-invalid:border-red-600";
 
 export default function TransferRequest() {
@@ -74,15 +75,15 @@ export default function TransferRequest() {
     setStatus("submitting");
     let sent = false;
     try {
-      const tokenResponse = await fetch("/api/csrf/", {
-        credentials: "same-origin", cache: "no-store", signal: AbortSignal.timeout(15000),
+      const tokenResponse = await fetch(`${backendUrl}/api/csrf/`, {
+        credentials: "include", cache: "no-store", signal: AbortSignal.timeout(15000),
       });
       if (!tokenResponse.ok) throw new Error("csrf_unavailable");
       const token = await tokenResponse.json();
       if (typeof token.csrfToken !== "string") throw new Error("csrf_unavailable");
       sent = true;
-      const response = await fetch("/api/survey-responses/", {
-        method: "POST", credentials: "same-origin", signal: AbortSignal.timeout(20000),
+      const response = await fetch(`${backendUrl}/api/survey-responses/`, {
+        method: "POST", credentials: "include", signal: AbortSignal.timeout(20000),
         headers: { "Content-Type": "application/json", "X-CSRFToken": token.csrfToken },
         body: JSON.stringify({ email, age: Number(age), education_type: education, desired_university: university || null }),
       });

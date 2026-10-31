@@ -38,6 +38,7 @@ INSTALLED_APPS = ["surveys.apps.SurveysConfig"]
 MIGRATION_MODULES = {"surveys": "migration.surveys"}
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "config.cors.SurveyCorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -71,6 +72,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 if os.environ.get("DJANGO_TRUST_PROXY", "0") == "1":
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 CSRF_COOKIE_SECURE = not DEBUG
+# Cross-site requests require HTTPS and SameSite=None. / 교차 사이트 쿠키는 HTTPS가 필요합니다.
+CSRF_COOKIE_SAMESITE = "Lax" if DEBUG else "None"
 SESSION_COOKIE_SECURE = not DEBUG
 SECURE_SSL_REDIRECT = os.environ.get("DJANGO_SSL_REDIRECT", "0") == "1"
 SECURE_SSL_HOST = os.environ.get("DJANGO_SSL_HOST") or None

@@ -7,16 +7,14 @@ RUN npm ci
 COPY next.config.js postcss.config.js tsconfig.json ./
 COPY public ./public
 COPY src ./src
+ARG NEXT_PUBLIC_BACKEND_URL
+ENV NEXT_PUBLIC_BACKEND_URL=$NEXT_PUBLIC_BACKEND_URL
 RUN npm run build
 
 FROM nginx:stable-alpine AS runtime
 
-ENV BACKEND_ORIGIN=http://host.docker.internal:8000 PUBLIC_SCHEME=http
-COPY nginx.conf /etc/nginx/nginx.conf.template
-COPY scripts/start-nginx.sh /usr/local/bin/start-nginx.sh
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/out /usr/share/nginx/html
 
-# Serve static files without root privileges. / 일반 사용자 권한으로 정적 파일을 제공합니다.
-USER nginx
 EXPOSE 8080
-ENTRYPOINT ["sh", "/usr/local/bin/start-nginx.sh"]
+CMD ["nginx", "-g", "daemon off;"]

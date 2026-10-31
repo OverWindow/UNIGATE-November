@@ -86,5 +86,6 @@ class EnvironmentSettingsTests(unittest.TestCase):
         })
         self.assertEqual(settings["SECURE_PROXY_SSL_HEADER"], ("HTTP_X_FORWARDED_PROTO", "https"))
         self.assertTrue(settings["CSRF_COOKIE_SECURE"])
+        self.assertEqual(settings["CSRF_COOKIE_SAMESITE"], "None")
         self.assertTrue(settings["SECURE_SSL_REDIRECT"])
         self.assertEqual(settings["SECURE_SSL_HOST"], "example.com")

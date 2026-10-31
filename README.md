@@ -21,7 +21,6 @@ unigate-main/
 │  ├─ data/           # 로컬 SQLite DB (Git 제외), .gitkeep
 │  ├─ manage.py
 │  ├─ export-surveys.cmd # Windows 설문 CSV 내보내기 실행 파일
-│  ├─ init_db.py       # 마이그레이션 이력 테이블만 초기화
 │  ├─ .env.example    # 환경별 예시 파일 안내
 │  ├─ .env.development.example # 개발 환경 설정 예시
 │  ├─ .env.production.example  # 운영 환경 설정 예시
@@ -136,7 +135,6 @@ set "DJANGO_ENV=development"
 
 `manage.py migrate`는 설문 응답 테이블 `survey_responses`와 마이그레이션 이력을 준비합니다.
 반복 실행해도 이미 적용된 마이그레이션을 다시 적용하지 않습니다. 사용자·권한·세션·관리자 로그 테이블은 생성하지 않습니다.
-기존 `init_db.py`는 이력 테이블만 준비하는 보조 도구이며, 설문 테이블 생성에는 `migrate`를 사용하세요.
 
 마이그레이션은 `backend/migration/<앱 이름>/`에 보관합니다. 현재 설정은 `MIGRATION_MODULES = {"surveys": "migration.surveys"}`입니다.
 모델 변경 후 `manage.py makemigrations surveys`로 파일을 생성하고, `manage.py migrate`로 적용합니다.
@@ -205,7 +203,7 @@ DB 제약조건은 나이 범위, 허용된 학력·대학 유형, 공백만 있
 
 `python-dotenv`로 선택한 환경 파일을 읽으며, `backend/.env.example`은 분리된 예시 파일을 안내하는 용도입니다.
 `DJANGO_ENV=production`은 디버그를 끄며, 비밀 키와 명시적인 허용 호스트 설정이 필요합니다.
-운영 서버·HTTPS·백업·백엔드 Docker 설정은 아직 포함되지 않았습니다. `runserver`는 개발용입니다.
+운영 Docker·Gunicorn 및 마이그레이션 전 백업은 아래 배포 절을 참고하세요. 공개 HTTPS는 플랫폼에서 설정하며 `runserver`는 개발용입니다.
 배포 시 `backend/data/`를 영구 저장소에 연결하고 SQLite 백업·복구 방법을 마련해야 합니다.
 
 ## 프론트엔드 Docker 실행
@@ -214,15 +212,17 @@ Docker Desktop 또는 Docker Engine의 Linux 컨테이너 환경이 필요합니
 프로젝트 루트에서 실행합니다.
 
 ```powershell
-docker build --pull -t unigate-frontend ./frontend
+docker build --pull --build-arg NEXT_PUBLIC_BACKEND_URL=https://api.example.com -t unigate-frontend ./frontend
 docker run --rm --name unigate-frontend -p 127.0.0.1:8080:8080 unigate-frontend
 ```
 
 브라우저에서 `http://localhost:8080/`에 접속합니다. 종료하려면 별도 터미널에서 `docker stop unigate-frontend`를 실행합니다.
 
-이미지는 Node.js 24로 빌드하고 비관리자 Nginx로 HTTP 8080에서 정적 파일을 제공합니다.
-`nginx.conf`는 정적 경로·404 응답·기존 앵커 리디렉션과 캐싱을 설정하며, `/api/` 요청은 `BACKEND_ORIGIN`의 Django 서버로 전달합니다.
-Docker의 `BACKEND_ORIGIN` 기본값은 `http://host.docker.internal:8000`입니다. 실제 백엔드 주소와 HTTPS 구성은 배포 환경에 맞게 지정하세요.
+이미지는 Node.js 24로 빌드하고 공식 Nginx 기본 명령으로 HTTP 8080에서 정적 파일만 제공합니다.
+별도 시작 shell이나 API 프록시는 없습니다. 브라우저가 공개 백엔드 URL로 직접 요청합니다.
+`NEXT_PUBLIC_BACKEND_URL`은 빌드 시 정적 JavaScript에 포함되며, 변경 시 재빌드해야 합니다.
+런타임 `docker run -e`로는 주소가 바뀌지 않습니다. 로컬 빌드는 환경변수 또는 `frontend/.env.production`을 사용합니다.
+Docker는 `.env` 파일을 복사하지 않으므로 반드시 `--build-arg`를 사용하세요.
 
 ## 파일 관리
 
@@ -253,19 +253,28 @@ POST 필드는 `email`, `age`(숫자 정수 0~120), `education_type`, `desired_u
 
 ### 개발 연결
 
-1. 위 백엔드 설정 후 `backend/`에서 `.venv\Scripts\python.exe manage.py runserver`를 실행합니다.
+1. 백엔드 설정 후 `backend/`에서 `.venv\Scripts\python.exe manage.py runserver`를 실행합니다.
 2. 별도 터미널의 `frontend/`에서 `npm run dev`를 실행합니다.
-3. `http://localhost:3000/`에서 신청하면 Next.js 개발 프록시가 Django의 `http://127.0.0.1:8000`으로 전달합니다.
+3. `http://localhost:3000/`에서 신청하면 브라우저가 `http://localhost:8000`의 백엔드를 직접 호출합니다.
 
-백엔드 포트를 바꾸려면 프론트엔드 실행 전에 `$env:BACKEND_ORIGIN="http://127.0.0.1:8001"`처럼 지정합니다. `npm run preview`도 같은 환경 변수와 프록시를 사용합니다. 프론트엔드 포트를 바꾼 경우 Django의 `DJANGO_CSRF_TRUSTED_ORIGINS`에 실제 프론트엔드 origin을 지정합니다. 환경 파일 변경 후 서버를 재시작하세요.
+백엔드 주소를 바꾸려면 프론트 실행 전에 `$env:NEXT_PUBLIC_BACKEND_URL="http://localhost:8001"`처럼 지정합니다.
+HTTP 개발 환경에서는 localhost와 127.0.0.1을 섞지 말고 두 서비스 모두 같은 호스트명을 사용하세요.
 
-### 정적 배포 / Docker 연결
+### 정적 배포 / 다른 도메인 연결
 
-정적 `out/` 파일만 제공하는 호스팅은 Django API를 실행하지 않습니다. `/api/`를 Django에 전달하는 프록시가 필요하며, 제공된 Nginx 이미지에는 이 설정이 포함되어 있습니다. Docker 실행 시 `-e BACKEND_ORIGIN=http://backend:8000`처럼 접근 가능한 백엔드 origin(경로·끝 슬래시 제외)을 지정합니다. Docker Desktop에서 호스트의 개발 Django에 연결하려면 개발 서버를 `0.0.0.0:8000`에 바인딩해야 하며, Linux Docker에서는 별도 호스트 연결 또는 동일 네트워크가 필요합니다.
+프론트 빌드 시 `NEXT_PUBLIC_BACKEND_URL=https://api.example.com`처럼 공개 백엔드 origin을 지정합니다.
+경로나 `/api`는 붙이지 않습니다. `out/`는 어떤 정적 호스팅에서도 제공할 수 있으며 프론트에 API 프록시가 필요하지 않습니다.
+백엔드의 `DJANGO_ALLOWED_HOSTS`는 백엔드 공개 호스트명, `DJANGO_CSRF_TRUSTED_ORIGINS`는 프론트 공개 origin입니다.
+예: 각각 `api.example.com`, `https://www.example.com`. 프론트 origin은 CORS 허용 목록으로도 사용하며 와일드카드는 지원하지 않습니다.
+개발/미리보기 포트를 변경하면 해당 origin을 이 목록에 추가하세요.
 
-Django의 `DJANGO_ALLOWED_HOSTS`에는 프론트엔드 공개 호스트를, `DJANGO_CSRF_TRUSTED_ORIGINS`에는 실제 공개 origin(예: `https://www.example.com`)을 지정합니다. HTTPS 종료 프록시와 운영 Django 서버 자체는 별도 구성 대상입니다.
+요청은 `credentials: include`와 CSRF 토큰을 사용합니다. 운영 CSRF 쿠키는 `Secure; SameSite=None`이므로 HTTPS가 필요합니다.
+서로 다른 사이트의 쿠키를 차단하는 브라우저에서는 설정이 올바르더라도 제출이 실패할 수 있습니다.
+가능하면 `www.example.com`과 `api.example.com`처럼 같은 사이트의 별도 도메인을 사용하고 실제 배포 도메인에서 확인하세요.
+참고: [MDN의 credentialed CORS 및 쿠키 제한](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS#requests_with_credentials).
 
-검증 명령: 프론트엔드의 `npm run lint`, `npm run typecheck`, `npm run build`; 백엔드의 `manage.py test surveys config.test_settings`, `manage.py check`, `manage.py makemigrations --check --dry-run`. API 테스트는 별도 테스트 DB를 사용하며 실제 DB에 테스트 신청을 남기지 않습니다.
+검증: 프론트 `npm run lint`, `npm run typecheck`, `npm run build`; 백엔드 `manage.py test surveys config.test_settings config.test_health config.test_cors`.
+테스트는 별도 테스트 DB를 사용하며 실제 설문 DB에 테스트 신청을 남기지 않습니다.
 
 ## 설문 응답 CSV 내보내기
 
@@ -304,44 +313,63 @@ CSV는 Excel에서 한글을 읽을 수 있도록 **UTF-8 BOM**으로 저장합�
 테스트는 별도 DB와 임시 CSV를 사용하며 실제 신청 데이터를 내보내거나 수정하지 않습니다.
 
 
-## Cloudtype 통합 배포와 데이터 보존
+## Cloudtype 프론트·백엔드 분리 배포
 
-저장소 루트의 `Dockerfile`을 사용합니다. Nginx(8080)가 정적 홈페이지와 `/api/`를 제공하며 Gunicorn은 내부 8000 포트에서 Django를 실행합니다. 로컬 DB, 환경 파일, 가상환경은 이미지에 포함하지 않습니다.
+프론트와 백엔드를 별도 공개 도메인의 Dockerfile 서비스로 배포합니다. 각각 `frontend/`, `backend/`를 빌드 컨텍스트로 지정합니다. 루트 Dockerfile은 없습니다.
 
-Cloudtype에 설정할 값:
+```text
+브라우저 → 프론트 공개 도메인 → Nginx :8080 (정적 파일)
+브라우저 → 백엔드 공개 도메인 → Gunicorn :8000 → 영구 디스크 SQLite
+```
 
-| 항목 | 값 |
+프론트 Nginx는 API 요청을 전달하지 않습니다. 브라우저가 빌드 시 지정한 백엔드 URL을 직접 호출하며, 백엔드는 허용된 프론트 origin에 CORS 응답을 제공합니다. CSRF 보호는 유지합니다.
+
+### 백엔드 서비스 먼저 설정
+
+| 항목 | 설정 |
 |---|---|
-| 배포 방식 | Dockerfile, 저장소 루트 빌드 컨텍스트 |
-| 공개 HTTP 포트 | 8080 |
-| Health Check | `/api/health/` |
+| 템플릿 / 소스 디렉터리 | Dockerfile / `backend` |
+| Dockerfile | 해당 디렉터리의 `Dockerfile` |
+| 서비스 포트 | 8000, 백엔드 전용 공개 HTTPS ingress로 연결 |
+| 공개 접근 | 브라우저가 접근 가능한 별도 HTTPS 도메인 |
 | UID / GID | 1000 / 1000 |
-| 레플리카 | 1 |
-| Update strategy | Recreate (배포 중 일시 중단) |
-| 영구 디스크 연결 경로 | `/app/backend/data` |
-| 환경 변수 | 아래 표 참고 |
+| 영구 디스크 마운트 | `/app/backend/data` |
+| 레플리카 / 배포 방식 | 1 / Recreate |
+| Health Check | `/api/health/` |
+| 시작 명령 | 이미지 기본값 사용 |
 
-**운영 전 필수:** 현재 Cloudtype 계정의 Dockerfile 서비스에서 영구 디스크를 위 경로에 연결할 수 있는지, POSIX 파일 잠금 및 SQLite 사용을 지원하는지 확인하세요. 공개 문서만으로 현재 계정의 지원 조건은 확인하지 못했습니다. 지원하지 않는 경우 이 SQLite 구성으로 운영하지 말고 저장소 방식을 다시 결정해야 합니다. Dockerfile의 디렉터리 생성만으로 영구 디스크가 생기지 않습니다. 전체 `/app`이 아닌 정확한 `data` 디렉터리에 마운트해야 합니다.
+Cloudtype 계정에서 Dockerfile 서비스의 지정 경로 마운트, 재배포 후 동일 디스크 유지, SQLite 파일 잠금 지원을 확인해야 합니다. 현재 계정에서의 지원 여부와 실제 배포는 아직 확인하지 않았습니다. 연결된 디렉터리에 UID/GID 1000의 읽기·쓰기 권한이 필요합니다. 전체 `/app` 대신 정확히 `/app/backend/data`에 연결하세요. 마운트 검사는 임시 저장소와 영구 저장소를 구별하지 못하므로 Cloudtype 설정에서도 영구성을 확인해야 합니다.
 
-연결한 디렉터리는 UID/GID 1000이 읽고 쓸 수 있어야 합니다. 시작 시 실제 마운트 여부와 쓰기 권한을 검사합니다. 이 검사는 마운트 누락을 감지하지만 임시 디스크와 영구 디스크를 판별하지는 못합니다. 영구성은 Cloudtype 설정에서 확인해야 합니다.
-
-| 환경 변수 | 운영 값 |
+| 백엔드 환경 변수 | 값 |
 |---|---|
 | `DJANGO_ENV` | `production` (이미지 기본값) |
-| `DJANGO_SECRET_KEY` | 고정된 운영 비밀 키, 런타임 시크릿으로 입력 |
-| `DJANGO_ALLOWED_HOSTS` | 공개 도메인, 호스트명만 쉼표로 구분 |
-| `DJANGO_CSRF_TRUSTED_ORIGINS` | `https://실제도메인` |
-| `PUBLIC_SCHEME` | `https` |
-| `DJANGO_TRUST_PROXY` | `1` |
+| `DJANGO_SECRET_KEY` | 고정 운영 키, 런타임 시크릿으로 등록 |
+| `DJANGO_ALLOWED_HOSTS` | 백엔드 공개 호스트명, 필요 시 상태 검사에 사용되는 정확한 호스트명 추가 |
+| `DJANGO_CSRF_TRUSTED_ORIGINS` | `https://프론트공개호스트명` |
+| `DJANGO_TRUST_PROXY` | 신뢰된 플랫폼 ingress가 전달 헤더를 교체하는 경우에만 `1` |
 | `DJANGO_SSL_REDIRECT` | `1` |
-| `DJANGO_SSL_HOST` | 리다이렉트할 고정 공개 호스트명 |
-| `BACKEND_ORIGIN` | 통합 배포는 기본값 `http://127.0.0.1:8000` |
+| `DJANGO_SSL_HOST` | 백엔드 공개 호스트명 |
 
-Cloudtype에서 HTTPS를 종료하고 HTTP를 HTTPS로 전환하도록 구성하세요. Nginx는 사용자 입력 헤더를 신뢰하지 않고 `PUBLIC_SCHEME`로 전달 프로토콜을 덮어씁니다. `https` 설정은 HTTPS가 보장되는 공개 진입점에서만 사용하세요. `/api/health/`는 HTTP 상태 검사도 가능하도록 Django 리다이렉트 예외입니다. 이미지에서는 dotenv 파일 로딩을 끄고 프로세스 환경 변수만 사용합니다.
+이미지에는 dotenv 파일을 포함하지 않고 프로세스 환경 변수를 사용합니다. 백엔드 공개 도메인은 플랫폼 HTTPS ingress로 연결하세요. 전달 헤더를 신뢰할 때는 ingress를 우회한 프로세스 직접 접근을 차단하세요. 플랫폼 상태 검사 Host가 허용 목록에 없다면 400을 반환하므로 정확한 호스트를 확인해 추가합니다. `/api/health/`는 HTTP 리다이렉트 예외입니다.
 
-시작 순서: 마운트·권한 확인 → 미적용 마이그레이션 확인 → 기존 DB가 있으면 SQLite backup API로 `data/backups/` 백업 → migrate → 시스템 검사 → 서버 실행. 오류가 나면 서버를 시작하지 않습니다. 이미 적용된 마이그레이션은 다시 적용하지 않으며 빌드 시 DB를 생성하지 않습니다. Recreate와 레플리카 1을 유지하여 이전 서버의 쓰기와 마이그레이션이 겹치지 않도록 합니다. 기존 스키마를 파괴하는 변경은 자동 배포 전에 별도 검토해야 합니다.
+백엔드 시작은 `backend/deploy/start.sh` → `prepare_database.py` → Gunicorn 순서입니다. 저장소·쓰기 권한을 확인하고, 미적용 마이그레이션이 있을 때 기존 DB를 `data/backups/`에 백업한 다음 적용합니다. 실패하면 서버를 시작하지 않습니다. Recreate와 레플리카 1을 유지해 이전 서버의 쓰기와 마이그레이션이 겹치지 않게 하세요. 코드 롤백은 DB 롤백이 아니며 파괴적인 스키마 변경은 사전 검토해야 합니다.
 
-Supervisor는 Nginx와 Gunicorn을 함께 관리하며 어느 한쪽이 종료되면 전체 컨테이너를 종료합니다. Cloudtype의 재시작·상태 검사 설정도 적용하세요. 별도 백그라운드 작업 워커는 없습니다.
+### 프론트 서비스 설정
+
+| 항목 | 설정 |
+|---|---|
+| 템플릿 / 소스 디렉터리 | Dockerfile / `frontend` |
+| 공개 HTTP 포트 | 8080 |
+| Health Check | `/` (프론트 자체 상태) |
+| 시작 명령 | 이미지 기본값 사용 |
+| 빌드 인자 `NEXT_PUBLIC_BACKEND_URL` | `https://실제백엔드공개호스트` |
+
+브라우저에서 접근 가능한 백엔드 공개 HTTPS 주소를 빌드 인자로 전달하세요. 런타임 환경변수만 등록하면 정적 파일에 반영되지 않습니다.
+플랫폼에서 Docker 빌드 인자를 전달하는 방법을 확인하거나, 해당 인자로 미리 빌드한 이미지를 배포하세요.
+두 서비스 모두 HTTPS 및 HTTP→HTTPS 전환을 설정합니다. 프론트에는 Django 비밀 키나 SQLite 디스크를 연결하지 않습니다.
+백엔드 상태는 백엔드 도메인의 `/api/health/`에서 확인합니다.
+
+프론트 재배포는 백엔드 시작·마이그레이션·DB에 영향을 주지 않습니다. 백엔드를 재배포할 때 기존 영구 디스크를 재사용하며 개발 DB를 업로드하거나 운영 디스크를 초기화하지 않습니다.
 
 ### 백업과 복구
 
@@ -354,16 +382,15 @@ python -c "import sqlite3,datetime,pathlib; p=pathlib.Path('data/backups'); p.mk
 
 완성된 백업을 접근이 제한된 외부 저장소로 복사하고 보존 기간을 관리하세요. 응답 개인정보가 포함되므로 공개 링크나 Git에 올리지 않습니다. 복구는 서비스를 완전히 중지하고 현재 DB도 보존한 다음, 검증한 백업으로 복원하고 그 DB와 호환되는 코드로 실행합니다. 활성 연결이 없는 상태에서 SQLite journal/WAL 부속 파일 처리까지 확인해야 합니다. Cloudtype 코드 롤백은 DB를 자동 복원하지 않습니다. 운영 데이터를 개발 PC의 DB로 덮어쓰지 마세요.
 
-### 검증과 향후 분리
+### 로컬 배포 검증
+
+프로젝트 루트에서 실행합니다.
 
 ```powershell
-docker build -t unigate-deploy-test .
-backend/.venv/Scripts/python.exe deploy/verify-deployment.py
+docker build -t unigate-backend-test backend
+docker build --build-arg NEXT_PUBLIC_BACKEND_URL=https://api.example.com -t unigate-frontend-test frontend
 ```
 
-검증 스크립트는 고유한 테스트 볼륨을 만들고, 마운트 누락 거부·홈페이지·HTTPS CSRF 제출·컨테이너 교체 후 응답 보존·프로세스 종료를 검사합니다. 테스트 후 자신이 만든 컨테이너와 볼륨만 제거합니다. 실제 로컬/운영 DB는 사용하지 않습니다. Cloudtype에서도 별도 검증 환경으로 재배포 보존을 확인한 후 운영하세요.
+이미지 빌드 후 별도 테스트 네트워크·볼륨에서 두 서비스를 실행해 홈페이지, CSRF 제출, 각각의 재배포 후 연결과 데이터 보존을 확인하세요. 실제 로컬/운영 DB는 테스트에 사용하지 않습니다.
 
-향후 분리 시 프론트 이미지는 `docker build -t unigate-frontend frontend`, 백엔드는 **루트 컨텍스트로** `docker build -f backend/Dockerfile -t unigate-backend .` 또는 `docker build --target backend -t unigate-backend .`로 만듭니다. 프론트의 `BACKEND_ORIGIN`을 백엔드의 내부 서비스 주소로 바꾸면 브라우저는 계속 동일 출처의 `/api/`를 사용합니다. 백엔드에는 기존 영구 디스크를 연결하고 공개 포트는 프론트에만 둡니다. 백엔드 단독 포트는 8000입니다. 별도 백엔드가 프록시 헤더를 신뢰할 때는 신뢰된 프론트 프록시에서만 접근할 수 있도록 제한하세요. 디스크 재연결이 불가능하면 쓰기를 중지한 후 백업·복원으로 이전합니다.
-
-
-배포 구성 검증 결과: 통합·프론트 단독·백엔드 단독 이미지 빌드, 백엔드 테스트 32개, 프론트 lint/typecheck, 격리 볼륨에서 재배포 후 응답 보존 및 마이그레이션 실패 시 백업 보존을 확인했습니다. `check --deploy`는 HSTS 미설정 경고 1개를 반환합니다. 전체 도메인의 HTTPS 구성이 확인된 뒤 Cloudtype 진입점 또는 Nginx에서 정적 페이지와 API에 함께 적용할 HSTS 정책을 결정해야 합니다. 실제 Cloudtype 계정의 배포·영구 디스크 연결 및 보존 검증은 아직 수행하지 않았습니다.
+실제 Cloudtype에서도 별도 검증 환경에서 저장→재배포→동일 응답 확인을 완료한 뒤 운영하세요. 외부 백업·보존 기간·복원 훈련은 별도로 운영해야 합니다. HSTS는 전체 공개 도메인의 HTTPS를 확인한 후 플랫폼 또는 프론트 Nginx에서 적용할 정책을 결정하세요. 현재 Django `check --deploy`에서는 HSTS 미설정 경고가 남습니다.
