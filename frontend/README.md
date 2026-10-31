@@ -32,7 +32,10 @@ docker build --build-arg NEXT_PUBLIC_BACKEND_URL=https://api.example.com -t unig
 docker run --rm -p 8080:8080 unigate-frontend
 ```
 
-Nginx 기본 실행 명령으로 정적 파일만 제공합니다. 별도 시작 shell이나 API 프록시가 없습니다.
+비관리자용 `nginx/nginx-unprivileged:stable-alpine` 이미지에서 Nginx 기본 명령으로 정적 파일만 제공합니다. 별도 시작 shell이나 API 프록시가 없습니다.
+임시 파일과 PID는 `/tmp`를 사용하므로 UID/GID 1000으로도 실행할 수 있습니다.
+Cloudtype의 Dockerfile path는 `Dockerfile`, Dockerfile text는 빈칸으로 둡니다.
+Start commands를 명시하는 경우 `nginx -g 'daemon off;'`를 입력합니다.
 배포 시 소스 디렉터리는 `frontend`, 서비스 포트는 `8080`입니다.
 `NEXT_PUBLIC_BACKEND_URL`은 **빌드 인자**로 전달해야 합니다. 컨테이너 런타임 환경변수만 설정하면 반영되지 않습니다.
 주소는 브라우저에서 접근 가능한 HTTP(S) origin이며 `/api` 경로는 붙이지 않습니다. 운영에서는 HTTPS를 사용하세요.

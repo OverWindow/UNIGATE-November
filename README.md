@@ -218,7 +218,8 @@ docker run --rm --name unigate-frontend -p 127.0.0.1:8080:8080 unigate-frontend
 
 브라우저에서 `http://localhost:8080/`에 접속합니다. 종료하려면 별도 터미널에서 `docker stop unigate-frontend`를 실행합니다.
 
-이미지는 Node.js 24로 빌드하고 공식 Nginx 기본 명령으로 HTTP 8080에서 정적 파일만 제공합니다.
+이미지는 Node.js 24로 빌드하고 비관리자용 `nginx/nginx-unprivileged:stable-alpine` 이미지로 HTTP 8080에서 정적 파일만 제공합니다.
+Nginx 임시 파일과 PID는 `/tmp`에 저장하므로 UID/GID 1000으로도 실행할 수 있습니다.
 별도 시작 shell이나 API 프록시는 없습니다. 브라우저가 공개 백엔드 URL로 직접 요청합니다.
 `NEXT_PUBLIC_BACKEND_URL`은 빌드 시 정적 JavaScript에 포함되며, 변경 시 재빌드해야 합니다.
 런타임 `docker run -e`로는 주소가 바뀌지 않습니다. 로컬 빌드는 환경변수 또는 `frontend/.env.production`을 사용합니다.
@@ -363,6 +364,8 @@ Cloudtype 계정에서 Dockerfile 서비스의 지정 경로 마운트, 재배�
 | Health Check | `/` (프론트 자체 상태) |
 | 시작 명령 | 이미지 기본값 사용 |
 | 빌드 인자 `NEXT_PUBLIC_BACKEND_URL` | `https://실제백엔드공개호스트` |
+
+Dockerfile path는 `Dockerfile`, Dockerfile text는 빈칸으로 둡니다. Start commands를 명시할 경우 `nginx -g 'daemon off;'`를 사용하세요. 프론트도 UID/GID 1000으로 실행할 수 있습니다.
 
 브라우저에서 접근 가능한 백엔드 공개 HTTPS 주소를 빌드 인자로 전달하세요. 런타임 환경변수만 등록하면 정적 파일에 반영되지 않습니다.
 플랫폼에서 Docker 빌드 인자를 전달하는 방법을 확인하거나, 해당 인자로 미리 빌드한 이미지를 배포하세요.
