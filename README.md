@@ -17,6 +17,7 @@ unigate-main/
 ├─ frontend-TOPIQ/    # TOPIK II 학습용 Next.js + TypeScript + Tailwind CSS 프론트엔드
 ├─ backend/           # 두 프론트엔드가 함께 사용하는 Django + PostgreSQL
 │  ├─ config/         # 설정, URL, WSGI/ASGI 진입점
+│  ├─ accounts/       # 기존 사용자·세션 테이블 기반 TOPIQ 인증 API
 │  ├─ surveys/        # 설문 모델·API 및 테스트
 │  ├─ migration/      # 앱별 마이그레이션 (surveys/ 등)
 │  ├─ manage.py
@@ -145,7 +146,8 @@ set "DJANGO_ENV=development"
 `manage.py migrate`는 설문 응답 테이블 `survey_responses`와 마이그레이션 이력을 준비합니다.
 반복 실행해도 이미 적용된 마이그레이션을 다시 적용하지 않습니다. Django 기본 사용자·권한·세션·관리자 로그 테이블도 생성하며 기존 신청 데이터는 유지합니다.
 
-마이그레이션은 `backend/migration/<앱 이름>/`에 보관합니다. 현재 설정은 `MIGRATION_MODULES = {"surveys": "migration.surveys"}`입니다.
+마이그레이션은 `backend/migration/<앱 이름>/`에 보관합니다. `surveys`와 `accounts`는 각각 `migration.surveys`, `migration.accounts`를 사용합니다.
+`accounts` 마이그레이션은 기존 `auth_user`에 이메일 고유 인덱스만 추가하며 테이블·컬럼을 생성하지 않습니다.
 모델 변경 후 `manage.py makemigrations surveys`로 파일을 생성하고, `manage.py migrate`로 적용합니다.
 검증은 `manage.py check`, `manage.py makemigrations --check --dry-run`, `manage.py test surveys config.test_settings`로 실행합니다.
 환경 파일 로딩 테스트만 실행하려면 `.venv\Scripts\python.exe -m unittest config.test_settings`를 사용합니다. 실제 환경 파일 대신 테스트용 값을 사용합니다.
@@ -190,6 +192,67 @@ DB 제약조건은 나이 범위, 허용된 학력·대학 유형, 공백만 있
 `DJANGO_ENV=production`은 디버그를 끄며, 비밀 키와 명시적인 허용 호스트 설정이 필요합니다.
 운영 Docker·Gunicorn 및 마이그레이션 전 백업은 아래 배포 절을 참고하세요. 공개 HTTPS는 플랫폼에서 설정하며 `runserver`는 개발용입니다.
 배포 시 별도 PostgreSQL 서비스에 연결하고 DB 백업·복구 방법을 마련해야 합니다.
+
+## TOPIQ 회원가입·로그인
+
+TOPIQ는 Next.js에서 `/api/auth/…`와 `/api/csrf/` 요청을 기존 Django로 전달합니다.
+`frontend-TOPIQ/`의 서버 전용 `DJANGO_BACKEND_URL`을 개발 서버 시작·운영 빌드 전에 지정합니다.
+기본값은 `http://127.0.0.1:8000`입니다. 브라우저에 백엔드 주소나 비밀 키를 전달하지 않습니다.
+프론트 실행과 인증 화면 안내는 [TOPIQ README](frontend-TOPIQ/README.md)를 참고하세요.
+
+| 방식 | 경로 | 목적 |
+| --- | --- | --- |
+| `POST` | `/api/auth/email/send/` | `email`, `language`(ko/en/id), `next`(내부 경로)로 Brevo 인증 메일 발송·재발송, 202 응답 |
+| `POST` | `/api/auth/email/verify/` | `token`으로 인증 링크 검증, 이메일·언어·복귀 경로·만료 시각 반환 |
+| `POST` | `/api/auth/signup/` | `email`, `nickname`, `password`, `password_confirm`, `verification_token`으로 가입 후 자동 로그인 |
+| `POST` | `/api/auth/login/` | 이메일·비밀번호 로그인 |
+| `POST` | `/api/auth/logout/` | 현재 로그인 세션 종료, 204 응답 |
+| `GET` | `/api/auth/me/` | 현재 회원 정보, 비로그인은 401 응답 |
+
+기존 `/api/csrf/`에서 토큰을 준비하고 모든 인증 POST에 `X-CSRFToken`을 보냅니다.
+가입·로그인 응답에는 `user: {id, email, nickname}`와 갱신된 `csrfToken`이 포함됩니다.
+인증 응답은 `private, no-store`이며 세션 쿠키는 HttpOnly, 운영에서는 Secure, SameSite=Lax입니다.
+로그인 유지 기간은 Django 기본 2주입니다.
+
+사용자·비밀번호 해시는 `auth_user`, 로그인 상태는 `django_session`을 재사용합니다.
+닉네임은 `first_name`, 내부 사용자명은 UUID 기반 `username`에 저장합니다.
+`auth_user_email_ci_unique`는 `LOWER(BTRIM(email))`의 고유 인덱스이며 공백뿐인 이메일을 제외합니다.
+기존 비어 있지 않은 이메일이 대소문자·공백 차이만으로 중복되면 마이그레이션이 중단됩니다.
+회원 데이터를 자동 변경·병합·삭제하지 않습니다. 인덱스 제거는 `migrate accounts zero`로 되돌릴 수 있습니다.
+
+일반 `migrate`에 포함되며 새 테이블·컬럼·DB 캐시·인증 패키지·백그라운드 워커는 추가하지 않습니다.
+로그인 실패는 동일 이메일 5회/5분, 가입 시도는 5회/10분으로 제한하며 초과 시 429와 `Retry-After`를 반환합니다.
+제한 정보는 서버 메모리에만 저장합니다. 재시작 시 초기화되고 여러 프로세스·서버 사이에는 공유되지 않습니다.
+새 가입은 이메일 인증 → 닉네임·비밀번호 설정 순서입니다. 비밀번호 재설정·소셜 로그인은 현재 제공하지 않습니다.
+
+Brevo는 `Unigate-PBT-Web/backend/src/email/brevo-result-email.ts`의 HTTP API 발송 방식을 참고합니다.
+`BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME`을 백엔드 환경에 설정하고 Brevo에서 인증된 발신자를 사용하세요.
+`TOPIQ_PUBLIC_URL`은 인증 링크에 넣는 신뢰된 TOPIQ origin이며 개발 기본값은 `http://localhost:3001`, 운영 기본값은 `https://topiq.unigate.kr`입니다.
+API 키는 프론트엔드·저장소·로그에 넣지 않습니다. 누락 또는 발송 실패 시 503으로 표시하며 계정은 생성하지 않습니다.
+실제 발송을 확인할 때는 본인 이메일로 요청하세요. 자동 테스트는 Brevo 요청을 모킹하며 실제 메일을 보내지 않습니다.
+
+인증 토큰은 Django 전용 salt로 서명하며 15분 동안 유효합니다. 링크는 `/verify-email#token=…` 형식으로,
+토큰이 HTTP URL·접근 로그에 들어가지 않게 하고 브라우저는 CSRF 보호 POST로 검증합니다.
+가입 시 서명·만료·이메일 일치를 다시 검증합니다. 인증·재발송 단계에서는 DB에 사용자나 토큰을 저장하지 않습니다.
+토큰을 localStorage에 저장하지 않으며 링크를 다시 열거나 새로고침하면 재검증합니다.
+토큰은 만료 전 재사용할 수 있고 재발송해도 이전 링크는 만료까지 유효합니다. 가입 후 중복 생성은 이메일 고유 인덱스가 막습니다.
+기존 회원·관리자와 `is_active` 값은 변경하지 않으며, 기존 계정의 과거 이메일 인증 여부를 기록하거나 추정하지 않습니다.
+
+발송은 이메일당 60초 간격·5회/10분, 접속 피어 IP당 100회/시간으로 제한합니다.
+IP는 위조 가능한 전달 헤더 대신 `REMOTE_ADDR`을 사용하므로 Next.js 같은 프록시 뒤에서는 해당 프록시의 발송 한도를 공유합니다.
+카운터는 기존 메모리 캐시를 사용해 재시작 시 초기화되고 프로세스 간 공유되지 않습니다.
+Brevo 요청은 10초 뒤 타임아웃 처리하며 자동 재시도하지 않습니다. 같은 Brevo 계정을 쓰면 발송 한도를 공유하고,
+PBT-Web 내부 DB 집계에는 TOPIQ 발송분이 자동 포함되지 않습니다. 새 DB 마이그레이션·테이블·컬럼·DB 캐시·워커는 없습니다.
+
+`DJANGO_CSRF_TRUSTED_ORIGINS`에는 기존 unigate origin과 TOPIQ origin을 함께 등록하세요.
+개발은 `http://localhost:3001`, `http://127.0.0.1:3001`, 운영 TOPIQ는 `https://topiq.unigate.kr`입니다.
+기존 설문 API의 CORS 및 운영 CSRF 쿠키 정책은 유지합니다.
+
+검증은 `backend/`에서 실행하며 별도 PostgreSQL 테스트 DB와 합성 계정만 사용합니다.
+
+```powershell
+.\.venv\Scripts\python.exe manage.py test accounts surveys config.test_settings config.test_health config.test_cors --noinput
+```
 
 ## Django 관리자
 

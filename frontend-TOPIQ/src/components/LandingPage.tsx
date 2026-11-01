@@ -1,14 +1,9 @@
 "use client";
 
-import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
-import { landingContent, learningAreas, type Language, type LearningArea } from "@/lib/landing-content";
-
-const languages: { code: Language; label: string; name: string }[] = [
-  { code: "ko", label: "한국어", name: "한국어" },
-  { code: "en", label: "EN", name: "English" },
-  { code: "id", label: "ID", name: "Bahasa Indonesia" },
-];
+import { useEffect, useState } from "react";
+import { useApp } from "@/app/providers";
+import { landingContent, learningAreas, type LearningArea } from "@/lib/landing-content";
+import SiteHeader, { Logo } from "./SiteHeader";
 const sampleAnswers = [
   "한 번에 많은 양을 공부해야 한다.",
   "작은 노력을 꾸준히 이어 가는 것이 중요하다.",
@@ -24,10 +19,6 @@ function Arrow({ external = false }: { external?: boolean }) {
   );
 }
 
-function Logo({ className = "" }: { className?: string }) {
-  return <Image className={`topiq-logo ${className}`} src="/brand/topiq-logo.png" alt="TOPIQ" width={1945} height={808} sizes="112px" />;
-}
-
 function LearningIcon({ area }: { area: LearningArea }) {
   return (
     <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -39,53 +30,17 @@ function LearningIcon({ area }: { area: LearningArea }) {
 }
 
 export default function LandingPage() {
-  const [language, setLanguage] = useState<Language>("ko");
+  const { language } = useApp();
   const [area, setArea] = useState<LearningArea>("reading");
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuButton = useRef<HTMLButtonElement>(null);
   const t = landingContent[language];
 
   useEffect(() => {
-    document.documentElement.lang = language;
     document.title = `TOPIQ | ${landingContent[language].hero.eyebrow}`;
   }, [language]);
 
-  const closeMenu = () => setMenuOpen(false);
-  const navigation = t.navigation.map((label) => (
-    <button key={label} type="button" disabled>{label}</button>
-  ));
-
   return (
     <>
-      <a className="skip-link" href="#main-content">{t.accessibility.skip}</a>
-      <header className="site-header" onKeyDown={(event) => {
-        if (event.key === "Escape" && menuOpen) {
-          closeMenu();
-          menuButton.current?.focus();
-        }
-      }}>
-        <div className="page-container header-inner">
-          <a className="brand-link" href="#intro" aria-label={t.accessibility.home} onClick={closeMenu}>
-            <Logo />
-            <span className="brand-tag">TOPIK II</span>
-          </a>
-          <nav className="desktop-navigation" aria-label={t.accessibility.navigation}>{navigation}</nav>
-          <div className="header-actions">
-            <div className="language-switcher" role="group" aria-label={t.accessibility.language}>
-              {languages.map(({ code, label, name }) => (
-                <button key={code} type="button" lang={code} aria-label={name} aria-pressed={language === code} onClick={() => setLanguage(code)}>{label}</button>
-              ))}
-            </div>
-            <button className="header-login" type="button" disabled>{t.login}</button>
-            <button className="menu-toggle" type="button" ref={menuButton} aria-label={menuOpen ? t.accessibility.closeMenu : t.accessibility.openMenu} aria-controls="mobile-navigation" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>
-              <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
-                <path d={menuOpen ? "m6 6 12 12M6 18 18 6" : "M4 6h16M4 12h16M4 18h16"} />
-              </svg>
-            </button>
-          </div>
-        </div>
-        <nav className="mobile-navigation" id="mobile-navigation" aria-label={t.accessibility.navigation} hidden={!menuOpen}>{navigation}</nav>
-      </header>
+      <SiteHeader />
 
       <main id="main-content" tabIndex={-1}>
         <section id="intro" className="hero-section" aria-labelledby="hero-title">

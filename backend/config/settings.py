@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
@@ -23,6 +24,16 @@ if not SECRET_KEY:
     raise ImproperlyConfigured("Set DJANGO_SECRET_KEY before starting Django.")
 
 DEBUG = DJANGO_ENV == "development"
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "").strip()
+BREVO_SENDER_EMAIL = os.environ.get("BREVO_SENDER_EMAIL", "").strip()
+BREVO_SENDER_NAME = os.environ.get("BREVO_SENDER_NAME", "TOPIQ").strip() or "TOPIQ"
+TOPIQ_PUBLIC_URL = os.environ.get(
+    "TOPIQ_PUBLIC_URL", "http://localhost:3001" if DEBUG else "https://topiq.unigate.kr"
+).rstrip("/")
+topiq_url = urlsplit(TOPIQ_PUBLIC_URL)
+if (topiq_url.scheme not in ({"http", "https"} if DEBUG else {"https"}) or not topiq_url.netloc
+        or topiq_url.username or topiq_url.password or topiq_url.path or topiq_url.query or topiq_url.fragment):
+    raise ImproperlyConfigured("TOPIQ_PUBLIC_URL must be a trusted origin (HTTPS in production).")
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.environ.get(
@@ -40,9 +51,18 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "accounts.apps.AccountsConfig",
     "surveys.apps.SurveysConfig",
 ]
-MIGRATION_MODULES = {"surveys": "migration.surveys"}
+MIGRATION_MODULES = {"surveys": "migration.surveys", "accounts": "migration.accounts"}
+CACHES = {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+    "auth_rate_limit": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "topiq-auth-rate-limit",
+    },
+}
+CSRF_FAILURE_VIEW = "accounts.views.csrf_failure"
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
@@ -59,7 +79,7 @@ CSRF_TRUSTED_ORIGINS = [
     origin.strip()
     for origin in os.environ.get(
         "DJANGO_CSRF_TRUSTED_ORIGINS",
-        "http://localhost:3000,http://127.0.0.1:3000" if DEBUG else "",
+        "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001" if DEBUG else "",
     ).split(",") if origin.strip()
 ]
 TEMPLATES = [{
@@ -116,6 +136,8 @@ CSRF_COOKIE_SECURE = not DEBUG
 # Cross-site requests require HTTPS and SameSite=None. / 교차 사이트 쿠키는 HTTPS가 필요합니다.
 CSRF_COOKIE_SAMESITE = "Lax" if DEBUG else "None"
 SESSION_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
 SECURE_SSL_REDIRECT = os.environ.get("DJANGO_SSL_REDIRECT", "0") == "1"
 SECURE_SSL_HOST = os.environ.get("DJANGO_SSL_HOST") or None
 SECURE_REDIRECT_EXEMPT = [r"^api/health/$"]
