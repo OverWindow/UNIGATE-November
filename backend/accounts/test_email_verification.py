@@ -1,23 +1,24 @@
 import io
 import json
+from datetime import timedelta
 from unittest.mock import patch
 from urllib.error import HTTPError, URLError
 
 from django.contrib.auth import get_user_model
 from django.core import signing
-from django.core.cache import caches
 from django.db import connection
 from django.test import SimpleTestCase, TestCase, override_settings
+from django.utils import timezone
 
 from .email_delivery import EmailDeliveryError, build_verification_email, send_verification_email
 from .email_verification import TOKEN_SALT, make_verification_token
+from .models import RateLimit
 from .tests import AuthClientMixin, FAST_HASHERS
 
 
 @override_settings(PASSWORD_HASHERS=FAST_HASHERS)
 class EmailVerificationApiTests(AuthClientMixin, TestCase):
     def setUp(self):
-        caches["auth_rate_limit"].clear()
         self.client, self.token = self.csrf_client()
 
     @patch("accounts.views.send_verification_email")
@@ -68,18 +69,17 @@ class EmailVerificationApiTests(AuthClientMixin, TestCase):
 
     @patch("accounts.views.send_verification_email")
     def test_resend_email_limit_expiration_and_peer_limit(self, deliver):
-        for index in range(5):
-            with patch("accounts.rate_limits.time.time", return_value=10000 + index * 61):
-                response = self.post("/api/auth/email/send/", {"email": "learner@example.invalid"})
-                self.assertEqual(response.status_code, 202)
-                again = self.post("/api/auth/email/send/", {"email": "LEARNER@example.invalid"})
-                self.assertEqual(again.status_code, 429)
-                self.assertEqual(again["Retry-After"], "60")
-        with patch("accounts.rate_limits.time.time", return_value=10305):
-            self.assertEqual(self.post("/api/auth/email/send/", {"email": "learner@example.invalid"}).status_code, 429)
-        with patch("accounts.rate_limits.time.time", return_value=10601):
-            self.assertEqual(self.post("/api/auth/email/send/", {"email": "learner@example.invalid"}).status_code, 202)
-        caches["auth_rate_limit"].clear()
+        for _ in range(5):
+            response = self.post("/api/auth/email/send/", {"email": "learner@example.invalid"})
+            self.assertEqual(response.status_code, 202)
+            again = self.post("/api/auth/email/send/", {"email": "LEARNER@example.invalid"})
+            self.assertEqual(again.status_code, 429)
+            self.assertTrue(1 <= int(again["Retry-After"]) <= 60)
+            RateLimit.objects.filter(scope="email-resend").update(expires_at=timezone.now() - timedelta(seconds=1))
+        self.assertEqual(self.post("/api/auth/email/send/", {"email": "learner@example.invalid"}).status_code, 429)
+        RateLimit.objects.update(expires_at=timezone.now() - timedelta(seconds=1))
+        self.assertEqual(self.post("/api/auth/email/send/", {"email": "learner@example.invalid"}).status_code, 202)
+        RateLimit.objects.all().delete()
         from .rate_limits import record_attempt
         for _ in range(100):
             record_attempt("email-send-peer", "127.0.0.1", 100, 3600)
@@ -89,14 +89,13 @@ class EmailVerificationApiTests(AuthClientMixin, TestCase):
 
     @patch("accounts.views.send_verification_email", side_effect=EmailDeliveryError())
     def test_delivery_failure_does_not_create_user_and_can_be_retried(self, deliver):
-        with patch("accounts.rate_limits.time.time", return_value=10000):
-            response = self.post("/api/auth/email/send/", {"email": "learner@example.invalid"})
-            self.assertEqual(response.status_code, 503)
-            self.assertEqual(response.json()["error"], "email_delivery_unavailable")
+        response = self.post("/api/auth/email/send/", {"email": "learner@example.invalid"})
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["error"], "email_delivery_unavailable")
         self.assertFalse(get_user_model().objects.exists())
         deliver.side_effect = None
-        with patch("accounts.rate_limits.time.time", return_value=10061):
-            self.assertEqual(self.post("/api/auth/email/send/", {"email": "learner@example.invalid"}).status_code, 202)
+        RateLimit.objects.filter(scope="email-resend").update(expires_at=timezone.now() - timedelta(seconds=1))
+        self.assertEqual(self.post("/api/auth/email/send/", {"email": "learner@example.invalid"}).status_code, 202)
 
     @patch("accounts.views.send_verification_email")
     def test_existing_accounts_and_inactive_accounts_are_unchanged(self, deliver):

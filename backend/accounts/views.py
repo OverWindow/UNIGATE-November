@@ -1,5 +1,6 @@
 import json
 import logging
+from functools import wraps
 from uuid import uuid4
 
 from django.contrib.auth import authenticate, get_user_model, login, logout
@@ -15,7 +16,7 @@ from django.views.decorators.debug import sensitive_post_parameters, sensitive_v
 from django.views.decorators.http import require_GET, require_POST
 
 from .forms import LoginForm, SignupForm, normalize_email, users_for_email
-from .rate_limits import check_limit, clear_login_failures, record_attempt
+from .rate_limits import RateLimitUnavailable, check_limit, clear_login_failures, record_attempt
 from .email_delivery import EmailDeliveryError, send_verification_email
 from .email_verification import LANGUAGES, make_verification_token, read_verification_token
 
@@ -67,6 +68,18 @@ def limited_response(seconds):
     return response
 
 
+def rate_limit_errors(view):
+    @wraps(view)
+    def wrapped(request, *args, **kwargs):
+        try:
+            return view(request, *args, **kwargs)
+        except RateLimitUnavailable:
+            response = api_response({"error": "server_error"}, status=503)
+            response["Retry-After"] = "5"
+            return response
+    return wrapped
+
+
 def user_data(user):
     return {"id": user.pk, "email": user.email,
             "nickname": user.first_name or user.get_username()}
@@ -74,6 +87,7 @@ def user_data(user):
 
 @never_cache
 @require_POST
+@rate_limit_errors
 @sensitive_post_parameters("password", "password_confirm", "verification_token")
 @sensitive_variables()
 def signup(request):
@@ -96,6 +110,7 @@ def signup(request):
                 first_name=form.cleaned_data["nickname"], password=form.cleaned_data["password"],
                 is_staff=False, is_superuser=False, is_active=True,
             )
+            clear_login_failures(user.email)
     except IntegrityError as exc:
         if getattr(getattr(exc.__cause__, "diag", None), "constraint_name", None) == EMAIL_INDEX:
             return api_response({"error": "validation_error", "fields": {"email": ["email_unavailable"]}}, status=400)
@@ -103,12 +118,12 @@ def signup(request):
         logger.error("Account creation failed (%s).", type(exc).__name__)
         return api_response({"error": "server_error"}, status=500)
     login(request, user, backend="django.contrib.auth.backends.ModelBackend")
-    clear_login_failures(user.email)
     return api_response({"user": user_data(user), "csrfToken": get_token(request)}, status=201)
 
 
 @never_cache
 @require_POST
+@rate_limit_errors
 @sensitive_post_parameters("password")
 @sensitive_variables()
 def login_view(request):
@@ -154,6 +169,7 @@ def me(request):
 
 @never_cache
 @require_POST
+@rate_limit_errors
 @sensitive_variables()
 def send_email_verification(request):
     if request.user.is_authenticated:

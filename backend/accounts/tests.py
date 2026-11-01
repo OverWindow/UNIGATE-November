@@ -1,15 +1,17 @@
 from concurrent.futures import ThreadPoolExecutor
+from datetime import timedelta
 from importlib import import_module
 from threading import Barrier
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.core.cache import caches
 from django.db import IntegrityError, close_old_connections, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
 from django.test import Client, TestCase, TransactionTestCase, override_settings
+from django.utils import timezone
 
 from .forms import SignupForm
+from .models import RateLimit
 from .rate_limits import check_limit, record_attempt
 from .email_verification import make_verification_token
 
@@ -39,7 +41,6 @@ class AuthClientMixin:
 @override_settings(PASSWORD_HASHERS=FAST_HASHERS)
 class AccountApiTests(AuthClientMixin, TestCase):
     def setUp(self):
-        caches["auth_rate_limit"].clear()
         self.client, self.token = self.csrf_client()
 
     def create_user(self, email="learner@example.invalid", **changes):
@@ -149,15 +150,14 @@ class AccountApiTests(AuthClientMixin, TestCase):
         self.assertEqual(other.get("/api/auth/me/").status_code, 401)
 
     def test_login_limit_is_case_insensitive_and_expires(self):
-        with patch("accounts.rate_limits.time.time", return_value=10000):
-            for _ in range(5):
-                response = self.post("/api/auth/login/", {"email": "Missing@example.invalid", "password": "wrong"})
-                self.assertEqual(response.status_code, 401)
-            response = self.post("/api/auth/login/", {"email": "missing@EXAMPLE.INVALID", "password": "wrong"})
-            self.assertEqual(response.status_code, 429)
-            self.assertEqual(response["Retry-After"], "300")
-        with patch("accounts.rate_limits.time.time", return_value=10301):
-            self.assertEqual(self.post("/api/auth/login/", {"email": "missing@example.invalid", "password": "wrong"}).status_code, 401)
+        for _ in range(5):
+            response = self.post("/api/auth/login/", {"email": "Missing@example.invalid", "password": "wrong"})
+            self.assertEqual(response.status_code, 401)
+        response = self.post("/api/auth/login/", {"email": "missing@EXAMPLE.INVALID", "password": "wrong"})
+        self.assertEqual(response.status_code, 429)
+        self.assertTrue(1 <= int(response["Retry-After"]) <= 300)
+        RateLimit.objects.filter(scope="login").update(expires_at=timezone.now() - timedelta(seconds=1))
+        self.assertEqual(self.post("/api/auth/login/", {"email": "missing@example.invalid", "password": "wrong"}).status_code, 401)
 
     def test_success_resets_failures_and_signup_has_separate_limit(self):
         self.create_user()
@@ -205,9 +205,6 @@ class AccountApiTests(AuthClientMixin, TestCase):
 
 @override_settings(PASSWORD_HASHERS=FAST_HASHERS)
 class ConcurrentSignupTests(AuthClientMixin, TransactionTestCase):
-    def setUp(self):
-        caches["auth_rate_limit"].clear()
-
     def test_concurrent_requests_cannot_create_two_accounts(self):
         barrier = Barrier(2, timeout=10)
         original = SignupForm.clean_email
@@ -230,10 +227,19 @@ class ConcurrentSignupTests(AuthClientMixin, TransactionTestCase):
         self.assertEqual(statuses, [201, 400])
         self.assertEqual(get_user_model().objects.count(), 1)
 
-    def test_memory_counter_updates_are_thread_safe(self):
-        with ThreadPoolExecutor(max_workers=8) as pool:
-            results = list(pool.map(lambda _: record_attempt("signup", "thread@example.invalid", 5, 600), range(20)))
-        self.assertEqual(sum(result == 0 for result in results), 5)
+    def test_database_counter_updates_are_atomic_across_connections(self):
+        def attempt(limit):
+            close_old_connections()
+            try:
+                return record_attempt("signup", f"thread-{limit}@example.invalid", limit, 600)
+            finally:
+                connection.close()
+
+        for limit in (5, 100):
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                results = list(pool.map(attempt, [limit] * 20))
+            self.assertEqual(sum(result == 0 for result in results), min(limit, 20))
+        self.assertEqual(sorted(RateLimit.objects.values_list("attempts", flat=True)), [6, 20])
 
 
 class EmailIndexMigrationTests(TransactionTestCase):
@@ -253,7 +259,7 @@ class EmailIndexMigrationTests(TransactionTestCase):
                     migration.check_email_conflicts(None, editor)
         finally:
             user_model.objects.all().delete()
-            MigrationExecutor(connection).migrate([("accounts", "0001_initial")])
+            MigrationExecutor(connection).migrate([("accounts", "0002_rate_limit")])
         self.assertEqual(set(connection.introspection.table_names()), before_tables)
         with connection.cursor() as cursor:
             self.assertEqual([column.name for column in connection.introspection.get_table_description(cursor, "auth_user")], before_columns)

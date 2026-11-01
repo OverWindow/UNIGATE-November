@@ -1,42 +1,85 @@
-import math
-import time
-from threading import Lock
+import logging
 
-from django.core.cache import caches
+from django.db import DatabaseError, connection, transaction
 from django.utils.crypto import salted_hmac
 
+from .models import RateLimit
 
-_lock = Lock()
+
+logger = logging.getLogger(__name__)
 
 
-def _key(action, email):
-    digest = salted_hmac("topiq-auth-rate-limit", email).hexdigest()
-    return f"{action}:{digest}"
+class RateLimitUnavailable(Exception):
+    pass
+
+
+def _key_hash(value):
+    return salted_hmac("topiq-auth-rate-limit", value, algorithm="sha256").hexdigest()
 
 
 def check_limit(action, email, limit):
-    with _lock:
-        record = caches["auth_rate_limit"].get(_key(action, email))
-        if record and record["expires"] > time.time() and record["count"] >= limit:
-            return max(1, math.ceil(record["expires"] - time.time()))
-    return 0
+    try:
+        with transaction.atomic(), connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT GREATEST(1, CEIL(EXTRACT(EPOCH FROM (expires_at - statement_timestamp()))))::integer
+                FROM accounts_rate_limit
+                WHERE scope = %s AND key_hash = %s
+                  AND attempts >= %s AND expires_at > statement_timestamp()
+            """, [action, _key_hash(email), limit])
+            row = cursor.fetchone()
+        return row[0] if row else 0
+    except DatabaseError:
+        logger.error("Authentication rate limit storage is unavailable.")
+        raise RateLimitUnavailable from None
 
 
 def record_attempt(action, email, limit, window):
-    # One process serves two threads; protect the entire read/update sequence.
-    with _lock:
-        cache = caches["auth_rate_limit"]
-        key = _key(action, email)
-        now = time.time()
-        record = cache.get(key)
-        if not record or record["expires"] <= now:
-            record = {"count": 0, "expires": now + window}
-        record["count"] += 1
-        remaining = max(1, math.ceil(record["expires"] - now))
-        cache.set(key, record, timeout=remaining)
-        return remaining if record["count"] > limit else 0
+    try:
+        with transaction.atomic(), connection.cursor() as cursor:
+            # PostgreSQL serializes updates of the same key across processes.
+            cursor.execute("""
+                INSERT INTO accounts_rate_limit (scope, key_hash, attempts, expires_at)
+                VALUES (%s, %s, 1, statement_timestamp() + %s * INTERVAL '1 second')
+                ON CONFLICT (scope, key_hash) DO UPDATE SET
+                    attempts = CASE
+                        WHEN accounts_rate_limit.expires_at <= statement_timestamp() THEN 1
+                        ELSE LEAST(accounts_rate_limit.attempts, %s) + 1
+                    END,
+                    expires_at = CASE
+                        WHEN accounts_rate_limit.expires_at <= statement_timestamp() THEN EXCLUDED.expires_at
+                        ELSE accounts_rate_limit.expires_at
+                    END
+                RETURNING attempts,
+                    GREATEST(1, CEIL(EXTRACT(EPOCH FROM (expires_at - statement_timestamp()))))::integer
+            """, [action, _key_hash(email), window, limit])
+            count, remaining = cursor.fetchone()
+        return remaining if count > limit else 0
+    except DatabaseError:
+        logger.error("Authentication rate limit storage is unavailable.")
+        raise RateLimitUnavailable from None
 
 
 def clear_login_failures(email):
-    with _lock:
-        caches["auth_rate_limit"].delete(_key("login", email))
+    try:
+        with transaction.atomic():
+            RateLimit.objects.filter(scope="login", key_hash=_key_hash(email)).delete()
+    except DatabaseError:
+        logger.error("Authentication rate limit storage is unavailable.")
+        raise RateLimitUnavailable from None
+
+
+def cleanup_expired(batch_size=1000):
+    # Lock only expired rows; a concurrent renewal must not be deleted.
+    with transaction.atomic(), connection.cursor() as cursor:
+        cursor.execute("""
+            WITH expired AS (
+                SELECT id FROM accounts_rate_limit
+                WHERE expires_at <= statement_timestamp()
+                ORDER BY expires_at, id LIMIT %s
+                FOR UPDATE SKIP LOCKED
+            )
+            DELETE FROM accounts_rate_limit AS target USING expired
+            WHERE target.id = expired.id
+            RETURNING target.id
+        """, [batch_size])
+        return len(cursor.fetchall())

@@ -36,7 +36,7 @@ unigate-main/
 |   `-- package-lock.json       # Locked npm dependencies
 `-- backend/                    # Shared Django backend
     |-- config/                 # Settings, routes, CORS, health checks, and configuration tests
-    |-- accounts/               # JSON authentication APIs using existing users and sessions
+    |-- accounts/               # Authentication APIs and PostgreSQL rate limits
     |-- surveys/                # Survey model, API, admin, export command, and tests
     |-- migration/              # Django application migrations
     |-- deploy/                 # Gunicorn configuration and container startup

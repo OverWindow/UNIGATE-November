@@ -55,13 +55,7 @@ INSTALLED_APPS = [
     "surveys.apps.SurveysConfig",
 ]
 MIGRATION_MODULES = {"surveys": "migration.surveys", "accounts": "migration.accounts"}
-CACHES = {
-    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
-    "auth_rate_limit": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "topiq-auth-rate-limit",
-    },
-}
+CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
 CSRF_FAILURE_VIEW = "accounts.views.csrf_failure"
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
