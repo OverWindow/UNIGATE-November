@@ -14,7 +14,8 @@ unigate-main/
 │  ├─ nginx.conf      # 정적 파일 서버 설정
 │  ├─ package.json
 │  └─ package-lock.json
-├─ backend/           # Django + PostgreSQL
+├─ frontend-TOPIQ/    # TOPIK II 학습용 Next.js + TypeScript + Tailwind CSS 프론트엔드
+├─ backend/           # 두 프론트엔드가 함께 사용하는 Django + PostgreSQL
 │  ├─ config/         # 설정, URL, WSGI/ASGI 진입점
 │  ├─ surveys/        # 설문 모델·API 및 테스트
 │  ├─ migration/      # 앱별 마이그레이션 (surveys/ 등)
@@ -31,6 +32,7 @@ unigate-main/
 ```
 
 프론트엔드와 백엔드 폴더는 하나의 Git 저장소에서 관리합니다.
+TOPIQ 개발 환경과 실행 방법은 [`frontend-TOPIQ/README.md`](frontend-TOPIQ/README.md)를 참고하세요.
 `.gitkeep`은 Git에서 빈 폴더 구조를 유지하기 위한 파일입니다.
 
 ## 프론트엔드 개발 실행
