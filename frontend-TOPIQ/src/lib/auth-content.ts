@@ -1,0 +1,107 @@
+import type { Language } from "./landing-content";
+
+interface AuthContent {
+  login: string; signup: string; logout: string; retry: string;
+  loginTitle: string; signupTitle: string; loginDescription: string; signupDescription: string;
+  email: string; nickname: string; password: string; confirm: string; passwordHint: string;
+  emailPlaceholder: string; nicknamePlaceholder: string;
+  show: string; hide: string; submitting: string; loading: string;
+  noAccount: string; hasAccount: string; home: string; signupNote: string;
+  network: string; errors: Record<string, string>;
+}
+
+export const authContent: Record<Language, AuthContent> = {
+  ko: {
+    login: "로그인", signup: "회원가입", logout: "로그아웃", retry: "다시 연결",
+    loginTitle: "다시 만나 반가워요.", signupTitle: "한국어 학습의 다음 단계, 함께해요.",
+    loginDescription: "내 TOPIQ 계정으로 로그인하세요.", signupDescription: "읽기·쓰기·단어장에 사용할 하나의 계정을 만드세요.",
+    email: "이메일", nickname: "닉네임", password: "비밀번호", confirm: "비밀번호 확인",
+    passwordHint: "8자 이상으로, 흔한 비밀번호나 숫자만으로 된 비밀번호는 사용할 수 없어요.",
+    emailPlaceholder: "you@example.com", nicknamePlaceholder: "어떻게 불러 드릴까요?",
+    show: "비밀번호 표시", hide: "비밀번호 숨기기", submitting: "처리 중…", loading: "로그인 상태를 확인하고 있어요.",
+    noAccount: "아직 계정이 없으신가요?", hasAccount: "이미 계정이 있으신가요?", home: "홈으로 돌아가기",
+    signupNote: "이메일 인증을 마친 뒤 계정을 만들어요. 본인이 사용하는 이메일로 시작해 주세요.",
+    network: "서버에 연결하지 못했어요. 연결을 확인하고 다시 시도해 주세요.",
+    errors: {
+      required: "입력해 주세요.", invalid: "올바른 형식으로 입력해 주세요.",
+      max_length: "입력한 내용이 너무 깁니다.", min_length: "입력한 내용을 확인해 주세요.",
+      email_unavailable: "사용할 수 없는 이메일입니다. 기존 계정이 있다면 로그인해 주세요.",
+      password_mismatch: "비밀번호가 일치하지 않습니다.", password_too_short: "비밀번호를 8자 이상 입력해 주세요.",
+      password_too_common: "더 추측하기 어려운 비밀번호를 사용해 주세요.", password_entirely_numeric: "숫자 외의 문자도 포함해 주세요.",
+      password_too_similar: "이메일이나 닉네임과 다른 비밀번호를 사용해 주세요.",
+      invalid_credentials: "이메일 또는 비밀번호를 확인해 주세요.",
+      rate_limited: "시도 횟수를 초과했어요. 잠시 후 다시 시도해 주세요.",
+      csrf_failed: "연결 정보가 만료됐어요. 페이지를 새로고침하고 다시 시도해 주세요.",
+      server_error: "요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.",
+      already_authenticated: "이미 로그인되어 있어요. 페이지를 새로고침해 주세요.",
+      validation_error: "입력한 내용을 확인해 주세요.", invalid_json: "입력한 내용을 확인해 주세요.",
+      payload_too_large: "입력한 내용이 너무 깁니다.",
+      email_verification_invalid: "올바른 인증 링크가 아닙니다. 새 인증 메일을 요청해 주세요.",
+      email_verification_expired: "인증 링크가 만료됐어요. 새 인증 메일을 요청해 주세요.",
+      email_verification_mismatch: "인증한 이메일과 일치하지 않아요. 다시 이메일을 인증해 주세요.",
+      email_delivery_unavailable: "인증 메일을 보내지 못했어요. 잠시 후 다시 시도해 주세요.",
+    },
+  },
+  en: {
+    login: "Log in", signup: "Sign up", logout: "Log out", retry: "Reconnect",
+    loginTitle: "Good to see you again.", signupTitle: "Your next chapter in Korean starts here.",
+    loginDescription: "Log in to your TOPIQ account.", signupDescription: "One account for reading, writing, and vocabulary.",
+    email: "Email", nickname: "Nickname", password: "Password", confirm: "Confirm password",
+    passwordHint: "Use at least 8 characters. Avoid common passwords and passwords made up of only numbers.",
+    emailPlaceholder: "you@example.com", nicknamePlaceholder: "What should we call you?",
+    show: "Show password", hide: "Hide password", submitting: "Please wait…", loading: "Checking your login status…",
+    noAccount: "New to TOPIQ?", hasAccount: "Already have an account?", home: "Back to home",
+    signupNote: "Verify your email before creating an account. Start with an email address you own.",
+    network: "We couldn't connect to the server. Check your connection and try again.",
+    errors: {
+      required: "Please fill in this field.", invalid: "Please enter a valid value.",
+      max_length: "This value is too long.", min_length: "Please check this value.",
+      email_unavailable: "This email is unavailable. Log in if you already have an account.",
+      password_mismatch: "The passwords don't match.", password_too_short: "Use at least 8 characters.",
+      password_too_common: "Choose a less common password.", password_entirely_numeric: "Include characters other than numbers.",
+      password_too_similar: "Choose a password different from your email and nickname.",
+      invalid_credentials: "Please check your email and password.",
+      rate_limited: "Too many attempts. Please wait before trying again.",
+      csrf_failed: "Your connection information expired. Refresh the page and try again.",
+      server_error: "We couldn't complete your request. Please try again shortly.",
+      already_authenticated: "You're already logged in. Please refresh the page.",
+      validation_error: "Please check the information you entered.", invalid_json: "Please check the information you entered.",
+      payload_too_large: "The information you entered is too long.",
+      email_verification_invalid: "This verification link is invalid. Request a new email.",
+      email_verification_expired: "This verification link has expired. Request a new email.",
+      email_verification_mismatch: "This address doesn't match the verified email. Verify your email again.",
+      email_delivery_unavailable: "We couldn't send the verification email. Please try again shortly.",
+    },
+  },
+  id: {
+    login: "Masuk", signup: "Daftar", logout: "Keluar", retry: "Hubungkan lagi",
+    loginTitle: "Senang bertemu kembali.", signupTitle: "Langkah baru dalam bahasa Korea dimulai di sini.",
+    loginDescription: "Masuk ke akun TOPIQ milikmu.", signupDescription: "Satu akun untuk membaca, menulis, dan kosakata.",
+    email: "Email", nickname: "Nama panggilan", password: "Kata sandi", confirm: "Konfirmasi kata sandi",
+    passwordHint: "Gunakan minimal 8 karakter. Hindari kata sandi umum atau yang hanya berisi angka.",
+    emailPlaceholder: "you@example.com", nicknamePlaceholder: "Kami harus memanggilmu apa?",
+    show: "Tampilkan kata sandi", hide: "Sembunyikan kata sandi", submitting: "Sedang diproses…", loading: "Memeriksa status masuk…",
+    noAccount: "Belum punya akun?", hasAccount: "Sudah punya akun?", home: "Kembali ke beranda",
+    signupNote: "Verifikasi email sebelum membuat akun. Gunakan alamat email milikmu sendiri.",
+    network: "Tidak dapat terhubung ke server. Periksa koneksi dan coba lagi.",
+    errors: {
+      required: "Harap isi kolom ini.", invalid: "Masukkan nilai dengan format yang benar.",
+      max_length: "Isian ini terlalu panjang.", min_length: "Periksa isian ini.",
+      email_unavailable: "Email ini tidak tersedia. Masuk jika kamu sudah memiliki akun.",
+      password_mismatch: "Kata sandi tidak cocok.", password_too_short: "Gunakan minimal 8 karakter.",
+      password_too_common: "Pilih kata sandi yang lebih sulit ditebak.", password_entirely_numeric: "Sertakan karakter selain angka.",
+      password_too_similar: "Pilih kata sandi yang berbeda dari email dan nama panggilan.",
+      invalid_credentials: "Periksa email dan kata sandimu.",
+      rate_limited: "Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.",
+      csrf_failed: "Informasi koneksi kedaluwarsa. Muat ulang halaman dan coba lagi.",
+      server_error: "Permintaan belum dapat diproses. Coba lagi sebentar lagi.",
+      already_authenticated: "Kamu sudah masuk. Muat ulang halaman ini.",
+      validation_error: "Periksa informasi yang kamu masukkan.", invalid_json: "Periksa informasi yang kamu masukkan.",
+      payload_too_large: "Informasi yang dimasukkan terlalu panjang.",
+      email_verification_invalid: "Tautan verifikasi tidak valid. Minta email baru.",
+      email_verification_expired: "Tautan verifikasi kedaluwarsa. Minta email baru.",
+      email_verification_mismatch: "Alamat ini tidak cocok dengan email terverifikasi. Verifikasi email lagi.",
+      email_delivery_unavailable: "Email verifikasi belum dapat dikirim. Coba lagi sebentar lagi.",
+    },
+  },
+};
