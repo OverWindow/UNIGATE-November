@@ -1,92 +1,222 @@
-# Unigate
+# UNIGATE
 
-대학 편입·한국어 교육 서비스입니다. 현재 React + Vite 프론트엔드의 시작 앱이 구현되어 있습니다.
-기존 Django 백엔드는 의도적으로 삭제했으며, `backend/`는 `.gitkeep`만 있는 빈 폴더입니다. 현재 저장소에는 실행 가능한 백엔드, API, DB 연동 또는 백엔드 배포 설정이 없습니다.
-소스 코드 삭제가 외부 DB나 Docker 컨테이너의 삭제를 의미하지는 않습니다.
+한국 대학 편입 안내 PDF 신청을 받는 인도네시아어 프로모션 랜딩페이지입니다.
+단일 페이지에서 안내 콘텐츠, 비용 비교, 대학 갤러리와 통계 팝업을 제공하고, PDF 신청 정보를 PostgreSQL에 저장합니다.
+PDF 파일은 운영자가 나중에 수동으로 보냅니다. 이 랜딩페이지에는 자동 다운로드·메일 발송·회원가입·이용자 로그인·결제·백그라운드 작업이 없습니다. 별도 TOPIQ의 인증 기능은 공유 백엔드에 유지합니다.
 
-## 프로젝트 구조
+## 구성
+
+- 프론트엔드: Node.js 24, npm, Next.js 16, React 19, TypeScript, 일반 CSS. `frontend/out/`으로 정적 내보내기합니다.
+- 백엔드: Python 3.13, Django 5.2, Psycopg 3, PostgreSQL 16 기준. 신청 저장, 관리자, CSV 내보내기, 상태 검사 및 기존 TOPIQ 인증을 제공합니다.
+- 배포: 프론트 Nginx HTTP 8080, 백엔드 Gunicorn HTTP 8000을 별도 서비스로 실행합니다. 공개 HTTPS는 배포 플랫폼에서 처리합니다.
+- 정확한 패키지 버전은 `frontend/package-lock.json`, `backend/requirements*.txt`를 따릅니다.
 
 ```text
-unigate-main/
-├─ frontend/          # React + Vite 프론트엔드
-│  ├─ public/         # 로고 등 정적 파일
-│  ├─ src/            # React 화면과 CSS
-│  ├─ Dockerfile      # 프론트엔드 배포 이미지
-│  ├─ nginx.conf      # 정적 파일 서버 설정
-│  ├─ package.json
-│  └─ package-lock.json
-├─ backend/           # .gitkeep만 있음, 백엔드 미구현
-├─ AGENTS.md          # 프로젝트 작업 지침
-├─ DESIGN.md          # 디자인 기준과 공식 로고 안내
-├─ README.md
-└─ .gitignore
+frontend/
+  src/app/page.tsx                   # 모든 랜딩페이지 섹션과 통계 팝업
+  src/app/layout.tsx                 # 문서 언어와 공통 CSS
+  src/styles/index.css              # 반응형 디자인과 CSS 애니메이션
+  src/components/LandingEffects.tsx # 배경 입자, 캐릭터, 스크롤과 갤러리 동작
+  src/components/TransferRequest/   # PDF 신청 폼과 제출 상태
+  src/lib/landing/                  # 대학 데이터와 팝업 애니메이션
+  src/lib/survey.ts                 # 신청 항목 코드와 인도네시아어 문구
+  public/landing/                   # 배경·대학 이미지 11개
+  scripts/preview.mjs               # 정적 빌드 미리보기
+  Dockerfile / nginx.conf
+backend/
+  surveys/                         # 기존 신청 모델·API·관리자·CSV·테스트
+  config/                          # 설정·라우팅·CORS·상태 검사
+  accounts/                        # 기존 TOPIQ 인증·이메일 인증·DB 기반 시도 제한
+  migration/                       # 기존 DB 마이그레이션
+  deploy/                          # 컨테이너 시작과 Gunicorn 설정
+  manage.py / export-surveys
+  Dockerfile / requirements*.txt
+frontend-TOPIQ/                     # 별도 프로젝트; 랜딩페이지 빌드·배포에서 제외
 ```
 
-프론트엔드와 백엔드 폴더는 하나의 Git 저장소에서 관리합니다.
-`.gitkeep`은 Git에서 빈 폴더 구조를 유지하기 위한 파일입니다.
+`frontend-TOPIQ/`는 수정하거나 정리하지 않습니다. 공유 백엔드의 TOPIQ 인증·로그인 제한과 원격의 최신 TOPIQ 화면 변경을 유지합니다.
+디자인·이미지·애니메이션은 위 프론트 소스에 통합되어 있으며 별도 HTML 원본 파일이 필요하지 않습니다.
+대학 이미지의 출처·저작자·라이선스는 각 카드에 유지합니다. Google Fonts에서 Manrope를 불러오며, 실패하면 Arial/sans-serif로 표시합니다.
 
-## 프론트엔드 개발 실행
+## 로컬 실행
 
-Node.js 24와 npm이 필요합니다. 현재 화면 실행에는 Python·DB·Docker 설정이 필요 없습니다.
-아래 명령은 프로젝트 루트(`unigate-main`)에서 시작하는 Windows PowerShell 기준입니다.
+### 프론트엔드
 
-처음 실행하거나 의존성(`package.json` 또는 `package-lock.json`)이 변경되었을 때:
-
-```powershell
+```sh
 cd frontend
 npm ci
-npm run dev -- --open
+npm run dev
 ```
 
-다음부터 실행할 때:
+`http://localhost:3000`으로 접속합니다. 화면만 확인할 때는 백엔드가 없어도 되지만 신청 저장에는 백엔드가 필요합니다.
+개발 백엔드 기본 주소는 `http://localhost:8000`입니다. 변경하려면 `NEXT_PUBLIC_BACKEND_URL`을 HTTP(S) origin으로 지정합니다. `/api` 등 경로를 붙이지 않습니다.
 
-```powershell
-cd frontend
-npm run dev -- --open
+### 백엔드
+
+Python 3.13과 PostgreSQL을 준비하고 `backend/.env.development.example`을 `backend/.env.development`로 복사합니다.
+개발 전용 비밀 키와 DB 연결값을 채웁니다. 실제 환경 파일은 Git에 넣지 않습니다.
+
+macOS/Linux:
+
+```sh
+cd backend
+python3.13 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python manage.py check
+.venv/bin/python manage.py migrate
+.venv/bin/python manage.py runserver
 ```
 
-브라우저가 자동으로 열립니다. 접속 주소는 터미널에 표시되며, 기본값은 `http://localhost:5173/`입니다.
-React·CSS 파일을 수정하고 저장하면 화면에 반영됩니다. 서버는 터미널에서 `Ctrl+C`로 종료합니다.
+Windows PowerShell에서는 `py -3.13 -m venv .venv`로 환경을 만들고 위 `.venv/bin/python`을 `.\.venv\Scripts\python.exe`로 바꿉니다.
+`http://localhost:8000`으로 실행됩니다. 브라우저와 백엔드 주소에 `localhost`와 `127.0.0.1`을 섞지 마세요.
 
-| 수정할 내용 | 파일 |
+`DJANGO_ENV`는 기본 `development`이며 `.env.development`만 읽습니다. 운영은 프로세스에 `DJANGO_ENV=production`을 지정하고 `.env.production` 또는 플랫폼 환경변수를 사용합니다.
+프로세스 환경변수가 파일보다 우선하며, 일반 `.env`는 읽지 않습니다. Docker에서는 환경 파일을 복사하지 않고 런타임 환경변수만 사용합니다.
+
+## 신청과 데이터
+
+페이지 상단·안내 목록·하단의 무료 PDF 안내 버튼으로 동일한 신청 모달을 엽니다.
+
+| 필드 | 규칙 |
 |---|---|
-| 화면 구성 | `frontend/src/App.jsx` |
-| 화면 스타일 | `frontend/src/App.css` |
-| 공통 스타일 | `frontend/src/index.css` |
-| 공식 로고 | `frontend/public/brand/unigate-logo.svg` |
-| 디자인 기준 | `DESIGN.md` — 디자인 변경 전에 확인 |
+| `email` | 필수 이메일, 최대 254자 |
+| `age` | 필수 정수, 0~120 |
+| `education_type` | 필수, 기존 교육기관 유형 중 선택 |
+| `desired_university` | 선택, 최대 500자, 미입력은 NULL |
 
-## 코드 검사와 빌드
+`survey_responses`의 기존 스키마를 사용합니다. `id`와 `created_at`은 서버가 생성하며 중복 이메일은 별도 신청으로 허용합니다.
+프론트는 제출 중 입력·닫기·재제출을 막고, 서버의 201 응답을 받은 뒤에만 완료를 표시합니다. 입력 오류나 실패 시 내용을 유지합니다.
+응답 유실·서버 오류는 이미 저장되었을 가능성을 안내하며 자동 재전송하지 않습니다.
 
-아래 명령은 `frontend/`에서 실행합니다.
+Google Analytics 4 측정 ID `G-S2TDPYEQ93`을 랜딩페이지에 삽입했습니다. 기본 페이지 조회 외에 `guide_open`(버튼 위치 `hero`/`contents`/`footer`), `guide_submit`, `guide_submit_failed`(오류 유형), `generate_lead`(신청 API의 201 응답), `university_stats_open` 이벤트를 전송합니다. 신청자의 이메일·나이·학교명과 입력값은 이벤트에 포함하지 않습니다. 운영 반영은 프론트엔드 재빌드·배포 후 확인합니다.
 
-| 명령 | 용도 |
-|---|---|
-| `npm run lint` | Oxlint 코드 검사 |
-| `npm run build` | `dist/`에 배포 파일 생성 |
-| `npm run preview` | 빌드 결과 로컬 확인 (운영 서버 아님) |
+| 메서드 | 경로 | 용도 |
+|---|---|---|
+| GET | `/api/csrf/` | CSRF 쿠키와 토큰 발급 |
+| POST | `/api/survey-responses/` | 입력 검증 후 신청 저장, 성공 201 |
+| GET | `/api/health/` | 신청 테이블 접근 가능 여부, 200 또는 503 |
 
-현재 프론트엔드 테스트 스크립트는 없습니다. 백엔드는 미구현 상태이므로 백엔드 검사·마이그레이션·실행 명령도 없습니다.
+`/api/auth/*`는 기존 TOPIQ가 사용하는 인증 API이며 랜딩페이지에서는 호출하지 않습니다. `/admin/`은 운영자용 Django 관리자입니다.
+관리자 로그인에 필요한 Django 기본 인증·권한·세션 앱은 유지합니다.
+`accounts` 앱은 TOPIQ의 가입·로그인·이메일 인증과 PostgreSQL 기반 시도 제한을 제공합니다. 기존 이메일 고유 인덱스 및 마이그레이션 이력을 유지합니다.
+기존 모델·마이그레이션·테이블을 삭제하거나 초기화하지 않습니다.
 
-## 프론트엔드 Docker 실행
+### 관리자와 수동 발송
 
-Docker Desktop 또는 Docker Engine의 Linux 컨테이너 환경이 필요합니다.
-프로젝트 루트에서 실행합니다.
+백엔드에서 `manage.py createsuperuser`로 운영자 계정을 대화형으로 만든 후 백엔드 도메인의 `/admin/`에 접속합니다.
+신청 목록을 검색·필터링하고 관리자의 **CSV 다운로드** 버튼으로 현재 필터에 맞는 전체 신청을 내려받아 PDF를 수동 발송합니다. CSV 다운로드는 신청 조회 권한이 있는 운영자만 사용할 수 있습니다. 관리자에서 신청을 삭제하면 실제 데이터가 삭제됩니다.
+운영자 계정·신청자 개인정보·내보낸 CSV는 Git이나 공개 공유 경로에 올리지 않습니다.
 
-```powershell
-docker build --pull -t unigate-frontend ./frontend
-docker run --rm --name unigate-frontend -p 127.0.0.1:8080:8080 unigate-frontend
+Linux 또는 컨테이너:
+
+```sh
+cd backend
+./export-surveys
+./export-surveys --output /tmp/survey-responses.csv
 ```
 
-브라우저에서 `http://localhost:8080/`에 접속합니다. 종료하려면 별도 터미널에서 `docker stop unigate-frontend`를 실행합니다.
+Windows: `backend/`에서 `.\.venv\Scripts\python.exe manage.py export_surveys`를 실행합니다.
+기본 출력은 저장소 루트의 `exports/survey_responses_날짜_시간.csv`이며 UTF-8 BOM과 ID 오름차순을 사용합니다.
+헤더는 `id,email,age,education_type,desired_university,created_at`입니다. Excel 수식으로 해석될 수 있는 입력은 표시용으로 이스케이프하며 DB 원문은 바꾸지 않습니다.
+기존 파일 덮어쓰기는 `--overwrite`를 명시한 경우만 허용합니다. 컨테이너의 CSV는 교체 전에 외부로 복사해야 합니다.
 
-이미지는 Node.js 24로 빌드하고 비관리자 Nginx로 HTTP 8080에서 정적 파일을 제공합니다.
-`nginx.conf`는 SPA 경로 처리와 캐싱을 설정하며, `/api`와 `/api/` 하위 요청은 현재 404를 반환합니다.
-HTTPS와 백엔드 프록시 연결은 향후 배포 환경에 맞게 별도로 설정해야 합니다.
+## 빌드와 검증
 
-## 파일 관리
+`frontend/`에서:
 
-- `frontend/package-lock.json`은 커밋하고 `npm ci`로 의존성을 설치합니다.
-- 의존성·빌드 결과·실제 `.env*` 파일은 커밋하지 않습니다. 환경 설정을 공유할 때는 비밀 값 없는 `.example` 파일을 사용합니다.
-- `.gitignore`의 Python 관련 규칙과 `backend/media/`, `backend/staticfiles/` 규칙은 향후 백엔드 작업을 위해 유지합니다. 해당 구현이나 폴더가 현재 존재한다는 의미는 아닙니다.
-- 백엔드 구현이나 폴더 구조가 변경되면 `AGENTS.md`와 이 문서도 함께 갱신합니다.
+```sh
+npm ci
+NEXT_PUBLIC_BACKEND_URL=http://localhost:8000 npm run lint
+NEXT_PUBLIC_BACKEND_URL=http://localhost:8000 npm run typecheck
+NEXT_PUBLIC_BACKEND_URL=http://localhost:8000 npm run build
+npm run preview
+```
+
+PowerShell에서는 먼저 `$env:NEXT_PUBLIC_BACKEND_URL="http://localhost:8000"`을 설정한 뒤 `npm run ...`을 실행합니다.
+타입 생성과 빌드에도 백엔드 origin이 필요합니다. `preview`는 기본 `http://127.0.0.1:3000`에서 `out/`만 제공합니다.
+미리보기로 신청을 검증할 때는 브라우저에서 `http://localhost:3000`을 사용하거나 프론트·백엔드 호스트명을 함께 맞춥니다.
+
+격리된 PostgreSQL 테스트 환경을 지정한 후 `backend/`에서:
+
+```sh
+.venv/bin/python manage.py check
+.venv/bin/python manage.py makemigrations --check --dry-run
+.venv/bin/python manage.py test accounts surveys config.test_settings config.test_health config.test_cors config.test_routes --noinput
+```
+
+테스트는 합성 데이터와 `test_<DB_NAME>`을 사용하며 테스트 계정에는 CREATEDB 권한이 필요합니다. 운영 DB 연결 설정으로 실행하지 않습니다.
+환경 설정 파싱 테스트만 실행하려면 `.venv/bin/python -m unittest config.test_settings`를 사용합니다.
+
+## 공유 백엔드의 TOPIQ 인증
+
+`frontend-TOPIQ/`의 코드는 원격 최신 상태 그대로 유지합니다. TOPIQ의 Next.js 서버가 `DJANGO_BACKEND_URL`로 공유 Django를 호출하며, 랜딩페이지의 정적 빌드와는 별개입니다.
+
+| 메서드 | 기존 경로 | 목적 |
+|---|---|---|
+| POST | `/api/auth/email/send/` | Brevo 이메일 인증 발송·재발송 |
+| POST | `/api/auth/email/verify/` | 서명된 인증 토큰 검증 |
+| POST | `/api/auth/signup/` | 이메일 인증 후 가입·로그인 |
+| POST | `/api/auth/login/` | 이메일·비밀번호 로그인 |
+| POST | `/api/auth/logout/` | 세션 종료 |
+| GET | `/api/auth/me/` | 현재 회원 조회 |
+
+CSRF·세션 쿠키·사용자 테이블과 기존 `accounts_rate_limit` 테이블을 유지합니다. 로그인·가입·메일 발송의 시도 제한은 PostgreSQL에 저장하며 서버 재시작 후에도 유지됩니다. 제한 저장소 오류는 503으로 응답합니다.
+이 테이블과 `migration/accounts/0002_rate_limit.py`는 기존 원격 변경이며 이번 랜딩페이지 변경에서 새로 추가한 것이 아닙니다.
+운영자가 `manage.py cleanup_auth_rate_limits --batch-size 1000`을 실행하면 만료된 제한 기록만 정리합니다. 자동 워커는 없습니다.
+
+TOPIQ 이메일 인증에는 백엔드 런타임에 `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME`, `TOPIQ_PUBLIC_URL`을 설정합니다. 키는 프론트엔드에 전달하지 않습니다.
+`DJANGO_CSRF_TRUSTED_ORIGINS`에는 랜딩페이지와 TOPIQ의 정확한 origin을 함께 등록합니다. 테스트에서는 메일 전송을 모킹하고 실제 메일을 발송하지 않습니다.
+
+## Docker / Cloudtype 배포
+
+빌드 컨텍스트는 각각 `frontend/`와 `backend/`입니다. `frontend-TOPIQ/`는 포함하지 않습니다.
+
+```sh
+docker build --build-arg NEXT_PUBLIC_BACKEND_URL=https://api.example.com -t unigate-frontend ./frontend
+docker build -t unigate-backend ./backend
+```
+
+| 서비스 | 포트 | 상태 검사 | 설정 |
+|---|---|---|---|
+| 프론트 | 8080 | `/` | 빌드 인자 `NEXT_PUBLIC_BACKEND_URL` |
+| 백엔드 | 8000 | `/api/health/` | 아래 런타임 환경변수 |
+
+프론트는 비관리자 Nginx로 정적 파일을 제공하고 API를 프록시하지 않습니다. 브라우저가 백엔드 공개 주소로 직접 요청합니다.
+`NEXT_PUBLIC_BACKEND_URL`은 **빌드 시** JavaScript에 포함됩니다. 런타임 환경변수만 바꿔서는 반영되지 않으며 재빌드가 필요합니다.
+이전 홈페이지 경로 `/tentang-kami`, `/kurikulum`, `/institusi-mitra`, `/contact`는 `/`로 이동합니다.
+
+백엔드 필수/선택 설정:
+
+| 변수 | 값과 용도 |
+|---|---|
+| `DJANGO_ENV` | 운영은 `production` (이미지 기본값) |
+| `DJANGO_SECRET_KEY` | 지속적인 운영 키, 플랫폼 시크릿으로 관리 |
+| `DJANGO_ALLOWED_HOSTS` | 백엔드 공개 호스트명, 쉼표 구분, 와일드카드 금지 |
+| `DJANGO_CSRF_TRUSTED_ORIGINS` | 프론트 공개 HTTPS origin, CORS 허용 목록도 겸함 |
+| `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` | 기존 PostgreSQL 연결값 |
+| `DB_SSLMODE` | DB TLS 정책에 맞게 지정; 기본 `prefer` |
+| `DJANGO_TRUST_PROXY` | ingress가 전달 헤더를 교체하고 직접 접근을 차단할 때만 `1` |
+| `DJANGO_SSL_REDIRECT` | 운영 HTTPS 전환 시 `1` |
+| `DJANGO_SSL_HOST` | HTTPS 전환 대상 백엔드 호스트명 |
+
+프론트·백엔드 모두 공개 HTTPS를 설정합니다. CORS origin에는 경로·끝 슬래시·와일드카드를 넣지 않습니다. `https://unigate.kr` 또는 `https://www.unigate.kr` 중 하나를 명시하면 두 공식 랜딩 주소를 CSRF·CORS에 함께 허용합니다. 다른 도메인이나 서브도메인은 자동으로 추가하지 않습니다.
+쿠키와 `X-CSRFToken`을 함께 사용하며 운영 CSRF 쿠키는 `Secure; SameSite=None`입니다.
+브라우저의 교차 사이트 쿠키 제한을 줄이려면 같은 사이트의 서브도메인(예: `www.example.com`, `api.example.com`)을 사용하고 실제 배포 도메인에서 확인하세요.
+
+백엔드는 `migrate --noinput` → `collectstatic --noinput` → Gunicorn 순서로 시작합니다. 관리자의 정적 파일은 WhiteNoise가 제공합니다.
+기존 배포의 단일 레플리카 / Recreate 구성을 유지하고, 동일한 PostgreSQL 서비스·볼륨·연결값을 사용합니다.
+마이그레이션 전 백업은 운영자가 별도로 수행합니다. 코드 교체가 DB 백업이나 복원을 대신하지 않습니다.
+DB 비밀번호·이메일 발송 키를 프론트 빌드 인자에 넣지 않습니다. 랜딩페이지 신청에는 Brevo가 필요 없지만 TOPIQ 이메일 인증에는 앞 절의 Brevo 설정이 필요합니다.
+
+배포 후 별도 검증 환경에서 HTTPS, 상태 검사, CSRF를 포함한 신청 저장, 관리자 조회와 CSV 내보내기를 확인하세요.
+Docker 실행 환경이나 운영 도메인에서 확인하지 못한 항목은 로컬 코드 검사 통과만으로 검증된 것으로 취급하지 않습니다.
+
+## 배포 전 검증 기록 (2026-11-02)
+
+- Chromium에서 360, 390, 650, 768, 900, 1024, 1440, 1920px 폭을 비교했습니다. 신청 폼을 제외한 346개 요소의 위치·크기와 주요 계산 스타일은 기준 디자인과 일치했습니다.
+- 배경·대학 이미지 11개는 기준 이미지와 바이트 단위로 일치합니다.
+- 동일한 뷰포트·난수·시간 조건에서 캐릭터의 20프레임 변형값과 배경 캔버스 픽셀이 일치했습니다. CSS 애니메이션 6개의 키프레임과 재생 설정도 일치했습니다.
+- 정지 화면 비교는 무작위 배경 입자를 숨긴 조건입니다. 1440×1000 화면은 픽셀이 일치했고, 390×844 화면은 일부 픽셀에 RGB 1 이내의 차이가 있었습니다. 모든 기기·브라우저의 픽셀 동일성을 보장하는 검사는 아닙니다.
+- 의도된 차이는 기존 신청 폼 항목·저장 동작과 651~900px에서 화면 밖으로 나가는 캐릭터 장식의 가로 넘침 보정입니다. 이 보정은 섹션 배치와 크기를 변경하지 않습니다.
+- 랜딩페이지 검증에서 PostgreSQL 16과 Python 3.13의 배포 컨테이너로 테스트 43개와 브라우저→Nginx→Gunicorn→DB의 합성 신청 저장을 확인했습니다. 최신 원격 통합 후에는 TOPIQ 인증·시도 제한·관리자 CSV 및 공식 랜딩 도메인 CORS 회귀 테스트를 포함한 전체 97개 검사가 통과했습니다.
+- 검증은 로컬 격리 환경에서 수행했습니다. 운영 HTTPS·도메인·쿠키 정책과 플랫폼 설정은 실제 배포 환경에서 별도로 확인해야 합니다.

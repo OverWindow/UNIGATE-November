@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+
+backend_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [ -x "$backend_dir/.venv/bin/python" ]; then
+    python="$backend_dir/.venv/bin/python"
+else
+    python=python3
+fi
+
+exec "$python" "$backend_dir/manage.py" export_surveys "$@"
