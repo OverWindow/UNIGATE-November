@@ -88,6 +88,8 @@ Windows PowerShell에서는 `py -3.13 -m venv .venv`로 환경을 만들고 위 
 프론트는 제출 중 입력·닫기·재제출을 막고, 서버의 201 응답을 받은 뒤에만 완료를 표시합니다. 입력 오류나 실패 시 내용을 유지합니다.
 응답 유실·서버 오류는 이미 저장되었을 가능성을 안내하며 자동 재전송하지 않습니다.
 
+Google Analytics 4 측정 ID `G-S2TDPYEQ93`을 랜딩페이지에 삽입했습니다. 기본 페이지 조회 외에 `guide_open`(버튼 위치 `hero`/`footer`), `guide_submit`, `guide_submit_failed`(오류 유형), `generate_lead`(신청 API의 201 응답), `university_stats_open` 이벤트를 전송합니다. 신청자의 이메일·나이·학교명과 입력값은 이벤트에 포함하지 않습니다. 운영 반영은 프론트엔드 재빌드·배포 후 확인합니다.
+
 | 메서드 | 경로 | 용도 |
 |---|---|---|
 | GET | `/api/csrf/` | CSRF 쿠키와 토큰 발급 |

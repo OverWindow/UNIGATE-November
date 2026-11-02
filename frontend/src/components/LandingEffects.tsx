@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 import { closeModal, isBackdropClick, openModal } from "@/lib/landing/modal";
+import { trackEvent } from "@/lib/analytics";
+import universities from "@/lib/landing/universities.json";
 
 export default function LandingEffects() {
   useEffect(() => {
@@ -11,7 +13,7 @@ export default function LandingEffects() {
     const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
     const modal = document.querySelector<HTMLDialogElement>("#stats-dialog")!;
     document.querySelectorAll("[data-open-stats]").forEach(button => {
-      button.addEventListener("click", () => openModal(modal), { signal });
+      button.addEventListener("click", () => { trackEvent("university_stats_open"); openModal(modal); }, { signal });
     });
     modal.querySelector(".close")!.addEventListener("click", () => { void closeModal(modal); }, { signal });
     modal.addEventListener("cancel", event => { event.preventDefault(); void closeModal(modal); }, { signal });
@@ -86,12 +88,15 @@ export default function LandingEffects() {
     const gallery = section.querySelector<HTMLElement>(".university-window")!;
     const track = section.querySelector<HTMLElement>(".university-track")!;
     const progress = section.querySelector<HTMLElement>(".university-counter span")!;
+    const counter = section.querySelector<HTMLElement>(".university-counter")!;
     let travel = 0, universityFrame = 0;
     function updateUniversities() {
       universityFrame = 0;
       const distance = Math.max(0, Math.min(travel, -section.getBoundingClientRect().top));
       track.style.transform = `translate3d(${-distance}px,0,0)`;
-      progress.textContent = String(Math.min(10, Math.round((travel ? distance / travel : 0) * 9) + 1)).padStart(2, "0");
+      const current = Math.min(universities.length, Math.round((travel ? distance / travel : 0) * (universities.length - 1)) + 1);
+      progress.textContent = String(current).padStart(2, "0");
+      counter.setAttribute("aria-label", `Kartu ${current} dari ${universities.length}`);
     }
     function sizeUniversities() {
       travel = Math.max(0, track.scrollWidth - gallery.clientWidth);

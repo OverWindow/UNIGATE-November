@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { closeModal, isBackdropClick, openModal } from "@/lib/landing/modal";
+import { trackEvent } from "@/lib/analytics";
 import { educationTypes, surveyCopy } from "@/lib/survey";
 
 type Field = "email" | "age" | "education_type" | "desired_university";
@@ -39,6 +40,7 @@ export default function TransferRequest() {
     const controller = new AbortController();
     document.querySelectorAll<HTMLButtonElement>("[data-open-guide]").forEach(button => {
       button.addEventListener("click", () => {
+        trackEvent("guide_open", { placement: button.closest(".hero") ? "hero" : "footer" });
         trigger.current = button;
         if (dialog.current) openModal(dialog.current);
         setOpen(true);
@@ -74,6 +76,7 @@ export default function TransferRequest() {
     }
 
     inFlight.current = true;
+    trackEvent("guide_submit");
     setStatus("submitting");
     let sent = false;
     try {
@@ -90,17 +93,21 @@ export default function TransferRequest() {
         body: JSON.stringify({ email, age: Number(age), education_type: education, desired_university: university || null }),
       });
       if (response.status === 201) {
+        trackEvent("generate_lead", { source: "guide_form" });
         form.reset();
         setStatus("success");
       } else if (response.status === 400) {
+        trackEvent("guide_submit_failed", { reason: "validation" });
         const result = await response.json();
         setErrors(Object.fromEntries(fields.filter((field) => result.fields?.[field]).map((field) => [field, true])));
         setStatus("invalid");
       } else {
+        trackEvent("guide_submit_failed", { reason: response.status >= 500 ? "server" : "request" });
         setStatus(response.status >= 500 ? "uncertain" : "failure");
       }
     } catch {
       // Never retry a POST automatically: the server may already have saved it.
+      trackEvent("guide_submit_failed", { reason: sent ? "uncertain" : "csrf_or_network" });
       setStatus(sent ? "uncertain" : "failure");
     } finally {
       inFlight.current = false;
