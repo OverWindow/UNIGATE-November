@@ -76,6 +76,11 @@ CSRF_TRUSTED_ORIGINS = [
         "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001" if DEBUG else "",
     ).split(",") if origin.strip()
 ]
+# Both official landing hostnames use the same form; keep CORS and CSRF aligned.
+landing_origins = ("https://unigate.kr", "https://www.unigate.kr")
+if any(origin in CSRF_TRUSTED_ORIGINS for origin in landing_origins):
+    CSRF_TRUSTED_ORIGINS += [origin for origin in landing_origins if origin not in CSRF_TRUSTED_ORIGINS]
+
 TEMPLATES = [{
     "BACKEND": "django.template.backends.django.DjangoTemplates",
     "DIRS": [],

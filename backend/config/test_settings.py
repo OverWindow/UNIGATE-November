@@ -104,3 +104,27 @@ class EnvironmentSettingsTests(unittest.TestCase):
         for variable in ("DB_NAME", "DB_USER", "DB_PASSWORD", "DB_HOST", "DB_PORT"):
             with self.subTest(variable=variable), self.assertRaises(ImproperlyConfigured):
                 self.read_settings({"DJANGO_SECRET_KEY": "test", variable: ""})
+
+    def test_official_landing_origins_are_kept_in_sync(self):
+        for origins in ("https://unigate.kr", "https://www.unigate.kr",
+                        "https://unigate.kr,https://www.unigate.kr"):
+            with self.subTest(origins=origins):
+                settings, _ = self.read_settings({
+                    "DJANGO_SECRET_KEY": "test",
+                    "DJANGO_CSRF_TRUSTED_ORIGINS": origins + ",https://topiq.unigate.kr",
+                    "DJANGO_ENV": "production", "DJANGO_ALLOWED_HOSTS": "api.unigate.kr",
+                })
+                trusted = settings["CSRF_TRUSTED_ORIGINS"]
+                self.assertEqual(trusted.count("https://unigate.kr"), 1)
+                self.assertEqual(trusted.count("https://www.unigate.kr"), 1)
+                self.assertIn("https://topiq.unigate.kr", trusted)
+
+    def test_landing_aliases_require_an_explicit_official_origin(self):
+        for origin in ("", "https://example.com", "https://unigate.kr.evil.example",
+                       "https://www.unigate.kr.evil.example", "https://topiq.unigate.kr"):
+            with self.subTest(origin=origin):
+                settings, _ = self.read_settings({
+                    "DJANGO_SECRET_KEY": "test", "DJANGO_CSRF_TRUSTED_ORIGINS": origin,
+                })
+                self.assertNotIn("https://unigate.kr", settings["CSRF_TRUSTED_ORIGINS"])
+                self.assertNotIn("https://www.unigate.kr", settings["CSRF_TRUSTED_ORIGINS"])

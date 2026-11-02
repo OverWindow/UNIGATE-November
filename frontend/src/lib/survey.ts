@@ -7,7 +7,7 @@ export const surveyCopy = {
   description: "Daftar sekarang. Panduan transfer universitas dalam format PDF akan dikirim ke email Anda dalam beberapa minggu.",
   email: "Email", emailPlaceholder: "Masukkan alamat email Anda", age: "Usia", agePlaceholder: "Contoh: 20",
   education: "Institusi / Pendidikan", educationPlaceholder: "Pilih jenis pendidikan",
-  educationHelp: "Pilih jenis perguruan tinggi tempat Anda belajar saat ini atau terakhir. Pilih lulusan SMA/sederajat jika belum pernah kuliah.",
+  educationHelp: "Pilih pendidikan terakhir.",
   university: "Universitas Tujuan (Opsional)", universityPlaceholder: "Masukkan universitas yang Anda minati",
   submit: "Daftar Informasi", submitting: "Mengirim…", close: "Tutup",
   successTitle: "Pendaftaran berhasil", success: "Panduan transfer universitas dalam format PDF akan dikirim ke email Anda dalam beberapa minggu.",

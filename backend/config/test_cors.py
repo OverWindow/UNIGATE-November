@@ -70,3 +70,20 @@ class SurveyCorsTests(TestCase):
         self.assertNotIn("Access-Control-Allow-Origin", response)
         response = self.client.get("/missing/", secure=True, **self.headers)
         self.assertNotIn("Access-Control-Allow-Origin", response)
+
+    @override_settings(CSRF_TRUSTED_ORIGINS=["https://unigate.kr", "https://www.unigate.kr"])
+    def test_both_official_landing_hosts_can_submit(self):
+        for origin in ("https://unigate.kr", "https://www.unigate.kr"):
+            with self.subTest(origin=origin):
+                client = Client(enforce_csrf_checks=True)
+                headers = {**self.headers, "HTTP_ORIGIN": origin}
+                token = client.get("/api/csrf/", secure=True, **headers)
+                self.assertEqual(token["Access-Control-Allow-Origin"], origin)
+                self.assertEqual(token["Access-Control-Allow-Credentials"], "true")
+                response = client.post(
+                    "/api/survey-responses/", self.payload, content_type="application/json",
+                    secure=True, **headers, HTTP_X_CSRFTOKEN=token.json()["csrfToken"],
+                )
+                self.assertEqual(response.status_code, 201)
+                self.assertEqual(response["Access-Control-Allow-Origin"], origin)
+        self.assertEqual(SurveyResponse.objects.count(), 2)

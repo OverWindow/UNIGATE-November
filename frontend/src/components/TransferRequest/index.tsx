@@ -18,6 +18,9 @@ export default function TransferRequest() {
   const [status, setStatus] = useState<Status>("idle");
   const [errors, setErrors] = useState<Partial<Record<Field, boolean>>>({});
   const busy = status === "submitting";
+  const firstError = fields.find(field => errors[field]);
+  const requestMessage = status === "failure" ? t.failure : status === "uncertain" ? t.uncertain
+    : status === "invalid" && !firstError ? t.invalid : null;
 
   useEffect(() => {
     if (!open) return;
@@ -28,7 +31,7 @@ export default function TransferRequest() {
 
   useEffect(() => {
     if (open && (status === "success" || status === "failure" || status === "uncertain" || status === "invalid")) {
-      feedback.current?.focus();
+      feedback.current?.focus({ preventScroll: true });
     }
   }, [status, open]);
 
@@ -105,7 +108,7 @@ export default function TransferRequest() {
   }
 
   function error(field: Field) {
-    return errors[field] ? <p id={`transfer-${field}-error`} className="field-error">{t.errors[field]}</p> : null;
+    return firstError === field ? <p id={`transfer-${field}-error`} className="field-error" role="alert">{t.errors[field]}</p> : null;
   }
 
   return (
@@ -114,9 +117,10 @@ export default function TransferRequest() {
       onClose={() => { setOpen(false); trigger.current?.focus({ preventScroll: true }); }}
       onClick={event => { if (isBackdropClick(event.nativeEvent, event.currentTarget)) close(); }}>
       <button className="close" type="button" aria-label={t.close} disabled={busy} onClick={close}>×</button>
-      <p className="section-tag">Panduan dalam format PDF</p>
       <h2 className="modal-title" id="dialog-title">{status === "success" ? t.successTitle : "Mulai langkah pertamamu."}</h2>
-      <p className="modal-copy" id="dialog-copy">{t.description}</p>
+      <div className={`modal-copy${requestMessage ? " request-error" : ""}`} id="dialog-copy"
+        ref={requestMessage ? feedback : undefined} role={requestMessage ? "alert" : undefined}
+        tabIndex={requestMessage ? -1 : undefined}>{requestMessage ?? t.description}</div>
       {status === "success" ? (
         <div ref={feedback} tabIndex={-1} role="status" className="form-feedback success">
           <p>{t.success}</p>
@@ -133,17 +137,17 @@ export default function TransferRequest() {
           }}>
             <div className="form-field">
               <label htmlFor="transfer-email">{t.email}</label>
-              <input id="transfer-email" name="email" type="email" autoComplete="email" required maxLength={254} placeholder={t.emailPlaceholder} aria-invalid={Boolean(errors.email)} aria-describedby={errors.email ? "transfer-email-error" : undefined} />
+              <input id="transfer-email" name="email" type="email" autoComplete="email" required maxLength={254} placeholder={t.emailPlaceholder} aria-invalid={Boolean(errors.email)} aria-describedby={firstError === "email" ? "transfer-email-error" : undefined} />
               {error("email")}
             </div>
             <div className="form-field">
               <label htmlFor="transfer-age">{t.age}</label>
-              <input id="transfer-age" name="age" type="number" inputMode="numeric" min={0} max={120} step={1} required placeholder={t.agePlaceholder} aria-invalid={Boolean(errors.age)} aria-describedby={errors.age ? "transfer-age-error" : undefined} />
+              <input id="transfer-age" name="age" type="number" inputMode="numeric" min={0} max={120} step={1} required placeholder={t.agePlaceholder} aria-invalid={Boolean(errors.age)} aria-describedby={firstError === "age" ? "transfer-age-error" : undefined} />
               {error("age")}
             </div>
             <div className="form-field">
               <label htmlFor="transfer-education">{t.education}</label>
-              <select id="transfer-education" name="education_type" required defaultValue="" aria-invalid={Boolean(errors.education_type)} aria-describedby={`transfer-education-help${errors.education_type ? " transfer-education_type-error" : ""}`}>
+              <select id="transfer-education" name="education_type" required defaultValue="" aria-invalid={Boolean(errors.education_type)} aria-describedby={`transfer-education-help${firstError === "education_type" ? " transfer-education_type-error" : ""}`}>
                 <option value="" disabled>{t.educationPlaceholder}</option>
                 {educationTypes.map(value => <option key={value} value={value}>{t.choices[value]}</option>)}
               </select>
@@ -152,11 +156,10 @@ export default function TransferRequest() {
             </div>
             <div className="form-field">
               <label htmlFor="transfer-university">{t.university}</label>
-              <input id="transfer-university" name="desired_university" maxLength={500} placeholder={t.universityPlaceholder} aria-invalid={Boolean(errors.desired_university)} aria-describedby={errors.desired_university ? "transfer-desired_university-error" : undefined} />
+              <input id="transfer-university" name="desired_university" maxLength={500} placeholder={t.universityPlaceholder} aria-invalid={Boolean(errors.desired_university)} aria-describedby={firstError === "desired_university" ? "transfer-desired_university-error" : undefined} />
               {error("desired_university")}
             </div>
           </fieldset>
-          {(status === "failure" || status === "uncertain" || status === "invalid") && <div ref={feedback} tabIndex={-1} role="alert" className="form-feedback">{t[status]}</div>}
           <button type="submit" className="primary" disabled={busy}>{busy ? t.submitting : t.submit}</button>
         </form>
       )}
