@@ -4,6 +4,9 @@ export function openModal(modal: HTMLDialogElement) {
   if (modal.open) return;
   modal.classList.remove("closing");
   modal.showModal();
+  // Keep keyboard focus in the dialog without selecting its close button first.
+  modal.tabIndex = -1;
+  modal.focus({ preventScroll: true });
   modal.scrollTop = 0;
   const region = modal.querySelector(".stats-table-window");
   if (region) region.scrollTop = 0;

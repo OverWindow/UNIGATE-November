@@ -4,10 +4,8 @@ export const educationTypes = [
 ] as const;
 
 export const surveyCopy = {
-  description: "Daftar sekarang. Panduan transfer universitas dalam format PDF akan dikirim ke email Anda dalam beberapa minggu.",
   email: "Email", emailPlaceholder: "Masukkan alamat email Anda", age: "Usia", agePlaceholder: "Contoh: 20",
-  education: "Institusi / Pendidikan", educationPlaceholder: "Pilih jenis pendidikan",
-  educationHelp: "Pilih pendidikan terakhir.",
+  education: "Pendidikan Terakhir", educationPlaceholder: "Pilih jenis pendidikan",
   university: "Universitas Tujuan (Opsional)", universityPlaceholder: "Masukkan universitas yang Anda minati",
   submit: "Daftar Informasi", submitting: "Mengirim…", close: "Tutup",
   successTitle: "Pendaftaran berhasil", success: "Panduan transfer universitas dalam format PDF akan dikirim ke email Anda dalam beberapa minggu.",

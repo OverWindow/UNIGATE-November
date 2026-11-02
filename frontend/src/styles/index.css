@@ -53,19 +53,19 @@ html{overflow-x:clip}.hero{padding-top:78px;padding-bottom:50px;min-height:640px
 #guide-dialog .modal-copy{font-size:12px;line-height:1.5;margin:12px 0 18px}
 #guide-dialog label{font-size:11px;line-height:1.4;margin-bottom:5px}
 #guide-dialog input{min-height:44px;padding:10px 12px;font-size:13px}
-#guide-dialog form>.primary{min-height:46px;padding:10px 20px;margin-top:16px}
+#guide-dialog form>.primary{min-height:46px;padding:10px 20px;margin-top:18px}
 #guide-dialog .field-error{font-size:11px;line-height:1.4;margin-top:4px}
 #guide-dialog .form-feedback{font-size:12px;line-height:1.5;padding:10px;margin-top:12px}
 #guide-dialog fieldset{border:0;padding:0;margin:0;min-width:0}
-#guide-dialog .form-field+.form-field{margin-top:12px}
+#guide-dialog .form-field+.form-field{margin-top:15px}
 #guide-dialog select{font:inherit;width:100%;min-width:0;border:1px solid #a59bb9;background:#ffffffa6;border-radius:10px;min-height:44px;padding:10px 12px;color:var(--ink);font-size:13px}
 #guide-dialog select:focus{outline:2px solid #7b65a5;outline-offset:2px}
-#guide-dialog .notice{font-size:11px;line-height:1.4;margin-top:5px;white-space:nowrap}
 #guide-dialog [aria-invalid=true]{border-color:#a43248}
 .field-error{font-size:12px;color:#92283e;margin-top:6px}
 .form-feedback{font-size:13px;color:#92283e;background:#fff5f5a6;border:1px solid #a4324833;border-radius:10px;padding:14px;margin-top:18px}
 .form-feedback.success{color:var(--ink);background:#ffffff70;border-color:var(--line)}
 .form-feedback.success .primary{width:100%;margin-top:18px}
+#guide-dialog .form-feedback.success{background:none;border:0;border-radius:0;box-shadow:none;padding:0;margin-top:14px}
 #guide-dialog fieldset:disabled{opacity:.7}
 #guide-dialog .close:disabled{opacity:.4;cursor:wait;transform:none}
 
@@ -75,12 +75,12 @@ html{overflow-x:clip}.hero{padding-top:78px;padding-bottom:50px;min-height:640px
 @media(max-height:720px){
   #guide-dialog{padding:20px}
   #guide-dialog .modal-copy{margin:8px 0 12px}
-  #guide-dialog .form-field+.form-field{margin-top:9px}
+  #guide-dialog .form-field+.form-field{margin-top:11px}
   #guide-dialog form>.primary{margin-top:12px}
 }
 @media(max-height:560px) and (min-width:560px){
   #guide-dialog{width:min(620px,calc(100% - 32px));padding:16px 24px}
-  #guide-dialog fieldset{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px}
+  #guide-dialog fieldset{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px}
   #guide-dialog .form-field+.form-field{margin-top:0}
   #guide-dialog .modal-copy{margin:6px 0 10px}
 }
@@ -91,17 +91,16 @@ html{overflow-x:clip}.hero{padding-top:78px;padding-bottom:50px;min-height:640px
   #guide-dialog .modal-title{font-size:20px}
   #guide-dialog .modal-copy{font-size:11px;line-height:1.45;margin:8px 0 10px}
   #guide-dialog input,#guide-dialog select{min-height:40px;padding:9px 12px;font-size:12px}
-  #guide-dialog .form-field+.form-field{margin-top:7px}
+  #guide-dialog .form-field+.form-field{margin-top:9px}
   #guide-dialog form>.primary{min-height:42px;font-size:14px;padding:8px 20px}
 }
 @media(max-height:380px) and (min-width:560px){
   #guide-dialog{padding:10px 20px}
   #guide-dialog .modal-title{font-size:20px}
   #guide-dialog .modal-copy{font-size:11px;line-height:1.4;margin:6px 0 8px}
-  #guide-dialog fieldset{gap:6px 16px}
+  #guide-dialog fieldset{gap:7px 16px}
   #guide-dialog label{font-size:10px;line-height:1.2;margin-bottom:4px}
   #guide-dialog input,#guide-dialog select{min-height:34px;padding:6px 10px;font-size:12px}
-  #guide-dialog .notice{font-size:10px;line-height:1.3;margin-top:3px}
   #guide-dialog .field-error{font-size:10px;line-height:1.3;margin-top:2px}
   #guide-dialog form>.primary{min-height:36px;margin-top:8px;padding:6px 20px;font-size:13px}
 }
@@ -112,6 +111,11 @@ html{overflow-x:clip}.hero{padding-top:78px;padding-bottom:50px;min-height:640px
 .cost-option:nth-child(1)::after{width:100%;background:#a59ab0}
 .cost-option:nth-child(2)::after{width:50%}
 .cost-option:nth-child(3)::after{width:25%}
+.cost-option::after{transform:scaleX(0);transform-origin:left;transition:transform .9s cubic-bezier(.16,1,.3,1)}
+.cost-story.is-visible .cost-option::after{transform:scaleX(1)}
+.cost-option:nth-child(2)::after{transition-delay:.12s}
+.cost-option:nth-child(3)::after{transition-delay:.24s}
+@media(prefers-reduced-motion:reduce){.cost-option::after{transform:none}}
 .cost-route,.contents h2,.cta h2{text-wrap:balance}
 .cost-note,.section-copy,.topic-name{text-wrap:pretty}
 .university-counter{white-space:nowrap;font-variant-numeric:tabular-nums}

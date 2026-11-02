@@ -119,17 +119,17 @@ export default function TransferRequest() {
   }
 
   return (
-    <dialog ref={dialog} id="guide-dialog" aria-labelledby="dialog-title" aria-describedby="dialog-copy"
+    <dialog ref={dialog} id="guide-dialog" aria-labelledby="dialog-title"
+      aria-describedby={status === "success" ? "dialog-success" : requestMessage ? "dialog-copy" : undefined}
       onCancel={event => { event.preventDefault(); close(); }}
       onClose={() => { setOpen(false); trigger.current?.focus({ preventScroll: true }); }}
       onClick={event => { if (isBackdropClick(event.nativeEvent, event.currentTarget)) close(); }}>
       <button className="close" type="button" aria-label={t.close} disabled={busy} onClick={close}>×</button>
       <h2 className="modal-title" id="dialog-title">{status === "success" ? t.successTitle : "Mulai langkah pertamamu."}</h2>
-      <div className={`modal-copy${requestMessage ? " request-error" : ""}`} id="dialog-copy"
-        ref={requestMessage ? feedback : undefined} role={requestMessage ? "alert" : undefined}
-        tabIndex={requestMessage ? -1 : undefined}>{requestMessage ?? t.description}</div>
+      {requestMessage && <div className="modal-copy request-error" id="dialog-copy"
+        ref={feedback} role="alert" tabIndex={-1}>{requestMessage}</div>}
       {status === "success" ? (
-        <div ref={feedback} tabIndex={-1} role="status" className="form-feedback success">
+        <div ref={feedback} id="dialog-success" tabIndex={-1} role="status" className="form-feedback success">
           <p>{t.success}</p>
           <button type="button" className="primary" onClick={close}>{t.close}</button>
         </div>
@@ -154,11 +154,10 @@ export default function TransferRequest() {
             </div>
             <div className="form-field">
               <label htmlFor="transfer-education">{t.education}</label>
-              <select id="transfer-education" name="education_type" required defaultValue="" aria-invalid={Boolean(errors.education_type)} aria-describedby={`transfer-education-help${firstError === "education_type" ? " transfer-education_type-error" : ""}`}>
+              <select id="transfer-education" name="education_type" required defaultValue="" aria-invalid={Boolean(errors.education_type)} aria-describedby={firstError === "education_type" ? "transfer-education_type-error" : undefined}>
                 <option value="" disabled>{t.educationPlaceholder}</option>
                 {educationTypes.map(value => <option key={value} value={value}>{t.choices[value]}</option>)}
               </select>
-              <p id="transfer-education-help" className="notice">{t.educationHelp}</p>
               {error("education_type")}
             </div>
             <div className="form-field">
