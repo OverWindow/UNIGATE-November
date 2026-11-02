@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useApp } from "@/app/providers";
 import { landingContent, learningAreas, type LearningArea } from "@/lib/landing-content";
 import SiteHeader, { Logo } from "./SiteHeader";
+import SiteFooter from "./SiteFooter";
 const sampleAnswers = [
   "한 번에 많은 양을 공부해야 한다.",
   "작은 노력을 꾸준히 이어 가는 것이 중요하다.",
@@ -31,7 +32,6 @@ function LearningIcon({ area }: { area: LearningArea }) {
 
 export default function LandingPage() {
   const { language } = useApp();
-  const [area, setArea] = useState<LearningArea>("reading");
   const t = landingContent[language];
 
   useEffect(() => {
@@ -49,7 +49,7 @@ export default function LandingPage() {
               <p className="eyebrow hero-eyebrow"><span className="accent-dot" />{t.hero.eyebrow}</p>
               <h1 id="hero-title">{t.hero.title}</h1>
               <p className="hero-description">{t.hero.description}</p>
-              <a className="button button-outline" href="#learning">{t.hero.action}<Arrow /></a>
+              <a className="button button-outline" href="#about">{t.hero.action}<Arrow /></a>
               <p className="hero-note">{t.hero.note}</p>
             </div>
             <div className="question-scene">
@@ -69,27 +69,6 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="learning" className="learning-section section-space" aria-labelledby="learning-title">
-          <div className="page-container">
-            <p className="eyebrow">{t.learning.eyebrow}</p>
-            <h2 id="learning-title" className="section-heading">{t.learning.title}</h2>
-            <p className="section-description">{t.learning.description}</p>
-            <div className="learning-panel">
-              <div className="learning-select">
-                <label htmlFor="learning-area">{t.learning.field}</label>
-                <select id="learning-area" value={area} aria-describedby="learning-selection-description" onChange={(event) => setArea(event.target.value as LearningArea)}>
-                  {learningAreas.map((key) => <option key={key} value={key}>{t.areas[key].name}</option>)}
-                </select>
-              </div>
-              <div className="learning-summary">
-                <span className="field-label">{t.learning.focus}</span>
-                <p id="learning-selection-description" aria-live="polite">{t.areas[area].summary}</p>
-              </div>
-              <a className="button button-primary" href={`#${area}`}>{t.learning.action}<Arrow /></a>
-            </div>
-          </div>
-        </section>
-
         <section id="about" className="about-section section-space" aria-labelledby="about-title">
           <div className="page-container">
             <div className="about-intro">
@@ -98,7 +77,7 @@ export default function LandingPage() {
             </div>
             <div className="feature-grid">
               {learningAreas.map((key, index) => (
-                <article key={key} id={key} className="feature-card" data-active={area === key} aria-labelledby={`${key}-title`}>
+                <article key={key} id={key} className="feature-card" aria-labelledby={`${key}-title`}>
                   <div className="feature-topline"><span className="feature-icon"><LearningIcon area={key} /></span><span className="feature-number">0{index + 1}</span></div>
                   <p className="feature-label">{t.areas[key].name}</p>
                   <h3 id={`${key}-title`}>{t.areas[key].title}</h3>
@@ -133,9 +112,7 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className="site-footer">
-        <div className="page-container"><div className="footer-main"><div><a href="#intro" aria-label={t.accessibility.home}><Logo /></a><p>{t.footer.description}</p></div><div className="footer-links"><a href="https://www.unigate.kr/" target="_blank" rel="noopener noreferrer">{t.footer.parent}<Arrow external /></a><a href="#intro">{t.footer.top}<span aria-hidden="true">↑</span></a></div></div><div className="footer-bottom"><span>© 2026 UNIGATE. All rights reserved.</span><span>{t.footer.tagline}</span></div></div>
-      </footer>
+      <SiteFooter />
     </>
   );
 }

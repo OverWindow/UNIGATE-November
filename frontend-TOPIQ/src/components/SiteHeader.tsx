@@ -39,9 +39,12 @@ export default function SiteHeader({ authHref }: { authHref?: string }) {
     finally { setLoggingOut(false); }
   }
 
-  const navigation = t.navigation.map((label) => (
-    <button key={label} type="button" disabled>{label}</button>
-  ));
+  const navigation = t.navigation.map((label, index) => {
+    const href = ["/pbt", "/ibt"][index];
+    return href ? (
+      <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined} onClick={() => setMenuOpen(false)}>{label}</Link>
+    ) : <button key={label} type="button" disabled>{label}</button>;
+  });
 
   return (
     <>

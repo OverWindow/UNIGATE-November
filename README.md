@@ -376,6 +376,14 @@ HTTP 개발 환경에서는 localhost와 127.0.0.1을 섞지 말고 두 서비�
 
 ## 설문 응답 CSV 내보내기
 
+### 관리자 페이지에서 다운로드
+
+백엔드 `/admin/`에 로그인하고 **Survey responses** 목록 상단의 **CSV 다운로드**를 누르면 PC로 CSV를 내려받습니다. 검색·학력·신청일 필터를 적용했다면 해당 조건에 맞는 전체 응답을 내보냅니다. 현재 페이지나 체크박스 선택 여부와 관계없이 모든 해당 행을 ID 오름차순으로 내보내며, 검색·필터가 없으면 전체 응답을 다운로드합니다. 결과가 없으면 헤더만 있는 CSV를 받습니다.
+
+활성 Staff 계정에 설문 응답 조회 권한(또는 Django에서 조회를 포함하는 수정 권한)이 있어야 합니다. 관리자 전용 `GET /admin/surveys/surveyresponse/export-csv/` 경로를 사용하며 로그인·권한 확인과 캐시 방지를 적용합니다. DB 테이블·마이그레이션·워커·추가 라이브러리는 필요하지 않습니다. CSV 형식은 아래 명령과 동일합니다.
+
+### 명령으로 파일 저장
+
 Linux 또는 Docker 컨테이너에서 실행합니다. Django·프론트엔드 서버를 켤 필요는 없지만 PostgreSQL은 실행 중이어야 합니다.
 Docker 이미지에는 실행 권한이 포함됩니다. Linux에 소스를 직접 내려받았다면 최초 한 번 `chmod +x backend/export-surveys`를 실행하세요.
 
@@ -413,7 +421,7 @@ CSV는 Excel에서 한글을 읽을 수 있도록 **UTF-8 BOM**으로 저장합�
 내보내기 테스트는 `backend/`에서 실행합니다. Linux 실행 파일 테스트는 Linux 컨테이너에서 `python manage.py test surveys.test_export`로 실행합니다. Windows에서는 해당 실행 파일 테스트만 건너뜁니다.
 
 ```powershell
-.\.venv\Scripts\python.exe manage.py test surveys.test_export
+.\.venv\Scripts\python.exe manage.py test surveys.test_admin surveys.test_export
 ```
 
 테스트는 별도 DB와 임시 CSV를 사용하며 실제 신청 데이터를 내보내거나 수정하지 않습니다.

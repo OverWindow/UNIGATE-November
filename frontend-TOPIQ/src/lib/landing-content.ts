@@ -33,14 +33,6 @@ interface LandingContent {
     sampleLabel: string;
     sampleFooter: string;
   };
-  learning: {
-    eyebrow: string;
-    title: string;
-    description: string;
-    field: string;
-    focus: string;
-    action: string;
-  };
   about: { title: string; description: string; notice: string };
   areas: Record<LearningArea, LearningContent>;
   guide: {
@@ -85,14 +77,6 @@ export const landingContent: Record<Language, LandingContent> = {
       sample: "학습 예시",
       sampleLabel: "읽기",
       sampleFooter: "이해하는 즐거움, 한 문제에서 시작됩니다.",
-    },
-    learning: {
-      eyebrow: "LEARN YOUR WAY",
-      title: "어떤 학습을 찾고 있나요?",
-      description: "목표에 맞는 학습을 골라 TOPIQ이 준비하는 학습 방식을 살펴보세요.",
-      field: "학습 영역",
-      focus: "학습 포인트",
-      action: "소개 보기",
     },
     about: {
       title: "읽기부터 어휘까지, 한곳에서 차근차근.",
@@ -172,14 +156,6 @@ export const landingContent: Record<Language, LandingContent> = {
       sampleLabel: "Reading",
       sampleFooter: "Understanding starts with one question.",
     },
-    learning: {
-      eyebrow: "LEARN YOUR WAY",
-      title: "What would you like to work on?",
-      description: "Choose an area and explore the learning experience TOPIQ is preparing.",
-      field: "Learning area",
-      focus: "Your focus",
-      action: "Learn more",
-    },
     about: {
       title: "From reading to vocabulary. All connected.",
       description: "Understand a passage, put your thoughts into words, and make new vocabulary your own. TOPIQ is preparing a place where your Korean learning comes together.",
@@ -257,14 +233,6 @@ export const landingContent: Record<Language, LandingContent> = {
       sample: "Contoh pembelajaran",
       sampleLabel: "Membaca",
       sampleFooter: "Pemahaman dimulai dari satu soal.",
-    },
-    learning: {
-      eyebrow: "BELAJAR DENGAN CARAMU",
-      title: "Apa yang ingin kamu pelajari?",
-      description: "Pilih bidang dan kenali pembelajaran yang sedang disiapkan TOPIQ.",
-      field: "Bidang pembelajaran",
-      focus: "Fokus belajar",
-      action: "Lihat penjelasan",
     },
     about: {
       title: "Dari membaca hingga kosakata. Saling terhubung.",

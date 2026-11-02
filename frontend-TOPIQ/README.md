@@ -3,9 +3,20 @@
 TOPIK II 읽기·쓰기 문제와 단어장을 위한 프론트엔드입니다.
 Next.js App Router, React, TypeScript, Tailwind CSS v4를 사용합니다.
 백엔드는 저장소의 기존 `backend/` Django 프로젝트를 함께 사용합니다.
-현재는 TOPIQ 서비스 소개용 랜딩 페이지가 구성되어 있습니다.
-한국어·영어·인도네시아어 전환, 학습 영역 선택, 모바일 메뉴, FAQ와 회원가입·로그인을 제공합니다.
+TOPIQ 서비스 소개용 랜딩 페이지와 PBT·IBT 안내 페이지가 구성되어 있습니다.
+한국어·영어·인도네시아어 전환, 모바일 메뉴, FAQ와 회원가입·로그인을 제공합니다.
 실제 문제풀이·채점·학습 기록 기능은 포함하지 않습니다.
+
+## PBT·IBT 모의고사 안내
+
+헤더의 PBT·IBT 메뉴는 각각 `/pbt`, `/ibt`로 연결되며 모바일에서도 이동할 수 있습니다.
+각 페이지는 시험 방식의 짧은 설명 아래에 모의고사 응시 패널을 표시합니다.
+설명은 [교육부·국립국제교육원 공식 안내](https://www.niied.go.kr/convert/preview/1764509391006/index.html)를 기준으로 작성했습니다.
+
+영역은 읽기·쓰기 중 선택할 수 있고 기본값은 읽기입니다. 선택은 페이지 내부에서만 관리합니다.
+현재 등록된 모의고사가 없어 회차 선택과 응시 버튼은 비활성화되어 있으며, 준비 중 안내를 제공합니다.
+실제 문제풀이·채점·응시 기록과 모의고사 API·DB 테이블은 추가하지 않았습니다.
+랜딩의 기존 선택 패널은 제거했으며 ‘학습 살펴보기’는 학습 소개 영역으로 이동합니다.
 
 ## 개발 실행
 
@@ -81,8 +92,12 @@ npm start
 | 경로 | 용도 |
 | --- | --- |
 | `src/app/page.tsx` | 랜딩 페이지 진입점 |
-| `src/components/LandingPage.tsx` | 랜딩 화면과 언어·메뉴·학습 선택 동작 |
+| `src/components/LandingPage.tsx` | 랜딩 화면과 학습 소개 |
 | `src/lib/landing-content.ts` | 한국어·영어·인도네시아어 문구 |
+| `src/app/pbt/page.tsx`, `src/app/ibt/page.tsx` | PBT·IBT 페이지 진입점과 메타데이터 |
+| `src/components/ExamPage.tsx` | 공통 시험 안내와 모의고사 응시 준비 화면 |
+| `src/lib/exam-content.ts` | 세 언어의 시험 설명과 응시 패널 문구 |
+| `src/components/SiteFooter.tsx` | 랜딩·시험 페이지의 공통 푸터 |
 | `src/app/providers.tsx` | 공통 언어·인증 상태 |
 | `src/components/AuthScreen.tsx` | 로그인·가입 화면 |
 | `src/components/SiteHeader.tsx` | 공통 헤더와 회원 상태 |

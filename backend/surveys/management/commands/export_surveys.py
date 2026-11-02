@@ -1,30 +1,14 @@
-import csv
 import os
 from pathlib import Path
 import tempfile
-from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import DatabaseError
 from django.utils import timezone
 
+from surveys.csv_export import SEOUL, write_survey_csv
 from surveys.models import SurveyResponse
-
-
-COLUMNS = ("id", "email", "age", "education_type", "desired_university", "created_at")
-SEOUL = ZoneInfo("Asia/Seoul")
-
-
-def spreadsheet_text(value):
-    if value is None:
-        return ""
-    text = str(value)
-    # Treat formula-like user input as text; the database value stays unchanged.
-    probe = text.lstrip("\ufeff \t\r\n\v\f")
-    if text.startswith(("\t", "\r", "\n")) or probe.startswith(tuple("=+-@＝＋－＠")):
-        return "'" + text
-    return text
 
 
 class Command(BaseCommand):
@@ -48,19 +32,12 @@ class Command(BaseCommand):
             if output.is_dir():
                 raise CommandError("Output must be a CSV file, not a directory.")
             output.parent.mkdir(parents=True, exist_ok=True)
-            count = 0
             with tempfile.NamedTemporaryFile(
                 mode="w", encoding="utf-8-sig", newline="", prefix=".survey-export-",
                 suffix=".tmp", dir=output.parent, delete=False,
             ) as stream:
                 temporary = Path(stream.name)
-                writer = csv.writer(stream, quoting=csv.QUOTE_ALL)
-                writer.writerow(COLUMNS)
-                rows = SurveyResponse.objects.order_by("id").values_list(*COLUMNS).iterator(chunk_size=2000)
-                for pk, email, age, education, university, created in rows:
-                    writer.writerow((pk, spreadsheet_text(email), age, spreadsheet_text(education),
-                                     spreadsheet_text(university), created.astimezone(SEOUL).isoformat()))
-                    count += 1
+                count = write_survey_csv(stream, SurveyResponse.objects.all())
                 stream.flush()
                 os.fsync(stream.fileno())
 
