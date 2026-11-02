@@ -50,7 +50,7 @@ html{overflow-x:clip}.hero{padding-top:78px;padding-bottom:50px;min-height:640px
 /* Existing request fields use the reference dialog's glass surface and controls. */
 #guide-dialog{width:min(440px,calc(100% - 32px));max-height:calc(100dvh - 32px);overflow:hidden;padding:28px}
 #guide-dialog .modal-title{font-size:24px;line-height:1.2;margin:0;padding-right:20px}
-#guide-dialog .modal-copy{font-size:12px;line-height:1.5;margin:12px 0 18px}
+#guide-dialog .modal-copy{font-size:12px;line-height:1.5;margin:16px 0 20px}
 #guide-dialog label{font-size:11px;line-height:1.4;margin-bottom:5px}
 #guide-dialog input{min-height:44px;padding:10px 12px;font-size:13px}
 #guide-dialog form>.primary{min-height:46px;padding:10px 20px;margin-top:18px}
@@ -122,4 +122,25 @@ html{overflow-x:clip}.hero{padding-top:78px;padding-bottom:50px;min-height:640px
 @media(max-width:650px){
   .contents{width:calc(100% - 16px);max-width:340px;margin-inline:auto;text-align:left;align-self:center}
   .cost-option::after{grid-column:1/-1;margin-top:5px}
+}
+
+.contents{row-gap:24px}
+.guide-prompt{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:28px;margin-top:20px;padding:24px 28px;border:1px solid #ffffffc9;border-radius:22px;background:linear-gradient(130deg,#ffffff86,#ffffff37);-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);box-shadow:0 12px 36px #5b386015}
+.prompt-message{display:flex;align-items:center;gap:17px;min-width:0}
+.prompt-message p{font-size:12px;line-height:1.5;color:var(--muted)}
+.prompt-message strong{display:block;font-size:17px;line-height:1.35;color:var(--ink);font-weight:var(--strong)}
+.prompt-message p span{display:block;margin-top:5px}
+.prompt-beacon{position:relative;width:14px;height:14px;flex:0 0 14px;border-radius:50%;background:#8b6aa0;box-shadow:0 0 0 5px #8b6aa01b}
+.prompt-beacon::after{content:"";position:absolute;inset:-7px;border:1px solid #8b6aa080;border-radius:50%;opacity:0}
+.guide-prompt.is-visible .prompt-beacon::after{animation:prompt-pulse 2.8s ease-out infinite}
+@keyframes prompt-pulse{0%{transform:scale(.65);opacity:.7}70%,100%{transform:scale(1.45);opacity:0}}
+.guide-prompt .primary{min-width:180px;min-height:50px;padding:12px 22px;font-size:13px;flex-shrink:0}
+.university-copy h3 a{text-decoration:underline;text-decoration-color:#80658f6b;text-decoration-thickness:1px;text-underline-offset:5px;transition:text-decoration-color .2s}
+.university-copy h3 a:hover{text-decoration-color:currentColor}
+@media(max-width:650px){
+  .guide-prompt{flex-direction:column;align-items:stretch;gap:18px;margin-top:36px;padding:22px 20px}
+  .prompt-message{align-items:flex-start;gap:14px}
+  .prompt-message strong{font-size:15px}
+  .prompt-message p{font-size:11px}
+  .guide-prompt .primary{width:100%;min-width:0}
 }

@@ -40,7 +40,8 @@ export default function TransferRequest() {
     const controller = new AbortController();
     document.querySelectorAll<HTMLButtonElement>("[data-open-guide]").forEach(button => {
       button.addEventListener("click", () => {
-        trackEvent("guide_open", { placement: button.closest(".hero") ? "hero" : "footer" });
+        const placement = button.closest(".hero") ? "hero" : button.closest(".guide-prompt") ? "contents" : "footer";
+        trackEvent("guide_open", { placement });
         trigger.current = button;
         if (dialog.current) openModal(dialog.current);
         setOpen(true);
@@ -120,14 +121,15 @@ export default function TransferRequest() {
 
   return (
     <dialog ref={dialog} id="guide-dialog" aria-labelledby="dialog-title"
-      aria-describedby={status === "success" ? "dialog-success" : requestMessage ? "dialog-copy" : undefined}
+      aria-describedby={status === "success" ? "dialog-success" : "dialog-copy"}
       onCancel={event => { event.preventDefault(); close(); }}
       onClose={() => { setOpen(false); trigger.current?.focus({ preventScroll: true }); }}
       onClick={event => { if (isBackdropClick(event.nativeEvent, event.currentTarget)) close(); }}>
       <button className="close" type="button" aria-label={t.close} disabled={busy} onClick={close}>×</button>
       <h2 className="modal-title" id="dialog-title">{status === "success" ? t.successTitle : "Mulai langkah pertamamu."}</h2>
-      {requestMessage && <div className="modal-copy request-error" id="dialog-copy"
-        ref={feedback} role="alert" tabIndex={-1}>{requestMessage}</div>}
+      {status !== "success" && <div className={`modal-copy${requestMessage ? " request-error" : ""}`} id="dialog-copy"
+        ref={requestMessage ? feedback : undefined} role={requestMessage ? "alert" : undefined}
+        tabIndex={requestMessage ? -1 : undefined}>{requestMessage ?? t.description}</div>}
       {status === "success" ? (
         <div ref={feedback} id="dialog-success" tabIndex={-1} role="status" className="form-feedback success">
           <p>{t.success}</p>

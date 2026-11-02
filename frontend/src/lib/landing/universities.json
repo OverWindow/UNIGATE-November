@@ -1,6 +1,7 @@
 [
   {
     "name": "Woosong University",
+    "website": "https://english.wsu.ac.kr/main/index.jsp",
     "description": "Universitas swasta di Daejeon dengan pendekatan pendidikan yang memadukan bahasa asing dan teknologi informasi.",
     "image": "/landing/image-02.jpg",
     "alt": "Kampus Woosong University",
@@ -11,6 +12,7 @@
   },
   {
     "name": "Yonsei University",
+    "website": "https://www.yonsei.ac.kr/en_sc/index.do",
     "description": "Universitas riset swasta di Seoul dengan tradisi akademik panjang dan beragam bidang studi.",
     "image": "/landing/image-03.jpg",
     "alt": "Kampus Yonsei University",
@@ -21,6 +23,7 @@
   },
   {
     "name": "KAIST",
+    "website": "https://www.kaist.ac.kr/site/en/",
     "description": "Universitas riset di Daejeon yang berfokus pada sains, teknologi, dan rekayasa.",
     "image": "/landing/image-04.jpg",
     "alt": "Kampus KAIST",
@@ -31,6 +34,7 @@
   },
   {
     "name": "Pukyong National University",
+    "website": "https://www.pknu.ac.kr/eng/1",
     "description": "Universitas negeri di Busan dengan tradisi pendidikan dalam ilmu kelautan, perikanan, dan teknologi.",
     "image": "/landing/image-05.jpg",
     "alt": "Kampus Pukyong National University",
@@ -41,6 +45,7 @@
   },
   {
     "name": "Seoul National University",
+    "website": "https://en.snu.ac.kr/index.html",
     "description": "Universitas riset negeri di Seoul yang menawarkan beragam disiplin ilmu dan kegiatan penelitian.",
     "image": "/landing/image-06.jpg",
     "alt": "Kampus Seoul National University",
@@ -51,6 +56,7 @@
   },
   {
     "name": "Korea University",
+    "website": "https://www.korea.ac.kr/sites/en/index.do",
     "description": "Universitas riset swasta di Seoul yang berdiri sejak 1905, dengan beragam pilihan bidang akademik.",
     "image": "/landing/image-07.jpg",
     "alt": "Kampus Korea University",
@@ -61,6 +67,7 @@
   },
   {
     "name": "Gyeongsang National University",
+    "website": "https://eng.gnu.ac.kr/eng/main.do",
     "description": "Universitas negeri di Jinju, Gyeongsangnam-do, yang menjadi salah satu pusat pendidikan tinggi di wilayah tersebut.",
     "image": "/landing/image-08.jpg",
     "alt": "Kampus Gyeongsang National University",
@@ -71,6 +78,7 @@
   },
   {
     "name": "Hanyang University",
+    "website": "https://www.hanyang.ac.kr/web/eng/",
     "description": "Universitas swasta dengan kampus di Seoul dan Ansan. Berawal dari pendidikan teknik dan berkembang menjadi universitas komprehensif.",
     "image": "/landing/image-09.jpg",
     "alt": "Kampus Hanyang University",
@@ -81,6 +89,7 @@
   },
   {
     "name": "Sungkyunkwan University",
+    "website": "https://www.skku.ac.kr/eng/",
     "description": "Universitas riset dengan kampus di Seoul dan Suwon, serta akar sejarah pendidikan yang bermula pada 1398.",
     "image": "/landing/image-10.jpg",
     "alt": "Kampus Sungkyunkwan University",
@@ -91,6 +100,7 @@
   },
   {
     "name": "Pusan National University",
+    "website": "https://www.pusan.ac.kr/eng/Main.do",
     "description": "Universitas negeri di Busan dengan beragam program akademik dan kegiatan riset di kawasan tenggara Korea.",
     "image": "/landing/image-11.jpg",
     "alt": "Kampus Pusan National University",
