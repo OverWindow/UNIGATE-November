@@ -220,3 +220,32 @@ Docker 실행 환경이나 운영 도메인에서 확인하지 못한 항목은 
 - 의도된 차이는 기존 신청 폼 항목·저장 동작과 651~900px에서 화면 밖으로 나가는 캐릭터 장식의 가로 넘침 보정입니다. 이 보정은 섹션 배치와 크기를 변경하지 않습니다.
 - 랜딩페이지 검증에서 PostgreSQL 16과 Python 3.13의 배포 컨테이너로 테스트 43개와 브라우저→Nginx→Gunicorn→DB의 합성 신청 저장을 확인했습니다. 최신 원격 통합 후에는 TOPIQ 인증·시도 제한·관리자 CSV 및 공식 랜딩 도메인 CORS 회귀 테스트를 포함한 전체 97개 검사가 통과했습니다.
 - 검증은 로컬 격리 환경에서 수행했습니다. 운영 HTTPS·도메인·쿠키 정책과 플랫폼 설정은 실제 배포 환경에서 별도로 확인해야 합니다.
+
+## Hub 문제은행 연결
+
+`backend/question_bank/`는 Hub가 직접 전송한 `topik_bank` 스키마의 6개 테이블을 조회합니다.
+Django의 기존 기본 PostgreSQL 연결을 사용하며, 모든 모델은 `managed=False`입니다.
+`migration/question_bank/0001_initial.py`는 Django 모델 상태만 기록하고 문제 테이블을 생성하지 않습니다.
+테이블·제약조건·인덱스·뷰의 초기화와 문제 데이터 덮어쓰기는 Hub의 **서버에 문제 등록** 화면이 담당합니다.
+수신 HTTP API, 역방향 전송, Django 관리자 편집 기능은 추가하지 않습니다.
+`managed=False`는 스키마 관리 설정이며 자체적으로 DB 쓰기 권한을 제한하지는 않습니다.
+
+Hub의 `QUESTION_BANK_LOCAL_DATABASE_URL`은 이 백엔드의 개발 DB와 같은 DB를,
+`QUESTION_BANK_PRODUCTION_DATABASE_URL`은 운영 DB를 가리키게 설정합니다.
+Hub의 원본 `DATABASE_URL`과는 다른 DB여야 합니다. 실제 연결값은 환경 파일에만 보관합니다.
+`topik_bank.schema_migrations`와 Hub 배포 이력은 복사하지 않으며 기존 Django 테이블은 유지합니다.
+S3·CloudFront 미디어 주소는 원본과 공유합니다.
+
+로컬에서 읽기 전용 연결 검증:
+
+```powershell
+cd backend
+$env:DJANGO_ENV = 'development'
+.\.venv\Scripts\python.exe manage.py inspect_question_bank
+.\.venv\Scripts\python.exe manage.py inspect_question_bank --set-id 세트_UUID
+```
+
+명령은 테이블별 건수와 세트별 문항 수를 출력하며 연결·미디어 모델 매핑을 조회합니다.
+문항 내용·정답·연결 비밀번호는 출력하지 않습니다. 문제은행이 아직 초기화되지 않았다면 오류로 안내합니다.
+일반 백엔드 검증에 `question_bank` 테스트를 포함합니다. 테스트는 로컬의 격리된 테스트 DB에서만 실행합니다.
+
