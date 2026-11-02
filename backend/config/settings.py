@@ -54,8 +54,9 @@ INSTALLED_APPS = [
     "accounts.apps.AccountsConfig",
     "surveys.apps.SurveysConfig",
     "question_bank.apps.QuestionBankConfig",
+    "pbt.apps.PbtConfig",
 ]
-MIGRATION_MODULES = {"surveys": "migration.surveys", "accounts": "migration.accounts", "question_bank": "migration.question_bank"}
+MIGRATION_MODULES = {"surveys": "migration.surveys", "accounts": "migration.accounts", "question_bank": "migration.question_bank", "pbt": "migration.pbt"}
 CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
 CSRF_FAILURE_VIEW = "accounts.views.csrf_failure"
 MIDDLEWARE = [

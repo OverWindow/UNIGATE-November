@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
 import { authContent } from "@/lib/auth-content";
 import { landingContent, type Language } from "@/lib/landing-content";
@@ -25,12 +25,20 @@ export default function SiteHeader({ authHref }: { authHref?: string }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState(false);
+  const [notice, setNotice] = useState<{ index: number; sequence: number } | null>(null);
+  const noticeSequence = useRef(0);
   const menuButton = useRef<HTMLButtonElement>(null);
   const t = landingContent[language];
   const a = authContent[language];
   const isAuthPage = ["/login", "/signup", "/verify-email"].includes(pathname);
   const loginHref = authHref || (isAuthPage
     ? "/login" : `/login?next=${encodeURIComponent(pathname)}`);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timeout = window.setTimeout(() => setNotice(null), 4500);
+    return () => window.clearTimeout(timeout);
+  }, [notice]);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -40,10 +48,19 @@ export default function SiteHeader({ authHref }: { authHref?: string }) {
   }
 
   const navigation = t.navigation.map((label, index) => {
-    const href = ["/pbt", "/ibt"][index];
+    const href = index === 0 ? "/pbt" : undefined;
     return href ? (
       <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined} onClick={() => setMenuOpen(false)}>{label}</Link>
-    ) : <button key={label} type="button" disabled>{label}</button>;
+    ) : (
+      <div className="pending-nav-item" key={label}>
+        <button className="pending-nav-button" type="button" onClick={() => setNotice({ index, sequence: ++noticeSequence.current })}>
+          <span>{label}</span><span className="coming-soon-badge">{t.comingSoon.badge}</span>
+        </button>
+        {notice?.index === index && (
+          <p className="coming-soon-notice" role="status" key={notice.sequence}>{t.comingSoon.message}</p>
+        )}
+      </div>
+    );
   });
 
   return (
@@ -54,6 +71,7 @@ export default function SiteHeader({ authHref }: { authHref?: string }) {
         if (main) { event.preventDefault(); main.focus(); main.scrollIntoView(); }
       }}>{t.accessibility.skip}</a>
       <header className="site-header" onKeyDown={(event) => {
+        if (event.key === "Escape") setNotice(null);
         if (event.key === "Escape" && menuOpen) {
           setMenuOpen(false);
           menuButton.current?.focus();
@@ -87,7 +105,7 @@ export default function SiteHeader({ authHref }: { authHref?: string }) {
                 router.push(`/login?next=${encodeURIComponent(current)}`);
               }}>{a.login}</Link>
             )}
-            <button className="menu-toggle" type="button" ref={menuButton} aria-label={menuOpen ? t.accessibility.closeMenu : t.accessibility.openMenu} aria-controls="mobile-navigation" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>
+            <button className="menu-toggle" type="button" ref={menuButton} aria-label={menuOpen ? t.accessibility.closeMenu : t.accessibility.openMenu} aria-controls="mobile-navigation" aria-expanded={menuOpen} onClick={() => { setMenuOpen(!menuOpen); setNotice(null); }}>
               <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
                 <path d={menuOpen ? "m6 6 12 12M6 18 18 6" : "M4 6h16M4 12h16M4 18h16"} />
               </svg>

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import ExamPage from "@/components/ExamPage";
+import PbtCatalog from "@/components/pbt/PbtCatalog";
 import { examContent } from "@/lib/exam-content";
 
 export const metadata: Metadata = {
@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function PbtPage() {
-  return <ExamPage format="pbt" />;
+  return <PbtCatalog />;
 }

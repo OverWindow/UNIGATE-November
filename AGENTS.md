@@ -1,5 +1,16 @@
+## Project Structure
+
+- `frontend/`: UNIGATE Next.js 프론트엔드. `src/`에 페이지·컴포넌트·스타일·공통 코드, `public/`에 정적 자산을 둡니다.
+- `frontend-TOPIQ/`: TOPIQ Next.js 프론트엔드. `src/`에 페이지·컴포넌트·공통 코드, `tests/`에 테스트를 둡니다.
+- `backend/`: 두 프론트엔드가 공유하는 Django 백엔드.
+  - `config/`: 설정과 공통 라우팅.
+  - `accounts/`, `surveys/`, `pbt/`, `question_bank/`: 인증·신청·PBT·문제은행 앱.
+  - `migration/`: 앱별 DB 마이그레이션.
+  - `deploy/`: 서버 실행·배포 설정.
+
 ## Working Guidelines
 
+- `frontend/` 또는 `frontend-TOPIQ/`의 파일을 수정하기 전에 해당 폴더의 `AGENTS.md`가 있으면 읽고, 루트 지침과 함께 따릅니다.
 - Keep code as simple as possible. Implement only what is needed for existing functionality and the current request to work. Do not design for unrequested features, hypothetical future requirements, or speculative extension points. Avoid unnecessary abstractions and complexity.
 - Keep this document limited to the technology stack, a brief project structure, and working guidelines. Do not append feature descriptions, operational procedures, implementation histories, or per-task summaries. Update these three sections only when necessary.
 - Before making changes, explain the proposed steps, affected files or systems, expected API or database changes, and relevant verification. Ask for explicit approval and wait, unless the user explicitly waives this step. The initial task request alone is not approval of an unpresented plan.

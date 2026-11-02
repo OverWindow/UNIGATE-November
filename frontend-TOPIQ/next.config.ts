@@ -18,6 +18,7 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       { source: "/api/auth/:path*", destination: `${backendOrigin.origin}/api/auth/:path*/` },
+      { source: "/api/pbt/:path*", destination: `${backendOrigin.origin}/api/pbt/:path*/` },
       { source: "/api/csrf/", destination: `${backendOrigin.origin}/api/csrf/` },
     ];
   },
