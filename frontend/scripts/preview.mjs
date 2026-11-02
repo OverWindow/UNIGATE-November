@@ -4,7 +4,7 @@ import { resolve, extname, sep } from 'node:path';
 const root = resolve('out');
 const port = Number(process.env.PORT || 3000);
 const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.txt': 'text/plain' };
-const redirects = { '/tentang-kami': '/#about', '/kurikulum': '/#curriculum', '/institusi-mitra': '/#partners', '/contact': '/#contact' };
+const redirects = { '/tentang-kami': '/', '/kurikulum': '/', '/institusi-mitra': '/', '/contact': '/' };
 createServer(async (req, res) => {
   try {
     const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);

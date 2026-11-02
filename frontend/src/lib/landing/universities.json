@@ -1,0 +1,102 @@
+[
+  {
+    "name": "Woosong University",
+    "description": "Universitas swasta di Daejeon dengan pendekatan pendidikan yang memadukan bahasa asing dan teknologi informasi.",
+    "image": "/landing/image-02.jpg",
+    "alt": "Kampus Woosong University",
+    "source": "https://commons.wikimedia.org/wiki/File%3AWoosong_University_West_Campus_20190608_A01.jpg",
+    "author": "*Youngjin",
+    "license": "https://creativecommons.org/licenses/by-sa/3.0",
+    "licenseLabel": "CC BY-SA 3.0"
+  },
+  {
+    "name": "Yonsei University",
+    "description": "Universitas riset swasta di Seoul dengan tradisi akademik panjang dan beragam bidang studi.",
+    "image": "/landing/image-03.jpg",
+    "alt": "Kampus Yonsei University",
+    "source": "https://commons.wikimedia.org/wiki/File%3AYonseiunderwood.jpg",
+    "author": "Kimhs5400",
+    "license": "https://creativecommons.org/licenses/by/4.0",
+    "licenseLabel": "CC BY 4.0"
+  },
+  {
+    "name": "KAIST",
+    "description": "Universitas riset di Daejeon yang berfokus pada sains, teknologi, dan rekayasa.",
+    "image": "/landing/image-04.jpg",
+    "alt": "Kampus KAIST",
+    "source": "https://commons.wikimedia.org/wiki/File%3AKAIST_fountains_view.jpg",
+    "author": "AhmadElq",
+    "license": "https://creativecommons.org/licenses/by-sa/4.0",
+    "licenseLabel": "CC BY-SA 4.0"
+  },
+  {
+    "name": "Pukyong National University",
+    "description": "Universitas negeri di Busan dengan tradisi pendidikan dalam ilmu kelautan, perikanan, dan teknologi.",
+    "image": "/landing/image-05.jpg",
+    "alt": "Kampus Pukyong National University",
+    "source": "https://commons.wikimedia.org/wiki/File%3APkny.JPG",
+    "author": "ssongdayeong",
+    "license": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "licenseLabel": "CC0"
+  },
+  {
+    "name": "Seoul National University",
+    "description": "Universitas riset negeri di Seoul yang menawarkan beragam disiplin ilmu dan kegiatan penelitian.",
+    "image": "/landing/image-06.jpg",
+    "alt": "Kampus Seoul National University",
+    "source": "https://commons.wikimedia.org/wiki/File%3ASNU_Maingate.jpg",
+    "author": "วิทวัส มงคลนวเสถียร",
+    "license": "https://creativecommons.org/licenses/by-sa/4.0",
+    "licenseLabel": "CC BY-SA 4.0"
+  },
+  {
+    "name": "Korea University",
+    "description": "Universitas riset swasta di Seoul yang berdiri sejak 1905, dengan beragam pilihan bidang akademik.",
+    "image": "/landing/image-07.jpg",
+    "alt": "Kampus Korea University",
+    "source": "https://commons.wikimedia.org/wiki/File%3AKorea_University.jpg",
+    "author": "Goodbye4ever",
+    "license": "https://creativecommons.org/licenses/by-sa/4.0",
+    "licenseLabel": "CC BY-SA 4.0"
+  },
+  {
+    "name": "Gyeongsang National University",
+    "description": "Universitas negeri di Jinju, Gyeongsangnam-do, yang menjadi salah satu pusat pendidikan tinggi di wilayah tersebut.",
+    "image": "/landing/image-08.jpg",
+    "alt": "Kampus Gyeongsang National University",
+    "source": "https://commons.wikimedia.org/wiki/File%3A%EA%B0%80%EC%A2%8C_%EC%BA%A0%ED%8D%BC%EC%8A%A4_%ED%95%AD%EA%B3%B5%EC%B4%AC%EC%98%81.jpg",
+    "author": "GNU",
+    "license": "https://creativecommons.org/licenses/by-sa/4.0",
+    "licenseLabel": "CC BY-SA 4.0"
+  },
+  {
+    "name": "Hanyang University",
+    "description": "Universitas swasta dengan kampus di Seoul dan Ansan. Berawal dari pendidikan teknik dan berkembang menjadi universitas komprehensif.",
+    "image": "/landing/image-09.jpg",
+    "alt": "Kampus Hanyang University",
+    "source": "https://commons.wikimedia.org/wiki/File%3AHanyang_University_008.JPG",
+    "author": "Piotrus",
+    "license": "https://creativecommons.org/licenses/by-sa/3.0",
+    "licenseLabel": "CC BY-SA 3.0"
+  },
+  {
+    "name": "Sungkyunkwan University",
+    "description": "Universitas riset dengan kampus di Seoul dan Suwon, serta akar sejarah pendidikan yang bermula pada 1398.",
+    "image": "/landing/image-10.jpg",
+    "alt": "Kampus Sungkyunkwan University",
+    "source": "https://commons.wikimedia.org/wiki/File%3ASungkyunkwan_University_Bicheondang_and_600th_Anniversary_Hall.jpg",
+    "author": "S h y numis",
+    "license": "https://creativecommons.org/licenses/by-sa/4.0",
+    "licenseLabel": "CC BY-SA 4.0"
+  },
+  {
+    "name": "Pusan National University",
+    "description": "Universitas negeri di Busan dengan beragam program akademik dan kegiatan riset di kawasan tenggara Korea.",
+    "image": "/landing/image-11.jpg",
+    "alt": "Kampus Pusan National University",
+    "source": "https://commons.wikimedia.org/wiki/File%3APusan_Natl_Univ_by_Ficell_006.jpg",
+    "author": "Hansol Jeong",
+    "license": "https://commons.wikimedia.org/wiki/File%3APusan_Natl_Univ_by_Ficell_006.jpg",
+    "licenseLabel": "Public domain"
+  }
+]

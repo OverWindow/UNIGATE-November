@@ -4,7 +4,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-COPY next.config.js postcss.config.js tsconfig.json ./
+COPY next.config.js tsconfig.json ./
 COPY public ./public
 COPY src ./src
 ARG NEXT_PUBLIC_BACKEND_URL

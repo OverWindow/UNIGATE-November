@@ -12,10 +12,7 @@
         "allowConstantExport": true,
         "allowExportNames": [
           "metadata",
-          "useLanguage",
-          "useTranslation",
-          "translations",
-          "useInView"
+          "viewport"
         ]
       }
     ]
