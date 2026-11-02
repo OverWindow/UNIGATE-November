@@ -1,6 +1,8 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from io import StringIO
+from threading import Event
+from time import monotonic, sleep
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -15,7 +17,7 @@ from django.utils import timezone
 
 from .models import RateLimit
 from .rate_limits import RateLimitUnavailable, check_limit, clear_login_failures, record_attempt, cleanup_expired
-from .tests import AuthClientMixin, FAST_HASHERS
+from .tests import AuthClientMixin, FAST_HASHERS, PASSWORD
 
 
 class RateLimitStorageTests(TestCase):
@@ -116,6 +118,122 @@ class RateLimitFailureApiTests(AuthClientMixin, TestCase):
         self.assertEqual(response.status_code, 503)
         self.assertFalse(get_user_model().objects.exists())
         self.assertNotIn("sessionid", response.cookies)
+
+
+@override_settings(PASSWORD_HASHERS=FAST_HASHERS)
+class ConcurrentLoginTests(AuthClientMixin, TransactionTestCase):
+    def setUp(self):
+        get_user_model().objects.create_user(
+            username="login-lock-fixture", email="learner@example.invalid", password=PASSWORD,
+        )
+
+    def overlapping_logins(self, first_password="wrong", second_email="LEARNER@example.invalid", timeout=False):
+        from .views import authenticate as original_authenticate
+
+        first_in_auth = Event()
+        release_first = Event()
+        second_in_auth = Event()
+        second_ready = Event()
+        application_name = "topiq-login-lock-regression"
+
+        def authenticate(request, **credentials):
+            if request.headers["X-Test-Login"] == "first":
+                first_in_auth.set()
+                if not release_first.wait(10):
+                    raise TimeoutError("Login regression fixture was not released.")
+            else:
+                second_in_auth.set()
+            return original_authenticate(request, **credentials)
+
+        def attempt(marker, email, password):
+            try:
+                client, token = self.csrf_client()
+                if marker == "second":
+                    with connection.cursor() as cursor:
+                        cursor.execute("SELECT set_config('application_name', %s, false)", [application_name])
+                    second_ready.set()
+                return client.post("/api/auth/login/", {"email": email, "password": password},
+                                   content_type="application/json", HTTP_X_CSRFTOKEN=token,
+                                   HTTP_X_TEST_LOGIN=marker)
+            finally:
+                connection.close()
+
+        with patch("accounts.views.authenticate", side_effect=authenticate) as auth, ThreadPoolExecutor(max_workers=2) as pool:
+            first = pool.submit(attempt, "first", "learner@example.invalid", first_password)
+            waited = False
+            try:
+                self.assertTrue(first_in_auth.wait(5))
+                second = pool.submit(attempt, "second", second_email, "wrong")
+                self.assertTrue(second_ready.wait(5))
+                deadline = monotonic() + 3
+                while monotonic() < deadline:
+                    if second_in_auth.is_set() or second.done():
+                        break
+                    with connection.cursor() as cursor:
+                        cursor.execute("""
+                            SELECT EXISTS (
+                                SELECT 1 FROM pg_stat_activity
+                                WHERE application_name = %s AND wait_event = 'advisory'
+                            )
+                        """, [application_name])
+                        waited = cursor.fetchone()[0]
+                    if waited:
+                        break
+                    sleep(0.01)
+                before_release = auth.call_count
+                if timeout:
+                    second_response = second.result(timeout=5)
+            finally:
+                release_first.set()
+            first_response = first.result(timeout=5)
+            if not timeout:
+                second_response = second.result(timeout=5)
+        return first_response, second_response, before_release, waited
+
+    def test_concurrent_login_cannot_check_a_sixth_password(self):
+        for _ in range(4):
+            record_attempt("login", "learner@example.invalid", 5, 300)
+        first, second, checked, waited = self.overlapping_logins()
+        self.assertEqual([first.status_code, second.status_code], [401, 429])
+        self.assertEqual(checked, 1)
+        self.assertTrue(waited)
+        self.assertEqual(RateLimit.objects.get(scope="login").attempts, 5)
+
+    def test_first_login_is_serialized_without_a_counter_row(self):
+        self.assertFalse(RateLimit.objects.exists())
+        first, second, checked, waited = self.overlapping_logins()
+        self.assertEqual([first.status_code, second.status_code], [401, 401])
+        self.assertEqual(checked, 1)
+        self.assertTrue(waited)
+        self.assertEqual(RateLimit.objects.get(scope="login").attempts, 2)
+
+    def test_success_reset_keeps_a_later_failed_attempt(self):
+        for _ in range(4):
+            record_attempt("login", "learner@example.invalid", 5, 300)
+        first, second, checked, waited = self.overlapping_logins(first_password=PASSWORD)
+        self.assertEqual([first.status_code, second.status_code], [200, 401])
+        self.assertEqual(checked, 1)
+        self.assertTrue(waited)
+        self.assertEqual(RateLimit.objects.get(scope="login").attempts, 1)
+
+    def test_another_email_does_not_wait_for_the_login_lock(self):
+        get_user_model().objects.create_user(
+            username="other-login-fixture", email="other@example.invalid", password=PASSWORD,
+        )
+        first, second, checked, waited = self.overlapping_logins(second_email="other@example.invalid")
+        self.assertEqual([first.status_code, second.status_code], [401, 401])
+        self.assertEqual(checked, 2)
+        self.assertFalse(waited)
+
+    def test_lock_timeout_returns_503_without_creating_a_session(self):
+        with self.assertLogs("accounts.rate_limits", level="ERROR") as logs:
+            first, second, checked, waited = self.overlapping_logins(timeout=True)
+        self.assertEqual([first.status_code, second.status_code], [401, 503])
+        self.assertEqual(second["Retry-After"], "5")
+        self.assertNotIn("sessionid", second.cookies)
+        self.assertEqual(checked, 1)
+        self.assertTrue(waited)
+        self.assertNotIn("learner@example.invalid", " ".join(logs.output))
 
 
 class RateLimitPersistenceTests(TransactionTestCase):

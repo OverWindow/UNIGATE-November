@@ -20,6 +20,17 @@ test("return paths stay on TOPIQ and cannot loop through auth pages", async () =
   assert.equal(safeReturnPath("/vocabulary?set=1#review"), "/vocabulary?set=1#review");
 });
 
+test("normalized return paths cannot become external navigation", async () => {
+  const { safeReturnPath } = await freshApi();
+  const origin = "https://topiq.example.invalid";
+  for (const path of ["/a/..//example.invalid", "/a/%2e%2e//example.invalid", "/.//example.invalid"]) {
+    const result = safeReturnPath(path);
+    assert.equal(result, "/");
+    assert.equal(new URL(result, origin).origin, origin);
+  }
+  assert.equal(safeReturnPath("/guide/../vocabulary?set=1#review"), "/vocabulary?set=1#review");
+});
+
 test("email send uses CSRF, language and an internal return path without expecting a user", async () => {
   const api = await freshApi();
   globalThis.fetch = async (path, options) => {

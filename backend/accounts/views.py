@@ -16,7 +16,7 @@ from django.views.decorators.debug import sensitive_post_parameters, sensitive_v
 from django.views.decorators.http import require_GET, require_POST
 
 from .forms import LoginForm, SignupForm, normalize_email, users_for_email
-from .rate_limits import RateLimitUnavailable, check_limit, clear_login_failures, record_attempt
+from .rate_limits import RateLimitUnavailable, check_limit, clear_login_failures, login_rate_limit_lock, record_attempt
 from .email_delivery import EmailDeliveryError, send_verification_email
 from .email_verification import LANGUAGES, make_verification_token, read_verification_token
 
@@ -134,20 +134,21 @@ def login_view(request):
     if not form.is_valid():
         return form_error(form)
     email = form.cleaned_data["email"]
-    wait = check_limit("login", email, limit=5)
-    if wait:
-        return limited_response(wait)
-    candidate = users_for_email(email).first()
-    if candidate is None:
-        # Match Django's nonexistent-user password hashing cost.
-        get_user_model()().set_password(form.cleaned_data["password"])
-        user = None
-    else:
-        user = authenticate(request, username=candidate.get_username(), password=form.cleaned_data["password"])
-    if user is None:
-        wait = record_attempt("login", email, limit=5, window=300)
-        return limited_response(wait) if wait else api_response({"error": "invalid_credentials"}, status=401)
-    clear_login_failures(email)
+    with login_rate_limit_lock(email):
+        wait = check_limit("login", email, limit=5)
+        if wait:
+            return limited_response(wait)
+        candidate = users_for_email(email).first()
+        if candidate is None:
+            # Match Django's nonexistent-user password hashing cost.
+            get_user_model()().set_password(form.cleaned_data["password"])
+            user = None
+        else:
+            user = authenticate(request, username=candidate.get_username(), password=form.cleaned_data["password"])
+        if user is None:
+            wait = record_attempt("login", email, limit=5, window=300)
+            return limited_response(wait) if wait else api_response({"error": "invalid_credentials"}, status=401)
+        clear_login_failures(email)
     login(request, user)
     return api_response({"user": user_data(user), "csrfToken": get_token(request)})
 

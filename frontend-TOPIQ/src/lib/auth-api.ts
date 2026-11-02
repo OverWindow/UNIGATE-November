@@ -151,7 +151,8 @@ export function safeReturnPath(value: string | null): string {
   if (!value?.startsWith("/") || value.startsWith("//") || value.includes("\\") ||
       [...value].some(character => character.charCodeAt(0) < 32)) return "/";
   const parsed = new URL(value, "https://topiq.unigate.kr");
-  if (parsed.origin !== "https://topiq.unigate.kr" || /^\/(login|signup|verify-email)(\/|$)/.test(parsed.pathname)) return "/";
+  if (parsed.origin !== "https://topiq.unigate.kr" || parsed.pathname.startsWith("//") ||
+      /^\/(login|signup|verify-email)(\/|$)/.test(parsed.pathname)) return "/";
   return `${parsed.pathname}${parsed.search}${parsed.hash}`;
 }
 

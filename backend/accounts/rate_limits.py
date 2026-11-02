@@ -1,4 +1,5 @@
 import logging
+from contextlib import contextmanager
 
 from django.db import DatabaseError, connection, transaction
 from django.utils.crypto import salted_hmac
@@ -15,6 +16,21 @@ class RateLimitUnavailable(Exception):
 
 def _key_hash(value):
     return salted_hmac("topiq-auth-rate-limit", value, algorithm="sha256").hexdigest()
+
+
+@contextmanager
+def login_rate_limit_lock(email):
+    # A stable key also serializes first attempts before a counter row exists.
+    lock_key = int(_key_hash(f"login:{email}")[:16], 16) - 2**63
+    try:
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute("SET LOCAL lock_timeout = '2s'")
+                cursor.execute("SELECT pg_advisory_xact_lock(%s)", [lock_key])
+            yield
+    except DatabaseError:
+        logger.error("Authentication rate limit storage is unavailable.")
+        raise RateLimitUnavailable from None
 
 
 def check_limit(action, email, limit):
