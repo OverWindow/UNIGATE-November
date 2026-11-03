@@ -33,7 +33,7 @@ def api_response(data=None, status=200):
 
 
 def csrf_failure(request, reason=""):
-    if request.path.startswith("/api/auth/"):
+    if request.path.startswith(("/api/auth/", "/api/pbt/")):
         return api_response({"error": "csrf_failed"}, status=403)
     return default_csrf_failure(request, reason=reason)
 

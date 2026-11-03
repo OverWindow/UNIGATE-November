@@ -12,7 +12,8 @@ interface LearningContent {
 }
 
 interface LandingContent {
-  navigation: [string, string, string];
+  navigation: [string, string, string, string];
+  comingSoon: { badge: string; title: string; message: string; home: string };
   login: string;
   accessibility: {
     home: string;
@@ -57,7 +58,8 @@ interface LandingContent {
 
 export const landingContent: Record<Language, LandingContent> = {
   ko: {
-    navigation: ["PBT", "IBT", "단어장"],
+    navigation: ["PBT", "IBT", "단어장", "AI 쓰기 튜터"],
+    comingSoon: { badge: "준비 중", title: "아직 준비 중이에요", message: "아직 준비 중이에요. 조금만 기다려 주세요!", home: "홈으로 돌아가기" },
     login: "로그인",
     accessibility: {
       home: "TOPIQ 처음으로",
@@ -135,7 +137,8 @@ export const landingContent: Record<Language, LandingContent> = {
     footer: { description: "한국어 학습의 다음 단계, TOPIQ.", parent: "UNIGATE 소개", top: "맨 위로", tagline: "당신의 다음 단계를 함께합니다." },
   },
   en: {
-    navigation: ["PBT", "IBT", "Vocabulary"],
+    navigation: ["PBT", "IBT", "Vocabulary", "AI Writing Tutor"],
+    comingSoon: { badge: "Coming soon", title: "Something new is on its way", message: "We're getting things ready. Please check back soon!", home: "Back to home" },
     login: "Log in",
     accessibility: {
       home: "TOPIQ home",
@@ -213,7 +216,8 @@ export const landingContent: Record<Language, LandingContent> = {
     footer: { description: "Your next chapter in Korean, with TOPIQ.", parent: "About UNIGATE", top: "Back to top", tagline: "Made for your next chapter." },
   },
   id: {
-    navigation: ["PBT", "IBT", "Kosakata"],
+    navigation: ["PBT", "IBT", "Kosakata", "Tutor Menulis AI"],
+    comingSoon: { badge: "Segera hadir", title: "Sedang kami siapkan", message: "Sedang kami siapkan. Tunggu sebentar lagi, ya!", home: "Kembali ke beranda" },
     login: "Masuk",
     accessibility: {
       home: "Beranda TOPIQ",

@@ -220,3 +220,84 @@ Docker 실행 환경이나 운영 도메인에서 확인하지 못한 항목은 
 - 의도된 차이는 기존 신청 폼 항목·저장 동작과 651~900px에서 화면 밖으로 나가는 캐릭터 장식의 가로 넘침 보정입니다. 이 보정은 섹션 배치와 크기를 변경하지 않습니다.
 - 랜딩페이지 검증에서 PostgreSQL 16과 Python 3.13의 배포 컨테이너로 테스트 43개와 브라우저→Nginx→Gunicorn→DB의 합성 신청 저장을 확인했습니다. 최신 원격 통합 후에는 TOPIQ 인증·시도 제한·관리자 CSV 및 공식 랜딩 도메인 CORS 회귀 테스트를 포함한 전체 97개 검사가 통과했습니다.
 - 검증은 로컬 격리 환경에서 수행했습니다. 운영 HTTPS·도메인·쿠키 정책과 플랫폼 설정은 실제 배포 환경에서 별도로 확인해야 합니다.
+
+## Hub 문제은행 연결
+
+`backend/question_bank/`는 Hub가 직접 전송한 `topik_bank` 스키마의 6개 테이블을 조회합니다.
+Django의 기존 기본 PostgreSQL 연결을 사용하며, 모든 모델은 `managed=False`입니다.
+`migration/question_bank/0001_initial.py`는 Django 모델 상태만 기록하고 문제 테이블을 생성하지 않습니다.
+테이블·제약조건·인덱스·뷰의 초기화와 문제 데이터 덮어쓰기는 Hub의 **서버에 문제 등록** 화면이 담당합니다.
+수신 HTTP API, 역방향 전송, Django 관리자 편집 기능은 추가하지 않습니다.
+`managed=False`는 스키마 관리 설정이며 자체적으로 DB 쓰기 권한을 제한하지는 않습니다.
+
+Hub의 `QUESTION_BANK_LOCAL_DATABASE_URL`은 이 백엔드의 개발 DB와 같은 DB를,
+`QUESTION_BANK_PRODUCTION_DATABASE_URL`은 운영 DB를 가리키게 설정합니다.
+Hub의 원본 `DATABASE_URL`과는 다른 DB여야 합니다. 실제 연결값은 환경 파일에만 보관합니다.
+`topik_bank.schema_migrations`와 Hub 배포 이력은 복사하지 않으며 기존 Django 테이블은 유지합니다.
+S3·CloudFront 미디어 주소는 원본과 공유합니다.
+
+로컬에서 읽기 전용 연결 검증:
+
+```powershell
+cd backend
+$env:DJANGO_ENV = 'development'
+.\.venv\Scripts\python.exe manage.py inspect_question_bank
+.\.venv\Scripts\python.exe manage.py inspect_question_bank --set-id 세트_UUID
+```
+
+명령은 테이블별 건수와 세트별 문항 수를 출력하며 연결·미디어 모델 매핑을 조회합니다.
+문항 내용·정답·연결 비밀번호는 출력하지 않습니다. 문제은행이 아직 초기화되지 않았다면 오류로 안내합니다.
+일반 백엔드 검증에 `question_bank` 테스트를 포함합니다. 테스트는 로컬의 격리된 테스트 DB에서만 실행합니다.
+
+## PBT 모의고사
+
+`frontend-TOPIQ`의 `/pbt`에서 듣기·읽기와 연습·실전 모드를 각각 선택합니다.
+세트당 50문항, 문항당 2점, 영역별 100점 만점입니다. 연습은 시간 제한이 없고 실전은 듣기 3,600초, 읽기 4,200초입니다.
+두 모드 모두 듣기 음원을 자유롭게 재생·반복·탐색할 수 있습니다. 쓰기와 IBT 문제풀이는 포함하지 않습니다.
+
+회원은 공개된 모든 세트, 비회원은 지정된 읽기 3세트·듣기 3세트(300문항)에 접근합니다.
+각 영역에 `guest_slot` 1~3을 할당하며 DB의 범위·고유 제약으로 비회원 공개 세트 수를 제한합니다.
+권한은 목록뿐 아니라 응시 생성 API에서도 확인합니다. 비회원 기록은 Django 세션의 무작위 소유자 UUID와 연결하고, 회원 응시는 기존 사용자 계정과 연결합니다.
+비회원 세션에서 로그인하면 기존 비회원 기록도 계속 볼 수 있지만 계정으로 자동 이관되지는 않습니다. 쿠키 삭제·만료·로그아웃 시 비회원 기록에 대한 접근이 사라집니다.
+
+문제은행이 준비된 환경에서 기존 DB 연결을 확인한 후 실행합니다.
+
+```powershell
+cd backend
+$env:DJANGO_ENV = 'development' # 운영에서는 production
+.\.venv\Scripts\python.exe manage.py migrate
+.\.venv\Scripts\python.exe manage.py sync_pbt_exams --check
+.\.venv\Scripts\python.exe manage.py sync_pbt_exams
+```
+
+`--check`는 등록하지 않고 자료 준비 상태를 조회합니다. 등록 명령은 1~50번 문항, 정답, 선택지, 현재 음성 연결, 듣기 그림 선택지, 읽기 10번 자료 이미지를 검증합니다.
+완성된 세트만 `pbt_exams`에 등록·공개하며, 최초 등록 시 생성 시각과 UUID 순으로 영역별 첫 3개에 비회원 슬롯을 할당합니다.
+후속 실행은 기존 시험 제목·회차·공개 여부·슬롯을 보존합니다. 새 Hub 세트를 전송한 뒤 명령을 다시 실행하면 추가 세트가 등록됩니다.
+세트 상태나 자료가 이후 변경되면 응시 시작 시 다시 검증하고, 불완전한 세트는 409로 안내합니다. 관리자에서 공개 상태와 비회원 슬롯을 조정할 수 있습니다.
+운영 시작 스크립트는 마이그레이션을 적용하지만 이 등록 명령은 자동 실행하지 않습니다.
+
+추가 테이블은 아래 3개이며 원본 `topik_bank`와 기존 사용자 테이블은 수정하지 않습니다.
+
+| 테이블 | 목적 |
+|---|---|
+| `pbt_exams` | 원본 세트 UUID, 표시 제목·회차, 영역, 공개 여부, 비회원 슬롯 |
+| `pbt_attempts` | 사용자 또는 비회원 소유자, 모드, 시작·마감·제출 시각, 상태·점수 |
+| `pbt_attempt_items` | 응시 시점 문제·정답·해설·대본·미디어 참조 사본과 선택 답안·채점 결과 |
+
+| HTTP 메서드 | 경로 | 목적 |
+|---|---|---|
+| GET | `/api/pbt/exams/` | 시험 목록과 접근 가능 여부 |
+| POST | `/api/pbt/attempts/` | 응시 시작 또는 같은 모드의 진행 중 응시 재개 |
+| GET | `/api/pbt/attempts/` | 본인의 최근 100개 응시 기록 |
+| GET | `/api/pbt/attempts/<id>/` | 본인 응시 상태·문제·저장 답안 |
+| PUT | `/api/pbt/attempts/<id>/answers/<position>/` | `selectedOption` 1~4 저장 또는 `null`로 해제 |
+| POST | `/api/pbt/attempts/<id>/submit/` | 멱등 제출·채점 |
+| GET | `/api/pbt/attempts/<id>/result/` | 제출 후 점수·정답·해설·대본 |
+
+변경 요청은 CSRF 검사를 수행하고 응답은 `private, no-store`입니다. 제출 전 API 응답은 표시용 필드만 포함하며 원본 `content_json`을 그대로 노출하지 않습니다.
+서버가 저장한 마감 시각 이후 답안 변경은 거절합니다. 열린 화면은 시간 종료 시 제출을 요청하고, 브라우저가 닫혀 있으면 다음 조회·저장·제출 요청에서 마감 시각 기준으로 확정합니다. 백그라운드 워커는 사용하지 않습니다.
+답안 저장과 제출은 같은 응시 행을 잠그므로 채점 중 답안 변경과 중복 채점을 방지합니다. 시작 요청은 소유자별 시간당 30회로 제한하고 기존 시도 제한 테이블을 재사용합니다.
+
+검증은 `python manage.py test` 및 `frontend-TOPIQ`의 `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`로 실행합니다.
+PBT 테스트는 격리된 PostgreSQL 테스트 DB에서 합성 문제로 비회원 제한, 소유권, CSRF, 무제한 연습, 시간 만료, 답안 저장·채점·스냅샷 보존, 미디어 누락을 검사합니다.
+

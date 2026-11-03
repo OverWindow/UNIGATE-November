@@ -39,7 +39,7 @@ main:focus { outline: none; }
 .brand-link { display: inline-flex; align-items: center; gap: 13px; flex-shrink: 0; }
 .topiq-logo { display: block; width: 103px; height: auto; }
 .brand-tag { padding: 4px 6px; border-radius: 4px; background: #fff2ec; color: #aa4b35; font-size: 9px; font-weight: 700; letter-spacing: .04em; white-space: nowrap; }
-.desktop-navigation { display: flex; align-items: center; gap: 32px; margin-inline: auto; }
+.desktop-navigation { display: flex; align-items: center; gap: 20px; margin-inline: auto; }
 .desktop-navigation a, .desktop-navigation button { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 4px; color: #42516b; font-size: 14px; font-weight: 550; white-space: nowrap; }
 .desktop-navigation a:hover, .desktop-navigation a[aria-current="page"], .mobile-navigation a:hover, .mobile-navigation a[aria-current="page"] { color: var(--color-primary); }
 .desktop-navigation a[aria-current="page"] { box-shadow: inset 0 -2px var(--color-primary); }
@@ -54,6 +54,28 @@ main:focus { outline: none; }
 .header-auth-notice { position: absolute; top: 100%; right: 20px; max-width: min(440px, calc(100vw - 40px)); margin: 8px 0 0; padding: 12px 16px; border: 1px solid #e6d1cb; border-radius: 10px; background: #fff8f5; color: #914332; font-size: 12px; line-height: 1.7; }
 .menu-toggle { display: none; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 8px; color: #253450; }
 .mobile-navigation { display: none; }
+
+.pending-nav-item { position: relative; }
+.desktop-navigation .pending-nav-button { flex-direction: column; justify-content: center; gap: 3px; padding-block: 5px; }
+.pending-nav-button:hover { color: var(--color-primary); }
+.coming-soon-badge { display: inline-flex; align-items: center; padding: 3px 7px; border: 1px solid #dce5f5; border-radius: 999px; background: #f0f4fc; color: #526b98; font-size: 9px; font-weight: 600; line-height: 1.3; white-space: nowrap; }
+.coming-soon-notice { position: absolute; top: calc(100% + 10px); left: 50%; z-index: 1; width: 260px; max-width: calc(100vw - 64px); margin: 0; padding: 14px 18px; border: 1px solid #dce5f5; border-radius: 12px; background: #fff; box-shadow: 0 12px 32px #25416c1a; color: #425778; font-size: 13px; font-weight: 400; line-height: 1.7; text-align: center; word-break: keep-all; overflow-wrap: anywhere; translate: -50% 0; animation: coming-soon-notice 4.5s ease both; }
+@keyframes coming-soon-notice {
+  0%, 100% { opacity: 0; transform: translateY(-5px); }
+  6%, 92% { opacity: 1; transform: translateY(0); }
+}
+
+.coming-soon-main { display: grid; place-items: center; min-height: calc(100svh - var(--header-height) - 200px); padding: 80px 20px; background: radial-gradient(ellipse at 50% 20%, #eaf0fd, transparent 65%), #fbfcff; }
+.coming-soon-card { width: min(100%, 580px); text-align: center; }
+.coming-soon-orbit { display: grid; place-items: center; width: 88px; height: 88px; margin: 0 auto 30px; border: 1px solid #dce5f5; border-radius: 50%; background: #ffffffa6; }
+.coming-soon-orbit span { width: 16px; height: 16px; border-radius: 50%; background: #5982d6; box-shadow: 0 0 0 12px #5982d610; animation: coming-soon-pulse 3s ease-in-out infinite; }
+@keyframes coming-soon-pulse {
+  0%, 100% { transform: translateY(2px); box-shadow: 0 0 0 10px #5982d610; }
+  50% { transform: translateY(-3px); box-shadow: 0 0 0 18px #5982d608; }
+}
+.coming-soon-card .eyebrow { margin-bottom: 12px; }
+.coming-soon-card h1 { margin: 22px 0 0; font-size: clamp(28px, 4vw, 40px); font-weight: 650; line-height: 1.3; letter-spacing: -.04em; word-break: keep-all; overflow-wrap: anywhere; }
+.coming-soon-description { margin: 20px 0 32px; color: var(--color-muted); font-size: 15px; line-height: 1.9; word-break: keep-all; overflow-wrap: anywhere; }
 
 /* The preview is an illustration, with no test or scoring behavior. */
 .hero-section { position: relative; isolation: isolate; overflow: hidden; background: radial-gradient(ellipse at 89% 21%, #e6edfc 0%, transparent 47%), radial-gradient(ellipse at 47% 102%, #f4eae9 0%, transparent 33%), #fbfcff; }
@@ -164,19 +186,24 @@ details[open] .faq-indicator::after { transform: rotate(0); }
 .footer-links svg { width: 14px; height: 14px; }
 .footer-bottom { display: flex; justify-content: space-between; gap: 12px; padding-top: 22px; border-top: 1px solid #edf0f5; color: #5c6c84; font-size: 11px; line-height: 1.8; letter-spacing: .015em; }
 
-@media (min-width: 1024px) and (max-width: 1190px) {
+@media (min-width: 1200px) and (max-width: 1290px) {
   .header-inner { gap: 16px; }
   .desktop-navigation { gap: 16px; }
   .brand-tag { display: none; }
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 1199px) {
   :root { --header-height: 72px; }
   .desktop-navigation { display: none; }
   .menu-toggle { display: inline-flex; }
   .mobile-navigation:not([hidden]) { position: absolute; top: 100%; left: 0; right: 0; display: grid; gap: 2px; padding: 12px 32px 20px; border-bottom: 1px solid #e5eaf2; background: #fff; box-shadow: 0 12px 20px #25416c0a; }
   .mobile-navigation a, .mobile-navigation button { padding: 12px 8px; border-radius: 6px; color: #4c5c75; font-size: 14px; text-align: left; }
   .mobile-navigation a[aria-current="page"] { background: #edf2ff; }
+  .mobile-navigation .pending-nav-button { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 44px; }
+  .mobile-navigation .coming-soon-notice { position: static; width: auto; max-width: none; margin: 0 8px 8px; text-align: left; translate: none; box-shadow: none; background: #f6f8fd; }
+}
+
+@media (max-width: 1023px) {
   .hero-grid { gap: 38px; padding-block: 72px; }
   .hero-copy h1 { font-size: 43px; }
   .hero-description { font-size: 15px; }
@@ -304,5 +331,6 @@ details[open] .faq-indicator::after { transform: rotate(0); }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
+  .coming-soon-notice, .coming-soon-orbit span { animation: none; }
   *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; }
 }
