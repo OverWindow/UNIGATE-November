@@ -24,6 +24,9 @@ export default function Home() {
 <radialGradient id="glow" cx=".55" cy=".95" r=".65"><stop stopColor="#47ffb4"/><stop offset=".5" stopColor="#20daa7" stopOpacity=".75"/><stop offset="1" stopColor="#1b8bd6" stopOpacity="0"/></radialGradient>
 <radialGradient id="shine" cx=".4" cy=".12" r=".65"><stop stopColor="#fff" stopOpacity=".95"/><stop offset=".42" stopColor="#d8ffff" stopOpacity=".7"/><stop offset=".75" stopColor="#b5ffff" stopOpacity="0"/></radialGradient>
 <linearGradient id="rim" x1="70" y1="70" x2="340" y2="350" gradientUnits="userSpaceOnUse"><stop stopColor="#f2ffff"/><stop offset=".38" stopColor="#97edf1"/><stop offset=".62" stopColor="#4739a1"/><stop offset="1" stopColor="#d2ffed"/></linearGradient>
+<linearGradient id="cap-top" x1="116" y1="24" x2="297" y2="105" gradientUnits="userSpaceOnUse"><stop stopColor="#3b3e47"/><stop offset=".38" stopColor="#202229"/><stop offset="1" stopColor="#08090c"/></linearGradient>
+<linearGradient id="cap-crown" x1="153" y1="74" x2="265" y2="129" gradientUnits="userSpaceOnUse"><stop stopColor="#30333b"/><stop offset=".45" stopColor="#17191f"/><stop offset="1" stopColor="#07080b"/></linearGradient>
+<linearGradient id="cap-tassel" x1="318" y1="79" x2="342" y2="151" gradientUnits="userSpaceOnUse"><stop stopColor="#41444c"/><stop offset=".5" stopColor="#17191e"/><stop offset="1" stopColor="#050609"/></linearGradient>
 <filter id="blur"><feGaussianBlur stdDeviation="12"/></filter><clipPath id="sphere"><circle cx="210" cy="210" r="164"/></clipPath>
 </defs>
 <circle cx="210" cy="210" r="166" fill="url(#rim)"/><g clipPath="url(#sphere)"><circle cx="210" cy="210" r="164" fill="url(#chrome)"/>
@@ -33,7 +36,19 @@ export default function Home() {
 <ellipse cx="98" cy="219" rx="20" ry="97" fill="#e9ffff" opacity=".39" filter="url(#blur)"/>
 <path d="M77 161C94 96 151 65 200 65" stroke="#edffff" strokeOpacity=".75" strokeWidth="3" strokeLinecap="round"/>
 <g className="face"><g className="eyes"><rect x="139" y="176" width="27" height="76" rx="13.5" fill="#161825"/><rect x="252" y="176" width="27" height="76" rx="13.5" fill="#161825"/><rect x="145" y="184" width="4" height="34" rx="2" fill="#fff" opacity=".11"/><rect x="258" y="184" width="4" height="34" rx="2" fill="#fff" opacity=".11"/></g></g>
-<path d="M163 350C211 367 263 355 294 335" stroke="#bbffe2" strokeWidth="2" strokeOpacity=".6" strokeLinecap="round"/></g></svg></div></div>
+<path d="M163 350C211 367 263 355 294 335" stroke="#bbffe2" strokeWidth="2" strokeOpacity=".6" strokeLinecap="round"/></g>
+<g className="graduation-cap">
+<path d="M143 72H277V108C277 133 143 133 143 108Z" fill="url(#cap-crown)"/>
+<path d="M143 106C163 124 257 124 277 106V113C277 138 143 138 143 113Z" fill="#090a0d" opacity=".75"/>
+<path d="M210 9L361 63L210 117L59 63Z" fill="url(#cap-top)" stroke="#090a0e" strokeWidth="2" strokeLinejoin="round"/>
+<path d="M64 62L210 111L356 62" stroke="#555861" strokeOpacity=".38" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+<path d="M94 53L210 14L324 53" stroke="#fff" strokeOpacity=".09" strokeWidth="2" strokeLinecap="round"/>
+<ellipse cx="210" cy="63" rx="8" ry="4" fill="#08090c"/><ellipse cx="208" cy="62" rx="4" ry="1.5" fill="#555861" opacity=".55"/>
+<path d="M210 63C253 63 291 68 322 76C331 79 334 85 334 95V133" stroke="url(#cap-tassel)" strokeWidth="4" strokeLinecap="round"/>
+<rect x="329" y="126" width="10" height="10" rx="4" fill="#17191e"/>
+<path d="M327 134H341L344 153C340 158 328 158 324 153Z" fill="url(#cap-tassel)"/>
+<path d="M330 139L328 152M334 139V154M338 139L340 152" stroke="#4a4d55" strokeOpacity=".45" strokeWidth="1.5" strokeLinecap="round"/>
+</g></svg></div></div>
 </div>
 </section>
 
