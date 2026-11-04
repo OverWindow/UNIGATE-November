@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="420" viewBox="0 0 420 420" fill="none" role="img" aria-labelledby="title">
+<title id="title">UNIGATE graduation character</title>
+
+<defs>
+<radialGradient id="chrome" cx=".32" cy=".2" r=".83"><stop stop-color="#f4ffff"/><stop offset=".19" stop-color="#b9f4f1"/><stop offset=".36" stop-color="#90b7c4"/><stop offset=".51" stop-color="#434f6a"/><stop offset=".63" stop-color="#a8a9ee"/><stop offset=".76" stop-color="#5cdfd7"/><stop offset=".9" stop-color="#93f7b7"/><stop offset="1" stop-color="#247b9d"/></radialGradient>
+<radialGradient id="glow" cx=".55" cy=".95" r=".65"><stop stop-color="#47ffb4"/><stop offset=".5" stop-color="#20daa7" stop-opacity=".75"/><stop offset="1" stop-color="#1b8bd6" stop-opacity="0"/></radialGradient>
+<radialGradient id="shine" cx=".4" cy=".12" r=".65"><stop stop-color="#fff" stop-opacity=".95"/><stop offset=".42" stop-color="#d8ffff" stop-opacity=".7"/><stop offset=".75" stop-color="#b5ffff" stop-opacity="0"/></radialGradient>
+<linearGradient id="rim" x1="70" y1="70" x2="340" y2="350" gradientUnits="userSpaceOnUse"><stop stop-color="#f2ffff"/><stop offset=".38" stop-color="#97edf1"/><stop offset=".62" stop-color="#4739a1"/><stop offset="1" stop-color="#d2ffed"/></linearGradient>
+<linearGradient id="cap-top" x1="92" y1="25" x2="330" y2="105" gradientUnits="userSpaceOnUse"><stop stop-color="#9edbdd"/><stop offset=".22" stop-color="#39465e"/><stop offset=".5" stop-color="#25243f"/><stop offset=".76" stop-color="#3a5370"/><stop offset="1" stop-color="#111a28"/></linearGradient>
+<linearGradient id="cap-crown" x1="151" y1="76" x2="272" y2="130" gradientUnits="userSpaceOnUse"><stop stop-color="#86c9ce"/><stop offset=".25" stop-color="#33445f"/><stop offset=".62" stop-color="#24223c"/><stop offset="1" stop-color="#122a35"/></linearGradient>
+<linearGradient id="cap-tassel" x1="318" y1="79" x2="342" y2="151" gradientUnits="userSpaceOnUse"><stop stop-color="#9ce6df"/><stop offset=".42" stop-color="#526285"/><stop offset="1" stop-color="#26364a"/></linearGradient>
+<linearGradient id="cap-glint" x1="89" y1="43" x2="267" y2="93" gradientUnits="userSpaceOnUse"><stop stop-color="#efffff" stop-opacity=".75"/><stop offset=".48" stop-color="#b6f1f0" stop-opacity=".22"/><stop offset="1" stop-color="#d9caff" stop-opacity="0"/></linearGradient>
+<filter id="blur"><feGaussianBlur stdDeviation="12"/></filter><clipPath id="sphere"><circle cx="210" cy="210" r="164"/></clipPath>
+</defs>
+<circle cx="210" cy="210" r="166" fill="url(#rim)"/><g clip-path="url(#sphere)"><circle cx="210" cy="210" r="164" fill="url(#chrome)"/>
+<path d="M26 190C104 133 148 263 247 224S351 90 408 179V333H26Z" fill="#a3a6ff" opacity=".6" filter="url(#blur)"/>
+<path d="M37 270C107 215 186 306 261 248S354 204 396 273V405H37Z" fill="url(#glow)"/>
+<ellipse cx="187" cy="105" rx="130" ry="63" fill="url(#shine)" filter="url(#blur)"/>
+<ellipse cx="98" cy="219" rx="20" ry="97" fill="#e9ffff" opacity=".39" filter="url(#blur)"/>
+<path d="M77 161C94 96 151 65 200 65" stroke="#edffff" stroke-opacity=".75" stroke-width="3" stroke-linecap="round"/>
+<g class="face"><g class="eyes"><rect x="139" y="176" width="27" height="76" rx="13.5" fill="#161825"/><rect x="252" y="176" width="27" height="76" rx="13.5" fill="#161825"/><rect x="145" y="184" width="4" height="34" rx="2" fill="#fff" opacity=".11"/><rect x="258" y="184" width="4" height="34" rx="2" fill="#fff" opacity=".11"/></g></g>
+<path d="M163 350C211 367 263 355 294 335" stroke="#bbffe2" stroke-width="2" stroke-opacity=".6" stroke-linecap="round"/></g>
+<g class="graduation-cap">
+<path d="M143 72H277V108C277 133 143 133 143 108Z" fill="url(#cap-crown)"/>
+<path d="M143 106C163 124 257 124 277 106V113C277 138 143 138 143 113Z" fill="#151d31" opacity=".8"/>
+<path d="M151 115C185 128 238 129 269 116" stroke="#b4e9e8" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+<path d="M210 9L361 63L210 117L59 63Z" fill="url(#cap-top)" stroke="#253849" stroke-width="2" stroke-linejoin="round"/>
+<path d="M88 57L210 15L280 40C235 40 182 62 129 72Z" fill="url(#cap-glint)"/>
+<path d="M64 62L210 111L356 62" stroke="#b3eae9" stroke-opacity=".58" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M94 53L210 14L324 53" stroke="#e7ffff" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+<ellipse cx="210" cy="63" rx="8" ry="4" fill="#1a263c"/><ellipse cx="208" cy="62" rx="4" ry="1.5" fill="#c4f4f0" opacity=".7"/>
+<path d="M210 63C253 63 291 68 322 76C331 79 334 85 334 95V133" stroke="url(#cap-tassel)" stroke-width="4" stroke-linecap="round"/>
+<rect x="329" y="126" width="10" height="10" rx="4" fill="#35465f"/>
+<path d="M327 134H341L344 153C340 158 328 158 324 153Z" fill="url(#cap-tassel)"/>
+<path d="M330 139L328 152M334 139V154M338 139L340 152" stroke="#b7eeeb" stroke-opacity=".5" stroke-width="1.5" stroke-linecap="round"/>
+</g></svg>
