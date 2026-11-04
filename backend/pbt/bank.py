@@ -24,7 +24,7 @@ def media_url(value):
 
 
 def load_set(set_id, section):
-    question_set = QuestionSet.objects.filter(pk=set_id, section=section, review_status__in=["reviewed", "pilot", "active"], published_at__isnull=False).first()
+    question_set = QuestionSet.objects.filter(pk=set_id, exam_format="pbt", section=section, review_status__in=["reviewed", "pilot", "active"], published_at__isnull=False).first()
     if not question_set:
         raise BankNotReady("set_unavailable")
     items = list(Item.objects.filter(set_id=set_id).order_by("position").prefetch_related(
@@ -38,7 +38,7 @@ def load_set(set_id, section):
         set_audio[binding.position] = media_url(binding.audio_asset.storage_url)
     result = []
     for item in items:
-        if item.section != section or item.review_status not in ("reviewed", "pilot", "active") or item.correct_answer not in (1, 2, 3, 4):
+        if item.exam_format != "pbt" or item.section != section or item.review_status not in ("reviewed", "pilot", "active") or item.correct_answer not in (1, 2, 3, 4):
             raise BankNotReady("invalid_question")
         content = item.content_json if isinstance(item.content_json, dict) else {}
         choices = item.choices

@@ -38,15 +38,15 @@ class QuestionBankTests(TransactionTestCase):
         set_id, item_id = uuid.uuid4(), uuid.uuid4()
         with connection.cursor() as cursor:
             cursor.execute('''INSERT INTO topik_bank.question_sets
-                (set_id,section,generator_provider,generator_model,generator_version,created_at,
+                (set_id,exam_format,section,generator_provider,generator_model,generator_version,created_at,
                  set_sequence,review_status,default_target_level,published_at)
-                VALUES (%s,'reading','synthetic','synthetic','synthetic',now(),1,'pending_review',4,now())''', [set_id])
+                VALUES (%s,'pbt','reading','synthetic','synthetic','synthetic',now(),1,'pending_review',4,now())''', [set_id])
             cursor.execute('''INSERT INTO topik_bank.items
-                (item_id,source_key,created_at,section,type_slot,item_type,primary_skill,target_level,
+                (item_id,exam_format,source_key,created_at,section,type_slot,item_type,primary_skill,target_level,
                  stem_length,choice_count,generator_provider,generator_model,generator_version,
                  prompt_version,review_status,stem,choices,correct_answer,explanation,content_json,
                  source_provenance,content_hash,updated_at,set_id,position)
-                VALUES (%s,'synthetic',now(),'reading',1,'synthetic','reading',4,1,4,
+                VALUES (%s,'pbt','synthetic',now(),'reading',1,'synthetic','reading',4,1,4,
                         'synthetic','synthetic','synthetic',%s,'pending_review','test','["a","b","c","d"]',
                         1,'test','{}','{}',%s,now(),%s,1)''', [item_id, 'a'*64, 'b'*64, set_id])
         out = io.StringIO()

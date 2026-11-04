@@ -11,6 +11,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
 from accounts.rate_limits import record_attempt, RateLimitUnavailable
+from question_bank.models import QuestionSet
 from .bank import BankNotReady, load_set
 from .models import Attempt, AttemptItem, Exam
 from .services import attempt_data, finalize, owner_filter
@@ -52,7 +53,7 @@ def payload(request, fields):
 def exams(request):
     if not request.user.is_authenticated and not request.session.get("pbt_guest_id"):
         request.session["pbt_guest_id"] = str(uuid.uuid4())
-    rows = Exam.objects.filter(is_published=True)
+    rows = Exam.objects.filter(is_published=True, source_set_id__in=QuestionSet.objects.filter(exam_format="pbt").values("set_id"))
     return response({"exams": [{"id": str(e.pk), "title": e.title, "section": e.section,
         "round": e.display_order, "questionCount": 50, "durationSeconds": 3600 if e.section == "listening" else 4200,
         "guestAvailable": e.guest_slot is not None, "accessible": request.user.is_authenticated or e.guest_slot is not None}

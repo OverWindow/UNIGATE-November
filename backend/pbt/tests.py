@@ -64,7 +64,8 @@ class PbtTests(TransactionTestCase):
     def test_guest_catalog_and_direct_member_access(self):
         for n in (2, 3, 4):
             for section in ("reading", "listening"):
-                Exam.objects.create(source_set_id=uuid.uuid4(), title=f"Synthetic {n}", section=section, display_order=n, guest_slot=n if n <= 3 else None, is_published=True)
+                source = self.make_set(section)
+                Exam.objects.create(source_set_id=source.pk, title=f"Synthetic {n}", section=section, display_order=n, guest_slot=n if n <= 3 else None, is_published=True)
         catalog = self.client.get("/api/pbt/exams/")
         self.assertIn("no-store", catalog.headers["Cache-Control"])
         rows = catalog.json()["exams"]

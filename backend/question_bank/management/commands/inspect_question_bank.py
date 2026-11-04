@@ -26,8 +26,8 @@ class Command(BaseCommand):
                     sets = sets.filter(pk=options["set_id"])
                     if not sets.exists():
                         raise CommandError("The requested set does not exist.")
-                entries = list(sets.annotate(item_count=Count("items")).order_by("section", "generator_version", "set_sequence")
-                               .values("set_id", "section", "set_sequence", "review_status", "item_count"))
+                entries = list(sets.annotate(item_count=Count("items")).order_by("exam_format", "section", "generator_version", "set_sequence")
+                               .values("set_id", "exam_format", "section", "set_sequence", "review_status", "item_count"))
                 # Exercise the complete mappings, including composite PK and media joins.
                 item = Item.objects.select_related("set").first()
                 if item:

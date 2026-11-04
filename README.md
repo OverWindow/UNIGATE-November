@@ -225,8 +225,10 @@ Docker 실행 환경이나 운영 도메인에서 확인하지 못한 항목은 
 
 `backend/question_bank/`는 Hub가 직접 전송한 `topik_bank` 스키마의 6개 테이블을 조회합니다.
 Django의 기존 기본 PostgreSQL 연결을 사용하며, 모든 모델은 `managed=False`입니다.
-`migration/question_bank/0001_initial.py`는 Django 모델 상태만 기록하고 문제 테이블을 생성하지 않습니다.
-테이블·제약조건·인덱스·뷰의 초기화와 문제 데이터 덮어쓰기는 Hub의 **서버에 문제 등록** 화면이 담당합니다.
+문제은행의 최초 초기화와 문제 데이터 전송은 Hub의 **서버에 문제 등록** 화면이 담당합니다.
+이후 소비 DB 구조 변경은 `backend/migration/question_bank/*.py`의 Django migration으로 관리합니다.
+모델의 `managed=False`는 유지하며, 필요한 DB 변경은 명시적인 migration 작업으로 적용합니다.
+기존 대상 DB의 구조가 다르면 Hub는 전송을 중단하며 자동 갱신하지 않습니다.
 수신 HTTP API, 역방향 전송, Django 관리자 편집 기능은 추가하지 않습니다.
 `managed=False`는 스키마 관리 설정이며 자체적으로 DB 쓰기 권한을 제한하지는 않습니다.
 
@@ -235,6 +237,22 @@ Hub의 `QUESTION_BANK_LOCAL_DATABASE_URL`은 이 백엔드의 개발 DB와 같�
 Hub의 원본 `DATABASE_URL`과는 다른 DB여야 합니다. 실제 연결값은 환경 파일에만 보관합니다.
 `topik_bank.schema_migrations`와 Hub 배포 이력은 복사하지 않으며 기존 Django 테이블은 유지합니다.
 S3·CloudFront 미디어 주소는 원본과 공유합니다.
+
+현재 소비 스키마는 Hub `010_exam_format` 기준입니다. `items`와 `question_sets`의 `exam_format`은
+`pbt` 또는 `ibt`이며 기본값은 `pbt`입니다. 세트 고유키는 시험 방식을 포함하고,
+문항과 소속 세트의 시험 방식은 복합 외래키로 일치시킵니다. IBT 문항 슬롯·세트 위치는 1~30입니다.
+
+`0002_exam_format.py`는 모델 상태를 기록하고, `0003_apply_exam_format_schema.py`는 기존 소비 DB의
+컬럼·제약조건·인덱스·뷰를 갱신합니다. 기존 문항은 `pbt`로 유지하며 UUID·미디어 연결·응시 기록을 보존합니다.
+이미 갱신된 DB에도 적용할 수 있으며, 적용 이력은 `django_migrations`로 관리합니다.
+문제은행 테이블이 전혀 없는 DB에서는 구조 갱신을 건너뛰고 Hub가 현재 스키마로 최초 초기화합니다.
+일부 테이블만 있는 불완전한 DB는 오류로 중단합니다. 소비 DB에 Hub의 마이그레이션·배포 이력 테이블을 만들지 않습니다.
+
+로컬에서는 사용자가 대상 DB와 백업을 확인한 뒤 `python manage.py migrate`를 직접 실행하고
+`python manage.py runserver`로 시작합니다. `runserver`에는 자동 마이그레이션을 추가하지 않습니다.
+운영에서는 기존 `deploy/start.sh`가 `migrate --noinput` 후 Gunicorn을 시작합니다.
+별도 SQL 파일이나 수동 SQL 실행은 사용하지 않습니다. 적용 후 아래 읽기 전용 점검 명령과
+`sync_pbt_exams --check`로 연결과 자료 준비 상태를 확인합니다.
 
 로컬에서 읽기 전용 연결 검증:
 
@@ -245,7 +263,7 @@ $env:DJANGO_ENV = 'development'
 .\.venv\Scripts\python.exe manage.py inspect_question_bank --set-id 세트_UUID
 ```
 
-명령은 테이블별 건수와 세트별 문항 수를 출력하며 연결·미디어 모델 매핑을 조회합니다.
+명령은 테이블별 건수와 시험 방식·세트별 문항 수를 출력하며 연결·미디어 모델 매핑을 조회합니다.
 문항 내용·정답·연결 비밀번호는 출력하지 않습니다. 문제은행이 아직 초기화되지 않았다면 오류로 안내합니다.
 일반 백엔드 검증에 `question_bank` 테스트를 포함합니다. 테스트는 로컬의 격리된 테스트 DB에서만 실행합니다.
 
@@ -271,7 +289,9 @@ $env:DJANGO_ENV = 'development' # 운영에서는 production
 ```
 
 `--check`는 등록하지 않고 자료 준비 상태를 조회합니다. 등록 명령은 1~50번 문항, 정답, 선택지, 현재 음성 연결, 듣기 그림 선택지, 읽기 10번 자료 이미지를 검증합니다.
-완성된 세트만 `pbt_exams`에 등록·공개하며, 최초 등록 시 생성 시각과 UUID 순으로 영역별 첫 3개에 비회원 슬롯을 할당합니다.
+`exam_format='pbt'`인 완성된 세트만 `pbt_exams`에 등록·공개하며, 최초 등록 시 생성 시각과 UUID 순으로 영역별 첫 3개에 비회원 슬롯을 할당합니다.
+IBT 세트는 동기화와 PBT 시험 목록에서 제외하며, 직접 요청으로 새 PBT 응시를 생성할 수도 없습니다.
+기존 응시의 조회·이어풀기·채점은 저장된 스냅샷을 사용합니다.
 후속 실행은 기존 시험 제목·회차·공개 여부·슬롯을 보존합니다. 새 Hub 세트를 전송한 뒤 명령을 다시 실행하면 추가 세트가 등록됩니다.
 세트 상태나 자료가 이후 변경되면 응시 시작 시 다시 검증하고, 불완전한 세트는 409로 안내합니다. 관리자에서 공개 상태와 비회원 슬롯을 조정할 수 있습니다.
 운영 시작 스크립트는 마이그레이션을 적용하지만 이 등록 명령은 자동 실행하지 않습니다.

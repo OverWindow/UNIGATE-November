@@ -4,6 +4,7 @@ from django.db import models
 
 class QuestionSet(models.Model):
     set_id = models.UUIDField(primary_key=True)
+    exam_format = models.TextField(default="pbt", choices=[("pbt", "PBT"), ("ibt", "IBT")])
     section = models.TextField()
     generator_provider = models.TextField()
     generator_model = models.TextField()
@@ -21,6 +22,7 @@ class QuestionSet(models.Model):
 
 class Item(models.Model):
     item_id = models.UUIDField(primary_key=True)
+    exam_format = models.TextField(default="pbt", choices=[("pbt", "PBT"), ("ibt", "IBT")])
     source_key = models.TextField(unique=True)
     created_at = models.DateTimeField()
     section = models.TextField()

@@ -18,6 +18,9 @@
 - Keep changes within the requested scope. Do not perform unrelated refactoring or modify unrelated files.
 - If instructions are unclear or open to multiple interpretations, ask for clarification and wait before proceeding with dependent work.
 - Evaluate existing functionality before adding a dependency. Reuse existing tables and relationships where possible; add tables only for a clear, current requirement.
+- DB 구조 변경은 `backend/migration/<기능명>/*.py`의 Django migration으로만 관리합니다. 별도 `.sql` 파일을 추가하거나 migration을 우회하여 DB에 SQL을 직접 실행하지 않습니다.
+- 로컬 `migrate`는 사용자가 직접 실행합니다. 에이전트는 임의로 실행하거나 `runserver`에 자동 적용을 추가하지 않습니다. 운영은 기존 `deploy/start.sh`의 `migrate` 후 Gunicorn 시작 절차를 유지합니다.
+- 관리 명령이나 실행 스크립트를 추가·변경하거나 기능 사용에 별도 실행이 필요하면, 완료 보고에 목적·정확한 명령·실행 위치와 시점·DB 변경 여부·자동/수동 실행 여부를 반드시 안내합니다. 필요한 수동 단계를 빠뜨리지 말고, 상세 사용법은 README에 기록합니다.
 - Before adding or configuring a background worker, explain its purpose and obtain approval.
 - Obtain approval before deleting data or making database changes that break schema compatibility.
 - Do not expose personal information, student information, API keys, database connection strings, credentials, or secrets in logs or the repository. Never print environment file values or commit secrets.

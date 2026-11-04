@@ -20,7 +20,7 @@ class Command(BaseCommand):
                     number = Exam.objects.filter(section=section).aggregate(n=Max("display_order"))["n"] or 0
                     slots = set(Exam.objects.filter(section=section, guest_slot__isnull=False).values_list("guest_slot", flat=True))
                     ready = 0
-                    for source in QuestionSet.objects.filter(section=section).order_by("created_at", "set_id"):
+                    for source in QuestionSet.objects.filter(exam_format="pbt", section=section).order_by("created_at", "set_id"):
                         try:
                             load_set(source.pk, section)
                         except BankNotReady as exc:
