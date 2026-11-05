@@ -7,7 +7,8 @@ import { useApp } from "@/app/providers";
 import { clockText, pbtRequest, PbtError, remainingSeconds, type Attempt } from "@/lib/pbt-api";
 import { pbtContent, pbtErrorMessage } from "@/lib/pbt-content";
 import SiteHeader from "../SiteHeader";
-import PbtQuestion, { ListeningPlayer, QuestionMaterial } from "./PbtQuestion";
+import PbtQuestion, { QuestionMaterial } from "./PbtQuestion";
+import ListeningPlayer, { type AudioProgress } from "./ListeningPlayer";
 
 export default function PbtAttempt({ id, review = false }: { id: string; review?: boolean }) {
   const { language, user, status } = useApp();
@@ -26,6 +27,11 @@ export default function PbtAttempt({ id, review = false }: { id: string; review?
   const [remaining, setRemaining] = useState<number | null>(null);
   const [revision, setRevision] = useState(0);
   const [wrongOnly, setWrongOnly] = useState(false);
+  const [audioPlaying, setAudioPlaying] = useState(false);
+  const [audioProgress, setAudioProgress] = useState<AudioProgress | null>(null);
+  const updateAudioProgress = useCallback((next: AudioProgress) => {
+    setAudioProgress(current => current && current.playbackKey === next.playbackKey && current.elapsed === next.elapsed && current.duration === next.duration ? current : next);
+  }, []);
   const receivedAt = useRef(0);
   const autoSubmitted = useRef(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -106,13 +112,17 @@ export default function PbtAttempt({ id, review = false }: { id: string; review?
   const grouped = group.length > 1;
   const first = group[0];
   const last = group.at(-1);
+  const playbackKey = `${id}:${first?.position}`;
+  const elapsedAudio = audioProgress?.playbackKey === playbackKey ? audioProgress.elapsed : 0;
+  const audioDuration = audioProgress?.playbackKey === playbackKey ? audioProgress.duration : null;
+  const audioTime = `${clockText(elapsedAudio)} / ${audioDuration === null ? "--:--" : clockText(audioDuration)}`;
   const sharedMaterial = grouped && !!(first?.passage || first?.materialUrl || first?.auxiliary);
   const total = attempt?.items.length ?? 50;
   const answered = attempt?.items.filter(item => item.selectedOption !== null).length ?? 0;
   const wrong = attempt?.items.filter(item => !item.isCorrect) ?? [];
   const disabled = busy || submitting || remaining === 0;
   const go = (next: number) => {
-    if (busy || submitting) return;
+    if (busy || submitting || audioPlaying) return;
     setDialog(null); setPosition(next);
     window.requestAnimationFrame(() => {
       paperRef.current?.scrollTo({ top: 0, behavior: "instant" });
@@ -154,11 +164,15 @@ export default function PbtAttempt({ id, review = false }: { id: string; review?
           {wrongOnly && !wrong.length && <p>{t.noWrong}</p>}
         </section> : first && last && <>
           <section ref={paperRef} className="pbt-exam-width pbt-test-paper" tabIndex={-1} aria-labelledby="pbt-section-title">
-            <div className="pbt-paper-heading">
+            <div className={`pbt-paper-heading${first.audioUrl ? " has-audio" : ""}`}>
               <h2 id="pbt-section-title">[{t[attempt.section]}]</h2>
+              {first.audioUrl && <div className="pbt-audio-time" role="timer" aria-label={`${t.audioTime}: ${audioTime}`} title={t.audioTimeHint}>
+                <span>{t.audioTime}</span><strong>{audioTime}</strong>
+              </div>}
               <span className="pbt-position">{first.position}{grouped ? `–${last.position}` : ""} / {total}</span>
             </div>
-            {first.audioUrl && <ListeningPlayer key={first.audioUrl} url={first.audioUrl} />}
+            {first.audioUrl && <ListeningPlayer key={playbackKey} url={first.audioUrl} mode={attempt.mode}
+              playbackKey={playbackKey} stopped={submitting || remaining === 0} onPlayingChange={setAudioPlaying} onProgressChange={updateAudioProgress} />}
             <div className={sharedMaterial ? "pbt-group-layout" : undefined}>
               {sharedMaterial && <section className="pbt-shared"><p>{first.position}–{last.position} · {t.group}</p><QuestionMaterial question={{ ...first, highlight: group.map(item => item.highlight).find(Boolean) || "" }} /></section>}
               <div className="pbt-group-questions">
@@ -167,14 +181,14 @@ export default function PbtAttempt({ id, review = false }: { id: string; review?
             </div>
           </section>
           <nav className="pbt-test-navigation" aria-label={t.questionNavigation}><div className="pbt-exam-width">
-            <button className="button pbt-secondary" disabled={first.position <= 1 || busy || submitting} onClick={() => go(first.position - 1)}><span aria-hidden="true">←</span> {t.previous}</button>
+            <button className="button pbt-secondary" disabled={first.position <= 1 || busy || submitting || audioPlaying} onClick={() => go(first.position - 1)}><span aria-hidden="true">←</span> {t.previous}</button>
             <button className="button pbt-secondary pbt-all-questions" aria-haspopup="dialog" onClick={() => setDialog("questions")} disabled={busy || submitting}>
               <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M1 1h3v3H1zm5 0h3v3H6zm5 0h3v3h-3zM1 6h3v3H1zm5 0h3v3H6zm5 0h3v3h-3zM1 11h3v3H1zm5 0h3v3H6zm5 0h3v3h-3z" /></svg>
               {t.allQuestions}
             </button>
             {last.position >= total
               ? <button className="button button-primary" disabled={disabled} onClick={() => setDialog("submit")}>{submitting ? t.submitting : t.submit}</button>
-              : <button className="button pbt-secondary" disabled={busy || submitting} onClick={() => go(last.position + 1)}>{t.next} <span aria-hidden="true">→</span></button>}
+              : <button className="button pbt-secondary" disabled={busy || submitting || audioPlaying} onClick={() => go(last.position + 1)}>{t.next} <span aria-hidden="true">→</span></button>}
           </div></nav>
         </>}
       </>}
@@ -187,7 +201,7 @@ export default function PbtAttempt({ id, review = false }: { id: string; review?
       {dialog === "questions" ? <>
         <p className="pbt-navigator-summary">{t.answered} <strong>{answered} / {total}</strong><span>{t.unanswered} <strong>{total - answered}</strong></span></p>
         <div className="pbt-number-grid">
-          {attempt?.items.map(item => <button key={item.position} className={item.selectedOption !== null ? "is-answered" : ""} aria-current={group.some(q => q.position === item.position) ? "step" : undefined} aria-label={`${item.position}: ${item.selectedOption === null ? t.noAnswer : `${t.yourAnswer} ${item.selectedOption}`}`} disabled={busy || submitting} onClick={() => go(item.position)}>{item.position}</button>)}
+          {attempt?.items.map(item => <button key={item.position} className={item.selectedOption !== null ? "is-answered" : ""} aria-current={group.some(q => q.position === item.position) ? "step" : undefined} aria-label={`${item.position}: ${item.selectedOption === null ? t.noAnswer : `${t.yourAnswer} ${item.selectedOption}`}`} disabled={busy || submitting || audioPlaying} onClick={() => go(item.position)}>{item.position}</button>)}
         </div>
         <div className="pbt-navigator-legend"><span><i className="is-current" />{t.currentQuestion}</span><span><i className="is-answered" />{t.answered}</span><span><i />{t.noAnswer}</span></div>
         <p className="pbt-muted">{attempt?.mode === "timed" ? t.timeHint : t.saveHint}</p>

@@ -8,14 +8,14 @@ from django.db import connection, IntegrityError, transaction
 from django.test import Client, TransactionTestCase
 from django.utils import timezone
 
-from question_bank.models import AudioAsset, Item, ItemAudioBinding, QuestionSet, SetItemAudioBinding, VisualAsset
+from question_bank.models import AudioAsset, Item, ItemAudioBinding, QuestionSet, VisualAsset
 from .bank import BankNotReady, load_set
 from .models import Attempt, AttemptItem, Exam
 
 
 class PbtTests(TransactionTestCase):
     def setUp(self):
-        self.bank_models = (QuestionSet, Item, AudioAsset, ItemAudioBinding, SetItemAudioBinding, VisualAsset)
+        self.bank_models = (QuestionSet, Item, AudioAsset, ItemAudioBinding, VisualAsset)
         with connection.cursor() as cursor:
             cursor.execute("CREATE SCHEMA topik_bank")
         with connection.schema_editor() as editor:
@@ -52,7 +52,11 @@ class PbtTests(TransactionTestCase):
             audio = AudioAsset.objects.create(audio_asset_id=uuid.uuid4(), source_hash="c" * 64, provider="synthetic", model_name="synthetic",
                 language_code="ko", female_voice="", male_voice="", mime_type="audio/mpeg", storage_bucket="", storage_path="",
                 storage_url="https://example.invalid/audio.mp3", byte_size=1, created_at=now, tts_style={}, narration_version="synthetic", storage_backend="s3")
-            SetItemAudioBinding.objects.bulk_create([SetItemAudioBinding(set=source, position=p, audio_asset=audio, source_hash="c" * 64, is_current=True, created_at=now) for p in range(1, 51)])
+            ItemAudioBinding.objects.bulk_create([
+                ItemAudioBinding(binding_id=uuid.uuid4(), item=item, content_hash=item.content_hash,
+                                 audio_asset=audio, source_hash="c" * 64, is_current=True, created_at=now)
+                for item in source.items.all()
+            ])
         return source
 
     def start(self, exam=None, mode="practice", client=None):
@@ -89,6 +93,101 @@ class PbtTests(TransactionTestCase):
             self.assertEqual((attempt.expires_at - attempt.started_at).total_seconds(), seconds)
         Attempt.objects.filter(pk=practice["id"]).update(started_at=timezone.now() - timedelta(days=90))
         self.assertEqual(self.client.get(f"/api/pbt/attempts/{practice['id']}/").json()["status"], "in_progress")
+
+    def test_catalog_shows_latest_submitted_score_per_mode_and_resume(self):
+        self.client.force_login(self.user)
+        empty = {"latestResult": None, "inProgressId": None}
+        catalog = self.client.get("/api/pbt/exams/").json()["exams"]
+        self.assertTrue(all(e["myProgress"] == {"practice": empty, "timed": empty} for e in catalog))
+
+        first = self.start()
+        first_path = f"/api/pbt/attempts/{first['id']}/"
+        self.client.put(first_path + "answers/1/", {"selectedOption": 2}, content_type="application/json")
+        self.client.post(first_path + "submit/")
+        latest = self.start()
+        self.client.post(f"/api/pbt/attempts/{latest['id']}/submit/")
+        now = timezone.now()
+        # Submission order wins over both starting order and the highest score.
+        Attempt.objects.filter(pk=first["id"]).update(started_at=now - timedelta(hours=3), submitted_at=now - timedelta(hours=2))
+        Attempt.objects.filter(pk=latest["id"]).update(started_at=now - timedelta(hours=4), submitted_at=now - timedelta(hours=1))
+        timed = self.start(mode="timed")
+        timed_path = f"/api/pbt/attempts/{timed['id']}/"
+        self.client.put(timed_path + "answers/1/", {"selectedOption": 2}, content_type="application/json")
+        self.client.post(timed_path + "submit/")
+        response = self.client.get("/api/pbt/exams/")
+        self.assertIn("no-store", response.headers["Cache-Control"])
+        self.assertIn("Cookie", response.headers["Vary"])
+        progress = next(e for e in response.json()["exams"] if e["id"] == str(self.exam.pk))["myProgress"]
+        self.assertEqual(progress["practice"], {"latestResult": {
+            "id": latest["id"], "score": 0, "maxScore": 100,
+            "submittedAt": (now - timedelta(hours=1)).isoformat(),
+        }, "inProgressId": None})
+        self.assertEqual(progress["timed"]["latestResult"]["id"], timed["id"])
+        self.assertEqual(progress["timed"]["latestResult"]["score"], 2)
+
+        active = self.start()
+        progress = next(e for e in self.client.get("/api/pbt/exams/").json()["exams"] if e["id"] == str(self.exam.pk))["myProgress"]
+        self.assertEqual(progress["practice"]["inProgressId"], active["id"])
+        self.assertEqual(progress["practice"]["latestResult"]["id"], latest["id"])
+        self.assertIsNone(progress["timed"]["inProgressId"])
+
+    def test_catalog_progress_excludes_guests_and_other_accounts(self):
+        guest = self.start()
+        self.client.post(f"/api/pbt/attempts/{guest['id']}/submit/")
+        self.assertTrue(all(e["myProgress"] is None for e in self.client.get("/api/pbt/exams/").json()["exams"]))
+        self.client.force_login(self.user)
+        other = Client()
+        other.force_login(get_user_model().objects.create_user(username="catalog-other", password="synthetic-test-only"))
+        foreign = self.start(client=other)
+        other.post(f"/api/pbt/attempts/{foreign['id']}/submit/")
+        self.start(mode="timed", client=other)
+        for exam in self.client.get("/api/pbt/exams/").json()["exams"]:
+            for progress in exam["myProgress"].values():
+                self.assertIsNone(progress["latestResult"])
+                self.assertIsNone(progress["inProgressId"])
+        self.assertEqual(self.client.get(f"/api/pbt/attempts/{foreign['id']}/result/").status_code, 404)
+
+        own = self.start()
+        self.client.post(f"/api/pbt/attempts/{own['id']}/submit/")
+        for client, expected in ((self.client, own), (other, foreign)):
+            progress = next(e for e in client.get("/api/pbt/exams/").json()["exams"] if e["id"] == str(self.exam.pk))["myProgress"]
+            self.assertEqual(progress["practice"]["latestResult"]["id"], expected["id"])
+        self.assertTrue(all(e["myProgress"] is None for e in Client().get("/api/pbt/exams/").json()["exams"]))
+
+    def test_catalog_progress_includes_attempts_beyond_recent_hundred(self):
+        self.client.force_login(self.user)
+        old = self.start()
+        self.client.post(f"/api/pbt/attempts/{old['id']}/submit/")
+        active = self.start()
+        old_time = timezone.now() - timedelta(days=90)
+        Attempt.objects.filter(pk=old["id"]).update(started_at=old_time, submitted_at=old_time)
+        Attempt.objects.filter(pk=active["id"]).update(started_at=old_time)
+        Attempt.objects.bulk_create([Attempt(exam=self.listen_exam, user=self.user, title=self.listen_exam.title,
+            section="listening", mode="practice", status="submitted", started_at=timezone.now(),
+            submitted_at=timezone.now(), score=100) for _ in range(100)])
+        history = self.client.get("/api/pbt/attempts/").json()["attempts"]
+        self.assertEqual(len(history), 100)
+        self.assertNotIn(old["id"], [a["id"] for a in history])
+        self.assertNotIn(active["id"], [a["id"] for a in history])
+        progress = next(e for e in self.client.get("/api/pbt/exams/").json()["exams"] if e["id"] == str(self.exam.pk))["myProgress"]["practice"]
+        self.assertEqual(progress["latestResult"]["id"], old["id"])
+        self.assertEqual(progress["latestResult"]["score"], 0)
+        self.assertEqual(progress["inProgressId"], active["id"])
+
+    def test_catalog_finalizes_expired_member_attempt(self):
+        self.client.force_login(self.user)
+        active = self.start(mode="timed")
+        path = f"/api/pbt/attempts/{active['id']}/"
+        self.client.put(path + "answers/1/", {"selectedOption": 2}, content_type="application/json")
+        expiry = timezone.now() - timedelta(seconds=1)
+        Attempt.objects.filter(pk=active["id"]).update(expires_at=expiry)
+        for _ in range(2):
+            progress = next(e for e in self.client.get("/api/pbt/exams/").json()["exams"] if e["id"] == str(self.exam.pk))["myProgress"]["timed"]
+            self.assertIsNone(progress["inProgressId"])
+            self.assertEqual(progress["latestResult"], {"id": active["id"], "score": 2, "maxScore": 100, "submittedAt": expiry.isoformat()})
+        result = self.client.get(path + "result/").json()
+        self.assertTrue(result["timedOut"])
+        self.assertEqual(result["score"], 2)
 
     def test_members_can_start_restricted_sets_and_other_accounts_cannot_read_them(self):
         self.exam.guest_slot = None
@@ -192,6 +291,51 @@ class PbtTests(TransactionTestCase):
         response = self.client.post("/api/pbt/attempts/", {"examId": str(self.exam.pk), "mode": "practice"}, content_type="application/json")
         self.assertEqual(response.json()["error"], "exam_not_ready")
         self.assertFalse(Attempt.objects.exists())
+
+    def test_audio_uses_item_identity_and_ignores_history(self):
+        item = self.listening.items.get(position=1)
+        current = item.audio_bindings.get(is_current=True)
+        audio = current.audio_asset
+        audio.pk = uuid.uuid4()
+        audio.source_hash = "d" * 64
+        audio.storage_url = "https://example.invalid/current.mp3"
+        audio.save(force_insert=True)
+        current.audio_asset = audio
+        # Origin records the old location, not the item's current membership.
+        current.origin_set_id = uuid.uuid4()
+        current.origin_position = 50
+        current.save()
+        for content_hash in (None, item.content_hash):
+            ItemAudioBinding.objects.create(
+                binding_id=uuid.uuid4(), item=item, content_hash=content_hash,
+                audio_asset=AudioAsset.objects.exclude(pk=audio.pk).first(), source_hash="c" * 64,
+                is_current=False, created_at=timezone.now())
+        questions = load_set(self.listening.pk, "listening")
+        self.assertEqual(questions[0]["snapshot"]["audioUrl"], "https://example.invalid/current.mp3")
+        self.assertEqual(questions[49]["snapshot"]["audioUrl"], "https://example.invalid/audio.mp3")
+        current.is_current = False
+        current.save()
+        with self.assertRaisesRegex(BankNotReady, "missing_audio"):
+            load_set(self.listening.pk, "listening")
+
+    def test_current_audio_requires_matching_hash_and_live_asset(self):
+        item = self.listening.items.get(position=1)
+        binding = item.audio_bindings.get(is_current=True)
+        binding.content_hash = "outdated"
+        binding.save()
+        with self.assertRaisesRegex(BankNotReady, "missing_audio"):
+            load_set(self.listening.pk, "listening")
+        binding.content_hash = item.content_hash
+        binding.save()
+        AudioAsset.objects.filter(pk=binding.audio_asset_id).update(deleted_at=timezone.now())
+        with self.assertRaisesRegex(BankNotReady, "missing_audio"):
+            load_set(self.listening.pk, "listening")
+
+    def test_sync_check_does_not_register_new_exams(self):
+        self.make_set("reading")
+        before = list(Exam.objects.values())
+        call_command("sync_pbt_exams", check=True, stdout=io.StringIO(), stderr=io.StringIO())
+        self.assertEqual(list(Exam.objects.values()), before)
 
     def test_visual_choices_do_not_expose_generation_descriptions(self):
         item = self.listening.items.get(position=1)

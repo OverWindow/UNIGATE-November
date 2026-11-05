@@ -53,10 +53,28 @@ def payload(request, fields):
 def exams(request):
     if not request.user.is_authenticated and not request.session.get("pbt_guest_id"):
         request.session["pbt_guest_id"] = str(uuid.uuid4())
-    rows = Exam.objects.filter(is_published=True, source_set_id__in=QuestionSet.objects.filter(exam_format="pbt").values("set_id"))
+    rows = list(Exam.objects.filter(is_published=True, source_set_id__in=QuestionSet.objects.filter(exam_format="pbt").values("set_id")))
+    progress = {}
+    if request.user.is_authenticated:
+        progress = {e.pk: {mode: {"latestResult": None, "inProgressId": None}
+                          for mode in ("practice", "timed")} for e in rows}
+        with transaction.atomic():
+            owned = Attempt.objects.filter(user=request.user, exam_id__in=progress)
+            # Finalize expired tests before selecting results, including older history.
+            for attempt in owned.filter(status="in_progress", expires_at__lte=timezone.now()).select_for_update().order_by("-started_at"):
+                finalize(attempt)
+            latest = owned.filter(status="submitted").order_by("exam_id", "mode", "-submitted_at", "-started_at", "-id").distinct("exam_id", "mode")
+            for attempt in latest:
+                progress[attempt.exam_id][attempt.mode]["latestResult"] = {
+                    "id": str(attempt.pk), "score": attempt.score, "maxScore": 100,
+                    "submittedAt": attempt.submitted_at.isoformat(),
+                }
+            for attempt in owned.filter(status="in_progress"):
+                progress[attempt.exam_id][attempt.mode]["inProgressId"] = str(attempt.pk)
     return response({"exams": [{"id": str(e.pk), "title": e.title, "section": e.section,
         "round": e.display_order, "questionCount": 50, "durationSeconds": 3600 if e.section == "listening" else 4200,
-        "guestAvailable": e.guest_slot is not None, "accessible": request.user.is_authenticated or e.guest_slot is not None}
+        "guestAvailable": e.guest_slot is not None, "accessible": request.user.is_authenticated or e.guest_slot is not None,
+        "myProgress": progress.get(e.pk)}
         for e in rows]})
 
 

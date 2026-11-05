@@ -223,7 +223,8 @@ Docker 실행 환경이나 운영 도메인에서 확인하지 못한 항목은 
 
 ## Hub 문제은행 연결
 
-`backend/question_bank/`는 Hub가 직접 전송한 `topik_bank` 스키마의 6개 테이블을 조회합니다.
+`backend/question_bank/`는 Hub가 직접 전송한 `topik_bank` 스키마의 5개 테이블을 조회합니다.
+대상은 `question_sets`, `items`, `tts_audio_assets`, `item_audio_bindings`, `item_visual_assets`입니다.
 Django의 기존 기본 PostgreSQL 연결을 사용하며, 모든 모델은 `managed=False`입니다.
 문제은행의 최초 초기화와 문제 데이터 전송은 Hub의 **서버에 문제 등록** 화면이 담당합니다.
 이후 소비 DB 구조 변경은 `backend/migration/question_bank/*.py`의 Django migration으로 관리합니다.
@@ -238,21 +239,48 @@ Hub의 원본 `DATABASE_URL`과는 다른 DB여야 합니다. 실제 연결값�
 `topik_bank.schema_migrations`와 Hub 배포 이력은 복사하지 않으며 기존 Django 테이블은 유지합니다.
 S3·CloudFront 미디어 주소는 원본과 공유합니다.
 
-현재 소비 스키마는 Hub `010_exam_format` 기준입니다. `items`와 `question_sets`의 `exam_format`은
+현재 소비 스키마는 Hub `011_item_audio_only` 기준입니다. `010_exam_format`에서 추가한 `items`와 `question_sets`의 `exam_format`은
 `pbt` 또는 `ibt`이며 기본값은 `pbt`입니다. 세트 고유키는 시험 방식을 포함하고,
 문항과 소속 세트의 시험 방식은 복합 외래키로 일치시킵니다. IBT 문항 슬롯·세트 위치는 1~30입니다.
 
 `0002_exam_format.py`는 모델 상태를 기록하고, `0003_apply_exam_format_schema.py`는 기존 소비 DB의
 컬럼·제약조건·인덱스·뷰를 갱신합니다. 기존 문항은 `pbt`로 유지하며 UUID·미디어 연결·응시 기록을 보존합니다.
-이미 갱신된 DB에도 적용할 수 있으며, 적용 이력은 `django_migrations`로 관리합니다.
-문제은행 테이블이 전혀 없는 DB에서는 구조 갱신을 건너뛰고 Hub가 현재 스키마로 최초 초기화합니다.
-일부 테이블만 있는 불완전한 DB는 오류로 중단합니다. 소비 DB에 Hub의 마이그레이션·배포 이력 테이블을 만들지 않습니다.
+`0003`은 기존 6개 테이블과 음원 통합 후의 5개 테이블 모두 지원합니다.
 
-로컬에서는 사용자가 대상 DB와 백업을 확인한 뒤 `python manage.py migrate`를 직접 실행하고
-`python manage.py runserver`로 시작합니다. `runserver`에는 자동 마이그레이션을 추가하지 않습니다.
+`0004_item_audio_only.py`는 기존 `question_set_item_audio_bindings`의 전체 이력을 `item_audio_bindings`로
+옮기고 검증한 뒤 기존 세트 연결 테이블을 제거합니다. 기존 문항·세트·음원·이미지와 PBT 응시 스냅샷은 변경하지 않습니다.
+연결 PK는 `binding_id` UUID이며, 이전 연결에서 생성하는 UUID는 Hub 011과 같은 결정적 규칙을 사용합니다.
+기존 문항 연결의 해시·음원·생성 시각을 보존하고, 세트 연결의 원래 위치는 `origin_set_id`·`origin_position`에 기록합니다.
+현재 유효한 세트 연결을 우선 유지하고, 없으면 현재 문항 해시와 일치하는 삭제되지 않은 문항 음원을 유지합니다.
+과거 세트 연결의 알 수 없는 해시는 `NULL`로 보존하며, 현재 연결은 해시가 필수이고 문항당 최대 하나입니다.
+PBT는 `item_id`로 현재 연결을 조회하고 문항 해시 일치·음원 미삭제 여부를 확인합니다. 이관 출처의 위치로 음원을 찾지 않습니다.
+
+이미 Hub 011로 전환된 DB에서는 `0004`가 컬럼·PK·FK·CHECK 제약·인덱스를 검증하고 Django 모델 상태와 적용 이력만 기록합니다.
+기존 음원 연결을 다시 이관하거나 UUID를 재생성하지 않습니다. 적용 이력은 `django_migrations`로 관리합니다.
+문제은행 테이블이 전혀 없는 DB에서는 구조 갱신을 건너뛰고 Hub가 현재 스키마로 최초 초기화합니다.
+일부 테이블만 있거나 구형·신형 음원 컬럼이 섞인 DB는 오류로 중단합니다. 소비 DB에 Hub의 마이그레이션·배포 이력 테이블을 만들지 않습니다.
+
+구형 DB 적용 전에는 대상 DB의 전체 백업과 복원 가능 여부를 확인하고, Hub 전송·음원 편집 및 웹 요청을 중지합니다.
+`0004`는 관련 테이블 쓰기를 잠그고 이관·이력 검증·테이블 제거를 하나의 트랜잭션으로 수행합니다.
+문항 없는 연결, 이력 검증 실패 또는 제거 대상 테이블을 참조하는 외부 객체가 있으면 전체 이관을 롤백합니다.
+자동 백업이나 역방향 migration은 제공하지 않으며, 적용 후 이전 구조로 돌아가려면 적용 전 백업을 복원해야 합니다.
+
+로컬에서는 사용자가 백업을 확인한 뒤 아래 명령을 `backend/`에서 수동 실행합니다.
+`migrate`는 구형 DB의 구조·음원 연결 데이터를 변경하며, 이미 전환된 DB에서는 검증과 Django 적용 이력 기록만 수행합니다.
+뒤의 두 점검 명령은 DB를 변경하지 않습니다. 최초 빈 DB에서는 `migrate` 후 Hub 초기화·전송을 완료하고 점검합니다.
+
+```powershell
+cd backend
+$env:DJANGO_ENV = 'development'
+.\.venv\Scripts\python.exe manage.py migrate
+.\.venv\Scripts\python.exe manage.py inspect_question_bank
+.\.venv\Scripts\python.exe manage.py sync_pbt_exams --check
+```
+
+점검 후 `python manage.py runserver`로 시작합니다. `runserver`에는 자동 마이그레이션을 추가하지 않습니다.
 운영에서는 기존 `deploy/start.sh`가 `migrate --noinput` 후 Gunicorn을 시작합니다.
-별도 SQL 파일이나 수동 SQL 실행은 사용하지 않습니다. 적용 후 아래 읽기 전용 점검 명령과
-`sync_pbt_exams --check`로 연결과 자료 준비 상태를 확인합니다.
+운영 배포 전에도 같은 백업·쓰기 중지 절차가 필요합니다. 신규 HTTP API·영구 테이블·백그라운드 작업은 없습니다.
+별도 SQL 파일이나 수동 SQL 실행은 사용하지 않습니다.
 
 로컬에서 읽기 전용 연결 검증:
 
@@ -266,6 +294,9 @@ $env:DJANGO_ENV = 'development'
 명령은 테이블별 건수와 시험 방식·세트별 문항 수를 출력하며 연결·미디어 모델 매핑을 조회합니다.
 문항 내용·정답·연결 비밀번호는 출력하지 않습니다. 문제은행이 아직 초기화되지 않았다면 오류로 안내합니다.
 일반 백엔드 검증에 `question_bank` 테스트를 포함합니다. 테스트는 로컬의 격리된 테스트 DB에서만 실행합니다.
+`backend/`에서 `.\.venv\Scripts\python.exe manage.py test question_bank pbt --noinput`으로 실행합니다.
+테스트 러너는 별도 테스트 DB를 생성·제거합니다. 구형 이관·이미 전환된 DB·빈 DB·불완전한 스키마,
+음원 이력과 응시 기록 보존·실패 시 전체 롤백·현재 음원 조회를 검증합니다.
 
 ## PBT 모의고사
 
@@ -277,6 +308,12 @@ $env:DJANGO_ENV = 'development'
 각 영역에 `guest_slot` 1~3을 할당하며 DB의 범위·고유 제약으로 비회원 공개 세트 수를 제한합니다.
 권한은 목록뿐 아니라 응시 생성 API에서도 확인합니다. 비회원 기록은 Django 세션의 무작위 소유자 UUID와 연결하고, 회원 응시는 기존 사용자 계정과 연결합니다.
 비회원 세션에서 로그인하면 기존 비회원 기록도 계속 볼 수 있지만 계정으로 자동 이관되지는 않습니다. 쿠키 삭제·만료·로그아웃 시 비회원 기록에 대한 접근이 사라집니다.
+
+로그인한 사용자의 세트 카드에는 기존 우측 상단 배지 자리에 선택한 모드의 최근 제출 점수를 표시합니다.
+점수 배지를 누르면 결과로 이동하며, 마우스를 올리거나 스크린 리더로 읽으면 모드·제출일도 확인할 수 있습니다. 카드 높이와 기존 정보 배치는 유지합니다.
+이 요약은 계정에 저장된 전체 응시 기록에서 세트·모드별 최근 제출을 조회하므로 최근 100건에 포함되지 않은 결과도 표시합니다.
+진행 중인 응시가 있으면 `이어풀기`, 제출 기록만 있으면 `다시 풀기`, 기록이 없으면 `응시 시작`을 제공합니다.
+재응시 중에도 이전 제출 점수는 유지하며, 비회원 기록은 카드 요약에 포함하지 않습니다.
 
 문제은행이 준비된 환경에서 기존 DB 연결을 확인한 후 실행합니다.
 
@@ -306,13 +343,17 @@ IBT 세트는 동기화와 PBT 시험 목록에서 제외하며, 직접 요청�
 
 | HTTP 메서드 | 경로 | 목적 |
 |---|---|---|
-| GET | `/api/pbt/exams/` | 시험 목록과 접근 가능 여부 |
+| GET | `/api/pbt/exams/` | 시험 목록·접근 가능 여부와 로그인 사용자의 세트·모드별 최근 결과 및 진행 중 응시 |
 | POST | `/api/pbt/attempts/` | 응시 시작 또는 같은 모드의 진행 중 응시 재개 |
 | GET | `/api/pbt/attempts/` | 본인의 최근 100개 응시 기록 |
 | GET | `/api/pbt/attempts/<id>/` | 본인 응시 상태·문제·저장 답안 |
 | PUT | `/api/pbt/attempts/<id>/answers/<position>/` | `selectedOption` 1~4 저장 또는 `null`로 해제 |
 | POST | `/api/pbt/attempts/<id>/submit/` | 멱등 제출·채점 |
 | GET | `/api/pbt/attempts/<id>/result/` | 제출 후 점수·정답·해설·대본 |
+
+`GET /api/pbt/exams/`의 각 세트에는 `myProgress`가 포함됩니다. 비회원은 `null`, 회원은 `practice`·`timed` 각각에
+`latestResult`(제출 기록이 없으면 `null`, 있으면 `id`·`score`·`maxScore`·`submittedAt`)와 `inProgressId`(없으면 `null`)를 받습니다.
+카드 조회에서도 시간이 지난 본인 실전 응시는 기존 채점 절차로 확정합니다. 점수 표시에는 새 테이블·마이그레이션이나 별도 수동 실행이 필요하지 않습니다.
 
 변경 요청은 CSRF 검사를 수행하고 응답은 `private, no-store`입니다. 제출 전 API 응답은 표시용 필드만 포함하며 원본 `content_json`을 그대로 노출하지 않습니다.
 서버가 저장한 마감 시각 이후 답안 변경은 거절합니다. 열린 화면은 시간 종료 시 제출을 요청하고, 브라우저가 닫혀 있으면 다음 조회·저장·제출 요청에서 마감 시각 기준으로 확정합니다. 백그라운드 워커는 사용하지 않습니다.

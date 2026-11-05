@@ -3,7 +3,7 @@ from urllib.parse import urlsplit
 
 from django.db.models import Prefetch
 
-from question_bank.models import Item, ItemAudioBinding, QuestionSet, SetItemAudioBinding, VisualAsset
+from question_bank.models import Item, ItemAudioBinding, QuestionSet, VisualAsset
 
 
 class BankNotReady(Exception):
@@ -33,9 +33,6 @@ def load_set(set_id, section):
     ))
     if [item.position for item in items] != list(range(1, 51)):
         raise BankNotReady("requires_50_questions")
-    set_audio = {}
-    for binding in SetItemAudioBinding.objects.filter(set_id=set_id, is_current=True, audio_asset__deleted_at__isnull=True).select_related("audio_asset").order_by("created_at", "audio_asset_id"):
-        set_audio[binding.position] = media_url(binding.audio_asset.storage_url)
     result = []
     for item in items:
         if item.exam_format != "pbt" or item.section != section or item.review_status not in ("reviewed", "pilot", "active") or item.correct_answer not in (1, 2, 3, 4):
@@ -61,11 +58,10 @@ def load_set(set_id, section):
             choices = ["", "", "", ""]
         elif not isinstance(choices, list) or len(choices) != 4 or not all(isinstance(c, str) and c.strip() for c in choices):
             raise BankNotReady("invalid_choices")
-        audio_url = set_audio.get(item.position, "")
-        if not audio_url:
-            for binding in item.audio_bindings.all():
-                if binding.content_hash == item.content_hash:
-                    audio_url = media_url(binding.audio_asset.storage_url)
+        audio_url = ""
+        for binding in item.audio_bindings.all():
+            if binding.content_hash == item.content_hash:
+                audio_url = media_url(binding.audio_asset.storage_url)
         if section == "listening" and not audio_url:
             raise BankNotReady("missing_audio")
         if section == "reading" and item.position == 10 and not material:

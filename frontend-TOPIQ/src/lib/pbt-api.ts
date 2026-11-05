@@ -1,8 +1,13 @@
 export type Section = "reading" | "listening";
 export type Mode = "practice" | "timed";
+export interface ExamProgress {
+  latestResult: { id: string; score: number; maxScore: number; submittedAt: string } | null;
+  inProgressId: string | null;
+}
 export interface Exam {
   id: string; title: string; section: Section; round: number; questionCount: number;
   durationSeconds: number; guestAvailable: boolean; accessible: boolean;
+  myProgress: Record<Mode, ExamProgress> | null;
 }
 export interface Question {
   position: number; itemType: string; prompt: string; passage: string; auxiliary: string;

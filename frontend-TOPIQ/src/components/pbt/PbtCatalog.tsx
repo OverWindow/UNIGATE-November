@@ -12,6 +12,7 @@ import SiteFooter from "../SiteFooter";
 export default function PbtCatalog() {
   const { language, user, status, refreshSession } = useApp();
   const t = pbtContent[language];
+  const locale = language === "ko" ? "ko-KR" : language === "id" ? "id-ID" : "en-US";
   const router = useRouter();
   const [section, setSection] = useState<Section>("reading");
   const [mode, setMode] = useState<Mode>("practice");
@@ -65,13 +66,24 @@ export default function PbtCatalog() {
       </div>
       {(error || status === "error") ? <div role="alert" className="pbt-alert">{pbtErrorMessage(error, t)} <button onClick={retry}>{t.retry}</button></div> : null}
       {loading || status === "loading" ? <p role="status">{t.loading}</p> : <div className="pbt-exam-grid">
-        {exams.filter(exam => exam.section === section).map(exam => <article className="pbt-exam-card" key={exam.id}>
-          <div className="pbt-card-top"><span className="pbt-set-number">{String(exam.round).padStart(2, "0")}</span><span className={`pbt-badge ${exam.guestAvailable ? "pbt-badge-free" : ""}`}>{exam.guestAvailable ? t.free : t.members}</span></div>
-          <h2>{t[exam.section]} · {t.round} {exam.round}</h2>
-          <p>{exam.questionCount} {t.questions} <span>·</span> {mode === "practice" ? t.unlimited : `${exam.durationSeconds / 60} ${t.minutes}`}</p>
-          {exam.accessible ? <button className="button button-primary" disabled={!!starting} onClick={() => void start(exam)}>{starting === exam.id ? t.loading : t.start}<span aria-hidden="true">↗</span></button>
-            : <Link className="button pbt-secondary" href="/login?next=/pbt">{t.login}<span aria-hidden="true">↗</span></Link>}
-        </article>)}
+        {exams.filter(exam => exam.section === section).map(exam => {
+          const progress = user ? exam.myProgress?.[mode] : null;
+          const result = progress?.latestResult;
+          const resultLabel = result ? `${t.latestScore} · ${t[mode]}: ${result.score} / ${result.maxScore} · ${t.submittedOn}: ${new Date(result.submittedAt).toLocaleDateString(locale)} · ${t.result}` : "";
+          return <article className="pbt-exam-card" key={exam.id}>
+            <div className="pbt-card-top">
+              <span className="pbt-set-number">{String(exam.round).padStart(2, "0")}</span>
+              {result ? <Link className="pbt-badge pbt-badge-score" href={`/pbt/attempts/${result.id}/result`} title={resultLabel} aria-label={resultLabel}>
+                {result.score} / {result.maxScore} <span aria-hidden="true">↗</span>
+              </Link> : <span className={`pbt-badge ${exam.guestAvailable ? "pbt-badge-free" : ""}`}>{exam.guestAvailable ? t.free : t.members}</span>}
+            </div>
+            <h2>{t[exam.section]} · {t.round} {exam.round}</h2>
+            <p>{exam.questionCount} {t.questions} <span>·</span> {mode === "practice" ? t.unlimited : `${exam.durationSeconds / 60} ${t.minutes}`}</p>
+            {progress?.inProgressId ? <Link className="button button-primary" href={`/pbt/attempts/${progress.inProgressId}`}>{t.resume}<span aria-hidden="true">↗</span></Link>
+              : exam.accessible ? <button className="button button-primary" disabled={!!starting} onClick={() => void start(exam)}>{starting === exam.id ? t.loading : result ? t.retake : t.start}<span aria-hidden="true">↗</span></button>
+              : <Link className="button pbt-secondary" href="/login?next=/pbt">{t.login}<span aria-hidden="true">↗</span></Link>}
+          </article>;
+        })}
         {!exams.some(exam => exam.section === section) && !error && <p>{t.empty}</p>}
       </div>}
       <section className="pbt-history" aria-labelledby="pbt-history"><h2 id="pbt-history">{t.history}</h2>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment } from "react";
 import { useApp } from "@/app/providers";
 import type { Question } from "@/lib/pbt-api";
 import { pbtContent } from "@/lib/pbt-content";
@@ -18,17 +18,6 @@ export function QuestionMaterial({ question }: { question: Question }) {
     {question.materialUrl ? <img className="pbt-material-image" src={question.materialUrl} alt={question.passage || t.material} />
       : question.passage && <div className="pbt-passage" lang="ko"><Highlight text={question.passage} highlight={question.highlight} /></div>}
   </>;
-}
-
-export function ListeningPlayer({ url }: { url: string }) {
-  const { language } = useApp();
-  const t = pbtContent[language];
-  const [failed, setFailed] = useState(false);
-  const [revision, setRevision] = useState(0);
-  return <div className="pbt-audio"><p>{t.audioHint}</p>
-    <audio key={revision} controls controlsList="nodownload" preload="none" src={url} onError={() => setFailed(true)} aria-label={t.listening} />
-    {failed && <p role="alert">{t.audioError} <button onClick={() => { setFailed(false); setRevision(n => n + 1); }}>{t.retry}</button></p>}
-  </div>;
 }
 
 export default function PbtQuestion({ question, onAnswer, disabled, shared = false, review = false }: {

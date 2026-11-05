@@ -82,31 +82,19 @@ class AudioAsset(models.Model):
 
 
 class ItemAudioBinding(models.Model):
-    pk = models.CompositePrimaryKey("item_id", "content_hash", "audio_asset_id")
+    binding_id = models.UUIDField(primary_key=True)
     item = models.ForeignKey(Item, models.DO_NOTHING, db_column="item_id", related_name="audio_bindings")
-    content_hash = models.CharField(max_length=64)
+    content_hash = models.CharField(max_length=64, null=True)
     audio_asset = models.ForeignKey(AudioAsset, models.DO_NOTHING, db_column="audio_asset_id", related_name="item_bindings")
     source_hash = models.CharField(max_length=64)
     is_current = models.BooleanField()
     created_at = models.DateTimeField()
+    origin_set_id = models.UUIDField(null=True)
+    origin_position = models.SmallIntegerField(null=True)
 
     class Meta:
         managed = False
         db_table = '"topik_bank"."item_audio_bindings"'
-
-
-class SetItemAudioBinding(models.Model):
-    pk = models.CompositePrimaryKey("set_id", "position", "audio_asset_id")
-    set = models.ForeignKey(QuestionSet, models.DO_NOTHING, db_column="set_id", related_name="audio_bindings")
-    position = models.SmallIntegerField()
-    audio_asset = models.ForeignKey(AudioAsset, models.DO_NOTHING, db_column="audio_asset_id", related_name="set_bindings")
-    source_hash = models.CharField(max_length=64)
-    is_current = models.BooleanField()
-    created_at = models.DateTimeField()
-
-    class Meta:
-        managed = False
-        db_table = '"topik_bank"."question_set_item_audio_bindings"'
 
 
 class VisualAsset(models.Model):

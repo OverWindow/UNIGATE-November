@@ -49,8 +49,8 @@ def apply_schema(apps, schema_editor):
         cursor.execute("SELECT table_name FROM information_schema.tables "
                        "WHERE table_schema='topik_bank' AND table_type='BASE TABLE'")
         tables = {row[0] for row in cursor.fetchall()}
-    required = {"question_sets", "items", "tts_audio_assets", "item_audio_bindings",
-                "question_set_item_audio_bindings", "item_visual_assets"}
+    # Hub 011 consumers no longer have question_set_item_audio_bindings.
+    required = {"question_sets", "items", "tts_audio_assets", "item_audio_bindings", "item_visual_assets"}
     # A fresh database receives the current consumer schema from Hub initialization.
     if not tables:
         return

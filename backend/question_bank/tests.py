@@ -6,13 +6,13 @@ from django.core.management import call_command
 from django.db import connection
 from django.test import TransactionTestCase
 
-from .models import AudioAsset, Item, ItemAudioBinding, QuestionSet, SetItemAudioBinding, VisualAsset
+from .models import AudioAsset, Item, ItemAudioBinding, QuestionSet, VisualAsset
 
 
 class QuestionBankTests(TransactionTestCase):
     def setUp(self):
         # Unmanaged tables are provisioned only inside Django's disposable test DB.
-        self.models = (QuestionSet, Item, AudioAsset, ItemAudioBinding, SetItemAudioBinding, VisualAsset)
+        self.models = (QuestionSet, Item, AudioAsset, ItemAudioBinding, VisualAsset)
         with connection.cursor() as cursor:
             cursor.execute("CREATE SCHEMA IF NOT EXISTS topik_bank")
         with connection.schema_editor() as editor:
@@ -26,12 +26,14 @@ class QuestionBankTests(TransactionTestCase):
         with connection.cursor() as cursor:
             cursor.execute("DROP SCHEMA topik_bank")
 
-    def test_models_map_existing_columns_and_composite_keys(self):
+    def test_models_map_item_audio_history(self):
         for model in self.models:
             self.assertFalse(model._meta.managed)
             self.assertEqual(list(model.objects.all()), [])
-        self.assertEqual(ItemAudioBinding._meta.pk.field_names, ('item_id', 'content_hash', 'audio_asset_id'))
-        self.assertEqual(SetItemAudioBinding._meta.pk.field_names, ('set_id', 'position', 'audio_asset_id'))
+        self.assertEqual(ItemAudioBinding._meta.pk.name, 'binding_id')
+        self.assertTrue(ItemAudioBinding._meta.get_field('content_hash').null)
+        self.assertTrue(ItemAudioBinding._meta.get_field('origin_set_id').null)
+        self.assertTrue(ItemAudioBinding._meta.get_field('origin_position').null)
         self.assertNotIn('id', [f.name for f in ItemAudioBinding._meta.fields])
 
     def test_inspection_is_read_only_and_reports_membership(self):
@@ -52,6 +54,7 @@ class QuestionBankTests(TransactionTestCase):
         out = io.StringIO()
         call_command('inspect_question_bank', set_id=set_id, stdout=out)
         result = json.loads(out.getvalue())
+        self.assertEqual(len(result['counts']), 5)
         self.assertEqual(result['sets'][0]['item_count'], 1)
         self.assertEqual(Item.objects.get(pk=item_id).set.pk, set_id)
         self.assertEqual(Item.objects.get(pk=item_id).stem, 'test')
