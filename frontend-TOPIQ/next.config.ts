@@ -9,6 +9,7 @@ if (!["http:", "https:"].includes(backendOrigin.protocol) || backendOrigin.usern
 }
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   reactStrictMode: true,
   // Preserve Django's trailing-slash API URLs through the proxy.
   skipTrailingSlashRedirect: true,

@@ -21,7 +21,7 @@ export default function PbtAttempt({ id, review = false }: { id: string; review?
   const busyRef = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
-  const [confirm, setConfirm] = useState(false);
+  const [dialog, setDialog] = useState<"questions" | "submit" | null>(null);
   const [position, setPosition] = useState(1);
   const [remaining, setRemaining] = useState<number | null>(null);
   const [revision, setRevision] = useState(0);
@@ -29,6 +29,8 @@ export default function PbtAttempt({ id, review = false }: { id: string; review?
   const receivedAt = useRef(0);
   const autoSubmitted = useRef(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const dialogTitleRef = useRef<HTMLHeadingElement>(null);
+  const paperRef = useRef<HTMLElement>(null);
   const retry = () => setRevision(n => n + 1);
 
   useEffect(() => {
@@ -62,13 +64,15 @@ export default function PbtAttempt({ id, review = false }: { id: string; review?
   }, [busy]);
 
   useEffect(() => {
-    if (confirm) dialogRef.current?.showModal();
-    else dialogRef.current?.close();
-  }, [confirm]);
+    if (dialog) {
+      if (!dialogRef.current?.open) dialogRef.current?.showModal();
+      dialogTitleRef.current?.focus();
+    } else dialogRef.current?.close();
+  }, [dialog]);
 
   const submit = useCallback(async () => {
     if (submittingRef.current || busyRef.current) return;
-    submittingRef.current = true; setSubmitting(true); setSubmitError(false); setConfirm(false);
+    submittingRef.current = true; setSubmitting(true); setSubmitError(false); setDialog(null);
     try {
       await pbtRequest<Attempt>(`attempts/${id}/submit/`, "POST", {});
       router.replace(`/pbt/attempts/${id}/result`);
@@ -102,27 +106,43 @@ export default function PbtAttempt({ id, review = false }: { id: string; review?
   const grouped = group.length > 1;
   const first = group[0];
   const last = group.at(-1);
+  const sharedMaterial = grouped && !!(first?.passage || first?.materialUrl || first?.auxiliary);
+  const total = attempt?.items.length ?? 50;
   const answered = attempt?.items.filter(item => item.selectedOption !== null).length ?? 0;
   const wrong = attempt?.items.filter(item => !item.isCorrect) ?? [];
   const disabled = busy || submitting || remaining === 0;
-  const go = (next: number) => { setPosition(next); window.scrollTo({ top: 0, behavior: "instant" }); };
+  const go = (next: number) => {
+    if (busy || submitting) return;
+    setDialog(null); setPosition(next);
+    window.requestAnimationFrame(() => {
+      paperRef.current?.scrollTo({ top: 0, behavior: "instant" });
+      paperRef.current?.focus({ preventScroll: true });
+    });
+  };
 
-  return <><SiteHeader /><main id="main-content" className="pbt-workspace" tabIndex={-1}>
-    <div className="page-container">
-      <Link className="text-link pbt-back" href="/pbt" onClick={event => { if (busy || submitting) event.preventDefault(); }}>← {t.back}</Link>
-      {error ? <div className="pbt-alert" role="alert">{pbtErrorMessage(error, t)} <button onClick={retry}>{t.retry}</button></div> : !attempt ? <p role="status">{t.loading}</p> : <>
+  return <div className={!review && attempt ? "pbt-session" : undefined}><SiteHeader /><main id="main-content" className={`pbt-workspace${review ? "" : " pbt-exam"}`} tabIndex={-1}>
+    <div className={review ? "page-container" : "pbt-exam-content"}>
+      {(review || !attempt) && <div className={review ? undefined : "pbt-exam-width pbt-exam-loading"}>
+        <Link className="text-link pbt-back" href="/pbt">← {t.back}</Link>
+        {error ? <div className="pbt-alert" role="alert">{pbtErrorMessage(error, t)} <button onClick={retry}>{t.retry}</button></div> : !attempt && <p role="status">{t.loading}</p>}
+      </div>}
+      {attempt && <>
         {review ? <section className="pbt-result-summary">
           <div><p className="eyebrow">{attempt.title} · {t[attempt.section]} · {t[attempt.mode]}</p><h1>{t.complete}</h1>{attempt.timedOut && <p>{t.timedOut}</p>}</div>
           <div className="pbt-score"><span>{t.score}</span><strong>{attempt.score}<small> / 100</small></strong><span>{t.correct} {attempt.items.length - wrong.length} / 50</span></div>
         </section> : <>
-          <div className="pbt-test-heading"><div><p className="eyebrow">{attempt.title} · {t[attempt.mode]}</p><h1>{t[attempt.section]}</h1></div>
-            <div className={`pbt-timer ${remaining !== null && remaining < 300 ? "is-urgent" : ""}`} role="timer" aria-label={remaining === null ? t.unlimited : `${remaining} seconds`}>{remaining === null ? <><span>∞</span><small>{t.unlimited}</small></> : clockText(remaining)}</div>
+          <div className="pbt-exam-toolbar"><div className="pbt-exam-width pbt-exam-toolbar-inner">
+            <Link className="pbt-exam-back" href="/pbt" onClick={event => { if (busy || submitting) event.preventDefault(); }}><span aria-hidden="true">←</span> {t.back}</Link>
+            <h1>{attempt.title} <span>· {t[attempt.mode]}</span></h1>
+            <div className={`pbt-timer ${remaining !== null && remaining < 300 ? "is-urgent" : ""}`} role="timer" aria-label={remaining === null ? t.unlimited : `${t.remainingTime} ${clockText(remaining)}`} title={attempt.mode === "timed" ? t.timeHint : t.practiceHint}>
+              {remaining !== null && <small>{t.remainingTime}</small>}<span>{remaining === null ? t.unlimited : clockText(remaining)}</span>
+            </div>
+          </div></div>
+          <div className="pbt-exam-width pbt-exam-alerts">
+            {saveError && <p role="alert" className="pbt-alert">{t.saveFailed}</p>}
+            {remaining === 0 && <p role="status" className="pbt-alert">{t.expired}</p>}
+            {submitError && <div role="alert" className="pbt-alert">{t.submitFailed} <button onClick={() => void submit()}>{t.retry}</button></div>}
           </div>
-          <p className="pbt-muted">{attempt.mode === "timed" ? t.timeHint : t.saveHint}</p>
-          <div className="pbt-progress"><span>{t.answered} <strong>{answered} / 50</strong></span><span role="status">{busy ? t.saving : saveError ? t.saveFailed : t.saved}</span><progress max={50} value={answered} /></div>
-          {saveError && <p role="alert" className="pbt-alert">{t.saveFailed}</p>}
-          {remaining === 0 && <p role="status" className="pbt-alert">{t.expired}</p>}
-          {submitError && <div role="alert" className="pbt-alert">{t.submitFailed} <button onClick={() => void submit()}>{t.retry}</button></div>}
         </>}
         {review ? <section className="pbt-review"><div className="pbt-review-heading"><h2>{t.review}</h2><div className="pbt-section-tabs">
           <button aria-pressed={!wrongOnly} onClick={() => setWrongOnly(false)}>{t.all}</button><button aria-pressed={wrongOnly} onClick={() => setWrongOnly(true)}>{t.wrongOnly} ({wrong.length})</button>
@@ -132,24 +152,50 @@ export default function PbtAttempt({ id, review = false }: { id: string; review?
             <PbtQuestion question={item} review />
           </div>)}
           {wrongOnly && !wrong.length && <p>{t.noWrong}</p>}
-        </section> : first && last && <div className="pbt-test-layout">
-          <div className="pbt-test-paper">
+        </section> : first && last && <>
+          <section ref={paperRef} className="pbt-exam-width pbt-test-paper" tabIndex={-1} aria-labelledby="pbt-section-title">
+            <div className="pbt-paper-heading">
+              <h2 id="pbt-section-title">[{t[attempt.section]}]</h2>
+              <span className="pbt-position">{first.position}{grouped ? `–${last.position}` : ""} / {total}</span>
+            </div>
             {first.audioUrl && <ListeningPlayer key={first.audioUrl} url={first.audioUrl} />}
-            {grouped && first.passage && <section className="pbt-shared"><p>{first.position}–{last.position} · {t.group}</p><QuestionMaterial question={{ ...first, highlight: group.map(item => item.highlight).find(Boolean) || "" }} /></section>}
-            {group.map(item => <PbtQuestion key={item.position} question={item} shared={grouped && !!first.passage} disabled={disabled} onAnswer={(p, o) => void answer(p, o)} />)}
-            <div className="pbt-test-navigation"><button className="button pbt-secondary" disabled={first.position <= 1 || busy} onClick={() => go(first.position - 1)}>← {t.previous}</button>
-              <span>{first.position}{grouped ? `–${last.position}` : ""} / 50</span>
-              <button className="button pbt-secondary" disabled={last.position >= 50 || busy} onClick={() => go(last.position + 1)}>{t.next} →</button></div>
-          </div>
-          <aside className="pbt-answer-sheet"><h2>{t.navigator}</h2><div className="pbt-number-grid">
-            {attempt.items.map(item => <button key={item.position} className={item.selectedOption !== null ? "is-answered" : ""} aria-current={group.some(q => q.position === item.position) ? "step" : undefined} aria-label={`${item.position}: ${item.selectedOption ?? t.noAnswer}`} disabled={busy} onClick={() => go(item.position)}>{item.position}</button>)}
-          </div><p>{t.answered} {answered} / 50</p><button className="button button-primary" disabled={disabled} onClick={() => setConfirm(true)}>{submitting ? t.submitting : t.submit}</button><small>{t.saveHint}</small></aside>
-        </div>}
+            <div className={sharedMaterial ? "pbt-group-layout" : undefined}>
+              {sharedMaterial && <section className="pbt-shared"><p>{first.position}–{last.position} · {t.group}</p><QuestionMaterial question={{ ...first, highlight: group.map(item => item.highlight).find(Boolean) || "" }} /></section>}
+              <div className="pbt-group-questions">
+                {group.map(item => <PbtQuestion key={item.position} question={item} shared={sharedMaterial} disabled={disabled} onAnswer={(p, o) => void answer(p, o)} />)}
+              </div>
+            </div>
+          </section>
+          <nav className="pbt-test-navigation" aria-label={t.questionNavigation}><div className="pbt-exam-width">
+            <button className="button pbt-secondary" disabled={first.position <= 1 || busy || submitting} onClick={() => go(first.position - 1)}><span aria-hidden="true">←</span> {t.previous}</button>
+            <button className="button pbt-secondary pbt-all-questions" aria-haspopup="dialog" onClick={() => setDialog("questions")} disabled={busy || submitting}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M1 1h3v3H1zm5 0h3v3H6zm5 0h3v3h-3zM1 6h3v3H1zm5 0h3v3H6zm5 0h3v3h-3zM1 11h3v3H1zm5 0h3v3H6zm5 0h3v3h-3z" /></svg>
+              {t.allQuestions}
+            </button>
+            {last.position >= total
+              ? <button className="button button-primary" disabled={disabled} onClick={() => setDialog("submit")}>{submitting ? t.submitting : t.submit}</button>
+              : <button className="button pbt-secondary" disabled={busy || submitting} onClick={() => go(last.position + 1)}>{t.next} <span aria-hidden="true">→</span></button>}
+          </div></nav>
+        </>}
       </>}
     </div>
-    <dialog ref={dialogRef} className="pbt-dialog" onCancel={() => setConfirm(false)} aria-labelledby="pbt-confirm-title">
-      <h2 id="pbt-confirm-title">{t.confirm}</h2><p>{t.unanswered}: {50 - answered}</p>
-      <div><button className="button pbt-secondary" onClick={() => setConfirm(false)}>{t.cancel}</button><button className="button button-primary" onClick={() => void submit()} disabled={busy || submitting}>{t.submit}</button></div>
+    <dialog ref={dialogRef} className={`pbt-dialog${dialog === "questions" ? " pbt-navigator-dialog" : ""}`} onCancel={() => setDialog(null)} aria-labelledby="pbt-dialog-title">
+      {dialog === "questions" && <button className="pbt-dialog-close" type="button" aria-label={t.close} onClick={() => setDialog(null)}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6" /></svg>
+      </button>}
+      <h2 ref={dialogTitleRef} id="pbt-dialog-title" tabIndex={-1}>{dialog === "questions" ? t.allQuestions : t.confirm}</h2>
+      {dialog === "questions" ? <>
+        <p className="pbt-navigator-summary">{t.answered} <strong>{answered} / {total}</strong><span>{t.unanswered} <strong>{total - answered}</strong></span></p>
+        <div className="pbt-number-grid">
+          {attempt?.items.map(item => <button key={item.position} className={item.selectedOption !== null ? "is-answered" : ""} aria-current={group.some(q => q.position === item.position) ? "step" : undefined} aria-label={`${item.position}: ${item.selectedOption === null ? t.noAnswer : `${t.yourAnswer} ${item.selectedOption}`}`} disabled={busy || submitting} onClick={() => go(item.position)}>{item.position}</button>)}
+        </div>
+        <div className="pbt-navigator-legend"><span><i className="is-current" />{t.currentQuestion}</span><span><i className="is-answered" />{t.answered}</span><span><i />{t.noAnswer}</span></div>
+        <p className="pbt-muted">{attempt?.mode === "timed" ? t.timeHint : t.saveHint}</p>
+        <div className="pbt-dialog-actions"><button className="button button-primary" disabled={disabled} onClick={() => setDialog("submit")}>{t.submit}</button></div>
+      </> : <>
+        <p>{t.unanswered}: {total - answered}</p>
+        <div className="pbt-dialog-actions"><button className="button pbt-secondary" onClick={() => setDialog(null)}>{t.cancel}</button><button className="button button-primary" onClick={() => void submit()} disabled={busy || submitting}>{t.submit}</button></div>
+      </>}
     </dialog>
-  </main></>;
+  </main></div>;
 }

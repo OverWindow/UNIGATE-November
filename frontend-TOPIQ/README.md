@@ -92,6 +92,32 @@ npm start
 운영 서버를 시작한 상태에서 같은 출력 디렉터리를 다시 빌드하지 마세요.
 의존성 설치에는 커밋된 `package-lock.json`과 `npm ci`를 사용합니다.
 
+## Docker 배포
+
+TOPIQ 프론트엔드만 빌드하며, 기존 Django 백엔드는 별도로 실행합니다.
+배포할 때 저장소 루트에서 아래 명령을 수동 실행합니다.
+`https://api.example.com`은 컨테이너에서 접근할 수 있는 실제 Django origin으로 바꿉니다.
+
+```sh
+docker build --build-arg DJANGO_BACKEND_URL=https://api.example.com -t topiq-frontend ./frontend-TOPIQ
+docker run -d --name topiq-frontend -p 3001:3001 topiq-frontend
+```
+
+Node.js 24로 standalone 빌드한 뒤 필요한 실행 파일과 정적 파일만 포함합니다.
+컨테이너는 비관리자 사용자로 `node server.js`를 자동 실행하며 `0.0.0.0:3001`에서 수신합니다.
+로컬 확인 주소는 `http://localhost:3001`입니다.
+배포 플랫폼에서는 빌드 컨텍스트를 `frontend-TOPIQ/`, Dockerfile을 `Dockerfile`, 서비스 포트를 `3001`로 지정하고 HTTPS를 연결합니다.
+상태 검사 경로 `/`는 프론트엔드만 확인하며 백엔드 연결 상태는 포함하지 않습니다.
+
+`DJANGO_BACKEND_URL`은 필수 **빌드 인자**입니다. 주소를 바꾸면 이미지를 다시 빌드하고 컨테이너를 교체해야 합니다.
+런타임 환경변수만 바꿔서는 API 전달 주소가 변경되지 않습니다.
+컨테이너의 `localhost`는 컨테이너 자신이므로 별도 Django 서비스의 주소를 사용합니다.
+`.env*` 파일은 이미지에 포함하지 않으며 DB 비밀번호·메일 API 키도 전달하지 않습니다.
+
+배포 전에 백엔드의 `DJANGO_CSRF_TRUSTED_ORIGINS`에 TOPIQ 공개 origin(예: `https://topiq.unigate.kr`)을 등록합니다.
+이 Dockerfile은 API·DB 테이블을 추가하거나 변경하지 않으며 마이그레이션을 실행하지 않습니다.
+배포 후 홈페이지·로그인·PBT 화면과 API 연결을 확인합니다.
+
 ## 주요 파일
 
 | 경로 | 용도 |

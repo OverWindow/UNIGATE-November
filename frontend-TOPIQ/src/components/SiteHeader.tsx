@@ -48,7 +48,7 @@ export default function SiteHeader({ authHref }: { authHref?: string }) {
   }
 
   const navigation = t.navigation.map((label, index) => {
-    const href = index === 0 ? "/pbt" : undefined;
+    const href = index === 0 ? "/" : index === 1 ? "/pbt" : undefined;
     return href ? (
       <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined} onClick={() => setMenuOpen(false)}>{label}</Link>
     ) : (
