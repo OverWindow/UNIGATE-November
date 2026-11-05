@@ -120,6 +120,47 @@ class IbtTests(BankFixtures, TransactionTestCase):
         for row in self.client.get("/api/pbt/exams/").json()["exams"]:
             self.assertIsNone(row["myProgress"]["practice"]["latestResult"])
 
+    def test_restart_keeps_ibt_score_and_creates_empty_attempt_for_each_mode(self):
+        for member in (False, True):
+            client = Client()
+            if member:
+                client.force_login(self.user)
+            for mode in ("practice", "timed"):
+                with self.subTest(member=member, mode=mode):
+                    original = self.start(mode=mode, client=client)
+                    old = Attempt.objects.get(pk=original["id"])
+                    old.items.filter(position__in=[1, 2]).update(selected_option=2)
+                    payload = {"examId": str(self.ibt_exam.pk), "mode": mode, "restartAttemptId": original["id"]}
+                    response = client.post("/api/ibt/attempts/", payload, content_type="application/json")
+                    self.assertEqual(response.status_code, 201)
+                    old.refresh_from_db()
+                    self.assertEqual((old.status, old.score), ("submitted", 7))
+                    self.assertEqual(client.get(f"/api/ibt/attempts/{old.pk}/result/").json()["score"], 7)
+                    new = Attempt.objects.get(pk=response.json()["id"])
+                    self.assertEqual(new.exam_format, "ibt")
+                    self.assertEqual(new.items.count(), 30)
+                    self.assertFalse(new.items.filter(selected_option__isnull=False).exists())
+                    if mode == "timed":
+                        self.assertEqual((new.expires_at - new.started_at).total_seconds(), 2400)
+                    else:
+                        self.assertIsNone(new.expires_at)
+                    repeated = client.post("/api/ibt/attempts/", payload, content_type="application/json")
+                    self.assertEqual((repeated.status_code, repeated.json()["id"]), (200, str(new.pk)))
+                    self.assertEqual(self.start(mode=mode, client=client)["id"], str(new.pk))
+
+    def test_restart_rejects_other_format_and_preserves_both_attempts(self):
+        pbt = self.client.post("/api/pbt/attempts/", {
+            "examId": str(self.exam.pk), "mode": "practice",
+        }, content_type="application/json").json()
+        ibt = self.start()
+        for exam_format, exam, wrong_id in (("pbt", self.exam, ibt["id"]), ("ibt", self.ibt_exam, pbt["id"])):
+            response = self.client.post(f"/api/{exam_format}/attempts/", {
+                "examId": str(exam.pk), "mode": "practice", "restartAttemptId": wrong_id,
+            }, content_type="application/json")
+            self.assertEqual(response.status_code, 404)
+        self.assertEqual(Attempt.objects.count(), 2)
+        self.assertEqual(Attempt.objects.filter(status="in_progress").count(), 2)
+
     def test_timed_deadlines_and_late_answers(self):
         for exam, seconds in ((self.ibt_exam, 2400), (self.ibt_listen_exam, 2100)):
             data = self.start(exam, "timed")

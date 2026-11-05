@@ -385,7 +385,7 @@ $env:DJANGO_ENV = 'development'
 | HTTP 메서드 | 경로 | 목적 |
 |---|---|---|
 | GET | `/api/ibt/exams/` | IBT 시험 목록·접근 가능 여부·회원의 모드별 최근 결과와 진행 중 응시 |
-| POST | `/api/ibt/attempts/` | 응시 시작 또는 같은 모드의 진행 중 응시 재개 |
+| POST | `/api/ibt/attempts/` | 응시 시작·재개, `restartAttemptId` 지정 시 기존 응시 마감 후 새 응시 시작 |
 | GET | `/api/ibt/attempts/` | 본인의 최근 IBT 응시 100개 |
 | GET | `/api/ibt/attempts/<id>/` | 본인 응시 상태·문제·저장 답안 |
 | PUT | `/api/ibt/attempts/<id>/answers/<position>/` | `selectedOption` 1~4 저장 또는 `null`로 해제 |
@@ -393,6 +393,15 @@ $env:DJANGO_ENV = 'development'
 | GET | `/api/ibt/attempts/<id>/result/` | 제출 후 점수·정답·해설·대본 |
 
 PBT는 위 경로에서 `ibt`를 `pbt`로 바꾼 동일한 API를 사용합니다.
+시작 요청은 `examId`, `mode`를 받으며 선택적으로 `restartAttemptId`(기존 응시 UUID)를 받습니다.
+목록의 **풀기 시작**은 같은 세트·같은 모드의 진행 중 응시가 있으면 이 ID를 함께 보내 재시작합니다.
+기존 응시는 저장된 답안으로 채점·제출되며 미응답은 오답입니다. 기록과 결과를 보존하고 회원의 최근 점수에도 반영합니다.
+새 응시는 빈 답안으로 시작하고 실전 제한 시간도 새로 부여합니다. **이어풀기**는 기존 응시 화면으로 이동합니다.
+서버는 본인 계정 또는 현재 비회원 세션 소유의 동일 시험 방식·세트·모드인지 확인합니다.
+문제 준비 상태와 요청 제한을 확인한 뒤 기존 응시 마감과 새 응시 생성을 한 트랜잭션에서 처리합니다. 생성 실패 시 기존 응시도 유지합니다.
+같은 재시작 요청을 반복하면 현재 진행 중인 응시를 반환하고 추가로 마감하지 않습니다.
+대상이 이미 마감되었고 진행 중인 응시도 없으면 `409 attempt_closed`를 반환하므로 목록을 새로 조회한 뒤 시작합니다.
+`restartAttemptId`를 생략하면 기존처럼 진행 중 응시를 재개하거나 새 응시를 생성합니다. DB 구조 변경이나 별도 실행 명령은 필요 없습니다.
 목록·응시 응답의 `examFormat`은 `pbt` 또는 `ibt`, `maxScore`는 100입니다.
 목록의 `questionCount`·`durationSeconds`와 응시 문항 수를 이용해 화면을 표시합니다.
 목록의 `myProgress`는 비회원에게 `null`, 회원에게 모드별 `latestResult`와 `inProgressId`를 제공합니다.

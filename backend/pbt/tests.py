@@ -1,10 +1,13 @@
 import io
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from threading import Barrier
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
-from django.db import connection, IntegrityError, transaction
+from django.db import connection, connections, DatabaseError, IntegrityError, transaction
 from django.test import Client, TransactionTestCase
 from django.utils import timezone
 
@@ -246,6 +249,165 @@ class PbtTests(BankFixtures, TransactionTestCase):
         result = self.client.get(path + "result/").json()
         self.assertEqual(result["items"][0]["explanation"], "SECRET EXPLANATION")
         self.assertEqual(self.client.put(path + "answers/2/", {"selectedOption": 2}, content_type="application/json").status_code, 409)
+
+    def test_restart_preserves_results_and_starts_with_empty_answers(self):
+        for member in (False, True):
+            client = Client()
+            if member:
+                client.force_login(self.user)
+            for mode in ("practice", "timed"):
+                with self.subTest(member=member, mode=mode):
+                    data = self.start(mode=mode, client=client)
+                    old = Attempt.objects.get(pk=data["id"])
+                    old.items.filter(position=1).update(selected_option=2)
+                    old.items.filter(position=2).update(selected_option=1)
+                    old.started_at -= timedelta(minutes=5)
+                    if old.expires_at:
+                        old.expires_at -= timedelta(minutes=5)
+                    old.save()
+                    response = client.post("/api/pbt/attempts/", {
+                        "examId": str(self.exam.pk), "mode": mode, "restartAttemptId": data["id"],
+                    }, content_type="application/json")
+                    self.assertEqual(response.status_code, 201, response.content)
+                    new = Attempt.objects.get(pk=response.json()["id"])
+                    old.refresh_from_db()
+                    self.assertNotEqual(new.pk, old.pk)
+                    self.assertEqual((old.status, old.score, old.timed_out), ("submitted", 2, False))
+                    self.assertIsNotNone(old.submitted_at)
+                    self.assertEqual(old.items.get(position=1).selected_option, 2)
+                    self.assertTrue(old.items.get(position=1).is_correct)
+                    self.assertFalse(old.items.get(position=3).is_correct)
+                    self.assertEqual((new.status, new.score, new.user_id, new.guest_id),
+                                     ("in_progress", None, old.user_id, old.guest_id))
+                    self.assertEqual(new.items.count(), 50)
+                    self.assertFalse(new.items.filter(selected_option__isnull=False).exists())
+                    if mode == "timed":
+                        self.assertEqual((new.expires_at - new.started_at).total_seconds(), 4200)
+                        self.assertGreater(new.expires_at, old.expires_at)
+                    else:
+                        self.assertIsNone(new.expires_at)
+                    self.assertEqual(self.start(mode=mode, client=client)["id"], str(new.pk))
+                    result = client.get(f"/api/pbt/attempts/{old.pk}/result/").json()
+                    self.assertEqual(result["score"], 2)
+                    self.assertEqual(result["items"][0]["selectedOption"], 2)
+                    self.assertEqual(client.put(f"/api/pbt/attempts/{old.pk}/answers/2/",
+                        {"selectedOption": 2}, content_type="application/json").status_code, 409)
+                    if member:
+                        row = next(e for e in client.get("/api/pbt/exams/").json()["exams"] if e["id"] == str(self.exam.pk))
+                        self.assertEqual(row["myProgress"][mode]["latestResult"]["id"], str(old.pk))
+                        self.assertEqual(row["myProgress"][mode]["inProgressId"], str(new.pk))
+
+    def test_restart_retries_do_not_close_the_replacement(self):
+        original = self.start()
+        other_mode = self.start(mode="timed")
+        payload = {"examId": str(self.exam.pk), "mode": "practice", "restartAttemptId": original["id"]}
+        first = self.client.post("/api/pbt/attempts/", payload, content_type="application/json")
+        second = self.client.post("/api/pbt/attempts/", payload, content_type="application/json")
+        self.assertEqual((first.status_code, second.status_code), (201, 200))
+        self.assertEqual(first.json()["id"], second.json()["id"])
+        self.assertEqual(second.json()["status"], "in_progress")
+        self.assertEqual(Attempt.objects.filter(mode="practice").count(), 2)
+        self.assertEqual(Attempt.objects.get(pk=other_mode["id"]).status, "in_progress")
+        self.client.post(f"/api/pbt/attempts/{first.json()['id']}/submit/")
+        stale = self.client.post("/api/pbt/attempts/", payload, content_type="application/json")
+        self.assertEqual((stale.status_code, stale.json()["error"]), (409, "attempt_closed"))
+        self.assertEqual(Attempt.objects.filter(mode="practice").count(), 2)
+
+    def test_concurrent_restart_requests_create_one_replacement(self):
+        original = self.start()
+        barrier = Barrier(2)
+        clients = [Client(), Client()]
+        for client in clients:
+            client.cookies.update(self.client.cookies)
+
+        def restart(client):
+            try:
+                barrier.wait(timeout=10)
+                response = client.post("/api/pbt/attempts/", {
+                    "examId": str(self.exam.pk), "mode": "practice", "restartAttemptId": original["id"],
+                }, content_type="application/json")
+                return response.status_code, response.json()
+            finally:
+                connections.close_all()
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(restart, clients))
+        self.assertEqual(sorted(status for status, _ in results), [200, 201])
+        self.assertEqual(len({data["id"] for _, data in results}), 1)
+        self.assertEqual(Attempt.objects.count(), 2)
+        self.assertEqual(Attempt.objects.filter(status="in_progress").count(), 1)
+        self.assertEqual(Attempt.objects.get(pk=original["id"]).status, "submitted")
+
+    def test_restart_failures_preserve_existing_attempt_and_answers(self):
+        original = self.start()
+        old = Attempt.objects.get(pk=original["id"])
+        old.items.filter(position=1).update(selected_option=2)
+        payload = {"examId": str(self.exam.pk), "mode": "practice", "restartAttemptId": original["id"]}
+        failures = (
+            ("pbt.views.record_attempt", {"return_value": 60}, 429),
+            ("pbt.views.load_set", {"side_effect": BankNotReady("synthetic")}, 409),
+            ("pbt.views.AttemptItem.objects.bulk_create", {"side_effect": DatabaseError("synthetic")}, 503),
+        )
+        for target, options, status in failures:
+            with self.subTest(target=target), patch(target, **options):
+                response = self.client.post("/api/pbt/attempts/", payload, content_type="application/json")
+                self.assertEqual(response.status_code, status)
+            old.refresh_from_db()
+            self.assertEqual((old.status, old.score, old.submitted_at), ("in_progress", None, None))
+            self.assertEqual(old.items.get(position=1).selected_option, 2)
+            self.assertIsNone(old.items.get(position=1).is_correct)
+            self.assertEqual(Attempt.objects.count(), 1)
+            self.assertEqual(AttemptItem.objects.count(), 50)
+
+    def test_restart_validates_id_owner_set_mode_and_csrf(self):
+        original = self.start()
+        payload = {"examId": str(self.exam.pk), "mode": "practice", "restartAttemptId": original["id"]}
+        for invalid in (None, True, 1, "", "not-a-uuid", [], {}):
+            with self.subTest(invalid=invalid):
+                response = self.client.post("/api/pbt/attempts/", {**payload, "restartAttemptId": invalid}, content_type="application/json")
+                self.assertEqual(response.status_code, 400)
+        for changes in ({"restartAttemptId": str(uuid.uuid4())}, {"examId": str(self.listen_exam.pk)}, {"mode": "timed"}):
+            self.assertEqual(self.client.post("/api/pbt/attempts/", {**payload, **changes}, content_type="application/json").status_code, 404)
+        for invalid_payload in ({"restartAttemptId": original["id"]}, {**payload, "unexpected": True}):
+            self.assertEqual(self.client.post("/api/pbt/attempts/", invalid_payload, content_type="application/json").status_code, 400)
+        other = Client()
+        for member in (False, True):
+            if member:
+                other.force_login(self.user)
+            self.assertEqual(other.post("/api/pbt/attempts/", payload, content_type="application/json").status_code, 404)
+        strict = Client(enforce_csrf_checks=True)
+        strict.cookies.update(self.client.cookies)
+        self.assertEqual(strict.post("/api/pbt/attempts/", payload, content_type="application/json").status_code, 403)
+        self.assertEqual(Attempt.objects.count(), 1)
+        self.assertEqual(Attempt.objects.get(pk=original["id"]).status, "in_progress")
+
+    def test_restart_guest_attempt_after_login_creates_member_attempt(self):
+        original = self.start()
+        self.client.force_login(self.user)
+        payload = {"examId": str(self.exam.pk), "mode": "practice", "restartAttemptId": original["id"]}
+        first = self.client.post("/api/pbt/attempts/", payload, content_type="application/json")
+        self.assertEqual(first.status_code, 201)
+        new = Attempt.objects.get(pk=first.json()["id"])
+        self.assertEqual(new.user_id, self.user.pk)
+        self.assertIsNone(new.guest_id)
+        old = Attempt.objects.get(pk=original["id"])
+        self.assertIsNone(old.user_id)
+        self.assertEqual(old.status, "submitted")
+        second = self.client.post("/api/pbt/attempts/", payload, content_type="application/json")
+        self.assertEqual((second.status_code, second.json()["id"]), (200, str(new.pk)))
+
+    def test_restart_expired_attempt_preserves_deadline_and_resets_timer(self):
+        original = self.start(mode="timed")
+        expiry = timezone.now() - timedelta(seconds=1)
+        Attempt.objects.filter(pk=original["id"]).update(expires_at=expiry)
+        response = self.client.post("/api/pbt/attempts/", {
+            "examId": str(self.exam.pk), "mode": "timed", "restartAttemptId": original["id"],
+        }, content_type="application/json")
+        self.assertEqual(response.status_code, 201)
+        old = Attempt.objects.get(pk=original["id"])
+        self.assertEqual((old.status, old.timed_out, old.submitted_at), ("submitted", True, expiry))
+        new = Attempt.objects.get(pk=response.json()["id"])
+        self.assertEqual((new.expires_at - new.started_at).total_seconds(), 4200)
 
     def test_deadline_rejects_late_answer_and_finalizes_without_browser_timer(self):
         data = self.start(mode="timed")

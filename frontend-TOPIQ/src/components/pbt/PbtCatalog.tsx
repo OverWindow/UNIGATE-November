@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/app/providers";
 import { pbtRequest, type Attempt, type Exam, type Mode, type Section } from "@/lib/pbt-api";
@@ -23,6 +23,7 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [starting, setStarting] = useState<string | null>(null);
+  const startingRef = useRef(false);
   const [revision, setRevision] = useState(0);
   const retry = useCallback(() => { if (status === "error") void refreshSession(); else setRevision(n => n + 1); }, [status, refreshSession]);
 
@@ -42,13 +43,16 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
     return () => { active = false; };
   }, [status, user?.id, revision, examFormat]);
 
-  async function start(exam: Exam) {
-    if (starting) return;
+  async function start(exam: Exam, restartAttemptId?: string) {
+    if (startingRef.current) return;
+    startingRef.current = true;
     setStarting(exam.id); setError(null);
     try {
-      const attempt = await pbtRequest<Attempt>("attempts/", "POST", { examId: exam.id, mode }, examFormat);
+      const attempt = await pbtRequest<Attempt>("attempts/", "POST", {
+        examId: exam.id, mode, ...(restartAttemptId ? { restartAttemptId } : {}),
+      }, examFormat);
       router.push(`${basePath}/attempts/${attempt.id}`);
-    } catch (cause) { setError(cause); setStarting(null); }
+    } catch (cause) { setError(cause); setStarting(null); startingRef.current = false; }
   }
 
   const durationSeconds = exams.find(exam => exam.section === section)?.durationSeconds;
@@ -85,7 +89,7 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
             <h2>{t[exam.section]} · {t.round} {exam.round}</h2>
             <p>{exam.questionCount} {t.questions} <span>·</span> {mode === "practice" ? t.unlimited : `${exam.durationSeconds / 60} ${t.minutes}`}</p>
             {exam.accessible ? <div className="pbt-card-actions">
-              <button type="button" className="button button-primary" disabled={!!starting || !!inProgressId} onClick={() => void start(exam)}>{starting === exam.id ? t.loading : t.start}</button>
+              <button type="button" className="button button-primary" disabled={!!starting} onClick={() => void start(exam, inProgressId)}>{starting === exam.id ? t.loading : t.start}</button>
               {inProgressId ? <Link className="button button-primary" href={`${basePath}/attempts/${inProgressId}`}>{t.resume}</Link>
                 : <button type="button" className="button button-primary" disabled>{t.resume}</button>}
             </div>

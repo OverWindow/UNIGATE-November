@@ -35,7 +35,7 @@ def available(view):
     return wrapped
 
 
-def payload(request, fields):
+def payload(request, fields, optional_fields=()):
     if request.content_type != "application/json":
         raise ValueError
     try:
@@ -44,7 +44,7 @@ def payload(request, fields):
         data = json.loads(request.body)
     except (RequestDataTooBig, UnicodeDecodeError):
         raise ValueError from None
-    if not isinstance(data, dict) or set(data) != fields:
+    if not isinstance(data, dict) or not fields <= set(data) <= fields | set(optional_fields):
         raise ValueError
     return data
 
@@ -91,8 +91,9 @@ def attempts(request, exam_format="pbt"):
                 finalize(attempt)
             return response({"attempts": [attempt_data(a) for a in rows]})
     try:
-        data = payload(request, {"examId", "mode"})
+        data = payload(request, {"examId", "mode"}, {"restartAttemptId"})
         exam_id = uuid.UUID(data["examId"])
+        restart_id = uuid.UUID(data["restartAttemptId"]) if "restartAttemptId" in data else None
         if data["mode"] not in ("practice", "timed"):
             raise ValueError
     except (ValueError, TypeError, AttributeError):
@@ -104,11 +105,23 @@ def attempts(request, exam_format="pbt"):
         if not request.user.is_authenticated and exam.guest_slot is None:
             return response({"error": "login_required"}, 403)
         owner = {"user": request.user} if request.user.is_authenticated else {"guest_id": request.session["pbt_guest_id"], "user": None}
-        existing = Attempt.objects.select_for_update().filter(exam=exam, mode=data["mode"], status="in_progress", **owner).first()
-        if existing:
-            finalize(existing)
-            if existing.status == "in_progress":
+        active = Attempt.objects.filter(exam=exam, mode=data["mode"], status="in_progress", **owner)
+        restart = None
+        if restart_id is not None:
+            restart = get_object_or_404(Attempt.objects.select_for_update().filter(owner_filter(request)),
+                pk=restart_id, exam=exam, exam_format=exam_format, mode=data["mode"])
+            existing = active.first()
+            # A retry may only close the named attempt, never its replacement.
+            if existing and existing.pk != restart.pk:
                 return response(attempt_data(existing))
+            if restart.status != "in_progress":
+                return response({"error": "attempt_closed"}, 409)
+        else:
+            existing = active.select_for_update().first()
+            if existing:
+                finalize(existing)
+                if existing.status == "in_progress":
+                    return response(attempt_data(existing))
         wait = record_attempt(f"{exam_format}_start", str(request.user.pk) if request.user.is_authenticated else request.session["pbt_guest_id"], limit=30, window=3600)
         if wait:
             result = response({"error": "rate_limited"}, 429)
@@ -118,6 +131,8 @@ def attempts(request, exam_format="pbt"):
             questions = load_set(exam.source_set_id, exam.section, exam_format)
         except BankNotReady:
             return response({"error": "exam_not_ready"}, 409)
+        if restart is not None:
+            finalize(restart, force=True)
         now = timezone.now()
         attempt = Attempt.objects.create(exam=exam, exam_format=exam_format, title=exam.title, section=exam.section, mode=data["mode"],
             started_at=now, expires_at=now + timedelta(seconds=EXAM_FORMATS[exam_format]["duration"][exam.section]) if data["mode"] == "timed" else None, **owner)
