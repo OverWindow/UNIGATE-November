@@ -38,3 +38,31 @@ test("expired answer saves and guest restrictions are not treated as success", a
     await assert.rejects(api.pbtRequest("attempts/test/answers/1/", "PUT", { selectedOption: 2 }), error => error.code === code && error.status === status);
   }
 });
+
+test("IBT writes use the IBT endpoint and current CSRF token", async () => {
+  globalThis.fetch = async (path, options) => {
+    if (path === "/api/csrf/") return json({ csrfToken: "synthetic-ibt" });
+    assert.equal(path, "/api/ibt/attempts/test/answers/30/");
+    assert.equal(options.method, "PUT");
+    assert.equal(options.headers["X-CSRFToken"], "synthetic-ibt");
+    assert.deepEqual(JSON.parse(options.body), { selectedOption: 4 });
+    return json({ selectedOption: 4 });
+  };
+  await api.pbtRequest("attempts/test/answers/30/", "PUT", { selectedOption: 4 }, "ibt");
+});
+
+test("IBT groups use snapshot IDs; ordinary repeated types stay separate", () => {
+  const items = [
+    { position: 13, itemType: "ibt_main_idea", groupId: null },
+    { position: 14, itemType: "ibt_main_idea", groupId: null },
+    { position: 15, itemType: "ibt_idea_content", groupId: "ibt-listening-15" },
+    { position: 16, itemType: "ibt_idea_content", groupId: "ibt-listening-15" },
+    { position: 17, itemType: "ibt_idea_content", groupId: "ibt-listening-17" },
+    { position: 18, itemType: "ibt_idea_content", groupId: "ibt-listening-17" },
+  ];
+  assert.deepEqual(api.questionGroup(items, items[1]).map(i => i.position), [14]);
+  assert.deepEqual(api.questionGroup(items, items[3]).map(i => i.position), [15, 16]);
+  assert.deepEqual(api.questionGroup(items, items[4]).map(i => i.position), [17, 18]);
+  const legacy = [{ position: 49, itemType: "paired_reading" }, { position: 50, itemType: "paired_reading" }];
+  assert.deepEqual(api.questionGroup(legacy, legacy[1]), legacy);
+});

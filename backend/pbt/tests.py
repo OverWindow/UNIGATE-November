@@ -13,7 +13,7 @@ from .bank import BankNotReady, load_set
 from .models import Attempt, AttemptItem, Exam
 
 
-class PbtTests(TransactionTestCase):
+class BankFixtures:
     def setUp(self):
         self.bank_models = (QuestionSet, Item, AudioAsset, ItemAudioBinding, VisualAsset)
         with connection.cursor() as cursor:
@@ -34,20 +34,33 @@ class PbtTests(TransactionTestCase):
         with connection.cursor() as cursor:
             cursor.execute("DROP SCHEMA topik_bank")
 
-    def make_set(self, section):
+    def make_set(self, section, exam_format="pbt"):
         now = timezone.now()
-        source = QuestionSet.objects.create(set_id=uuid.uuid4(), section=section, generator_provider="synthetic", generator_model="synthetic", generator_version="synthetic", created_at=now, set_sequence=1, review_status="reviewed", default_target_level=4, published_at=now)
-        for position in range(1, 51):
+        source = QuestionSet.objects.create(set_id=uuid.uuid4(), exam_format=exam_format, section=section, generator_provider="synthetic", generator_model="synthetic", generator_version="synthetic", created_at=now, set_sequence=1, review_status="reviewed", default_target_level=4, published_at=now)
+        for position in range(1, 31 if exam_format == "ibt" else 51):
             content = {"question_prompt": "Synthetic prompt", "passage": "Synthetic passage", "answer": 2, "explanation": "SECRET EXPLANATION", "dialogue_turns": [{"speaker": "A", "text": "SECRET SCRIPT"}]}
+            item_type = "content_match"
+            if exam_format == "ibt":
+                item_type = "ibt_content_match"
+                if section == "listening" and position <= 2:
+                    item_type = "ibt_visual_scene" if position == 1 else "ibt_visual_chart"
+                elif position >= (15 if section == "listening" else 23):
+                    item_type = f"ibt_pair_{(position - 1) // 2}"
             item = Item.objects.create(item_id=uuid.uuid4(), source_key=str(uuid.uuid4()), created_at=now, updated_at=now,
-                section=section, type_slot=position, item_type="content_match", primary_skill=section, target_level=4, stem_length=10, choice_count=4,
+                exam_format=exam_format, section=section, type_slot=position, item_type=item_type, primary_skill=section, target_level=4, stem_length=10, choice_count=4,
                 generator_provider="synthetic", generator_model="synthetic", generator_version="synthetic", prompt_version="a" * 64,
                 review_status="reviewed", stem="SECRET SCRIPT" if section == "listening" else "Synthetic passage", choices=["a", "b", "c", "d"],
                 correct_answer=2, explanation="SECRET EXPLANATION", content_json=content, source_provenance={}, content_hash="b" * 64, set=source, position=position)
-            if section == "reading" and position == 10:
+            if section == "reading" and position in ((4, 5, 6, 7) if exam_format == "ibt" else (10,)):
                 VisualAsset.objects.create(visual_asset_id=uuid.uuid4(), item=item, content_hash=item.content_hash, option_number=1,
                     visual_role="material", storage_bucket="", storage_path="", storage_url="https://example.invalid/chart.png",
                     mime_type="image/png", byte_size=1, is_current=True, created_at=now, storage_backend="s3")
+            if exam_format == "ibt" and section == "listening" and position <= 2:
+                for option in range(1, 5):
+                    VisualAsset.objects.create(visual_asset_id=uuid.uuid4(), item=item, content_hash=item.content_hash,
+                        option_number=option, visual_role="choice", storage_bucket="", storage_path="",
+                        storage_url=f"https://example.invalid/{option}.png", mime_type="image/png", byte_size=1,
+                        is_current=True, created_at=now, storage_backend="s3")
         if section == "listening":
             audio = AudioAsset.objects.create(audio_asset_id=uuid.uuid4(), source_hash="c" * 64, provider="synthetic", model_name="synthetic",
                 language_code="ko", female_voice="", male_voice="", mime_type="audio/mpeg", storage_bucket="", storage_path="",
@@ -59,6 +72,8 @@ class PbtTests(TransactionTestCase):
             ])
         return source
 
+
+class PbtTests(BankFixtures, TransactionTestCase):
     def start(self, exam=None, mode="practice", client=None):
         client = client or self.client
         result = client.post("/api/pbt/attempts/", {"examId": str((exam or self.exam).pk), "mode": mode}, content_type="application/json")
@@ -334,7 +349,7 @@ class PbtTests(TransactionTestCase):
     def test_sync_check_does_not_register_new_exams(self):
         self.make_set("reading")
         before = list(Exam.objects.values())
-        call_command("sync_pbt_exams", check=True, stdout=io.StringIO(), stderr=io.StringIO())
+        call_command("sync_exams", check=True, stdout=io.StringIO(), stderr=io.StringIO())
         self.assertEqual(list(Exam.objects.values()), before)
 
     def test_visual_choices_do_not_expose_generation_descriptions(self):
@@ -356,9 +371,9 @@ class PbtTests(TransactionTestCase):
         self.exam.is_published = False
         self.exam.save()
         source = self.make_set("reading")
-        call_command("sync_pbt_exams", stdout=io.StringIO(), stderr=io.StringIO())
+        call_command("sync_exams", stdout=io.StringIO(), stderr=io.StringIO())
         self.exam.refresh_from_db()
         self.assertFalse(self.exam.is_published)
         self.assertEqual(Exam.objects.get(source_set_id=source.pk).guest_slot, 2)
-        call_command("sync_pbt_exams", stdout=io.StringIO(), stderr=io.StringIO())
+        call_command("sync_exams", stdout=io.StringIO(), stderr=io.StringIO())
         self.assertEqual(Exam.objects.count(), 3)

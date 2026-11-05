@@ -1,3 +1,5 @@
+import type { ExamFormat } from "./exam-content";
+
 export type Section = "reading" | "listening";
 export type Mode = "practice" | "timed";
 export interface ExamProgress {
@@ -5,17 +7,20 @@ export interface ExamProgress {
   inProgressId: string | null;
 }
 export interface Exam {
+  examFormat: ExamFormat; maxScore: number;
   id: string; title: string; section: Section; round: number; questionCount: number;
   durationSeconds: number; guestAvailable: boolean; accessible: boolean;
   myProgress: Record<Mode, ExamProgress> | null;
 }
 export interface Question {
+  groupId?: string | null;
   position: number; itemType: string; prompt: string; passage: string; auxiliary: string;
   highlight: string; choices: string[]; visuals: Record<string, string>; materialUrl: string;
   audioUrl: string; selectedOption: number | null; correctAnswer?: number;
   explanation?: string; transcript?: string; isCorrect?: boolean; points?: number;
 }
 export interface Attempt {
+  examFormat: ExamFormat;
   id: string; examId: string; title: string; section: Section; mode: Mode;
   status: "in_progress" | "submitted"; startedAt: string; expiresAt: string | null;
   submittedAt: string | null; timedOut: boolean; score: number | null; maxScore: number;
@@ -41,7 +46,7 @@ async function json(response: Response) {
   catch { throw new PbtError("server_error", response.status); }
 }
 
-export async function pbtRequest<T>(path: string, method = "GET", body?: object): Promise<T> {
+export async function pbtRequest<T>(path: string, method = "GET", body?: object, examFormat: ExamFormat = "pbt"): Promise<T> {
   // Fetch fresh CSRF after login/logout, which rotates Django's token.
   const headers: Record<string, string> = {};
   if (method !== "GET") {
@@ -52,7 +57,7 @@ export async function pbtRequest<T>(path: string, method = "GET", body?: object)
     headers["X-CSRFToken"] = token;
     headers["Content-Type"] = "application/json";
   }
-  const response = await fetchResponse(`/api/pbt/${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  const response = await fetchResponse(`/api/${examFormat}/${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   if (response.status === 404) throw new PbtError("not_found", 404);
   const data = await json(response);
   if (!response.ok) throw new PbtError(typeof data?.error === "string" ? data.error : response.status === 404 ? "not_found" : "server_error", response.status);
@@ -65,4 +70,14 @@ export function remainingSeconds(attempt: Pick<Attempt, "expiresAt" | "serverNow
 
 export function clockText(seconds: number) {
   return `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
+}
+
+
+export function questionGroup(items: Question[], current: Question): Question[] {
+  if (current.groupId) return items.filter(item => item.groupId === current.groupId);
+  // Older PBT snapshots predate explicit grouping.
+  if (current.groupId === undefined && current.itemType.startsWith("paired_")) {
+    return items.filter(item => item.itemType === current.itemType);
+  }
+  return [current];
 }

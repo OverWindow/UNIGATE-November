@@ -1,4 +1,5 @@
 import type { Language } from "./landing-content";
+import type { ExamFormat } from "./exam-content";
 
 const ko = {
   title: "나의 속도로 연습하고, 실전처럼 도전하세요.", intro: "영역과 응시 방식을 선택하세요. 한 세트는 50문항, 100점 만점입니다.",
@@ -7,7 +8,7 @@ const ko = {
   guestNote: "비회원도 읽기 3세트 + 듣기 3세트, 총 300문제를 풀 수 있어요. 로그인하면 공개된 모든 세트를 이용할 수 있습니다.",
   guestHistory: "비회원 응시 기록은 이 브라우저 세션에서만 확인할 수 있습니다. 쿠키 삭제·만료 또는 로그아웃 시 접근할 수 없게 됩니다.",
   memberNote: "공개된 모든 모의고사를 이용할 수 있습니다.", free: "비회원 공개", members: "회원 전용", round: "세트", questions: "문항", minutes: "분",
-  start: "응시 시작", login: "로그인하고 응시", loading: "불러오는 중…", retry: "다시 시도", empty: "아직 공개된 모의고사가 없습니다.",
+  start: "풀기 시작", login: "로그인하고 응시", loading: "불러오는 중…", retry: "다시 시도", empty: "아직 공개된 모의고사가 없습니다.",
   history: "최근 응시 기록", noHistory: "첫 모의고사를 시작해 보세요.", resume: "이어풀기", result: "결과 보기", inProgress: "진행 중", submitted: "제출 완료",
   latestScore: "내 최근 점수", submittedOn: "제출일", retake: "다시 풀기",
   back: "모의고사 목록", answered: "답한 문항", navigator: "답안표", previous: "이전", next: "다음", submit: "답안 제출", submitting: "제출 중…",
@@ -75,12 +76,37 @@ export const pbtContent: Record<Language, Copy> = {
   },
 };
 
+const ibtCopy: Record<Language, Pick<Copy, "intro" | "timedHint" | "guestNote" | "score">> = {
+  ko: {
+    intro: "영역과 응시 방식을 선택하세요. 한 세트는 30문항이며, 모의고사 점수는 정답률을 100점으로 환산합니다.",
+    timedHint: "듣기 35분 · 읽기 40분. 시간이 끝나면 자동 제출됩니다.",
+    guestNote: "비회원 공개 세트는 영역별 최대 3세트입니다. 로그인하면 공개된 모든 세트를 이용할 수 있습니다.",
+    score: "모의고사 환산 점수",
+  },
+  en: {
+    intro: "Choose a section and mode. Each set has 30 questions. Mock scores convert your accuracy to a 100-point scale.",
+    timedHint: "Listening: 35 min · Reading: 40 min. Answers submit when time runs out.",
+    guestNote: "Up to 3 sets per section are available to guests. Sign in to access all published sets.",
+    score: "Converted mock score",
+  },
+  id: {
+    intro: "Pilih bidang dan mode. Setiap set berisi 30 soal. Nilai simulasi dikonversi dari persentase jawaban benar ke skala 100.",
+    timedHint: "Menyimak 35 menit · Membaca 40 menit. Jawaban dikirim saat waktu habis.",
+    guestNote: "Tamu dapat mengakses hingga 3 set per bidang. Masuk untuk mengakses semua set yang dipublikasikan.",
+    score: "Nilai konversi simulasi",
+  },
+};
+
+export function examCopy(language: Language, examFormat: ExamFormat): Copy {
+  return examFormat === "ibt" ? { ...pbtContent[language], ...ibtCopy[language] } : pbtContent[language];
+}
+
 export function pbtErrorMessage(error: unknown, t: Copy) {
   const code = error && typeof error === "object" && "code" in error ? error.code : "";
   if (code === "login_required") return t.loginRequired;
   if (code === "not_found") return t.notFound;
   if (code === "exam_not_ready") return t.notReady;
-  if (code === "pbt_unavailable") return t.unavailable;
+  if (code === "pbt_unavailable" || code === "ibt_unavailable") return t.unavailable;
   if (code === "rate_limited") return t.rateLimited;
   return t.error;
 }

@@ -4,15 +4,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
-import { clockText, pbtRequest, PbtError, remainingSeconds, type Attempt } from "@/lib/pbt-api";
-import { pbtContent, pbtErrorMessage } from "@/lib/pbt-content";
+import { clockText, pbtRequest, PbtError, remainingSeconds, questionGroup, type Attempt } from "@/lib/pbt-api";
+import type { ExamFormat } from "@/lib/exam-content";
+import { examCopy, pbtErrorMessage } from "@/lib/pbt-content";
 import SiteHeader from "../SiteHeader";
 import PbtQuestion, { QuestionMaterial } from "./PbtQuestion";
 import ListeningPlayer, { type AudioProgress } from "./ListeningPlayer";
 
-export default function PbtAttempt({ id, review = false }: { id: string; review?: boolean }) {
+export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: { id: string; review?: boolean; examFormat?: ExamFormat }) {
+  const basePath = `/${examFormat}`;
   const { language, user, status } = useApp();
-  const t = pbtContent[language];
+  const t = examCopy(language, examFormat);
   const router = useRouter();
   const [attempt, setAttempt] = useState<Attempt | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -43,15 +45,15 @@ export default function PbtAttempt({ id, review = false }: { id: string; review?
     if (status === "loading") return;
     let active = true;
     setAttempt(null); setError(null);
-    void pbtRequest<Attempt>(`attempts/${id}/${review ? "result/" : ""}`).then(data => {
+    void pbtRequest<Attempt>(`attempts/${id}/${review ? "result/" : ""}`, "GET", undefined, examFormat).then(data => {
       if (!active) return;
-      if (!review && data.status === "submitted") { router.replace(`/pbt/attempts/${id}/result`); return; }
+      if (!review && data.status === "submitted") { router.replace(`${basePath}/attempts/${id}/result`); return; }
       receivedAt.current = performance.now();
       autoSubmitted.current = false;
       setRemaining(remainingSeconds(data, 0)); setAttempt(data);
     }).catch(cause => { if (active) setError(cause); });
     return () => { active = false; };
-  }, [id, review, revision, status, user?.id, router]);
+  }, [id, review, revision, status, user?.id, router, basePath, examFormat]);
 
   useEffect(() => {
     if (!attempt || review) return;
@@ -80,10 +82,10 @@ export default function PbtAttempt({ id, review = false }: { id: string; review?
     if (submittingRef.current || busyRef.current) return;
     submittingRef.current = true; setSubmitting(true); setSubmitError(false); setDialog(null);
     try {
-      await pbtRequest<Attempt>(`attempts/${id}/submit/`, "POST", {});
-      router.replace(`/pbt/attempts/${id}/result`);
+      await pbtRequest<Attempt>(`attempts/${id}/submit/`, "POST", {}, examFormat);
+      router.replace(`${basePath}/attempts/${id}/result`);
     } catch { setSubmitError(true); submittingRef.current = false; setSubmitting(false); }
-  }, [id, router]);
+  }, [id, router, basePath, examFormat]);
 
   useEffect(() => {
     if (remaining !== 0 || review || !attempt || busy || autoSubmitted.current) return;
@@ -97,9 +99,9 @@ export default function PbtAttempt({ id, review = false }: { id: string; review?
     busyRef.current = true; setBusy(true); setSaveError(false);
     setAttempt(current => current ? { ...current, items: current.items.map(item => item.position === itemPosition ? { ...item, selectedOption: option } : item) } : current);
     try {
-      await pbtRequest(`attempts/${id}/answers/${itemPosition}/`, "PUT", { selectedOption: option });
+      await pbtRequest(`attempts/${id}/answers/${itemPosition}/`, "PUT", { selectedOption: option }, examFormat);
     } catch (cause) {
-      if (cause instanceof PbtError && cause.code === "attempt_closed") router.replace(`/pbt/attempts/${id}/result`);
+      if (cause instanceof PbtError && cause.code === "attempt_closed") router.replace(`${basePath}/attempts/${id}/result`);
       else {
         setSaveError(true);
         setAttempt(current => current ? { ...current, items: current.items.map(item => item.position === itemPosition ? { ...item, selectedOption: old } : item) } : current);
@@ -108,7 +110,7 @@ export default function PbtAttempt({ id, review = false }: { id: string; review?
   }
 
   const current = attempt?.items.find(item => item.position === position) ?? attempt?.items[0];
-  const group = current && attempt ? (current.itemType.startsWith("paired_") ? attempt.items.filter(item => item.itemType === current.itemType) : [current]) : [];
+  const group = current && attempt ? questionGroup(attempt.items, current) : [];
   const grouped = group.length > 1;
   const first = group[0];
   const last = group.at(-1);
@@ -117,7 +119,7 @@ export default function PbtAttempt({ id, review = false }: { id: string; review?
   const audioDuration = audioProgress?.playbackKey === playbackKey ? audioProgress.duration : null;
   const audioTime = `${clockText(elapsedAudio)} / ${audioDuration === null ? "--:--" : clockText(audioDuration)}`;
   const sharedMaterial = grouped && !!(first?.passage || first?.materialUrl || first?.auxiliary);
-  const total = attempt?.items.length ?? 50;
+  const total = attempt?.items.length ?? 0;
   const answered = attempt?.items.filter(item => item.selectedOption !== null).length ?? 0;
   const wrong = attempt?.items.filter(item => !item.isCorrect) ?? [];
   const disabled = busy || submitting || remaining === 0;
@@ -133,16 +135,16 @@ export default function PbtAttempt({ id, review = false }: { id: string; review?
   return <div className={!review && attempt ? "pbt-session" : undefined}><SiteHeader /><main id="main-content" className={`pbt-workspace${review ? "" : " pbt-exam"}`} tabIndex={-1}>
     <div className={review ? "page-container" : "pbt-exam-content"}>
       {(review || !attempt) && <div className={review ? undefined : "pbt-exam-width pbt-exam-loading"}>
-        <Link className="text-link pbt-back" href="/pbt">← {t.back}</Link>
+        <Link className="text-link pbt-back" href={basePath}>← {t.back}</Link>
         {error ? <div className="pbt-alert" role="alert">{pbtErrorMessage(error, t)} <button onClick={retry}>{t.retry}</button></div> : !attempt && <p role="status">{t.loading}</p>}
       </div>}
       {attempt && <>
         {review ? <section className="pbt-result-summary">
           <div><p className="eyebrow">{attempt.title} · {t[attempt.section]} · {t[attempt.mode]}</p><h1>{t.complete}</h1>{attempt.timedOut && <p>{t.timedOut}</p>}</div>
-          <div className="pbt-score"><span>{t.score}</span><strong>{attempt.score}<small> / 100</small></strong><span>{t.correct} {attempt.items.length - wrong.length} / 50</span></div>
+          <div className="pbt-score"><span>{t.score}</span><strong>{attempt.score}<small> / {attempt.maxScore}</small></strong><span>{t.correct} {attempt.items.length - wrong.length} / {attempt.items.length}</span></div>
         </section> : <>
           <div className="pbt-exam-toolbar"><div className="pbt-exam-width pbt-exam-toolbar-inner">
-            <Link className="pbt-exam-back" href="/pbt" onClick={event => { if (busy || submitting) event.preventDefault(); }}><span aria-hidden="true">←</span> {t.back}</Link>
+            <Link className="pbt-exam-back" href={basePath} onClick={event => { if (busy || submitting) event.preventDefault(); }}><span aria-hidden="true">←</span> {t.back}</Link>
             <h1>{attempt.title} <span>· {t[attempt.mode]}</span></h1>
             <div className={`pbt-timer ${remaining !== null && remaining < 300 ? "is-urgent" : ""}`} role="timer" aria-label={remaining === null ? t.unlimited : `${t.remainingTime} ${clockText(remaining)}`} title={attempt.mode === "timed" ? t.timeHint : t.practiceHint}>
               {remaining !== null && <small>{t.remainingTime}</small>}<span>{remaining === null ? t.unlimited : clockText(remaining)}</span>

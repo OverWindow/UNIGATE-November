@@ -4,6 +4,7 @@ from urllib.parse import urlsplit
 from django.db.models import Prefetch
 
 from question_bank.models import Item, ItemAudioBinding, QuestionSet, VisualAsset
+from .formats import EXAM_FORMATS
 
 
 class BankNotReady(Exception):
@@ -23,19 +24,20 @@ def media_url(value):
         return ""
 
 
-def load_set(set_id, section):
-    question_set = QuestionSet.objects.filter(pk=set_id, exam_format="pbt", section=section, review_status__in=["reviewed", "pilot", "active"], published_at__isnull=False).first()
+def load_set(set_id, section, exam_format="pbt"):
+    question_set = QuestionSet.objects.filter(pk=set_id, exam_format=exam_format, section=section, review_status__in=["reviewed", "pilot", "active"], published_at__isnull=False).first()
     if not question_set:
         raise BankNotReady("set_unavailable")
     items = list(Item.objects.filter(set_id=set_id).order_by("position").prefetch_related(
         Prefetch("visual_assets", queryset=VisualAsset.objects.filter(is_current=True).order_by("created_at", "visual_asset_id")),
         Prefetch("audio_bindings", queryset=ItemAudioBinding.objects.filter(is_current=True, audio_asset__deleted_at__isnull=True).select_related("audio_asset").order_by("created_at")),
     ))
-    if [item.position for item in items] != list(range(1, 51)):
-        raise BankNotReady("requires_50_questions")
+    count = EXAM_FORMATS[exam_format]["question_count"]
+    if [item.position for item in items] != list(range(1, count + 1)):
+        raise BankNotReady(f"requires_{count}_questions")
     result = []
     for item in items:
-        if item.exam_format != "pbt" or item.section != section or item.review_status not in ("reviewed", "pilot", "active") or item.correct_answer not in (1, 2, 3, 4):
+        if item.exam_format != exam_format or item.section != section or item.review_status not in ("reviewed", "pilot", "active") or item.correct_answer not in (1, 2, 3, 4):
             raise BankNotReady("invalid_question")
         content = item.content_json if isinstance(item.content_json, dict) else {}
         choices = item.choices
@@ -51,7 +53,7 @@ def load_set(set_id, section):
                 visuals[str(asset.option_number)] = url
             elif asset.visual_role == "material" and url:
                 material = url
-        is_visual = section == "listening" and item.item_type in ("visual_scene", "visual_chart")
+        is_visual = section == "listening" and item.item_type in ("visual_scene", "visual_chart", "ibt_visual_scene", "ibt_visual_chart")
         if is_visual:
             if len(visuals) != 4:
                 raise BankNotReady("missing_choice_images")
@@ -64,7 +66,8 @@ def load_set(set_id, section):
                 audio_url = media_url(binding.audio_asset.storage_url)
         if section == "listening" and not audio_url:
             raise BankNotReady("missing_audio")
-        if section == "reading" and item.position == 10 and not material:
+        material_positions = (4, 5, 6, 7) if exam_format == "ibt" else (10,)
+        if section == "reading" and item.position in material_positions and not material:
             raise BankNotReady("missing_material_image")
         listening = section == "listening"
         prompt = text(content.get("question_prompt"))
@@ -75,7 +78,9 @@ def load_set(set_id, section):
         # Whitelist presentation fields: content_json also contains answers and scripts.
         snapshot = {
             "itemType": item.item_type, "prompt": prompt,
-            "passage": "" if listening else text(content.get("passage")) or item.stem,
+            "groupId": item.item_type if exam_format == "pbt" and item.item_type.startswith("paired_") else None,
+            "passage": "" if listening else (text(content.get("passage"))
+                or (text(content.get("stem")) if exam_format == "ibt" else "") or item.stem),
             "auxiliary": "" if listening else text(content.get("auxiliary_text")),
             "highlight": "" if listening else text(content.get("highlight_text")),
             "choices": choices, "visuals": visuals, "materialUrl": material,
@@ -83,5 +88,14 @@ def load_set(set_id, section):
         }
         result.append({"position": item.position, "source_item_id": item.pk, "snapshot": snapshot,
                        "correct_answer": item.correct_answer, "explanation": item.explanation,
+                       "points": 1 if exam_format == "ibt" else 2,
                        "transcript": (transcript or item.stem) if listening else ""})
+    if exam_format == "ibt":
+        # These slots share one passage/audio; store grouping with the attempt.
+        for position in range(15 if section == "listening" else 23, 31, 2):
+            first, second = result[position - 1]["snapshot"], result[position]["snapshot"]
+            shared_field = "audioUrl" if section == "listening" else "passage"
+            if first["itemType"] != second["itemType"] or not first[shared_field] or first[shared_field] != second[shared_field]:
+                raise BankNotReady("invalid_question_group")
+            first["groupId"] = second["groupId"] = f"ibt-{section}-{position}"
     return result

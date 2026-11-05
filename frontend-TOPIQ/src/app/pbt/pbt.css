@@ -29,6 +29,10 @@
 .pbt-exam-card p { color: #667389; font-size: 13px; margin: 0 0 26px; }
 .pbt-exam-card p span { padding-inline: 8px; }
 .pbt-exam-card .button { width: 100%; justify-content: space-between; }
+.pbt-card-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.pbt-card-actions .button { min-width: 0; padding-inline: 8px; justify-content: center; }
+.pbt-card-actions .button:disabled { transform: none; }
+.pbt-card-actions .button:disabled:hover { background: var(--color-primary); }
 .pbt-secondary { border: 1px solid #d4dfef; background: #fff; color: #315c9d; }
 .pbt-main button:disabled, .pbt-workspace button:disabled { opacity: .5; cursor: not-allowed; }
 .pbt-alert { margin-block: 18px; padding: 16px 20px; border: 1px solid #eccabb; border-radius: 9px; color: #8b3e21; background: #fff7f0; font-size: 14px; line-height: 1.8; }

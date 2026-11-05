@@ -7,6 +7,7 @@ from django.db import models
 class Exam(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     source_set_id = models.UUIDField(unique=True)
+    exam_format = models.CharField(max_length=3, default="pbt", choices=[("pbt", "PBT"), ("ibt", "IBT")])
     title = models.CharField(max_length=160)
     section = models.CharField(max_length=10, choices=[("reading", "읽기"), ("listening", "듣기")])
     display_order = models.PositiveIntegerField()
@@ -17,7 +18,8 @@ class Exam(models.Model):
         db_table = "pbt_exams"
         ordering = ["section", "display_order", "id"]
         constraints = [
-            models.UniqueConstraint(fields=["section", "guest_slot"], name="pbt_guest_slot_unique"),
+            models.UniqueConstraint(fields=["exam_format", "section", "guest_slot"], name="exam_format_guest_slot_unique"),
+            models.CheckConstraint(condition=models.Q(exam_format__in=["pbt", "ibt"]), name="exam_format_valid"),
             models.CheckConstraint(condition=models.Q(guest_slot__isnull=True) | models.Q(guest_slot__range=(1, 3)), name="pbt_guest_slot_range"),
             models.CheckConstraint(condition=models.Q(section__in=["reading", "listening"]), name="pbt_exam_section_valid"),
         ]
@@ -29,6 +31,7 @@ class Exam(models.Model):
 class Attempt(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     exam = models.ForeignKey(Exam, models.PROTECT, related_name="attempts")
+    exam_format = models.CharField(max_length=3, default="pbt", choices=[("pbt", "PBT"), ("ibt", "IBT")])
     user = models.ForeignKey(settings.AUTH_USER_MODEL, models.CASCADE, null=True, blank=True)
     guest_id = models.UUIDField(null=True, editable=False)
     title = models.CharField(max_length=160)
@@ -46,6 +49,7 @@ class Attempt(models.Model):
         ordering = ["-started_at"]
         indexes = [models.Index(fields=["user", "-started_at"]), models.Index(fields=["guest_id", "-started_at"])]
         constraints = [
+            models.CheckConstraint(condition=models.Q(exam_format__in=["pbt", "ibt"]), name="attempt_exam_format_valid"),
             models.CheckConstraint(condition=(models.Q(user__isnull=False, guest_id__isnull=True) | models.Q(user__isnull=True, guest_id__isnull=False)), name="pbt_attempt_owner"),
             models.CheckConstraint(condition=(models.Q(mode="practice", expires_at__isnull=True) | models.Q(mode="timed", expires_at__isnull=False)), name="pbt_attempt_deadline"),
             models.UniqueConstraint(fields=["user", "exam", "mode"], condition=models.Q(status="in_progress", user__isnull=False), name="pbt_active_user_attempt"),

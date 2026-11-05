@@ -25,11 +25,15 @@ def finalize(attempt, force=False):
     attempt.timed_out = expired
     attempt.submitted_at = attempt.expires_at if expired else timezone.now()
     attempt.score = sum(item.points for item in items if item.is_correct)
+    if attempt.exam_format == "ibt":
+        correct = sum(item.is_correct for item in items)
+        attempt.score = (correct * 100 + len(items) // 2) // len(items) if items else 0
     attempt.save(update_fields=["status", "timed_out", "submitted_at", "score"])
 
 
 def attempt_data(attempt, include_items=False, results=False):
     data = {"id": str(attempt.pk), "examId": str(attempt.exam_id), "title": attempt.title,
+            "examFormat": attempt.exam_format,
             "section": attempt.section, "mode": attempt.mode, "status": attempt.status,
             "startedAt": attempt.started_at.isoformat(),
             "expiresAt": attempt.expires_at.isoformat() if attempt.expires_at else None,

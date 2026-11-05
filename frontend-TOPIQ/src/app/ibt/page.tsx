@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
-import ComingSoonPage from "@/components/ComingSoonPage";
-import { landingContent } from "@/lib/landing-content";
+import PbtCatalog from "@/components/pbt/PbtCatalog";
+import { examContent } from "@/lib/exam-content";
 
 export const metadata: Metadata = {
-  title: "TOPIQ | TOPIK II IBT 준비 중",
-  description: landingContent.ko.comingSoon.message,
+  title: "TOPIQ | TOPIK II IBT 모의고사",
+  description: examContent.ko.formats.ibt.description,
 };
 
 export default function IbtPage() {
-  return <ComingSoonPage />;
+  return <PbtCatalog examFormat="ibt" />;
 }
