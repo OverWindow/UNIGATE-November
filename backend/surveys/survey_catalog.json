@@ -353,5 +353,7 @@
       "3 times or more",
       "3 kali atau lebih"
     ]
-  ]
+  ],
+  "signupConsentVersion": "topiq_signup_privacy_v1",
+  "signupVersion": "signup_survey_v1"
 }

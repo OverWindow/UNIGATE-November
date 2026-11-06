@@ -45,6 +45,9 @@ test("email send uses CSRF, language and an internal return path without expecti
 
 test("verified email proof is submitted with signup and response data is validated", async () => {
   const api = await freshApi();
+  const survey = { nationalityCode: "ID", birthYear: 2000, topikReasons: ["employment"], topikReasonOther: "",
+    koreanStudyDuration: "1_to_2_years", topikExperience: "none", currentTopikLevel: null,
+    targetTopikLevel: 4, privacyConsent: true, privacyConsentVersion: "topiq_signup_privacy_v1" };
   const expiresAt = Math.floor(Date.now() / 1000) + 900;
   globalThis.fetch = async (path, options) => {
     if (path === "/api/csrf/") return json({ csrfToken: "token" });
@@ -54,12 +57,15 @@ test("verified email proof is submitted with signup and response data is validat
       return json({ email: user.email, language: "en", next: "/#faq", expiresAt });
     }
     assert.equal(body.verification_token, "synthetic-proof");
+    assert.equal(body.language, "en");
+    assert.deepEqual(body.survey, survey);
+    assert.equal("rating" in body, false);
     return json({ user, csrfToken: "rotated" }, 201);
   };
   const proof = await api.verifyEmail("synthetic-proof");
   assert.deepEqual(proof, { email: user.email, token: "synthetic-proof", language: "en", next: "/#faq", expiresAt });
   assert.deepEqual(await api.signUp({ email: proof.email, nickname: user.nickname, password: "synthetic-only",
-    password_confirm: "synthetic-only", verification_token: proof.token }), user);
+    password_confirm: "synthetic-only", verification_token: proof.token, language: "en", survey }), user);
   globalThis.fetch = async () => json({ email: user.email, expiresAt: "invalid" });
   await assert.rejects(api.verifyEmail("synthetic-proof"), error => error.code === "server_error");
 });

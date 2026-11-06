@@ -10,6 +10,9 @@ from django.db.migrations.executor import MigrationExecutor
 from django.test import Client, TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 
+from surveys.learner import CATALOG
+from surveys.models import SignupSurveyResponse
+
 from .forms import SignupForm
 from .models import RateLimit
 from .rate_limits import check_limit, record_attempt
@@ -18,6 +21,13 @@ from .email_verification import make_verification_token
 
 PASSWORD = "Korean!Study-6048"
 FAST_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
+
+def signup_survey_input(**changes):
+    return {"nationalityCode": "ID", "birthYear": 2000, "topikReasons": ["employment"],
+            "topikReasonOther": "", "koreanStudyDuration": "1_to_2_years", "topikExperience": "none",
+            "currentTopikLevel": None, "targetTopikLevel": 4, "privacyConsent": True,
+            "privacyConsentVersion": CATALOG["signupConsentVersion"], **changes}
 
 
 class AuthClientMixin:
@@ -35,6 +45,7 @@ class AuthClientMixin:
     def payload(self, email="learner@example.invalid", **changes):
         return {"email": email, "nickname": "학습자", "password": PASSWORD,
                 "password_confirm": PASSWORD,
+                "language": "ko", "survey": signup_survey_input(),
                 "verification_token": make_verification_token(email if isinstance(email, str) else ""), **changes}
 
 
@@ -226,6 +237,7 @@ class ConcurrentSignupTests(AuthClientMixin, TransactionTestCase):
             statuses = sorted(pool.map(attempt, range(2)))
         self.assertEqual(statuses, [201, 400])
         self.assertEqual(get_user_model().objects.count(), 1)
+        self.assertEqual(SignupSurveyResponse.objects.count(), 1)
 
     def test_database_counter_updates_are_atomic_across_connections(self):
         def attempt(limit):

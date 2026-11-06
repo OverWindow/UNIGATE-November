@@ -8,7 +8,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_GET
 
 from .csv_export import SEOUL, write_survey_csv
-from .models import SurveyResponse
+from .models import SignupSurveyResponse, SurveyResponse
 
 
 @admin.register(SurveyResponse)
@@ -48,3 +48,29 @@ class SurveyResponseAdmin(admin.ModelAdmin):
         response.write("\ufeff")
         write_survey_csv(response, queryset)
         return response
+
+
+@admin.register(SignupSurveyResponse)
+class SignupSurveyResponseAdmin(admin.ModelAdmin):
+    list_display = ("user_id", "email", "nickname", "nationality_code", "target_topik_level", "language", "survey_completed_at")
+    list_filter = ("language", "nationality_code", "target_topik_level", "survey_completed_at")
+    search_fields = ("user__email", "user__first_name")
+    list_select_related = ("user",)
+    readonly_fields = tuple(field.name for field in SignupSurveyResponse._meta.fields)
+
+    @admin.display(description="이메일", ordering="user__email")
+    def email(self, obj):
+        return obj.user.email
+
+    @admin.display(description="닉네임", ordering="user__first_name")
+    def nickname(self, obj):
+        return obj.user.first_name
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

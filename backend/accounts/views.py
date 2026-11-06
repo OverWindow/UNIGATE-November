@@ -15,6 +15,9 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import sensitive_post_parameters, sensitive_variables
 from django.views.decorators.http import require_GET, require_POST
 
+from surveys.learner import CATALOG, validate_survey
+from surveys.models import SignupSurveyResponse
+
 from .forms import LoginForm, SignupForm, normalize_email, users_for_email
 from .rate_limits import RateLimitUnavailable, check_limit, clear_login_failures, login_rate_limit_lock, record_attempt
 from .email_delivery import EmailDeliveryError, send_verification_email
@@ -38,7 +41,7 @@ def csrf_failure(request, reason=""):
     return default_csrf_failure(request, reason=reason)
 
 
-def read_payload(request, allowed_fields):
+def read_payload(request, allowed_fields, *, object_fields=()):
     if request.content_type != "application/json":
         return None, api_response({"error": "unsupported_media_type"}, status=415)
     try:
@@ -51,7 +54,7 @@ def read_payload(request, allowed_fields):
         return None, api_response({"error": "invalid_json"}, status=400)
     if not isinstance(data, dict) or set(data) - allowed_fields:
         return None, api_response({"error": "invalid_json"}, status=400)
-    if any(not isinstance(value, str) for value in data.values()):
+    if any(not isinstance(value, dict if key in object_fields else str) for key, value in data.items()):
         return None, api_response({"error": "invalid_json"}, status=400)
     return data, None
 
@@ -93,7 +96,7 @@ def user_data(user):
 def signup(request):
     if request.user.is_authenticated:
         return api_response({"error": "already_authenticated"}, status=409)
-    data, error = read_payload(request, {"email", "nickname", "password", "password_confirm", "verification_token"})
+    data, error = read_payload(request, {"email", "nickname", "password", "password_confirm", "verification_token", "language", "survey"}, object_fields={"survey"})
     if error is not None:
         return error
     email = normalize_email(data.get("email", ""))
@@ -103,6 +106,13 @@ def signup(request):
     form = SignupForm(data)
     if not form.is_valid():
         return form_error(form)
+    if data.get("language") not in LANGUAGES:
+        return api_response({"error": "validation_error", "fields": {"language": ["invalid"]}}, status=400)
+    try:
+        survey = validate_survey(data.get("survey"), consent_version=CATALOG["signupConsentVersion"],
+                                 survey_version=CATALOG["signupVersion"])
+    except ValidationError as exc:
+        return api_response({"error": "validation_error", "fields": exc.message_dict}, status=400)
     try:
         with transaction.atomic():
             user = get_user_model().objects.create_user(
@@ -110,6 +120,7 @@ def signup(request):
                 first_name=form.cleaned_data["nickname"], password=form.cleaned_data["password"],
                 is_staff=False, is_superuser=False, is_active=True,
             )
+            SignupSurveyResponse.objects.create(user=user, language=data["language"], **survey)
             clear_login_failures(user.email)
     except IntegrityError as exc:
         if getattr(getattr(exc.__cause__, "diag", None), "constraint_name", None) == EMAIL_INDEX:

@@ -8,7 +8,7 @@ import { clockText, pbtRequest, PbtError, remainingSeconds, questionGroup, type 
 import type { ExamFormat } from "@/lib/exam-content";
 import { examCopy, pbtErrorMessage } from "@/lib/pbt-content";
 import SiteHeader from "../SiteHeader";
-import { surveyCopy } from "@/lib/exam-survey";
+import { surveyCopy } from "@/lib/learner-survey";
 import PbtQuestion, { QuestionMaterial } from "./PbtQuestion";
 import ListeningPlayer, { type AudioProgress } from "./ListeningPlayer";
 

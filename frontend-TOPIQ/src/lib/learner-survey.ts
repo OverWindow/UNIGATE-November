@@ -7,11 +7,13 @@ export interface SurveyInput {
   koreanStudyDuration: string; topikExperience: string; currentTopikLevel: number | null;
   targetTopikLevel: number; privacyConsent: boolean; privacyConsentVersion: string;
 }
-export const emptySurvey = (): SurveyInput => ({ nationalityCode: "", birthYear: 0, topikReasons: [], topikReasonOther: "",
+export type SurveyPurpose = "exam" | "signup";
+export const consentVersion = (purpose: SurveyPurpose) => purpose === "signup" ? catalog.signupConsentVersion : catalog.consentVersion;
+export const emptySurvey = (purpose: SurveyPurpose = "exam"): SurveyInput => ({ nationalityCode: "", birthYear: 0, topikReasons: [], topikReasonOther: "",
   koreanStudyDuration: "", topikExperience: "", currentTopikLevel: null, targetTopikLevel: 0,
-  privacyConsent: false, privacyConsentVersion: catalog.consentVersion });
+  privacyConsent: false, privacyConsentVersion: consentVersion(purpose) });
 export const currentSurveyYear = () => Number(new Intl.DateTimeFormat("en", { year: "numeric", timeZone: "Asia/Seoul" }).format(new Date()));
-export function surveyErrors(value: SurveyInput): string[] {
+export function surveyErrors(value: SurveyInput, purpose: SurveyPurpose = "exam"): string[] {
   const errors: string[] = [];
   if (![...catalog.countries, "OTHER"].includes(value.nationalityCode)) errors.push("nationalityCode");
   if (!Number.isInteger(value.birthYear) || value.birthYear < 1950 || value.birthYear > currentSurveyYear()) errors.push("birthYear");
@@ -21,10 +23,31 @@ export function surveyErrors(value: SurveyInput): string[] {
   if (!catalog.experiences.some(([code]) => code === value.topikExperience)) errors.push("topikExperience");
   if (value.topikExperience !== "none" && (value.currentTopikLevel === null || !Number.isInteger(value.currentTopikLevel) || value.currentTopikLevel < 0 || value.currentTopikLevel > 6)) errors.push("currentTopikLevel");
   if (!Number.isInteger(value.targetTopikLevel) || value.targetTopikLevel < 3 || value.targetTopikLevel > 6) errors.push("targetTopikLevel");
-  if (!value.privacyConsent || value.privacyConsentVersion !== catalog.consentVersion) errors.push("privacyConsent");
+  if (!value.privacyConsent || value.privacyConsentVersion !== consentVersion(purpose)) errors.push("privacyConsent");
   return errors;
 }
 export const choiceLabel = (row: string[], language: Language) => row[language === "ko" ? 1 : language === "en" ? 2 : 3];
+
+export const signupSurveyCopy = {
+  ko: {
+    title: "어떤 한국어 학습을 하고 계신가요?", description: "마지막 단계예요. 학습 설문을 작성하고 가입을 완료해 주세요.",
+    next: "다음: 학습 설문", back: "계정 정보 수정", finish: "가입 완료", step: "3단계 중 3 · 학습 설문",
+    targetTopikLevel: "목표 TOPIK 급수",
+    privacyConsent: "학습자 이해 및 설문 응답 분석을 위해 계정과 연결된 국적, 출생연도, 응시 목적, 학습 기간, 응시 경험과 급수를 수집·이용하는 데 동의합니다.",
+  },
+  en: {
+    title: "Tell us about your Korean learning.", description: "One last step. Complete this learning survey to finish signing up.",
+    next: "Next: learning survey", back: "Edit account details", finish: "Complete sign-up", step: "Step 3 of 3 · Learning survey",
+    targetTopikLevel: "Target TOPIK level",
+    privacyConsent: "I consent to the collection and use of my account-linked nationality, birth year, test reasons, study duration, test experience and levels to understand learners and analyze survey responses.",
+  },
+  id: {
+    title: "Ceritakan pembelajaran bahasa Koreamu.", description: "Langkah terakhir. Lengkapi survei belajar untuk menyelesaikan pendaftaran.",
+    next: "Lanjut: survei belajar", back: "Ubah informasi akun", finish: "Selesaikan pendaftaran", step: "Langkah 3 dari 3 · Survei belajar",
+    targetTopikLevel: "Target level TOPIK",
+    privacyConsent: "Saya menyetujui pengumpulan dan penggunaan kewarganegaraan, tahun lahir, tujuan ujian, lama belajar, pengalaman ujian, dan level yang terhubung ke akun untuk memahami pelajar dan menganalisis jawaban survei.",
+  },
+} satisfies Record<Language, Record<"title" | "description" | "next" | "back" | "finish" | "step" | "targetTopikLevel" | "privacyConsent", string>>;
 
 const ko = {
   title: "결과를 받을 이메일과 설문을 작성해 주세요", description: "별점과 설문을 제출하면 점수·정답·해설을 확인할 수 있는 링크를 이메일로 보내 드립니다.",

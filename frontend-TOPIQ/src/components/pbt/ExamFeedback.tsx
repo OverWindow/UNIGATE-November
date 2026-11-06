@@ -5,11 +5,11 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/app/providers";
 import { pbtRequest, PbtError, type Attempt, type FeedbackState } from "@/lib/pbt-api";
-import { emptySurvey, surveyCopy, surveyErrors } from "@/lib/exam-survey";
+import { emptySurvey, surveyCopy, surveyErrors } from "@/lib/learner-survey";
 import { examCopy, pbtErrorMessage } from "@/lib/pbt-content";
 import type { ExamFormat } from "@/lib/exam-content";
 import SiteHeader from "../SiteHeader";
-import LearnerSurveyForm from "./LearnerSurveyForm";
+import LearnerSurveyForm from "../LearnerSurveyForm";
 import StarRating from "./StarRating";
 
 export default function ExamFeedback({ id, examFormat }: { id: string; examFormat: ExamFormat }) {

@@ -426,12 +426,12 @@ PBT·IBT의 읽기·듣기, 연습·실전에 공통 적용합니다. 비회원 
 `/<format>/attempts/<id>/feedback`에서 이메일, 1~5점 별점, 설문과 수집·이용 동의를 입력합니다.
 결과 메일의 링크를 열어야 점수·정답·정오답·해설·듣기 대본을 확인할 수 있습니다.
 기존 비회원 기록에도 적용하며, 비회원으로 시작한 응시는 이후 로그인해도 이메일 인증이 필요합니다.
-회원 계정으로 시작한 응시는 기존처럼 조회하며 회원가입 설문은 포함하지 않습니다.
+회원 계정으로 시작한 응시는 기존처럼 조회합니다. 회원가입 설문은 아래의 별도 가입 흐름에서 수집합니다.
 
 설문은 국적, 출생연도(1950~KST 올해), TOPIK 응시 목적(복수 선택), 기타 목적(선택 시 필수, 500자),
 한국어 학습 기간, TOPIK II 응시 경험, 현재 급수(응시 경험이 있으면 0~6), 목표 급수(3~6)를 받습니다.
 `0`은 급수 없음이고, 응시 경험이 없으면 현재 급수는 NULL입니다. 별점은 정수만 허용합니다.
-설문 선택 코드·번역은 `backend/pbt/survey_catalog.json`과 `frontend-TOPIQ/src/lib/survey-catalog.json`에
+설문 선택 코드·번역은 `backend/surveys/survey_catalog.json`과 `frontend-TOPIQ/src/lib/survey-catalog.json`에
 동일하게 보관합니다. 두 배포가 독립적이므로 양쪽을 함께 수정하며 계약 테스트로 일치 여부를 검사합니다.
 설문·동의 문구를 바꿀 때는 해당 버전도 갱신합니다.
 
@@ -493,3 +493,50 @@ Django 테스트 러너는 `test_<DB_NAME>` 테스트 DB를 생성·삭제합니
 메일은 테스트에서 대체하므로 실제 이메일은 보내지 않습니다. 서버 입력 검증, 소유권, 점수·정답 비공개,
 교차 브라우저 열람, 토큰 변조·만료·교체, 재발송·동시 요청, 기존 회원가입 메일과 응시 기능을 확인합니다.
 `frontend-TOPIQ/`에서는 `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`를 실행합니다.
+
+
+### TOPIQ 회원가입 학습 설문
+
+회원가입은 이메일 인증 → 닉네임·비밀번호 설정 → 학습 설문 → 가입 완료 순서입니다.
+계정 설정과 설문 사이를 이동해도 입력값을 유지하고, 비밀번호와 설문을 브라우저 저장소에 저장하지 않습니다.
+가입 설문에는 별점이 없으며 이메일은 인증된 회원 정보를 사용합니다. 기존 회원에게 설문을 소급 요구하지 않습니다.
+
+신규 API는 없습니다. 기존 `POST /api/auth/signup/`는 계정 필드(`email`, `nickname`, `password`,
+`password_confirm`, `verification_token`)와 함께 `language`(`ko`/`en`/`id`), `survey` 객체를 필수로 받습니다.
+`survey`의 문항 키와 조건부 검증은 위 시험 설문과 같으며, 가입 동의 버전은 `topiq_signup_privacy_v1`입니다.
+시험용 동의 버전으로 가입할 수 없습니다. 설문 버전 `signup_survey_v1`과 완료·동의 시각은 서버가 기록합니다.
+인증 토큰은 최종 제출 시에도 검증하며, 계정과 설문을 하나의 트랜잭션으로 저장한 뒤에만 자동 로그인합니다.
+검증 오류는 기존 `400 validation_error`와 `fields`에 반환합니다. 구버전 클라이언트는 설문 없이 가입할 수 없으므로
+백엔드와 프론트엔드를 같은 배포 작업에서 반영합니다.
+
+신규 테이블 **`signup_survey_responses`**는 `auth_user`와 1:1로 연결됩니다. 언어, 국적, 출생연도,
+응시 목적·기타 목적, 학습 기간, 응시 경험, 현재·목표 급수, 설문/동의 버전과 시각을 저장합니다.
+이메일은 사용자 관계에서 참조하고 별점·결과 메일 필드는 저장하지 않습니다.
+Django 관리자에서 조회 권한이 있는 담당자만 이메일·닉네임으로 검색하고 언어·국적·목표 급수·완료 시각으로
+필터링할 수 있습니다. 가입 당시의 기록이므로 관리자 화면에서는 추가·수정·삭제하지 않습니다.
+기존 시험 설문과 가입 설문은 각 응답 시점의 기록이며, 답변을 자동 복사하거나 통합하지 않습니다.
+
+문항·서버 검증은 `backend/surveys/learner.py`, 프론트 문항·검증은
+`frontend-TOPIQ/src/lib/learner-survey.ts`, 공통 입력 UI는 `components/LearnerSurveyForm.tsx`에서 관리합니다.
+가입과 시험의 동의 문구·버전은 각각 관리하고 카탈로그 일치 여부는 테스트로 확인합니다.
+
+**로컬 적용:** 코드를 받은 뒤 새 백엔드를 시작하기 전에 개발자가 `backend/`에서 수동 실행합니다.
+
+```powershell
+.\.venv\Scripts\python.exe manage.py migrate
+```
+
+`migration/surveys/0002_signup_survey_response.py`가 새 테이블, 회원 1:1 관계와 급수 제약을 생성합니다.
+이 명령은 다른 미적용 마이그레이션도 함께 적용할 수 있습니다. 에이전트와 개발 서버는 로컬에 자동 적용하지 않습니다.
+운영에서는 기존 `deploy/start.sh`가 migration 후 Gunicorn을 시작하는 절차를 유지합니다.
+추가 환경 변수, 백그라운드 작업자, 관리 명령은 필요하지 않습니다.
+
+**검증:** 개발·운영과 분리된 PostgreSQL 테스트 연결 설정으로 `backend/`에서 실행합니다.
+
+```powershell
+.\.venv\Scripts\python.exe manage.py test accounts pbt surveys --noinput
+```
+
+Django 테스트 러너가 테스트 DB를 생성·삭제하며 실제 이메일은 보내지 않습니다. 가입 필수 설문, 동의 버전,
+조건부 문항, 중복 가입, 계정·설문 원자적 저장, 기존 인증 및 PBT/IBT 설문을 확인합니다.
+프론트엔드는 `frontend-TOPIQ/`에서 `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`로 검증합니다.

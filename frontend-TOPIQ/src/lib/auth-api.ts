@@ -1,4 +1,5 @@
 import type { Language } from "./landing-content";
+import type { SurveyInput } from "./learner-survey";
 
 export interface AuthUser {
   id: number;
@@ -12,6 +13,8 @@ export interface SignupInput {
   password: string;
   password_confirm: string;
   verification_token: string;
+  language: Language;
+  survey: SurveyInput;
 }
 
 export interface VerifiedEmail {

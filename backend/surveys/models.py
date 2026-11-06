@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models.functions import Now, Trim
@@ -59,3 +60,28 @@ class SurveyResponse(models.Model):
         # Ordinary ORM writes must validate without an API or form. / 일반 ORM 저장도 검증합니다.
         self.full_clean()
         return super().save(*args, **kwargs)
+
+
+class SignupSurveyResponse(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, models.CASCADE, primary_key=True, related_name="signup_survey")
+    language = models.CharField(max_length=2, choices=[("ko", "한국어"), ("en", "English"), ("id", "Indonesia")])
+    nationality_code = models.CharField(max_length=5)
+    birth_year = models.PositiveSmallIntegerField()
+    topik_reasons = models.JSONField()
+    topik_reason_other = models.CharField(max_length=500, blank=True)
+    korean_study_duration = models.CharField(max_length=32)
+    topik_experience = models.CharField(max_length=16)
+    current_topik_level = models.PositiveSmallIntegerField(null=True, blank=True)
+    target_topik_level = models.PositiveSmallIntegerField()
+    survey_version = models.CharField(max_length=40)
+    survey_completed_at = models.DateTimeField()
+    privacy_consent_version = models.CharField(max_length=40)
+    privacy_consented_at = models.DateTimeField()
+
+    class Meta:
+        db_table = "signup_survey_responses"
+        ordering = ["-survey_completed_at"]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(target_topik_level__range=(3, 6)), name="signup_survey_target_range"),
+            models.CheckConstraint(condition=models.Q(current_topik_level__isnull=True) | models.Q(current_topik_level__range=(0, 6)), name="signup_survey_current_range"),
+        ]

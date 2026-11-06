@@ -9,7 +9,7 @@ import type { ExamFormat } from "@/lib/exam-content";
 import { examCopy, pbtErrorMessage } from "@/lib/pbt-content";
 import SiteHeader from "../SiteHeader";
 import SiteFooter from "../SiteFooter";
-import { surveyCopy } from "@/lib/exam-survey";
+import { surveyCopy } from "@/lib/learner-survey";
 
 export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFormat }) {
   const basePath = `/${examFormat}`;

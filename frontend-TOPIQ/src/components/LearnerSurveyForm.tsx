@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo } from "react";
-import { catalog, choiceLabel, currentSurveyYear, surveyCopy, type SurveyInput } from "@/lib/exam-survey";
+import { catalog, choiceLabel, currentSurveyYear, surveyCopy, signupSurveyCopy, type SurveyInput, type SurveyPurpose } from "@/lib/learner-survey";
+import "./learner-survey.css";
 import type { Language } from "@/lib/landing-content";
 
-export default function LearnerSurveyForm({ value, onChange, language, errors }: {
-  value: SurveyInput; onChange: (value: SurveyInput) => void; language: Language; errors: string[];
+export default function LearnerSurveyForm({ value, onChange, language, errors, purpose = "exam" }: {
+  value: SurveyInput; onChange: (value: SurveyInput) => void; language: Language; errors: string[]; purpose?: SurveyPurpose;
 }) {
-  const t = surveyCopy[language];
+  const t = purpose === "signup" ? { ...surveyCopy[language], ...signupSurveyCopy[language] } : surveyCopy[language];
   const countries = useMemo(() => {
     const names = new Intl.DisplayNames([language], { type: "region" });
     return catalog.countries.map(code => ({ code, label: names.of(code) || code }))

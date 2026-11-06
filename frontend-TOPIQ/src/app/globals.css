@@ -283,8 +283,8 @@ details[open] .faq-indicator::after { transform: rotate(0); }
 .auth-card { width: min(100%, 480px); padding: 38px 40px; border: 1px solid #e3e9f3; border-radius: 24px; background: #fff; box-shadow: 0 16px 50px -20px #2d4b7620; }
 .auth-card h1 { margin: 0; font-size: 29px; font-weight: 650; line-height: 1.4; letter-spacing: -.045em; word-break: keep-all; overflow-wrap: anywhere; }
 .auth-description { margin: 14px 0 28px; color: #647185; font-size: 14px; line-height: 1.85; word-break: keep-all; }
-.auth-form fieldset { display: grid; gap: 20px; min-width: 0; margin: 0; padding: 0; border: 0; }
-.auth-form fieldset:disabled { opacity: .7; }
+.auth-form > fieldset { display: grid; gap: 20px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.auth-form > fieldset:disabled { opacity: .7; }
 .auth-field { min-width: 0; }
 .auth-field label { display: block; margin-bottom: 9px; color: #35445d; font-size: 13px; font-weight: 550; }
 .auth-field input { width: 100%; height: 48px; min-width: 0; padding: 12px 14px; border: 1px solid #d7e0ec; border-radius: 10px; background: #fff; color: #23334d; font-size: 16px; line-height: 1.5; }
@@ -334,3 +334,12 @@ details[open] .faq-indicator::after { transform: rotate(0); }
   .coming-soon-notice, .coming-soon-orbit span { animation: none; }
   *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; }
 }
+
+.auth-account-fields { display: grid; gap: 20px; }
+.auth-account-fields[hidden] { display: none; }
+.auth-survey-card { width: min(100%, 720px); }
+.auth-survey-card .exam-survey-fields { margin-top: 0; }
+.signup-verified-email { margin: 0; padding: 14px 16px; border-radius: 10px; background: #f3f6fb; color: #416393; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.signup-back { justify-self: start; color: var(--color-primary); font-size: 14px; }
+.auth-card h1 { scroll-margin-top: calc(var(--header-height) + 24px); }
+.auth-card h1:focus { outline: none; }

@@ -114,9 +114,11 @@ class RateLimitFailureApiTests(AuthClientMixin, TestCase):
 
     @patch("accounts.views.clear_login_failures", side_effect=RateLimitUnavailable)
     def test_signup_rolls_back_if_clearing_failures_fails(self, clear):
+        from surveys.models import SignupSurveyResponse
         response = self.post("/api/auth/signup/", self.payload())
         self.assertEqual(response.status_code, 503)
         self.assertFalse(get_user_model().objects.exists())
+        self.assertFalse(SignupSurveyResponse.objects.exists())
         self.assertNotIn("sessionid", response.cookies)
 
 

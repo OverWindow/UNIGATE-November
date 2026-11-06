@@ -4,10 +4,10 @@ import { test } from "node:test";
 import ts from "typescript";
 
 const catalog = JSON.parse(await readFile(new URL("../src/lib/survey-catalog.json", import.meta.url), "utf8"));
-const source = (await readFile(new URL("../src/lib/exam-survey.ts", import.meta.url), "utf8"))
+const source = (await readFile(new URL("../src/lib/learner-survey.ts", import.meta.url), "utf8"))
   .replace('import catalog from "./survey-catalog.json";', `const catalog = ${JSON.stringify(catalog)};`);
 const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
-const { surveyErrors, emptySurvey, surveyCopy, currentSurveyYear } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
+const { surveyErrors, emptySurvey, surveyCopy, signupSurveyCopy, currentSurveyYear } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
 const valid = () => ({ ...emptySurvey(), nationalityCode: "ID", birthYear: 2000, topikReasons: ["employment"],
   koreanStudyDuration: "1_to_2_years", topikExperience: "none", targetTopikLevel: 4, privacyConsent: true });
 
@@ -30,8 +30,19 @@ test("survey copy and selectable choices cover all three languages", () => {
   for (const language of ["ko", "en", "id"]) {
     assert.deepEqual(Object.keys(surveyCopy[language]), Object.keys(surveyCopy.ko));
     assert.ok(Object.values(surveyCopy[language]).every(value => typeof value === "string" && value.trim()));
+    assert.deepEqual(Object.keys(signupSurveyCopy[language]), Object.keys(signupSurveyCopy.ko));
+    assert.ok(Object.values(signupSurveyCopy[language]).every(value => typeof value === "string" && value.trim()));
   }
   for (const list of [catalog.reasons, catalog.studyDurations, catalog.experiences]) {
     assert.ok(list.every(row => row.length === 4 && row.every(value => value.length)));
   }
+});
+
+test("signup uses the same questions but requires its own consent version", () => {
+  const signup = { ...valid(), privacyConsentVersion: emptySurvey("signup").privacyConsentVersion };
+  assert.deepEqual(surveyErrors(signup, "signup"), []);
+  assert.deepEqual(surveyErrors(signup), ["privacyConsent"]);
+  assert.deepEqual(surveyErrors(valid(), "signup"), ["privacyConsent"]);
+  assert.ok(surveyErrors({ ...signup, privacyConsent: false }, "signup").includes("privacyConsent"));
+  assert.ok(surveyErrors({ ...signup, topikExperience: "once" }, "signup").includes("currentTopikLevel"));
 });

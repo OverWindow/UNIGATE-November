@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Language } from "@/lib/landing-content";
-import { surveyCopy } from "@/lib/exam-survey";
+import { surveyCopy } from "@/lib/learner-survey";
 
 export default function StarRating({ value, onChange, language, invalid }: { value: number; onChange: (value: number) => void; language: Language; invalid: boolean }) {
   const [hover, setHover] = useState(0);
