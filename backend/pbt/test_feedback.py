@@ -251,9 +251,12 @@ class SurveyContractTests(SimpleTestCase):
         value = validate_survey(survey_input(currentTopikLevel=4, topikReasonOther="unused"))
         self.assertIsNone(value["current_topik_level"])
         self.assertEqual(value["topik_reason_other"], "")
-        attempt = Attempt(id=uuid.uuid4(), exam_format="ibt", title="<Synthetic>")
+        attempt = Attempt(id=uuid.uuid4(), exam_format="ibt", title="<Synthetic>", section="listening", mode="timed")
         for language in ("ko", "en", "id"):
             body = build_result_email(attempt, "token/&", language)
             self.assertIn(f"/ibt/attempts/{attempt.pk}/result#token=token%2F%26", body["textContent"])
             self.assertIn("&lt;Synthetic&gt;", body["htmlContent"])
             self.assertNotIn("<Synthetic>", body["htmlContent"])
+            details = {"ko": "IBT · 듣기 · 실전", "en": "IBT · Listening · Timed", "id": "IBT · Menyimak · Simulasi"}[language]
+            self.assertIn(details, body["textContent"])
+            self.assertIn(details, body["htmlContent"])
