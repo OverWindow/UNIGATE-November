@@ -40,7 +40,7 @@ export default function TransferRequest() {
     const controller = new AbortController();
     document.querySelectorAll<HTMLButtonElement>("[data-open-guide]").forEach(button => {
       button.addEventListener("click", () => {
-        const placement = button.closest(".hero") ? "hero" : button.closest(".guide-prompt") ? "contents" : "footer";
+        const placement = button.closest(".hero") ? "hero" : "footer";
         trackEvent("guide_open", { placement });
         trigger.current = button;
         if (dialog.current) openModal(dialog.current);

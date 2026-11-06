@@ -117,29 +117,6 @@ export default function LandingEffects() {
     // Font loading can change the pinned gallery's height after the first layout.
     void document.fonts.ready.then(() => { if (!signal.aborted) sizeUniversities(); });
 
-    const clockValues = [...document.querySelectorAll<HTMLElement>(".countdown-value")];
-    if (clockValues.length) {
-      const DAY = 24 * 3600;
-      let remaining = DAY - 1;
-      const timer = setInterval(() => {
-        if (signal.aborted) { clearInterval(timer); return; }
-        remaining = remaining > 0 ? remaining - 1 : DAY - 1;
-        const parts = { hours: Math.floor(remaining / 3600), minutes: Math.floor((remaining % 3600) / 60), seconds: remaining % 60 };
-        clockValues.forEach(element => {
-          const unit = element.dataset.unit as keyof typeof parts;
-          const next = String(parts[unit]).padStart(2, "0");
-          if (element.textContent !== next) {
-            element.textContent = next;
-            if (!reduceMotion.matches) {
-              element.classList.remove("is-flipping");
-              void element.offsetWidth;
-              element.classList.add("is-flipping");
-            }
-          }
-        });
-      }, 1000);
-    }
-
     const reveals = [...document.querySelectorAll<HTMLElement>(".hero>div:first-child,.story-heading,.transfer-reasons article,.cost-story,.contents>div,.topics li,.university-heading,.university-window,.university-more,.cta,.site-footer")];    reveals.forEach(element => {
       element.classList.add("scroll-reveal");
       if (element.matches(".university-window")) element.classList.add("reveal-calm");
