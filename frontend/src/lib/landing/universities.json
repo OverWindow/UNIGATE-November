@@ -35,7 +35,7 @@
   {
     "name": "Pukyong National University",
     "website": "https://www.pknu.ac.kr/eng/1",
-    "description": "Universitas negeri di Busan dengan tradisi pendidikan dalam ilmu kelautan, perikanan, dan teknologi.",
+    "description": "Universitas negeri di Busan dengan tradisi pendidikan di bidang kelautan, perikanan, dan teknologi.",
     "image": "/landing/image-05.jpg",
     "alt": "Kampus Pukyong National University",
     "source": "https://commons.wikimedia.org/wiki/File%3APkny.JPG",
@@ -46,7 +46,7 @@
   {
     "name": "Seoul National University",
     "website": "https://en.snu.ac.kr/index.html",
-    "description": "Universitas riset negeri di Seoul yang menawarkan beragam disiplin ilmu dan kegiatan penelitian.",
+    "description": "Universitas riset negeri di Seoul dengan beragam bidang studi dan kegiatan penelitian.",
     "image": "/landing/image-06.jpg",
     "alt": "Kampus Seoul National University",
     "source": "https://commons.wikimedia.org/wiki/File%3ASNU_Maingate.jpg",
@@ -57,7 +57,7 @@
   {
     "name": "Korea University",
     "website": "https://www.korea.ac.kr/sites/en/index.do",
-    "description": "Universitas riset swasta di Seoul yang berdiri sejak 1905, dengan beragam pilihan bidang akademik.",
+    "description": "Universitas riset swasta di Seoul yang berdiri sejak 1905, dengan beragam bidang akademik.",
     "image": "/landing/image-07.jpg",
     "alt": "Kampus Korea University",
     "source": "https://commons.wikimedia.org/wiki/File%3AKorea_University.jpg",
@@ -90,7 +90,7 @@
   {
     "name": "Sungkyunkwan University",
     "website": "https://www.skku.ac.kr/eng/",
-    "description": "Universitas riset dengan kampus di Seoul dan Suwon, serta akar sejarah pendidikan yang bermula pada 1398.",
+    "description": "Universitas riset dengan kampus di Seoul dan Suwon serta akar sejarah pendidikan yang bermula pada 1398.",
     "image": "/landing/image-10.jpg",
     "alt": "Kampus Sungkyunkwan University",
     "source": "https://commons.wikimedia.org/wiki/File%3ASungkyunkwan_University_Bicheondang_and_600th_Anniversary_Hall.jpg",
@@ -101,7 +101,7 @@
   {
     "name": "Pusan National University",
     "website": "https://www.pusan.ac.kr/eng/Main.do",
-    "description": "Universitas negeri di Busan dengan beragam program akademik dan kegiatan riset di kawasan tenggara Korea.",
+    "description": "Universitas negeri di Busan, Korea bagian tenggara, dengan beragam program akademik dan kegiatan riset.",
     "image": "/landing/image-11.jpg",
     "alt": "Kampus Pusan National University",
     "source": "https://commons.wikimedia.org/wiki/File%3APusan_Natl_Univ_by_Ficell_006.jpg",
