@@ -390,7 +390,7 @@ $env:DJANGO_ENV = 'development'
 | GET | `/api/ibt/attempts/<id>/` | 본인 응시 상태·문제·저장 답안 |
 | PUT | `/api/ibt/attempts/<id>/answers/<position>/` | `selectedOption` 1~4 저장 또는 `null`로 해제 |
 | POST | `/api/ibt/attempts/<id>/submit/` | 멱등 제출·채점 |
-| GET | `/api/ibt/attempts/<id>/result/` | 제출 후 점수·정답·해설·대본 |
+| GET | `/api/ibt/attempts/<id>/result/` | 제출 후 점수·정답·해설·대본. 비회원 응시는 이메일 링크 인증 필요 |
 
 PBT는 위 경로에서 `ibt`를 `pbt`로 바꾼 동일한 API를 사용합니다.
 시작 요청은 `examId`, `mode`를 받으며 선택적으로 `restartAttemptId`(기존 응시 UUID)를 받습니다.
@@ -419,3 +419,77 @@ IBT 문항의 `points=1`은 정답 수 집계용 원점수이며 최종 `score`�
 `frontend-TOPIQ/`에서 `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`로 실행합니다.
 백엔드 테스트는 격리된 PostgreSQL 테스트 DB에 합성 문제를 만들어 시험 방식 분리, 기존 PBT 보존,
 마이그레이션, 동기화 옵션, 비회원 제한, 소유권, CSRF, 시간 만료, 저장·채점·스냅샷·미디어를 확인합니다.
+
+### 비회원 결과 이메일·별점·사후 설문
+
+PBT·IBT의 읽기·듣기, 연습·실전에 공통 적용합니다. 비회원 응시는 제출(자동 제출 포함) 후
+`/<format>/attempts/<id>/feedback`에서 이메일, 1~5점 별점, 설문과 수집·이용 동의를 입력합니다.
+결과 메일의 링크를 열어야 점수·정답·정오답·해설·듣기 대본을 확인할 수 있습니다.
+기존 비회원 기록에도 적용하며, 비회원으로 시작한 응시는 이후 로그인해도 이메일 인증이 필요합니다.
+회원 계정으로 시작한 응시는 기존처럼 조회하며 회원가입 설문은 포함하지 않습니다.
+
+설문은 국적, 출생연도(1950~KST 올해), TOPIK 응시 목적(복수 선택), 기타 목적(선택 시 필수, 500자),
+한국어 학습 기간, TOPIK II 응시 경험, 현재 급수(응시 경험이 있으면 0~6), 목표 급수(3~6)를 받습니다.
+`0`은 급수 없음이고, 응시 경험이 없으면 현재 급수는 NULL입니다. 별점은 정수만 허용합니다.
+설문 선택 코드·번역은 `backend/pbt/survey_catalog.json`과 `frontend-TOPIQ/src/lib/survey-catalog.json`에
+동일하게 보관합니다. 두 배포가 독립적이므로 양쪽을 함께 수정하며 계약 테스트로 일치 여부를 검사합니다.
+설문·동의 문구를 바꿀 때는 해당 버전도 갱신합니다.
+
+신규 테이블은 **`exam_attempt_feedback` 하나**입니다. 기존 `pbt_attempts`와 1:1로 연결해
+이메일·별점·언어, 설문 답변, 최초 설문/동의 버전·시각, 토큰 해시·만료·최초 열람 시각,
+메일 상태·요청·접수 시각, 생성·수정 시각을 저장합니다. 이메일 중복은 허용하며 기존 응시는 수정하지 않습니다.
+Django 관리자에서 시험 방식·영역·별점·언어·메일 상태로 필터링하고 이메일로 검색할 수 있습니다.
+관리 화면은 조회 전용이고 토큰 해시는 표시하지 않습니다. 개인정보 조회는 해당 모델 조회 권한이 있는 관리자만 가능합니다.
+
+신규 API (`<format>`은 `pbt` 또는 `ibt`):
+
+| 메서드 | 경로 | 목적 |
+|---|---|---|
+| POST | `/api/<format>/attempts/<id>/result-email/` | 해당 응시 소유 세션에서 입력 저장 및 결과 메일 발송·재발송 |
+| POST | `/api/<format>/result-access/` | `attemptId`, `token` 검증 후 현재 브라우저에 해당 결과 조회 권한 부여 |
+
+첫 발송은 `email`, `rating`, `language`(`ko`/`en`/`id`), `survey`를 받습니다.
+`survey` 키는 `nationalityCode`, `birthYear`, `topikReasons`, `topikReasonOther`, `koreanStudyDuration`,
+`topikExperience`, `currentTopikLevel`, `targetTopikLevel`, `privacyConsent`(true), `privacyConsentVersion`입니다.
+현재 동의 버전은 `topiq_exam_privacy_v1`입니다. 재발송은 `survey`를 생략할 수 있으며,
+기존 설문과 동의 시각을 덮어쓰지 않습니다. 응시 상세·목록·제출 응답은 `guestAttempt`, `resultAccess` 및
+비회원의 `feedback` 완료·메일 상태를 제공합니다. 미인증 비회원의 `score`는 NULL입니다.
+접근이 잠긴 결과 API는 소유자에게 `403 result_email_required`, 다른 사람에게 404를 반환합니다.
+
+결과 링크는 **7일** 유효하고, 토큰은 URL fragment(`#token=...`)로 전달한 뒤 화면에서 제거합니다.
+서버에는 원문을 저장하지 않습니다. 다른 브라우저에서도 링크로 결과만 조회할 수 있으며
+응시 상세·답안 수정·재발송 권한은 생기지 않습니다. 열람 권한도 링크 만료 시 함께 끝납니다.
+재발송할 때 새 토큰으로 교체하므로 **기존 링크와 그 링크로 얻은 조회 권한은 만료**됩니다.
+재발송은 최초 응시 브라우저 세션이 필요합니다. 쿠키 삭제·로그아웃으로 소유 세션을 잃으면 재발송할 수 없습니다.
+
+메일은 기존 `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME`, `TOPIQ_PUBLIC_URL` 설정을 사용합니다.
+프론트엔드에 키를 전달하지 않습니다. 발송은 요청 안에서 실행하며 별도 작업자·스케줄·실행 명령은 없습니다.
+설문과 발송 요청은 메일 호출 전에 커밋하므로 실패해도 설문은 보존됩니다.
+`accepted`는 Brevo 접수 완료이며 실제 도착을 보장하지 않습니다. 타임아웃 등 접수 여부가 불명확하면
+`uncertain`으로 표시하고 자동 재발송하지 않습니다. 받은 편지함을 확인한 뒤 수동 재시도합니다.
+프로세스 중단으로 `sending` 상태가 남아도 재발송 제한 시간이 지나면 수동 재시도할 수 있습니다.
+재발송 간격은 60초, 발송 시도는 응시·수신 이메일별 시간당 5회, 요청 IP별 시간당 100회입니다.
+링크 검증 요청도 IP별 10분당 100회로 제한합니다. 제한 시 `429`와 `Retry-After`를 반환합니다.
+모든 POST는 CSRF 검사, 응답은 `private, no-store`를 사용하고 개인정보·토큰을 로그에 기록하지 않습니다.
+
+**적용:** 코드를 반영한 뒤 새 백엔드를 실행하기 전에 개발자가 `backend/`에서 수동 실행합니다.
+
+```powershell
+.\.venv\Scripts\python.exe manage.py migrate
+```
+
+이 명령은 `migration/pbt/0003_exam_attempt_feedback.py`를 포함한 미적용 마이그레이션을 적용하며,
+신규 테이블 및 별점·급수 제약을 생성합니다. 에이전트나 개발 서버가 로컬에 자동 적용하지 않습니다.
+운영은 기존 `deploy/start.sh`가 마이그레이션 → 정적 파일 수집 → Gunicorn 시작을 자동 수행합니다.
+백엔드 적용 후 프론트엔드를 배포합니다. 메일 설정이 없으면 발송 실패로 표시되므로 활성화 전에 설정을 확인합니다.
+
+**검증:** 개발·운영과 분리된 PostgreSQL 테스트 DB 및 합성 데이터로 `backend/`에서 실행합니다.
+
+```powershell
+.\.venv\Scripts\python.exe manage.py test pbt accounts question_bank --noinput
+```
+
+Django 테스트 러너는 `test_<DB_NAME>` 테스트 DB를 생성·삭제합니다. 운영 연결 설정으로 실행하지 않습니다.
+메일은 테스트에서 대체하므로 실제 이메일은 보내지 않습니다. 서버 입력 검증, 소유권, 점수·정답 비공개,
+교차 브라우저 열람, 토큰 변조·만료·교체, 재발송·동시 요청, 기존 회원가입 메일과 응시 기능을 확인합니다.
+`frontend-TOPIQ/`에서는 `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`를 실행합니다.

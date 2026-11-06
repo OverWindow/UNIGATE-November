@@ -25,10 +25,17 @@ export interface Attempt {
   status: "in_progress" | "submitted"; startedAt: string; expiresAt: string | null;
   submittedAt: string | null; timedOut: boolean; score: number | null; maxScore: number;
   serverNow: string; items: Question[];
+  guestAttempt: boolean; resultAccess: boolean; feedback?: FeedbackState;
+}
+
+export interface FeedbackState {
+  completed: boolean; rating?: number; maskedEmail?: string;
+  emailStatus?: "pending" | "sending" | "accepted" | "failed" | "uncertain";
+  retryAt?: string | null; expiresAt?: string | null;
 }
 
 export class PbtError extends Error {
-  constructor(public code: string, public status = 0) { super(code); }
+  constructor(public code: string, public status = 0, public fields: string[] = [], public feedback?: FeedbackState, public retryAfter = 0) { super(code); }
 }
 
 async function fetchResponse(path: string, options: RequestInit) {
@@ -60,7 +67,8 @@ export async function pbtRequest<T>(path: string, method = "GET", body?: object,
   const response = await fetchResponse(`/api/${examFormat}/${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   if (response.status === 404) throw new PbtError("not_found", 404);
   const data = await json(response);
-  if (!response.ok) throw new PbtError(typeof data?.error === "string" ? data.error : response.status === 404 ? "not_found" : "server_error", response.status);
+  if (!response.ok) throw new PbtError(typeof data?.error === "string" ? data.error : "server_error", response.status,
+    Array.isArray(data?.fields) ? data.fields : [], data?.feedback, Number(data?.retryAfter) || 0);
   return data as T;
 }
 

@@ -2,6 +2,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from .models import AttemptItem
+from .result_delivery import feedback_state, has_result_access
 
 
 def owner_filter(request):
@@ -31,15 +32,20 @@ def finalize(attempt, force=False):
     attempt.save(update_fields=["status", "timed_out", "submitted_at", "score"])
 
 
-def attempt_data(attempt, include_items=False, results=False):
+def attempt_data(attempt, include_items=False, results=False, request=None):
+    allowed = request is not None and has_result_access(request, attempt)
+    results = results and allowed
     data = {"id": str(attempt.pk), "examId": str(attempt.exam_id), "title": attempt.title,
             "examFormat": attempt.exam_format,
             "section": attempt.section, "mode": attempt.mode, "status": attempt.status,
             "startedAt": attempt.started_at.isoformat(),
             "expiresAt": attempt.expires_at.isoformat() if attempt.expires_at else None,
             "submittedAt": attempt.submitted_at.isoformat() if attempt.submitted_at else None,
-            "timedOut": attempt.timed_out, "score": attempt.score, "maxScore": 100,
+            "timedOut": attempt.timed_out, "score": attempt.score if allowed else None, "maxScore": 100,
+            "guestAttempt": attempt.user_id is None, "resultAccess": allowed,
             "serverNow": timezone.now().isoformat()}
+    if attempt.user_id is None and not results:
+        data["feedback"] = feedback_state(attempt)
     if include_items:
         data["items"] = []
         for item in attempt.items.all():

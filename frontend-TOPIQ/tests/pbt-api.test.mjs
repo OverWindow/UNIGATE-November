@@ -10,6 +10,19 @@ const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.Scri
 const api = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status });
 
+test("delivery errors retain committed feedback, field errors and resend delay", async () => {
+  globalThis.fetch = async path => path === "/api/csrf/" ? json({ csrfToken: "synthetic" }) : json({
+    error: "result_email_rate_limited", fields: ["email"], feedback: { completed: true }, retryAfter: 60,
+  }, 429);
+  await assert.rejects(api.pbtRequest("attempts/test/result-email/", "POST", {}, "ibt"), error => {
+    assert.equal(error.code, "result_email_rate_limited");
+    assert.deepEqual(error.fields, ["email"]);
+    assert.equal(error.feedback.completed, true);
+    assert.equal(error.retryAfter, 60);
+    return true;
+  });
+});
+
 test("practice never expires; timed deadline comes from server time", () => {
   assert.equal(api.remainingSeconds({ expiresAt: null, serverNow: "2026-11-03T00:00:00Z" }, 900000000), null);
   const attempt = { serverNow: "2026-11-03T00:00:00Z", expiresAt: "2026-11-03T01:00:00Z" };

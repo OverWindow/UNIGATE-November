@@ -79,3 +79,42 @@ class AttemptItem(models.Model):
             models.CheckConstraint(condition=models.Q(correct_answer__range=(1, 4)), name="pbt_correct_answer_range"),
             models.CheckConstraint(condition=models.Q(selected_option__isnull=True) | models.Q(selected_option__range=(1, 4)), name="pbt_selected_option_range"),
         ]
+
+
+class ExamAttemptFeedback(models.Model):
+    attempt = models.OneToOneField(Attempt, models.CASCADE, primary_key=True, related_name="feedback")
+    email = models.EmailField(max_length=254)
+    rating = models.PositiveSmallIntegerField()
+    language = models.CharField(max_length=2, choices=[("ko", "한국어"), ("en", "English"), ("id", "Indonesia")])
+    nationality_code = models.CharField(max_length=5)
+    birth_year = models.PositiveSmallIntegerField()
+    topik_reasons = models.JSONField()
+    topik_reason_other = models.CharField(max_length=500, blank=True)
+    korean_study_duration = models.CharField(max_length=32)
+    topik_experience = models.CharField(max_length=16)
+    current_topik_level = models.PositiveSmallIntegerField(null=True, blank=True)
+    target_topik_level = models.PositiveSmallIntegerField()
+    survey_version = models.CharField(max_length=40)
+    survey_completed_at = models.DateTimeField()
+    privacy_consent_version = models.CharField(max_length=40)
+    privacy_consented_at = models.DateTimeField()
+    result_token_hash = models.CharField(max_length=64, blank=True, editable=False)
+    result_token_expires_at = models.DateTimeField(null=True, editable=False)
+    result_accessed_at = models.DateTimeField(null=True, editable=False)
+    email_status = models.CharField(max_length=12, default="pending", choices=[
+        ("pending", "대기"), ("sending", "발송 중"), ("accepted", "발송업체 접수"),
+        ("failed", "실패"), ("uncertain", "접수 확인 불가"),
+    ])
+    email_requested_at = models.DateTimeField(null=True, editable=False)
+    email_sent_at = models.DateTimeField(null=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "exam_attempt_feedback"
+        ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(rating__range=(1, 5)), name="exam_feedback_rating_range"),
+            models.CheckConstraint(condition=models.Q(target_topik_level__range=(3, 6)), name="exam_feedback_target_range"),
+            models.CheckConstraint(condition=models.Q(current_topik_level__isnull=True) | models.Q(current_topik_level__range=(0, 6)), name="exam_feedback_current_range"),
+        ]

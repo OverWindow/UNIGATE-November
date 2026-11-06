@@ -9,4 +9,6 @@ urlpatterns = [
     path("attempts/<uuid:attempt_id>/answers/<int:position>/", views.answer),
     path("attempts/<uuid:attempt_id>/submit/", views.submit),
     path("attempts/<uuid:attempt_id>/result/", views.result),
+    path("attempts/<uuid:attempt_id>/result-email/", views.result_email),
+    path("result-access/", views.result_access),
 ]

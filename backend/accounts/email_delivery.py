@@ -37,7 +37,9 @@ MAIL_CONTENT = {
 
 
 class EmailDeliveryError(Exception):
-    pass
+    def __init__(self, message="Email delivery is unavailable.", *, uncertain=False):
+        super().__init__(message)
+        self.uncertain = uncertain
 
 
 @sensitive_variables()
@@ -66,13 +68,18 @@ def build_verification_email(token, language):
 
 @sensitive_variables()
 def send_verification_email(email, token, language):
+    send_transactional_email(email, build_verification_email(token, language), "topiq-email-verification")
+
+
+@sensitive_variables()
+def send_transactional_email(email, content, tag):
     if not settings.BREVO_API_KEY or not settings.BREVO_SENDER_EMAIL:
         raise EmailDeliveryError("Email delivery is not configured.")
     payload = {
         "sender": {"email": settings.BREVO_SENDER_EMAIL, "name": settings.BREVO_SENDER_NAME},
         "to": [{"email": email, "contactPixelTrackingConsent": False}],
-        **build_verification_email(token, language),
-        "tags": ["topiq-email-verification"],
+        **content,
+        "tags": [tag],
     }
     request = Request(BREVO_ENDPOINT, data=json.dumps(payload).encode("utf-8"), method="POST", headers={
         "accept": "application/json", "content-type": "application/json", "api-key": settings.BREVO_API_KEY,
@@ -83,9 +90,9 @@ def send_verification_email(email, token, language):
         if not isinstance(data, dict) or not isinstance(data.get("messageId"), str) or not data["messageId"]:
             raise ValueError("Missing message id")
     except HTTPError as error:
-        logger.warning("Brevo rejected verification email (HTTP %s).", error.code)
+        logger.warning("Brevo rejected transactional email (HTTP %s).", error.code)
         error.close()
         raise EmailDeliveryError("Email delivery is unavailable.") from None
     except (URLError, OSError, ValueError, TypeError):
-        logger.warning("Verification email delivery failed.")
-        raise EmailDeliveryError("Email delivery is unavailable.") from None
+        logger.warning("Transactional email receipt could not be confirmed.")
+        raise EmailDeliveryError(uncertain=True) from None

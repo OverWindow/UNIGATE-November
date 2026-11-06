@@ -9,7 +9,7 @@ from django.utils import timezone
 class ExamFormatMigrationTests(TransactionTestCase):
     def test_existing_pbt_records_and_snapshots_survive(self):
         old_target = [("pbt", "0001_initial")]
-        new_target = [("pbt", "0002_exam_format")]
+        new_target = [("pbt", "0003_exam_attempt_feedback")]
         executor = MigrationExecutor(connection)
         executor.migrate(old_target)
         try:

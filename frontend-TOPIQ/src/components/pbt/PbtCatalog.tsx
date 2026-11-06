@@ -9,6 +9,7 @@ import type { ExamFormat } from "@/lib/exam-content";
 import { examCopy, pbtErrorMessage } from "@/lib/pbt-content";
 import SiteHeader from "../SiteHeader";
 import SiteFooter from "../SiteFooter";
+import { surveyCopy } from "@/lib/exam-survey";
 
 export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFormat }) {
   const basePath = `/${examFormat}`;
@@ -60,7 +61,7 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
   return <><SiteHeader /><main id="main-content" className="pbt-main" tabIndex={-1}>
     <section className="pbt-hero"><div className="page-container">
       <p className="eyebrow">TOPIK II · {examFormat.toUpperCase()} MOCK TEST</p><h1>{t.title}</h1><p>{t.intro}</p>
-      <div className="pbt-access-note">{user ? t.memberNote : t.guestNote}</div>
+      <div className="pbt-access-note">{user ? t.memberNote : <>{t.guestNote}<br />{surveyCopy[language].notice}</>}</div>
     </div></section>
     <div className="page-container pbt-catalog">
       <div className="pbt-section-tabs" aria-label="TOPIK II">
@@ -103,7 +104,7 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
         {!loading && !attempts.length && <p className="pbt-muted">{t.noHistory}</p>}
         {attempts.map(attempt => <div className="pbt-history-row" key={attempt.id}>
           <div><strong>{attempt.title} · {t[attempt.section]}</strong><small>{t[attempt.mode]} · {new Date(attempt.startedAt).toLocaleString(language === "ko" ? "ko-KR" : language === "id" ? "id-ID" : "en-US")}</small></div>
-          <span>{attempt.status === "submitted" ? `${attempt.score} / ${attempt.maxScore}` : t.inProgress}</span>
+          <span>{attempt.status === "submitted" ? (attempt.score === null ? surveyCopy[language].locked : `${attempt.score} / ${attempt.maxScore}`) : t.inProgress}</span>
           <Link className="text-link" href={`${basePath}/attempts/${attempt.id}${attempt.status === "submitted" ? "/result" : ""}`}>{attempt.status === "submitted" ? t.result : t.resume} →</Link>
         </div>)}
       </section>

@@ -86,6 +86,7 @@ class IbtTests(BankFixtures, TransactionTestCase):
                 self.assertEqual(len(items[1]["visuals"]), 4)
 
     def test_save_resume_clear_rounding_snapshot_and_idempotent_submit(self):
+        self.client.force_login(self.user)
         data = self.start()
         path = f"/api/ibt/attempts/{data['id']}/"
         self.assertIsNone(data["expiresAt"])
@@ -135,7 +136,11 @@ class IbtTests(BankFixtures, TransactionTestCase):
                     self.assertEqual(response.status_code, 201)
                     old.refresh_from_db()
                     self.assertEqual((old.status, old.score), ("submitted", 7))
-                    self.assertEqual(client.get(f"/api/ibt/attempts/{old.pk}/result/").json()["score"], 7)
+                    result = client.get(f"/api/ibt/attempts/{old.pk}/result/")
+                    if member:
+                        self.assertEqual(result.json()["score"], 7)
+                    else:
+                        self.assertEqual(result.status_code, 403)
                     new = Attempt.objects.get(pk=response.json()["id"])
                     self.assertEqual(new.exam_format, "ibt")
                     self.assertEqual(new.items.count(), 30)
@@ -162,6 +167,7 @@ class IbtTests(BankFixtures, TransactionTestCase):
         self.assertEqual(Attempt.objects.filter(status="in_progress").count(), 2)
 
     def test_timed_deadlines_and_late_answers(self):
+        self.client.force_login(self.user)
         for exam, seconds in ((self.ibt_exam, 2400), (self.ibt_listen_exam, 2100)):
             data = self.start(exam, "timed")
             attempt = Attempt.objects.get(pk=data["id"])

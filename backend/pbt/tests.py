@@ -222,6 +222,7 @@ class PbtTests(BankFixtures, TransactionTestCase):
         self.assertEqual(other.get("/api/pbt/attempts/").json()["attempts"], [])
 
     def test_no_answers_or_listening_scripts_before_submission(self):
+        self.client.force_login(self.user)
         data = self.start(self.listen_exam)
         path = f"/api/pbt/attempts/{data['id']}/"
         response = self.client.get(path)
@@ -236,6 +237,7 @@ class PbtTests(BankFixtures, TransactionTestCase):
         self.assertIn("SECRET SCRIPT", result["items"][0]["transcript"])
 
     def test_save_resume_snapshot_and_idempotent_submission(self):
+        self.client.force_login(self.user)
         data = self.start()
         path = f"/api/pbt/attempts/{data['id']}/"
         self.assertEqual(self.start()["id"], data["id"])
@@ -287,9 +289,12 @@ class PbtTests(BankFixtures, TransactionTestCase):
                     else:
                         self.assertIsNone(new.expires_at)
                     self.assertEqual(self.start(mode=mode, client=client)["id"], str(new.pk))
-                    result = client.get(f"/api/pbt/attempts/{old.pk}/result/").json()
-                    self.assertEqual(result["score"], 2)
-                    self.assertEqual(result["items"][0]["selectedOption"], 2)
+                    response = client.get(f"/api/pbt/attempts/{old.pk}/result/")
+                    if member:
+                        self.assertEqual(response.json()["score"], 2)
+                        self.assertEqual(response.json()["items"][0]["selectedOption"], 2)
+                    else:
+                        self.assertEqual(response.status_code, 403)
                     self.assertEqual(client.put(f"/api/pbt/attempts/{old.pk}/answers/2/",
                         {"selectedOption": 2}, content_type="application/json").status_code, 409)
                     if member:
@@ -410,6 +415,7 @@ class PbtTests(BankFixtures, TransactionTestCase):
         self.assertEqual((new.expires_at - new.started_at).total_seconds(), 4200)
 
     def test_deadline_rejects_late_answer_and_finalizes_without_browser_timer(self):
+        self.client.force_login(self.user)
         data = self.start(mode="timed")
         path = f"/api/pbt/attempts/{data['id']}/"
         self.client.put(path + "answers/1/", {"selectedOption": 2}, content_type="application/json")
@@ -428,7 +434,8 @@ class PbtTests(BankFixtures, TransactionTestCase):
         Attempt.objects.filter(pk=data["id"]).update(expires_at=timezone.now() - timedelta(seconds=1))
         row = self.client.get("/api/pbt/attempts/").json()["attempts"][0]
         self.assertEqual(row["status"], "submitted")
-        self.assertEqual(row["score"], 0)
+        self.assertIsNone(row["score"])
+        self.assertEqual(Attempt.objects.get(pk=data["id"]).score, 0)
 
     def test_ownership_survives_login_but_not_another_guest(self):
         data = self.start()
