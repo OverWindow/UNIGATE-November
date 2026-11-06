@@ -8,6 +8,8 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_GET
 
 from .csv_export import SEOUL, write_survey_csv
+from .admin_export import CsvExportAdminMixin
+from .learner_csv import write_signup_survey_csv
 from .models import SignupSurveyResponse, SurveyResponse
 
 
@@ -51,7 +53,9 @@ class SurveyResponseAdmin(admin.ModelAdmin):
 
 
 @admin.register(SignupSurveyResponse)
-class SignupSurveyResponseAdmin(admin.ModelAdmin):
+class SignupSurveyResponseAdmin(CsvExportAdminMixin, admin.ModelAdmin):
+    csv_filename_prefix = "signup_survey_responses"
+    csv_writer = staticmethod(write_signup_survey_csv)
     list_display = ("user_id", "email", "nickname", "nationality_code", "target_topik_level", "language", "survey_completed_at")
     list_filter = ("language", "nationality_code", "target_topik_level", "survey_completed_at")
     search_fields = ("user__email", "user__first_name")

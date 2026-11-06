@@ -1,5 +1,8 @@
 from django.contrib import admin
 
+from surveys.admin_export import CsvExportAdminMixin
+from surveys.learner_csv import write_exam_survey_csv
+
 from .models import Exam, ExamAttemptFeedback
 
 
@@ -14,7 +17,9 @@ class ExamAdmin(admin.ModelAdmin):
 
 
 @admin.register(ExamAttemptFeedback)
-class ExamAttemptFeedbackAdmin(admin.ModelAdmin):
+class ExamAttemptFeedbackAdmin(CsvExportAdminMixin, admin.ModelAdmin):
+    csv_filename_prefix = "exam_attempt_feedback"
+    csv_writer = staticmethod(write_exam_survey_csv)
     list_display = ["attempt_id", "email", "rating", "language", "email_status", "survey_completed_at"]
     list_filter = ["attempt__exam_format", "attempt__section", "rating", "language", "email_status"]
     search_fields = ["email", "attempt__title"]
