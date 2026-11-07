@@ -100,12 +100,14 @@ const ibtCopy: Record<Language, Pick<Copy, "title" | "intro" | "timedHint" | "gu
     score: "모의고사 환산 점수",
   },
   en: {
+    title: "IBT Mock Test",
     intro: "Choose a section and mode. Each set has 30 questions. Mock scores convert your accuracy to a 100-point scale.",
     timedHint: ibtTimedHints.en.reading,
     guestNote: "Up to 3 sets per section are available to guests. Sign in to access all published sets.",
     score: "Converted mock score",
   },
   id: {
+    title: "Simulasi IBT",
     intro: "Pilih bidang dan mode. Setiap set berisi 30 soal. Nilai simulasi dikonversi dari persentase jawaban benar ke skala 100.",
     timedHint: ibtTimedHints.id.reading,
     guestNote: "Tamu dapat mengakses hingga 3 set per bidang. Masuk untuk mengakses semua set yang dipublikasikan.",
