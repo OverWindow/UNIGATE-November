@@ -46,7 +46,6 @@ export default function VocabularyStudy({ id }: { id: string }) {
       <button className="button vocabulary-secondary" onClick={() => setRevision(value => value + 1)}>{t.retry}</button>
     </div> : !data || !word ? <p className="vocabulary-status" role="status">{t.loading}</p> : <>
       <div className="vocabulary-study-heading"><div>
-        <p className="eyebrow">TOPIK II · {t.vocabulary}</p>
         <h1>{vocabularyLevelLabel(data.level, language)} <span>·</span> SET {String(data.number).padStart(2, "0")}</h1>
       </div><p>{data.wordCount} {t.words}</p></div>
       <div className="vocabulary-study-grid">

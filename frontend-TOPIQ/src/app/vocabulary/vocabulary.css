@@ -13,8 +13,7 @@
 .vocabulary-set-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
 .vocabulary-set-card { display: flex; flex-direction: column; padding: 24px; border: 1px solid #e0e6f0; border-radius: 16px; background: #fff; transition: border-color .15s, box-shadow .15s; }
 .vocabulary-set-card:hover { border-color: #91afe9; box-shadow: 0 6px 20px #244d9d0a; }
-.vocabulary-set-top { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--color-muted); }
-.vocabulary-set-top span:first-child { color: var(--color-primary); font-weight: 650; letter-spacing: .06em; }
+.vocabulary-set-number { color: #9baecb; font-size: 32px; font-weight: 500; letter-spacing: -.05em; }
 .vocabulary-set-card h3 { display: flex; flex-wrap: wrap; gap: 6px 12px; flex: 1; margin: 24px 0 30px; color: var(--color-ink); font-size: 20px; font-weight: 600; line-height: 1.6; overflow-wrap: anywhere; }
 .vocabulary-set-card h3 span:not(:last-child)::after { content: '·'; margin-left: 12px; color: #b5bfcd; }
 .vocabulary-set-action { display: flex; justify-content: space-between; padding-top: 18px; border-top: 1px solid #edf0f5; color: var(--color-primary); font-size: 13px; font-weight: 600; }
@@ -29,7 +28,6 @@
 .vocabulary-study { padding-top: 32px; }
 .vocabulary-back { display: inline-flex; align-items: center; gap: 5px; color: var(--color-muted); font-size: 14px; padding: 8px 0; }
 .vocabulary-study-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin: 28px 0; }
-.vocabulary-study-heading .eyebrow { margin-bottom: 10px; }
 .vocabulary-study-heading h1 { margin: 0; font-size: clamp(24px, 3vw, 32px); font-weight: 650; }
 .vocabulary-study-heading h1 span { padding: 0 8px; color: #a3adbd; }
 .vocabulary-study-heading > p { margin: 0 0 4px; color: var(--color-muted); font-size: 14px; }

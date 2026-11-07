@@ -294,10 +294,8 @@ details[open] .faq-indicator::after { transform: rotate(0); }
 .auth-field input:focus-visible { outline: 3px solid #b9cef5; outline-offset: 2px; border-color: #2d5ec5; }
 .auth-field input[aria-invalid="true"] { border-color: #b9614e; }
 .password-input { position: relative; }
-.password-input input { padding-right: 122px; }
-.password-toggle { position: absolute; top: 3px; right: 6px; display: flex; align-items: center; justify-content: center; height: 42px; max-width: 112px; padding: 4px 5px; color: #3c61a4; font-size: 10px; line-height: 1.35; text-align: center; }
-.auth-login-card .password-input input { padding-right: 54px; }
-.auth-login-card .password-toggle { width: 42px; padding: 0; }
+.password-input input { padding-right: 54px; }
+.password-toggle { position: absolute; top: 3px; right: 6px; display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; padding: 0; color: #3c61a4; }
 .field-hint { margin: 9px 0 0; color: #657186; font-size: 11px; line-height: 1.8; }
 .field-error { margin: 8px 0 0; color: #a0392c; font-size: 12px; line-height: 1.7; }
 .auth-error { margin: 0; padding: 12px 14px; border: 1px solid #efd7d0; border-radius: 9px; background: #fff6f3; color: #963e2f; font-size: 13px; line-height: 1.7; }
@@ -310,9 +308,8 @@ details[open] .faq-indicator::after { transform: rotate(0); }
 .auth-home-link { display: inline-flex; align-items: center; gap: 5px; margin-top: 24px; padding: 8px; color: #60728f; font-size: 12px; }
 .auth-home-link:hover { color: var(--color-primary); }
 .auth-state { padding-block: 24px; color: #596d8d; font-size: 14px; line-height: 1.8; }
-.verification-steps { margin: -12px 0 24px; color: #536b94; font-size: 12px; line-height: 1.7; }
-.verification-sent { padding: 22px 18px; border: 1px solid #dce6f7; border-radius: 12px; background: #f5f8ff; }
-.verification-symbol { display: block; margin-bottom: 12px; color: #2d5ec5; }
+.verification-sent { padding: 22px 18px; border: 1px solid #dce6f7; border-radius: 12px; background: #f5f8ff; text-align: center; }
+.verification-symbol { display: block; margin: 0 auto 12px; color: #2d5ec5; }
 .verification-sent h2 { margin: 0 0 12px; color: #243f72; font-size: 20px; font-weight: 700; line-height: 1.5; }
 .verification-sent p { margin: 12px 0 0; color: #52657f; font-size: 13px; line-height: 1.8; }
 .verification-address { display: block; margin-top: 16px; color: #254c96; font-size: 15px; overflow-wrap: anywhere; }
@@ -340,9 +337,7 @@ details[open] .faq-indicator::after { transform: rotate(0); }
 .auth-account-fields { display: grid; gap: 20px; }
 .auth-account-fields[hidden] { display: none; }
 .auth-survey-card { width: min(100%, 720px); }
-.auth-survey-card .exam-survey-fields { margin-top: 0; }
-.signup-verified-email { margin: 0; padding: 14px 16px; border-radius: 10px; background: #f3f6fb; color: #416393; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
-.signup-verified-email svg { vertical-align: middle; }
-.signup-back { justify-self: start; color: var(--color-primary); font-size: 14px; }
+.auth-survey-card .exam-survey-fields { margin-top: 0; padding-top: 0; border-top: 0; }
+.signup-back { justify-self: center; color: var(--color-primary); font-size: 14px; }
 .auth-card h1 { scroll-margin-top: calc(var(--header-height) + 24px); }
 .auth-card h1:focus { outline: none; }

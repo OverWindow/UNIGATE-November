@@ -60,7 +60,7 @@ function CatalogPage({ level, page }: { level: number; page: number }) {
       </div> : !data ? <p className="vocabulary-status" role="status">{t.loading}</p> : <>
         <div className="vocabulary-set-grid">
           {data.catalog.sets.map(group => <Link className="vocabulary-set-card" key={group.id} href={`/vocabulary/sets/${group.id}`}>
-            <div className="vocabulary-set-top"><span>SET {String(group.number).padStart(2, "0")}</span><span>{group.wordCount} {t.words}</span></div>
+            <span className="vocabulary-set-number">{String(group.number).padStart(2, "0")}</span>
             <h3>{group.preview.map((word, index) => <span key={index} lang="ko">{word}</span>)}</h3>
             <div className="vocabulary-set-action">{t.browse}<ExternalLink size={14} aria-hidden="true" /></div>
           </Link>)}

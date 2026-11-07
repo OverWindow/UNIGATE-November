@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Check, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Check, Eye, EyeOff } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useApp } from "@/app/providers";
@@ -124,7 +124,6 @@ export default function AuthScreen({ mode, verification, returnPath }: {
         <div className={`auth-card${isSignup ? " auth-signup-card" : " auth-login-card"}${isSurvey ? " auth-survey-card" : ""}`}>
           <h1 ref={headingRef} tabIndex={-1}>{title}</h1>
           {isSignup && (isSurvey || verification) && <p className="auth-description">{isSurvey ? s.description : e.finish}</p>}
-          {isSurvey && <p className="verification-steps">{s.step}</p>}
           {status === "loading" || status === "authenticated" ? (
             <p className="auth-state" role="status">{t.loading}</p>
           ) : status === "error" ? (
@@ -148,7 +147,7 @@ export default function AuthScreen({ mode, verification, returnPath }: {
                 </div>}
                 <div className="auth-field">
                   <label htmlFor="password">{t.password}</label>
-                  <div className="password-input"><input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete={isSignup ? "new-password" : "current-password"} maxLength={4096} required aria-invalid={!!fields.password} aria-describedby={fields.password ? "password-error" : isSignup ? "password-hint" : undefined} /><button type="button" className="password-toggle" aria-label={!isSignup ? showPassword ? t.hide : t.show : undefined} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{isSignup ? showPassword ? t.hide : t.show : showPassword ? <EyeOff size={20} aria-hidden="true" /> : <Eye size={20} aria-hidden="true" />}</button></div>
+                  <div className="password-input"><input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete={isSignup ? "new-password" : "current-password"} maxLength={4096} required aria-invalid={!!fields.password} aria-describedby={fields.password ? "password-error" : isSignup ? "password-hint" : undefined} /><button type="button" className="password-toggle" aria-label={showPassword ? t.hide : t.show} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff size={20} aria-hidden="true" /> : <Eye size={20} aria-hidden="true" />}</button></div>
                   {fields.password && <p className="field-error" id="password-error">{fieldMessage("password")}</p>}
                   {isSignup && <p className="field-hint" id="password-hint">{t.passwordHint}</p>}
                 </div>
@@ -158,18 +157,15 @@ export default function AuthScreen({ mode, verification, returnPath }: {
                   {fields.password_confirm && <p className="field-error" id="password-confirm-error">{fieldMessage("password_confirm")}</p>}
                 </div>}
                 </div>
-                {isSurvey && <>
-                  <p className="signup-verified-email"><Check size={14} aria-hidden="true" /> {e.verified}: <strong>{verification?.email}</strong></p>
-                  <LearnerSurveyForm value={survey} language={language} purpose="signup" errors={Object.keys(fields)} onChange={value => {
+                {isSurvey && <LearnerSurveyForm value={survey} language={language} purpose="signup" errors={Object.keys(fields)} onChange={value => {
                     setSurvey(value);
                     const invalid = surveyErrors(value, "signup");
                     setFields(current => Object.fromEntries(Object.entries(current).filter(([name]) => !(name in value) || invalid.includes(name))));
-                  }} />
-                </>}
+                  }} />}
                 {error && <p className="auth-error" role="alert">{message(error)}</p>}
                 {fields.verification_token && <div className="auth-error" role="alert"><p>{fieldMessage("verification_token")}</p><Link className="verification-change" href={signupHref}>{e.restart}</Link></div>}
                 {isSurvey && <button type="button" className="text-link signup-back" onClick={() => { setSignupStep("account"); setError(""); focusField("nickname"); }}><ArrowLeft size={16} aria-hidden="true" /> {s.back}</button>}
-                <button type="submit" className={`button button-primary auth-submit${isSignup ? "" : " auth-compact-submit"}`} aria-busy={pending}>{pending ? t.submitting : isSignup ? isSurvey ? s.finish : s.next : t.login}{isSignup && <ArrowRight size={16} aria-hidden="true" />}</button>
+                <button type="submit" className="button button-primary auth-submit auth-compact-submit" aria-busy={pending}>{pending ? t.submitting : isSignup ? isSurvey ? s.finish : s.next : t.login}</button>
               </fieldset>
             </form>
           )}
