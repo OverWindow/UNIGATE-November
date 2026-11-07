@@ -10,7 +10,7 @@ import { examCopy, ibtTimedHints, pbtErrorMessage } from "@/lib/pbt-content";
 import SiteHeader from "../SiteHeader";
 import SiteFooter from "../SiteFooter";
 import { surveyCopy } from "@/lib/learner-survey";
-import { listeningCopy } from "@/lib/ibt-listening";
+import { listeningCopy } from "@/lib/listening";
 
 export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFormat }) {
   const basePath = `/${examFormat}`;
@@ -58,8 +58,8 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
   }
 
   const durationSeconds = exams.find(exam => exam.section === section)?.durationSeconds;
-  const perPassage = examFormat === "ibt" && section === "listening";
-  const timedHint = examFormat === "ibt" ? ibtTimedHints[language][section] : t.timedHint;
+  const perPassage = section === "listening";
+  const timedHint = perPassage ? ibtTimedHints[language].listening : examFormat === "ibt" ? ibtTimedHints[language].reading : t.timedHint;
 
   return <><SiteHeader /><main id="main-content" className="pbt-main" tabIndex={-1}>
     <section className="pbt-hero"><div className="page-container">
@@ -73,7 +73,7 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
       <div className="pbt-modes">
         {(["practice", "timed"] as const).map(value => <button className="pbt-mode" type="button" key={value} aria-pressed={mode === value} onClick={() => setMode(value)}>
           <span className="pbt-radio" /><span><strong>{t[value]}</strong><small>{value === "practice" ? t.practiceHint : timedHint}</small></span>
-          <span className="pbt-mode-time">{value === "practice" ? "∞" : perPassage ? listeningCopy[language].perPassage : `${durationSeconds ? durationSeconds / 60 : "—"} ${t.minutes}`}</span>
+          <span className="pbt-mode-time">{value === "practice" ? "∞" : perPassage ? listeningCopy[language].estimatedDuration[examFormat] : `${durationSeconds ? durationSeconds / 60 : "—"} ${t.minutes}`}</span>
         </button>)}
       </div>
       {(error || status === "error") ? <div role="alert" className="pbt-alert">{pbtErrorMessage(error, t)} <button onClick={retry}>{t.retry}</button></div> : null}
@@ -91,7 +91,7 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
               </Link> : <span className={`pbt-badge ${exam.guestAvailable ? "pbt-badge-free" : ""}`}>{exam.guestAvailable ? t.free : t.members}</span>}
             </div>
             <h2>{t[exam.section]} · {t.round} {exam.round}</h2>
-            <p>{exam.questionCount} {t.questions} <span>·</span> {mode === "practice" ? t.unlimited : perPassage ? listeningCopy[language].perPassage : `${exam.durationSeconds ? exam.durationSeconds / 60 : "—"} ${t.minutes}`}</p>
+            <p>{exam.questionCount} {t.questions} <span>·</span> {mode === "practice" ? t.unlimited : perPassage ? listeningCopy[language].estimatedDuration[examFormat] : `${exam.durationSeconds ? exam.durationSeconds / 60 : "—"} ${t.minutes}`}</p>
             {exam.accessible ? <div className="pbt-card-actions">
               <button type="button" className="button button-primary" disabled={!!starting} onClick={() => void start(exam, inProgressId)}>{starting === exam.id ? t.loading : t.start}</button>
               {inProgressId ? <Link className="button button-primary" href={`${basePath}/attempts/${inProgressId}`}>{t.resume}</Link>

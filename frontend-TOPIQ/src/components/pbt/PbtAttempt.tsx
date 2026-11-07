@@ -11,8 +11,8 @@ import SiteHeader from "../SiteHeader";
 import { surveyCopy } from "@/lib/learner-survey";
 import PbtQuestion, { QuestionMaterial } from "./PbtQuestion";
 import ListeningPlayer, { type AudioProgress } from "./ListeningPlayer";
-import IbtListeningSession from "./IbtListeningSession";
-import { listeningCopy, readListeningCheckpoint } from "@/lib/ibt-listening";
+import ListeningSession from "./ListeningSession";
+import { listeningCopy, readListeningCheckpoint } from "@/lib/listening";
 
 export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: { id: string; review?: boolean; examFormat?: ExamFormat }) {
   const basePath = `/${examFormat}`;
@@ -41,8 +41,8 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
     completedPositionRef.current = finished;
     setCompletedPosition(finished);
   }, []);
-  const ibtListening = examFormat === "ibt" && attempt?.section === "listening";
-  const timedListening = ibtListening && attempt?.mode === "timed";
+  const isListening = attempt?.section === "listening";
+  const timedListening = isListening && attempt?.mode === "timed";
   const [audioProgress, setAudioProgress] = useState<AudioProgress | null>(null);
   const updateAudioProgress = useCallback((next: AudioProgress) => {
     setAudioProgress(current => current && current.playbackKey === next.playbackKey && current.elapsed === next.elapsed && current.duration === next.duration ? current : next);
@@ -64,8 +64,8 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
       receivedAt.current = performance.now();
       autoSubmitted.current = false;
       completedPositionRef.current = null; completionHandled.current = null; setCompletedPosition(null);
-      const listening = examFormat === "ibt" && data.section === "listening";
-      const saved = listening && data.mode === "timed" && !review ? readListeningCheckpoint(id) : null;
+      const listening = data.section === "listening";
+      const saved = listening && data.mode === "timed" && !review ? readListeningCheckpoint(id, examFormat) : null;
       setPosition(saved && data.items.some(item => item.position === saved.position) ? saved.position : 1);
       setRemaining(listening ? null : remainingSeconds(data, 0)); setAttempt(data);
     }).catch(cause => {
@@ -79,13 +79,13 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
   }, [id, review, revision, status, user?.id, router, basePath, examFormat]);
 
   useEffect(() => {
-    if (!attempt || review || ibtListening) return;
+    if (!attempt || review || isListening) return;
     const update = () => setRemaining(remainingSeconds(attempt, performance.now() - receivedAt.current));
     const timer = window.setInterval(update, 500);
     const onVisible = () => { if (document.visibilityState === "visible") update(); };
     document.addEventListener("visibilitychange", onVisible);
     return () => { clearInterval(timer); document.removeEventListener("visibilitychange", onVisible); };
-  }, [attempt, review, ibtListening]);
+  }, [attempt, review, isListening]);
 
   useEffect(() => {
     if (!busy) return;
@@ -187,7 +187,7 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
           <div className="pbt-exam-toolbar"><div className="pbt-exam-width pbt-exam-toolbar-inner">
             <Link className="pbt-exam-back" href={basePath} onClick={event => { if (busy || submitting) event.preventDefault(); }}><span aria-hidden="true">←</span> {t.back}</Link>
             <h1>{attempt.title} <span>· {t[attempt.mode]}</span></h1>
-            {ibtListening ? <span className="ibt-timing-label">{timedListening ? listeningCopy[language].perPassage : t.unlimited}</span> : <div className={`pbt-timer ${remaining !== null && remaining < 300 ? "is-urgent" : ""}`} role="timer" aria-label={remaining === null ? t.unlimited : `${t.remainingTime} ${clockText(remaining)}`} title={attempt.mode === "timed" ? t.timeHint : t.practiceHint}>
+            {isListening ? <span className="ibt-timing-label">{timedListening ? listeningCopy[language].estimatedDuration[examFormat] : t.unlimited}</span> : <div className={`pbt-timer ${remaining !== null && remaining < 300 ? "is-urgent" : ""}`} role="timer" aria-label={remaining === null ? t.unlimited : `${t.remainingTime} ${clockText(remaining)}`} title={attempt.mode === "timed" ? t.timeHint : t.practiceHint}>
               {remaining !== null && <small>{t.remainingTime}</small>}<span>{remaining === null ? t.unlimited : clockText(remaining)}</span>
             </div>}
           </div></div>
@@ -207,10 +207,10 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
           </div>)}
           {wrongOnly && !wrong.length && <p>{t.noWrong}</p>}
         </section> : first && last && <>
-          {ibtListening ? <IbtListeningSession key={playbackKey} attemptId={id} position={first.position} lastPosition={last.position}
+          {isListening ? <ListeningSession examFormat={examFormat} key={playbackKey} attemptId={id} position={first.position} lastPosition={last.position}
             total={total} questionCount={group.length} url={first.audioUrl} mode={attempt.mode} stopped={submitting}
             volume={listeningVolume} onVolumeChange={setListeningVolume}
-            paperRef={paperRef} onComplete={completePassage}>{questions}</IbtListeningSession> : <section ref={paperRef} className="pbt-exam-width pbt-test-paper" tabIndex={-1} aria-labelledby="pbt-section-title">
+            paperRef={paperRef} onComplete={completePassage}>{questions}</ListeningSession> : <section ref={paperRef} className="pbt-exam-width pbt-test-paper" tabIndex={-1} aria-labelledby="pbt-section-title">
             <div className={`pbt-paper-heading${first.audioUrl ? " has-audio" : ""}`}>
               <h2 id="pbt-section-title">[{t[attempt.section]}]</h2>
               {first.audioUrl && <div className="pbt-audio-time" role="timer" aria-label={`${t.audioTime}: ${audioTime}`} title={t.audioTimeHint}>

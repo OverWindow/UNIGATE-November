@@ -105,12 +105,36 @@ class PbtTests(BankFixtures, TransactionTestCase):
         practice = self.start()
         self.assertIsNone(practice["expiresAt"])
         self.assertEqual(AttemptItem.objects.filter(attempt_id=practice["id"]).count(), 50)
-        for exam, seconds in ((self.exam, 4200), (self.listen_exam, 3600)):
+        for exam, seconds in ((self.exam, 4200), (self.listen_exam, None)):
             data = self.start(exam, "timed")
             attempt = Attempt.objects.get(pk=data["id"])
-            self.assertEqual((attempt.expires_at - attempt.started_at).total_seconds(), seconds)
+            if seconds is None:
+                self.assertIsNone(attempt.expires_at)
+            else:
+                self.assertEqual((attempt.expires_at - attempt.started_at).total_seconds(), seconds)
         Attempt.objects.filter(pk=practice["id"]).update(started_at=timezone.now() - timedelta(days=90))
         self.assertEqual(self.client.get(f"/api/pbt/attempts/{practice['id']}/").json()["status"], "in_progress")
+
+    def test_listening_has_no_overall_deadline_and_submits_last_answer(self):
+        self.client.force_login(self.user)
+        data = self.start(self.listen_exam, "timed")
+        path = f"/api/pbt/attempts/{data['id']}/"
+        self.assertIsNone(data["expiresAt"])
+        Attempt.objects.filter(pk=data["id"]).update(started_at=timezone.now() - timedelta(hours=2))
+        self.assertEqual(self.client.get(path).json()["status"], "in_progress")
+        self.assertEqual(self.start(self.listen_exam, "timed")["id"], data["id"])
+        self.assertEqual(self.client.put(path + "answers/50/", {"selectedOption": 2}, content_type="application/json").status_code, 200)
+        result = self.client.post(path + "submit/").json()
+        self.assertEqual((result["status"], result["score"], result["timedOut"]), ("submitted", 2, False))
+        self.assertEqual(self.client.post(path + "submit/").json()["submittedAt"], result["submittedAt"])
+
+    def test_listening_pair_retains_group_and_shared_audio(self):
+        Item.objects.filter(set=self.listening, position__in=[49, 50]).update(item_type="paired_listening")
+        questions = load_set(self.listening.pk, "listening")
+        self.assertIsNone(questions[47]["snapshot"]["groupId"])
+        first, last = (question["snapshot"] for question in questions[48:])
+        self.assertEqual(first["groupId"], last["groupId"])
+        self.assertEqual(first["audioUrl"], last["audioUrl"])
 
     def test_catalog_shows_latest_submitted_score_per_mode_and_resume(self):
         self.client.force_login(self.user)

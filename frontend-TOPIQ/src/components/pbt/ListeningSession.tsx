@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useApp } from "@/app/providers";
 import { clockText, type Mode } from "@/lib/pbt-api";
+import type { ExamFormat } from "@/lib/exam-content";
 import { pbtContent } from "@/lib/pbt-content";
-import { listeningClock, listeningCopy, phaseSeconds, readListeningCheckpoint, saveListeningCheckpoint, solvingSeconds, type ListeningCheckpoint } from "@/lib/ibt-listening";
+import { listeningClock, listeningCopy, phaseSeconds, readListeningCheckpoint, saveListeningCheckpoint, solvingSeconds, type ListeningCheckpoint } from "@/lib/listening";
 
 interface Props {
+  examFormat: ExamFormat;
   attemptId: string;
   position: number;
   lastPosition: number;
@@ -22,14 +24,14 @@ interface Props {
   children: ReactNode;
 }
 
-export default function IbtListeningSession({ attemptId, position, lastPosition, total, questionCount, url, mode, stopped, volume, onVolumeChange, paperRef, onComplete, children }: Props) {
+export default function ListeningSession({ examFormat, attemptId, position, lastPosition, total, questionCount, url, mode, stopped, volume, onVolumeChange, paperRef, onComplete, children }: Props) {
   const { language } = useApp();
   const t = listeningCopy[language];
   const common = pbtContent[language];
   const timed = mode === "timed";
   const solveTime = solvingSeconds(questionCount);
   const [checkpoint, setCheckpoint] = useState<ListeningCheckpoint>(() => {
-    const saved = timed ? readListeningCheckpoint(attemptId) : null;
+    const saved = timed ? readListeningCheckpoint(attemptId, examFormat) : null;
     return saved?.position === position ? saved : {
       position, phase: "waiting", deadline: Date.now() + 3000, elapsed: 0, duration: null, volume: saved?.volume ?? volume,
     };
@@ -46,9 +48,9 @@ export default function IbtListeningSession({ attemptId, position, lastPosition,
   const update = useCallback((changes: Partial<ListeningCheckpoint>) => {
     const next = { ...current.current, ...changes };
     current.current = next;
-    if (timed) saveListeningCheckpoint(attemptId, next);
+    if (timed) saveListeningCheckpoint(attemptId, next, examFormat);
     setCheckpoint(next);
-  }, [attemptId, timed]);
+  }, [attemptId, timed, examFormat]);
 
   const play = useCallback(async () => {
     const audio = audioRef.current;
@@ -69,11 +71,11 @@ export default function IbtListeningSession({ attemptId, position, lastPosition,
     generation.current += 1;
     const audio = audioRef.current;
     if (audio) audio.volume = current.current.volume;
-    if (timed) saveListeningCheckpoint(attemptId, current.current);
+    if (timed) saveListeningCheckpoint(attemptId, current.current, examFormat);
     if (stopped) audio?.pause();
     else if (current.current.phase === "listening") void play();
     return () => { active.current = false; generation.current += 1; playPending.current = false; audio?.pause(); };
-  }, [attemptId, timed, stopped, play]);
+  }, [attemptId, timed, stopped, play, examFormat]);
 
   useEffect(() => {
     if (stopped) return;

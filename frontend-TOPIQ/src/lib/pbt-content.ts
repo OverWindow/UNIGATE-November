@@ -4,7 +4,7 @@ import type { ExamFormat } from "./exam-content";
 const ko = {
   title: "나의 속도로 연습하고, 실전처럼 도전하세요.", intro: "영역과 응시 방식을 선택하세요. 한 세트는 50문항, 100점 만점입니다.",
   reading: "읽기", listening: "듣기", practice: "연습", timed: "실전", unlimited: "시간 제한 없음",
-  practiceHint: "충분히 생각하고 자유롭게 풀어보세요.", timedHint: "듣기 60분 · 읽기 70분. 시간이 끝나면 자동 제출됩니다.",
+  practiceHint: "충분히 생각하고 자유롭게 풀어보세요.", timedHint: "읽기 제한 시간 70분. 시간이 끝나면 자동 제출됩니다.",
   guestNote: "비회원도 읽기 3세트 + 듣기 3세트, 총 300문제를 풀 수 있어요. 로그인하면 공개된 모든 세트를 이용할 수 있습니다.",
   guestHistory: "비회원 응시 기록은 이 브라우저 세션에서만 확인할 수 있습니다. 쿠키 삭제·만료 또는 로그아웃 시 접근할 수 없게 됩니다.",
   memberNote: "공개된 모든 모의고사를 이용할 수 있습니다.", free: "비회원 공개", members: "회원 전용", round: "세트", questions: "문항", minutes: "분",
@@ -33,7 +33,7 @@ export const pbtContent: Record<Language, Copy> = {
   en: {
     title: "Practice at your pace. Prepare for test day.", intro: "Choose a section and mode. Each set has 50 questions worth 100 points.",
     reading: "Reading", listening: "Listening", practice: "Practice", timed: "Timed", unlimited: "No time limit",
-    practiceHint: "Take your time and work at your own pace.", timedHint: "Listening: 60 min · Reading: 70 min. Answers submit when time runs out.",
+    practiceHint: "Take your time and work at your own pace.", timedHint: "Reading: 70 min. Answers submit when time runs out.",
     guestNote: "Try 3 reading and 3 listening sets without an account — 300 questions. Sign in to access all published sets.",
     guestHistory: "Guest attempts belong to this browser session. Clearing cookies, session expiry or signing out removes access.", memberNote: "You have access to all published mock tests.",
     free: "Guest access", members: "Members", round: "Set", questions: "questions", minutes: "min", start: "Start test", login: "Sign in to start", loading: "Loading…", retry: "Try again", empty: "No mock tests are published yet.",
@@ -55,7 +55,7 @@ export const pbtContent: Record<Language, Copy> = {
   id: {
     title: "Berlatih sesuai ritmemu. Bersiap untuk ujian.", intro: "Pilih bidang dan mode. Setiap set berisi 50 soal dengan nilai maksimal 100.",
     reading: "Membaca", listening: "Menyimak", practice: "Latihan", timed: "Simulasi", unlimited: "Tanpa batas waktu",
-    practiceHint: "Pahami dan kerjakan soal dengan tenang.", timedHint: "Menyimak 60 menit · Membaca 70 menit. Jawaban dikirim saat waktu habis.",
+    practiceHint: "Pahami dan kerjakan soal dengan tenang.", timedHint: "Membaca: 70 menit. Jawaban dikirim saat waktu habis.",
     guestNote: "Tanpa akun, tersedia 3 set membaca dan 3 set menyimak — total 300 soal. Masuk untuk mengakses semua set yang dipublikasikan.",
     guestHistory: "Riwayat tamu hanya tersedia dalam sesi browser ini. Menghapus cookie, sesi berakhir, atau keluar akan menghilangkan akses.", memberNote: "Anda dapat mengakses semua simulasi yang dipublikasikan.",
     free: "Akses tamu", members: "Khusus anggota", round: "Set", questions: "soal", minutes: "menit", start: "Mulai ujian", login: "Masuk untuk mulai", loading: "Memuat…", retry: "Coba lagi", empty: "Belum ada simulasi yang dipublikasikan.",
