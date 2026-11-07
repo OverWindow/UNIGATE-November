@@ -62,7 +62,6 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
   return <><SiteHeader /><main id="main-content" className="pbt-main" tabIndex={-1}>
     <section className="pbt-hero"><div className="page-container">
       <h1>{t.title}</h1><p>{t.intro}</p>
-      <div className="pbt-access-note">{user ? t.memberNote : null}</div>
     </div></section>
     <div className="page-container pbt-catalog">
       <div className="pbt-section-tabs" aria-label="TOPIK II">
@@ -88,11 +87,9 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
               </Link> : <span className={`pbt-badge ${exam.guestAvailable ? "pbt-badge-free" : ""}`}>{exam.guestAvailable ? t.free : t.members}</span>}
             </div>
             <h2>{language === "ko" ? `${t[exam.section]} 모의고사 ${exam.round}회` : <>{t[exam.section]} · {t.round} {exam.round}</>}</h2>
-            <p>{exam.questionCount}{t.questions}</p>
             {exam.accessible ? <div className="pbt-card-actions">
-              <button type="button" className="button button-primary" disabled={!!starting} onClick={() => void start(exam, inProgressId)}>{starting === exam.id ? t.loading : t.start}</button>
-              {inProgressId ? <Link className="button button-primary" href={`${basePath}/attempts/${inProgressId}`}>{t.resume}</Link>
-                : <button type="button" className="button button-primary" disabled>{t.resume}</button>}
+              <button type="button" className={`button ${inProgressId ? "pbt-restart" : "button-primary"}`} disabled={!!starting} onClick={() => void start(exam, inProgressId)}>{starting === exam.id ? t.loading : t.start}</button>
+              {inProgressId && <Link className="button button-primary" href={`${basePath}/attempts/${inProgressId}`}>{t.resume}</Link>}
             </div>
               : <Link className="button pbt-secondary" href={`/login?next=${basePath}`}>{t.login}<span aria-hidden="true">↗</span></Link>}
           </article>;
@@ -102,7 +99,7 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
       <section className="pbt-history" aria-labelledby="pbt-history"><h2 id="pbt-history">{t.history}</h2>
         {!loading && !attempts.length && <p className="pbt-muted">{t.noHistory}</p>}
         {attempts.map(attempt => <div className="pbt-history-row" key={attempt.id}>
-          <div><strong>{attempt.title} · {t[attempt.section]}</strong><small>{t[attempt.mode]} · {new Date(attempt.startedAt).toLocaleString(language === "ko" ? "ko-KR" : language === "id" ? "id-ID" : "en-US")}</small></div>
+          <div><strong>{language === "ko" ? attempt.title.replace(/ (\d+)$/, ` ${t[attempt.section]} 모의고사 $1회`) : `${attempt.title} · ${t[attempt.section]}`}</strong><small>{new Date(attempt.startedAt).toLocaleString(locale)}</small></div>
           <span>{attempt.status === "submitted" ? (attempt.score === null ? surveyCopy[language].locked : `${attempt.score} / ${attempt.maxScore}`) : t.inProgress}</span>
           <Link className="text-link" href={`${basePath}/attempts/${attempt.id}${attempt.status === "submitted" ? "/result" : ""}`}>{attempt.status === "submitted" ? t.result : t.resume} →</Link>
         </div>)}
