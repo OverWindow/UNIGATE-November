@@ -10,7 +10,6 @@ import { examCopy, ibtTimedHints, pbtErrorMessage } from "@/lib/pbt-content";
 import SiteHeader from "../SiteHeader";
 import SiteFooter from "../SiteFooter";
 import { surveyCopy } from "@/lib/learner-survey";
-import { listeningCopy } from "@/lib/listening";
 
 export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFormat }) {
   const basePath = `/${examFormat}`;
@@ -57,14 +56,13 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
     } catch (cause) { setError(cause); setStarting(null); startingRef.current = false; }
   }
 
-  const durationSeconds = exams.find(exam => exam.section === section)?.durationSeconds;
   const perPassage = section === "listening";
   const timedHint = perPassage ? ibtTimedHints[language].listening : examFormat === "ibt" ? ibtTimedHints[language].reading : t.timedHint;
 
   return <><SiteHeader /><main id="main-content" className="pbt-main" tabIndex={-1}>
     <section className="pbt-hero"><div className="page-container">
       <h1>{t.title}</h1><p>{t.intro}</p>
-      <div className="pbt-access-note">{user ? t.memberNote : <>{t.guestNote}<br />{surveyCopy[language].notice}</>}</div>
+      <div className="pbt-access-note">{user ? t.memberNote : null}</div>
     </div></section>
     <div className="page-container pbt-catalog">
       <div className="pbt-section-tabs" aria-label="TOPIK II">
@@ -73,7 +71,6 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
       <div className="pbt-modes">
         {(["practice", "timed"] as const).map(value => <button className="pbt-mode" type="button" key={value} aria-pressed={mode === value} onClick={() => setMode(value)}>
           <span className="pbt-radio" /><span><strong>{t[value]}</strong><small>{value === "practice" ? t.practiceHint : timedHint}</small></span>
-          <span className="pbt-mode-time">{value === "practice" ? "∞" : perPassage ? listeningCopy[language].estimatedDuration[examFormat] : `${durationSeconds ? durationSeconds / 60 : "—"} ${t.minutes}`}</span>
         </button>)}
       </div>
       {(error || status === "error") ? <div role="alert" className="pbt-alert">{pbtErrorMessage(error, t)} <button onClick={retry}>{t.retry}</button></div> : null}
@@ -90,8 +87,8 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
                 {result.score} / {result.maxScore} <span aria-hidden="true">↗</span>
               </Link> : <span className={`pbt-badge ${exam.guestAvailable ? "pbt-badge-free" : ""}`}>{exam.guestAvailable ? t.free : t.members}</span>}
             </div>
-            <h2>{t[exam.section]} · {t.round} {exam.round}</h2>
-            <p>{exam.questionCount} {t.questions} <span>·</span> {mode === "practice" ? t.unlimited : perPassage ? listeningCopy[language].estimatedDuration[examFormat] : `${exam.durationSeconds ? exam.durationSeconds / 60 : "—"} ${t.minutes}`}</p>
+            <h2>{language === "ko" ? `${t[exam.section]} 모의고사 ${exam.round}회` : <>{t[exam.section]} · {t.round} {exam.round}</>}</h2>
+            <p>{exam.questionCount}{t.questions}</p>
             {exam.accessible ? <div className="pbt-card-actions">
               <button type="button" className="button button-primary" disabled={!!starting} onClick={() => void start(exam, inProgressId)}>{starting === exam.id ? t.loading : t.start}</button>
               {inProgressId ? <Link className="button button-primary" href={`${basePath}/attempts/${inProgressId}`}>{t.resume}</Link>
@@ -103,7 +100,6 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
         {!exams.some(exam => exam.section === section) && !error && <p>{t.empty}</p>}
       </div>}
       <section className="pbt-history" aria-labelledby="pbt-history"><h2 id="pbt-history">{t.history}</h2>
-        {!user && <p className="pbt-muted">{t.guestHistory}</p>}
         {!loading && !attempts.length && <p className="pbt-muted">{t.noHistory}</p>}
         {attempts.map(attempt => <div className="pbt-history-row" key={attempt.id}>
           <div><strong>{attempt.title} · {t[attempt.section]}</strong><small>{t[attempt.mode]} · {new Date(attempt.startedAt).toLocaleString(language === "ko" ? "ko-KR" : language === "id" ? "id-ID" : "en-US")}</small></div>
