@@ -2,14 +2,14 @@ import type { Language } from "./landing-content";
 import type { ExamFormat } from "./exam-content";
 
 const ko = {
-  title: "나의 속도로 연습하고, 실전처럼 도전하세요.", intro: "영역과 응시 방식을 선택하세요. 한 세트는 50문항, 100점 만점입니다.",
+  title: "PBT 모의고사", intro: "영역과 응시 방식을 선택하세요. 한 세트는 50문항, 100점 만점입니다.",
   reading: "읽기", listening: "듣기", practice: "연습", timed: "실전", unlimited: "시간 제한 없음",
   practiceHint: "충분히 생각하고 자유롭게 풀어보세요.", timedHint: "읽기 제한 시간 70분. 시간이 끝나면 자동 제출됩니다.",
   guestNote: "비회원도 읽기 3세트 + 듣기 3세트, 총 300문제를 풀 수 있어요. 로그인하면 공개된 모든 세트를 이용할 수 있습니다.",
   guestHistory: "비회원 응시 기록은 이 브라우저 세션에서만 확인할 수 있습니다. 쿠키 삭제·만료 또는 로그아웃 시 접근할 수 없게 됩니다.",
   memberNote: "공개된 모든 모의고사를 이용할 수 있습니다.", free: "비회원 공개", members: "회원 전용", round: "세트", questions: "문항", minutes: "분",
   start: "풀기 시작", login: "로그인하고 응시", loading: "불러오는 중…", retry: "다시 시도", empty: "아직 공개된 모의고사가 없습니다.",
-  history: "최근 응시 기록", noHistory: "첫 모의고사를 시작해 보세요.", resume: "이어풀기", result: "결과 보기", inProgress: "진행 중", submitted: "제출 완료",
+  history: "최근 응시 기록", noHistory: "최근 응시 기록이 없습니다.", resume: "이어풀기", result: "결과 보기", inProgress: "진행 중", submitted: "제출 완료",
   latestScore: "내 최근 점수", submittedOn: "제출일", retake: "다시 풀기",
   back: "모의고사 목록", answered: "답한 문항", navigator: "답안표", previous: "이전", next: "다음", submit: "답안 제출", submitting: "제출 중…",
   allQuestions: "전체 문제", currentQuestion: "현재 문항", questionNavigation: "문항 이동", remainingTime: "남은 시간", close: "닫기",
@@ -91,8 +91,9 @@ export const ibtTimedHints: Record<Language, Record<"reading" | "listening", str
   },
 };
 
-const ibtCopy: Record<Language, Pick<Copy, "intro" | "timedHint" | "guestNote" | "score">> = {
+const ibtCopy: Record<Language, Pick<Copy, "title" | "intro" | "timedHint" | "guestNote" | "score">> = {
   ko: {
+    title: "IBT 모의고사",
     intro: "영역과 응시 방식을 선택하세요. 한 세트는 30문항이며, 모의고사 점수는 정답률을 100점으로 환산합니다.",
     timedHint: ibtTimedHints.ko.reading,
     guestNote: "비회원 공개 세트는 영역별 최대 3세트입니다. 로그인하면 공개된 모든 세트를 이용할 수 있습니다.",
