@@ -11,25 +11,28 @@ PDF 파일은 운영자가 나중에 수동으로 보냅니다. 이 랜딩페이
 세트를 다시 열면 첫 단어에서 시작합니다. 사이트 UI 언어(한국어·영어·인도네시아어)와 뜻 언어(영어·베트남어·일본어)는 별개이며,
 뜻은 영어가 기본입니다. 예문은 한국어와 영어 번역을 제공합니다. 원본에 없는 인도네시아어 뜻이나 다른 언어의 예문 번역은 만들지 않습니다.
 
-원본 `topik_bank.vocabulary`는 읽기 전용 unmanaged 모델로 연결합니다. 원본 테이블·컬럼·단어 데이터는 변경하지 않습니다.
+원본 `topik_bank.vocabulary`는 읽기 전용 unmanaged 모델로 연결합니다. 조회·세트 등록은 원본 데이터를 변경하지 않습니다.
+Hub와의 구조 정합화는 아래 Django migration으로 관리하며, 단어·음성 데이터 전송은 Hub에서 수행합니다.
 서비스용 테이블은 `vocabulary_sets`(급수·세트 번호), `vocabulary_set_items`(원본 단어 ID·세트 내 순서) 두 개입니다.
 원본 ID는 Hub의 데이터 관리를 막는 외래키 없이 참조하며, 등록 시와 세트 조회 시 원본 존재·급수 일치를 검사합니다.
 원본 단어 삭제·급수 변경으로 연결이 맞지 않으면 자동 재배치하지 않고 명령을 중단하거나 API가 503을 반환합니다.
 
 ### 적용 순서와 초기 세트 등록
 
-로컬에서는 사용자가 `backend/`에서 아래 명령을 **수동 실행**합니다. 첫 두 단계가 완료된 뒤 기능을 사용하세요.
+로컬에서는 사용자가 `backend/`에서 아래 순서로 **수동 실행**합니다. 새 백엔드를 시작하기 전에 구조를 적용하세요.
 
 ```powershell
-# 1. 서비스 테이블 생성. 원본 vocabulary는 생성·변경하지 않습니다.
+# 1. 서비스 테이블 생성 및 기존 vocabulary에 Hub 014 음성 컬럼·제약 적용
 .\.venv\Scripts\python.exe manage.py migrate
 
-# 2. 등록 예상 수량 점검 후, 세트·연결 데이터 등록
+# 2. Hub에서 '서버에 단어장 등록' → '등록 내용 확인' → '선택 서버에 단어장 등록'
+
+# 3. 등록 예상 수량 점검 후, 세트·연결 데이터 등록
 .\.venv\Scripts\python.exe manage.py create_vocabulary_sets --check
 .\.venv\Scripts\python.exe manage.py create_vocabulary_sets
 ```
 
-스키마 변경은 `migration/vocabulary/0001_initial.py`로만 적용합니다.
+서비스 테이블은 `migration/vocabulary/0001_initial.py`로 생성합니다.
 `migration/question_bank/0005_vocabulary.py`는 기존 원본의 Django 모델 상태만 등록하며 DB 테이블을 만들지 않습니다.
 `create_vocabulary_sets --check`는 읽기 전용 트랜잭션으로 예정 수량과 기존 연결을 점검하고 **데이터를 쓰지 않습니다**.
 옵션 없는 명령은 두 서비스 테이블에만 데이터를 추가하며, 단어와 사용자 데이터는 변경하지 않습니다.
@@ -49,6 +52,43 @@ python manage.py create_vocabulary_sets
 세트 구성 명령은 서버 시작 시 자동 실행하지 않으며 별도 워커·스케줄러는 없습니다.
 TOPIQ 프론트엔드는 새 `/api/vocabulary/` rewrite를 포함해 다시 빌드·배포해야 합니다.
 
+### Hub 음성 데이터 전송용 구조
+
+`migration/question_bank/0006_vocabulary_audio.py`는 기존 `topik_bank.vocabulary`에 Hub 014와 동일한
+순서·타입·NULL 허용·기본값으로 아래 8개 컬럼과 `vocabulary_audio_complete` 제약을 추가합니다.
+
+| 컬럼 | PostgreSQL 타입 |
+| --- | --- |
+| `audio_storage_bucket` | `text` |
+| `audio_storage_path` | `text` |
+| `audio_file_sha256` | `text` |
+| `audio_byte_size` | `integer` |
+| `audio_duration_ms` | `integer` |
+| `audio_source_hash` | `text` |
+| `audio_generation_config` | `jsonb` |
+| `audio_created_at` | `timestamp with time zone` |
+
+음성 필드는 기본값 없이 NULL을 허용합니다. 8개 모두 NULL이거나 모두 채워져 있어야 하며,
+저장 위치의 공백, SHA-256 형식, 양수 크기·길이, JSON 객체 형식을 검증합니다.
+기존 단어·ID·자동 증가 상태·세트 연결은 보존합니다. 이미 Hub에서 음성 구조를 적용했다면
+컬럼과 제약이 일치하는지 확인하고 기존 음성 데이터도 유지합니다. 부분 적용이나 다른 타입·기본값·제약은
+오류로 중단하고 해당 migration의 변경을 롤백하므로 원인을 확인한 뒤 다시 실행하세요.
+원본 테이블이 없는 DB에서는 생성하지 않고 건너뜁니다. 이후 음성 기능이 준비된 Hub 원본을 전송하면
+전체 17개 컬럼과 제약이 함께 생성됩니다. Hub 원본에도 음성 구조가 준비되어 있어야 합니다.
+
+기존 설치도 새 백엔드를 시작하기 전에 `backend/`에서 사용자가
+`.\.venv\Scripts\python.exe manage.py migrate`를 **수동 실행**한 뒤 Hub에서 대상을 선택해 전송합니다.
+이 명령은 DB 구조 및 다른 미적용 migration을 적용하며 단어 데이터를 전송하지 않습니다.
+에이전트나 개발 서버가 로컬에 자동 적용하지 않습니다. 운영은 기존 `deploy/start.sh`가
+migration → 정적 파일 수집 → Gunicorn 시작을 **자동 실행**하고, 완료 후 Hub 전송은 **수동 실행**합니다.
+Hub 전송은 단어·음성 메타데이터를 추가·갱신하며 S3 음성 파일은 공유합니다.
+새 단어를 전송했다면 위 `create_vocabulary_sets --check`와 `create_vocabulary_sets`를 수동 실행합니다.
+음성 정보만 갱신한 경우 기존 세트를 다시 만들 필요는 없습니다.
+
+이 변경은 새 API·테이블·관리 명령·워커를 추가하지 않으며 기존 API 응답과 프론트엔드는 유지합니다.
+음성 재생 UI는 포함하지 않습니다. 음성 데이터 유실을 막기 위해 migration 역적용은 지원하지 않습니다.
+이전 구조 복원이 필요하면 적용 전 DB 백업을 사용해야 합니다.
+
 ### 조회 API와 검증
 
 | 메서드 | 경로 | 목적 |
@@ -61,9 +101,10 @@ TOPIQ 프론트엔드는 새 `/api/vocabulary/` rewrite를 포함해 다시 빌�
 등록된 세트가 없으면 빈 목록을 반환합니다. 잘못된 급수·페이지는 400, 없는 세트·페이지는 404,
 테이블 미적용·원본 연결 오류 등은 연결 정보를 노출하지 않는 503 응답으로 처리합니다.
 
-백엔드는 `backend/`에서 `.\.venv\Scripts\python.exe manage.py test vocabulary question_bank.tests config.test_routes --noinput`으로 검사합니다.
+백엔드는 `backend/`에서 `.\.venv\Scripts\python.exe manage.py test vocabulary question_bank config.test_routes --noinput`으로 검사합니다.
 Django 테스트 러너가 별도 테스트 DB를 생성·삭제하므로 운영 연결 설정으로 실행하지 않습니다.
 균등 배정·누락/중복·반복 실행·추가 등록·읽기 전용 점검·페이지 구분·원본 누락·쓰기 차단을 합성 데이터로 검증합니다.
+음성 migration은 Hub 구조 일치·기존 데이터/세트/자동 증가 보존·이미 적용된 구조·잘못된 구조의 롤백과 음성 제약을 검증합니다.
 프론트엔드는 `frontend-TOPIQ/`에서 `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`를 실행합니다.
 
 ## 구성

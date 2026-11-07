@@ -12,6 +12,14 @@ class Vocabulary(models.Model):
     example_korean = models.TextField()
     example_english = models.TextField()
     topik_level = models.SmallIntegerField()
+    audio_storage_bucket = models.TextField(null=True)
+    audio_storage_path = models.TextField(null=True)
+    audio_file_sha256 = models.TextField(null=True)
+    audio_byte_size = models.IntegerField(null=True)
+    audio_duration_ms = models.IntegerField(null=True)
+    audio_source_hash = models.TextField(null=True)
+    audio_generation_config = models.JSONField(null=True)
+    audio_created_at = models.DateTimeField(null=True)
 
     class Meta:
         managed = False
