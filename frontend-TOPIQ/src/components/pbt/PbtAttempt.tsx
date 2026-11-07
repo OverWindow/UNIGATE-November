@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
-import { clockText, pbtRequest, PbtError, remainingSeconds, questionGroup, type Attempt } from "@/lib/pbt-api";
+import { answerText, isAnswered, clockText, pbtRequest, PbtError, remainingSeconds, questionGroup, type Answer, type Attempt } from "@/lib/pbt-api";
 import type { ExamFormat } from "@/lib/exam-content";
 import { examCopy, pbtErrorMessage } from "@/lib/pbt-content";
 import SiteHeader from "../SiteHeader";
@@ -116,18 +116,19 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
     void submit();
   }, [remaining, review, attempt, busy, submit]);
 
-  async function answer(itemPosition: number, option: number | null) {
+  async function answer(itemPosition: number, value: Answer) {
     if (!attempt || busyRef.current || submittingRef.current || remaining === 0 || (timedListening && completedPositionRef.current === first?.position)) return;
-    const old = attempt.items.find(item => item.position === itemPosition)?.selectedOption ?? null;
+    const old = attempt.items.find(item => item.position === itemPosition);
+    if (!old) return;
     busyRef.current = true; setBusy(true); setSaveError(false);
-    setAttempt(current => current ? { ...current, items: current.items.map(item => item.position === itemPosition ? { ...item, selectedOption: option } : item) } : current);
+    setAttempt(current => current ? { ...current, items: current.items.map(item => item.position === itemPosition ? { ...item, ...value } : item) } : current);
     try {
-      await pbtRequest(`attempts/${id}/answers/${itemPosition}/`, "PUT", { selectedOption: option }, examFormat);
+      await pbtRequest(`attempts/${id}/answers/${itemPosition}/`, "PUT", value, examFormat);
     } catch (cause) {
       if (cause instanceof PbtError && cause.code === "attempt_closed") router.replace(`${basePath}/attempts/${id}/result`);
       else {
         setSaveError(true);
-        setAttempt(current => current ? { ...current, items: current.items.map(item => item.position === itemPosition ? { ...item, selectedOption: old } : item) } : current);
+        setAttempt(current => current ? { ...current, items: current.items.map(item => item.position === itemPosition ? old : item) } : current);
       }
     } finally { busyRef.current = false; setBusy(false); }
   }
@@ -143,7 +144,7 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
   const audioTime = `${clockText(elapsedAudio)} / ${audioDuration === null ? "--:--" : clockText(audioDuration)}`;
   const sharedMaterial = grouped && !!(first?.passage || first?.materialUrl || first?.auxiliary);
   const total = attempt?.items.length ?? 0;
-  const answered = attempt?.items.filter(item => item.selectedOption !== null).length ?? 0;
+  const answered = attempt?.items.filter(isAnswered).length ?? 0;
   const wrong = attempt?.items.filter(item => !item.isCorrect) ?? [];
   const disabled = busy || submitting || remaining === 0 || (timedListening && completedPosition === first?.position);
   useEffect(() => {
@@ -243,7 +244,7 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
       {dialog === "questions" ? <>
         <p className="pbt-navigator-summary">{t.answered} <strong>{answered} / {total}</strong><span>{t.unanswered} <strong>{total - answered}</strong></span></p>
         <div className="pbt-number-grid">
-          {attempt?.items.map(item => <button key={item.position} className={item.selectedOption !== null ? "is-answered" : ""} aria-current={group.some(q => q.position === item.position) ? "step" : undefined} aria-label={`${item.position}: ${item.selectedOption === null ? t.noAnswer : `${t.yourAnswer} ${item.selectedOption}`}`} disabled={busy || submitting || audioPlaying} onClick={() => go(item.position)}>{item.position}</button>)}
+          {attempt?.items.map(item => <button key={item.position} className={isAnswered(item) ? "is-answered" : ""} aria-current={group.some(q => q.position === item.position) ? "step" : undefined} aria-label={`${item.position}: ${isAnswered(item) ? `${t.yourAnswer} ${answerText(item)}` : t.noAnswer}`} disabled={busy || submitting || audioPlaying} onClick={() => go(item.position)}>{item.position}</button>)}
         </div>
         <div className="pbt-navigator-legend"><span><i className="is-current" />{t.currentQuestion}</span><span><i className="is-answered" />{t.answered}</span><span><i />{t.noAnswer}</span></div>
         <p className="pbt-muted">{attempt?.mode === "timed" ? t.timeHint : t.saveHint}</p>

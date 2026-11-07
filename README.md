@@ -8,8 +8,9 @@ PDF 파일은 운영자가 나중에 수동으로 보냅니다. 이 랜딩페이
 
 `/vocabulary`에서 3~6급 세트를 선택하고 `/vocabulary/sets/[id]`에서 단어·품사·뜻·예문을 봅니다.
 비회원도 동일하게 이용하며 이어서 학습, 완료 표시, 단어별 암기 상태, 오늘의 복습은 제공하지 않습니다.
-세트를 다시 열면 첫 단어에서 시작합니다. 사이트 UI 언어(한국어·영어·인도네시아어)와 뜻 언어(영어·베트남어·일본어)는 별개이며,
-뜻은 영어가 기본입니다. 예문은 한국어와 영어 번역을 제공합니다. 원본에 없는 인도네시아어 뜻이나 다른 언어의 예문 번역은 만들지 않습니다.
+세트를 다시 열면 첫 단어에서 시작합니다. 사이트 UI 언어(한국어·영어·인도네시아어)와 뜻 언어는 별개이며,
+뜻은 영어가 기본입니다. 뜻 언어에서 영어·베트남어·일본어·중국어 간체(`中文（简体）`)·인도네시아어(`Bahasa Indonesia`)를 선택합니다.
+선택한 언어의 뜻이 비어 있으면 현재 UI 언어로 미등록 안내를 표시합니다. 예문은 한국어와 영어 번역을 제공합니다.
 
 원본 `topik_bank.vocabulary`는 읽기 전용 unmanaged 모델로 연결합니다. 조회·세트 등록은 원본 데이터를 변경하지 않습니다.
 Hub와의 구조 정합화는 아래 Django migration으로 관리하며, 단어·음성 데이터 전송은 Hub에서 수행합니다.
@@ -22,7 +23,7 @@ Hub와의 구조 정합화는 아래 Django migration으로 관리하며, 단어
 로컬에서는 사용자가 `backend/`에서 아래 순서로 **수동 실행**합니다. 새 백엔드를 시작하기 전에 구조를 적용하세요.
 
 ```powershell
-# 1. 서비스 테이블 생성 및 기존 vocabulary에 Hub 014 음성 컬럼·제약 적용
+# 1. 서비스 테이블 생성 및 기존 vocabulary에 Hub 014 음성·015 언어 컬럼 적용
 .\.venv\Scripts\python.exe manage.py migrate
 
 # 2. Hub에서 '서버에 단어장 등록' → '등록 내용 확인' → '선택 서버에 단어장 등록'
@@ -55,7 +56,7 @@ TOPIQ 프론트엔드는 새 `/api/vocabulary/` rewrite를 포함해 다시 빌�
 ### Hub 음성 데이터 전송용 구조
 
 `migration/question_bank/0006_vocabulary_audio.py`는 기존 `topik_bank.vocabulary`에 Hub 014와 동일한
-순서·타입·NULL 허용·기본값으로 아래 8개 컬럼과 `vocabulary_audio_complete` 제약을 추가합니다.
+타입·NULL 허용·기본값으로 아래 8개 컬럼과 `vocabulary_audio_complete` 제약을 추가합니다.
 
 | 컬럼 | PostgreSQL 타입 |
 | --- | --- |
@@ -74,7 +75,9 @@ TOPIQ 프론트엔드는 새 `/api/vocabulary/` rewrite를 포함해 다시 빌�
 컬럼과 제약이 일치하는지 확인하고 기존 음성 데이터도 유지합니다. 부분 적용이나 다른 타입·기본값·제약은
 오류로 중단하고 해당 migration의 변경을 롤백하므로 원인을 확인한 뒤 다시 실행하세요.
 원본 테이블이 없는 DB에서는 생성하지 않고 건너뜁니다. 이후 음성 기능이 준비된 Hub 원본을 전송하면
-전체 17개 컬럼과 제약이 함께 생성됩니다. Hub 원본에도 음성 구조가 준비되어 있어야 합니다.
+Hub 원본의 전체 컬럼과 제약이 함께 생성됩니다. Hub 원본에도 음성 구조가 준비되어 있어야 합니다.
+Hub 015 언어 컬럼이 먼저 생성되어 있어도 음성 컬럼 추가 또는 기존 구조 검증을 수행하며,
+두 기능의 컬럼 추가 순서가 달라도 허용합니다.
 
 기존 설치도 새 백엔드를 시작하기 전에 `backend/`에서 사용자가
 `.\.venv\Scripts\python.exe manage.py migrate`를 **수동 실행**한 뒤 Hub에서 대상을 선택해 전송합니다.
@@ -89,13 +92,44 @@ Hub 전송은 단어·음성 메타데이터를 추가·갱신하며 S3 음성 �
 음성 재생 UI는 포함하지 않습니다. 음성 데이터 유실을 막기 위해 migration 역적용은 지원하지 않습니다.
 이전 구조 복원이 필요하면 적용 전 DB 백업을 사용해야 합니다.
 
+### Hub 중국어·인도네시아어 컬럼
+
+`migration/question_bank/0007_vocabulary_languages.py`는 기존 `topik_bank.vocabulary`에
+Hub 015와 동일한 `chinese_simplified`(중국어 간체), `indonesian`(인도네시아어) 컬럼을 추가합니다.
+두 컬럼 모두 `TEXT NOT NULL DEFAULT ''`이며 기존 행의 새 뜻은 빈 문자열로 채워집니다.
+기존 단어·음성·ID·자동 증가 상태·세트 연결과 이미 등록된 번역은 보존합니다.
+이미 있는 언어 컬럼은 타입·NULL 허용·기본값을 검사하고, 일치하는 경우 없는 컬럼만 추가합니다.
+불일치하면 오류로 중단하고 해당 migration의 변경을 롤백합니다.
+원본 테이블이 없으면 생성하지 않고 건너뛰므로 이후 Hub에서 012·014·015가 적용된 원본을 전송합니다.
+
+**로컬 적용:** 새 백엔드를 시작하거나 Hub에서 번역을 전송하기 전에 사용자가 `backend/`에서 수동 실행합니다.
+
+```powershell
+$env:DJANGO_ENV = 'development'
+.\.venv\Scripts\python.exe manage.py migrate question_bank 0007_vocabulary_languages
+```
+
+이 명령은 DB 구조와 Django migration 이력을 변경하며 해당 migration에 필요한 미적용 선행 migration도 실행합니다.
+에이전트와 로컬 개발 서버는 자동 적용하지 않습니다. 운영은 기존 `deploy/start.sh`의 `migrate --noinput`으로 자동 적용합니다.
+실제 번역 데이터는 migration이 만들지 않으며 적용 후 Hub의 단어장 전송을 수동 실행합니다.
+기존 단어의 뜻만 갱신한 경우 세트 재등록은 필요하지 않습니다.
+기존 `GET /api/vocabulary/sets/{id}/`의 `meanings`는 `en`, `vi`, `ja`, `zh-Hans`, `id`를 반환하며,
+`zh-Hans`는 `chinese_simplified`, `id`는 `indonesian` 컬럼을 조회합니다. 미등록 뜻은 빈 문자열로 반환합니다.
+뜻 선택 기능은 기존 0007 컬럼을 사용하며 새 API·테이블·추가 DB 컬럼·관리 명령·워커는 없습니다.
+0007 적용 후 새 백엔드를 재시작하고, `frontend-TOPIQ/`에서 `npm run build`를 수동 실행해 프론트엔드를 배포합니다.
+번역 유실을 막기 위해 역적용은 지원하지 않습니다.
+
+검증은 격리된 PostgreSQL 테스트 DB에 합성 데이터를 만들어 `backend/`에서
+`.\.venv\Scripts\python.exe manage.py test question_bank.test_vocabulary_migration vocabulary --noinput`으로 실행합니다.
+Hub 구조 일치·기존 데이터 보존·DB 기본값과 NOT NULL·재적용·음성/언어 적용 순서·잘못된 구조의 롤백을 검사합니다.
+
 ### 조회 API와 검증
 
 | 메서드 | 경로 | 목적 |
 | --- | --- | --- |
 | GET | `/api/vocabulary/levels/` | 등록된 급수별 단어·세트 수 |
 | GET | `/api/vocabulary/sets/?level=3&page=1` | 급수별 세트 목록, 24세트씩 페이지 구분 |
-| GET | `/api/vocabulary/sets/{id}/` | 세트의 단어·세 언어 뜻·한국어/영어 예문 |
+| GET | `/api/vocabulary/sets/{id}/` | 세트의 단어·다섯 언어 뜻·한국어/영어 예문 |
 
 조회는 회원 인증 없이 가능하며 사용자별 상태나 학습 기록을 저장하지 않습니다. 쓰기 API는 없습니다.
 등록된 세트가 없으면 빈 목록을 반환합니다. 잘못된 급수·페이지는 400, 없는 세트·페이지는 404,
@@ -436,6 +470,38 @@ PBT 경로로 IBT 시험·응시를 요청하거나 반대로 요청하면 접�
 
 ### 마이그레이션과 시험 등록
 
+드래그 문장 순서 배열은 새로 시작하는 IBT 읽기 13~14번에만 적용합니다.
+PBT 읽기 13~15번은 기존·신규 응시 모두 네 가지 배열 보기 중 하나를 고르는 4지선다입니다.
+IBT에서는 오른쪽 `(가)~(라)` 문장을 왼쪽 네 칸에 드래그하거나, 문장 선택 후 칸을 선택합니다.
+배치한 문장끼리는 위치를 교환하고, 제시문 영역으로 끌거나 개별 되돌리기 버튼으로 반환합니다.
+초기화 버튼은 없습니다. 각 이동은 자동 저장되며 일부만 배치한 상태도 이어풀기에서 복원됩니다.
+네 칸을 모두 채워야 답변 완료로 표시하고 전체 순서가 맞아야 점수를 부여합니다.
+기존 진행 중 응시·제출 결과는 저장된 객관식 형식을 유지합니다.
+
+`migration/pbt/0006_attemptitem_selected_order.py`는 기존 `pbt_attempt_items`에 nullable JSON 컬럼
+`selected_order` 하나를 추가합니다. 새 테이블·API·관리 명령·의존성·워커는 없습니다.
+원본 문제은행을 수정하지 않고 IBT 응시 생성 시 문장과 기존 정답 보기의 형식을 검증합니다.
+기존 `PUT /api/ibt/attempts/{id}/answers/{position}/`에서 드래그 문항은
+`{"selectedOrder":["나",null,"가",null]}`처럼 정확히 네 칸을 받습니다.
+`PUT /api/pbt/attempts/{id}/answers/{position}/`와 IBT의 일반·기존 객관식 문항은
+`selectedOption`을 그대로 사용합니다. 중복·알 수 없는 문장·문항과 다른 답안 형식은 400으로 거부합니다.
+기존 응시 조회 API는 IBT 드래그 문항에 `answerMode`, `sentences`, `selectedOrder`를 반환하고,
+결과 접근 권한이 있는 제출 결과에만 `correctOrder`를 포함합니다.
+
+**로컬 적용:** 새 백엔드를 시작하기 전에 사용자가 `backend/`에서 다음 명령을 수동 실행합니다.
+DB 컬럼을 추가하는 명령이며 에이전트나 로컬 서버가 자동 실행하지 않습니다.
+
+```powershell
+$env:DJANGO_ENV = 'development'
+.\.venv\Scripts\python.exe manage.py migrate
+```
+
+운영에서는 기존 `deploy/start.sh`의 `migrate --noinput`이 시작 시 자동 적용합니다.
+기존 등록 세트에는 `sync_exams` 재실행이 필요하지 않습니다.
+검증은 격리된 PostgreSQL 테스트 DB에서 `backend/`의
+`.\.venv\Scripts\python.exe manage.py test pbt question_bank --noinput`과
+`frontend-TOPIQ/`의 `npm test`, `npm run lint`, `npm run typecheck`, `npm run build`로 수행합니다.
+
 최초 적용 시 **사용자가 `backend/`에서 수동으로** 아래 순서대로 실행합니다.
 로컬 서버를 실행하기 전에 마이그레이션을 적용하세요. 로컬 서버 시작 시 자동 적용하지 않습니다.
 
@@ -491,7 +557,7 @@ $env:DJANGO_ENV = 'development'
 | POST | `/api/ibt/attempts/` | 응시 시작·재개, `restartAttemptId` 지정 시 기존 응시 마감 후 새 응시 시작 |
 | GET | `/api/ibt/attempts/` | 본인의 최근 IBT 응시 100개 |
 | GET | `/api/ibt/attempts/<id>/` | 본인 응시 상태·문제·저장 답안 |
-| PUT | `/api/ibt/attempts/<id>/answers/<position>/` | `selectedOption` 1~4 저장 또는 `null`로 해제 |
+| PUT | `/api/ibt/attempts/<id>/answers/<position>/` | 객관식은 `selectedOption` 1~4 또는 `null`, 드래그 배열은 `selectedOrder` 네 칸 저장 |
 | POST | `/api/ibt/attempts/<id>/submit/` | 멱등 제출·채점 |
 | GET | `/api/ibt/attempts/<id>/result/` | 제출 후 점수·정답·해설·대본. 비회원 응시는 이메일 링크 인증 필요 |
 

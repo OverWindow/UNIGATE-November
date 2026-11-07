@@ -10,6 +10,7 @@
 
 ## Working Guidelines
 
+- 에이전트는 `git add`와 `git commit`을 절대 실행하지 않습니다. 스테이징과 커밋은 사용자가 직접 수행합니다.
 - `frontend/` 또는 `frontend-TOPIQ/`의 파일을 수정하기 전에 해당 폴더의 `AGENTS.md`가 있으면 읽고, 루트 지침과 함께 따릅니다.
 - Keep code as simple as possible. Implement only what is needed for existing functionality and the current request to work. Do not design for unrequested features, hypothetical future requirements, or speculative extension points. Avoid unnecessary abstractions and complexity.
 - Keep this document limited to the technology stack, a brief project structure, and working guidelines. Do not append feature descriptions, operational procedures, implementation histories, or per-task summaries. Update these three sections only when necessary.
@@ -24,5 +25,5 @@
 - Before adding or configuring a background worker, explain its purpose and obtain approval.
 - Obtain approval before deleting data or making database changes that break schema compatibility.
 - Do not expose personal information, student information, API keys, database connection strings, credentials, or secrets in logs or the repository. Never print environment file values or commit secrets.
-- After every modification, state whether APIs or database tables were added. For new APIs, list the HTTP method, path, and purpose; for new tables, list the name and purpose. Explicitly state when none were added.
+- After every modification, state whether APIs or database tables were added, or database columns were added or modified. For new APIs, list the HTTP method, path, and purpose; for new tables, list the name and purpose; for added or modified columns, list the table name, column name, change details, and purpose. Explicitly state when no APIs or tables were added and no columns were added or modified.
 - Keep comments short and explain intent, constraints, or non-obvious behavior. Avoid line-by-line narration and duplicate explanations. Concise English/Korean comments are welcome where useful; keep lengthy setup instructions in README.

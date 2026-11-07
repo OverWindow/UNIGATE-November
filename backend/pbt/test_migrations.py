@@ -9,8 +9,8 @@ from django.utils import timezone
 class ExamFormatMigrationTests(TransactionTestCase):
     def test_existing_pbt_records_and_snapshots_survive(self):
         old_target = [("pbt", "0001_initial")]
-        new_target = [("pbt", "0003_exam_attempt_feedback")]
         executor = MigrationExecutor(connection)
+        new_target = executor.loader.graph.leaf_nodes("pbt")
         executor.migrate(old_target)
         try:
             apps = executor.loader.project_state(old_target).apps
@@ -38,6 +38,7 @@ class ExamFormatMigrationTests(TransactionTestCase):
         self.assertEqual(current_attempt.score, 2)
         self.assertEqual(current_item.snapshot, snapshot)
         self.assertEqual(current_item.selected_option, 2)
+        self.assertIsNone(current_item.selected_order)
         apps.get_model("pbt", "Exam").objects.create(
             source_set_id=uuid.uuid4(), exam_format="ibt", title="IBT", section="reading",
             display_order=1, guest_slot=1)

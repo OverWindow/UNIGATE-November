@@ -1,4 +1,4 @@
-export type MeaningLanguage = "en" | "vi" | "ja";
+export type MeaningLanguage = "en" | "vi" | "ja" | "zh-Hans" | "id";
 export interface VocabularyLevel { level: number; wordCount: number; setCount: number }
 export interface VocabularySet {
   id: string; level: number; number: number; wordCount: number; preview: string[];

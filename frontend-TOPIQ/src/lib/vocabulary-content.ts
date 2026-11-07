@@ -8,6 +8,7 @@ const ko = {
   retry: "다시 시도", back: "세트 목록", previous: "이전", next: "다음", pagination: "세트 목록 페이지",
   meaningLanguage: "뜻 언어", showMeaning: "뜻과 예문 보기", hideMeaning: "뜻과 예문 접기",
   meaning: "뜻", example: "예문", englishExample: "영어 번역", wordList: "세트의 전체 단어",
+  missingMeaning: "이 언어의 뜻은 아직 등록되지 않았습니다.",
   currentWord: "현재 단어", firstWord: "처음으로", lastWord: "마지막 단어입니다.",
 };
 type VocabularyCopy = { [Key in keyof typeof ko]: string };
@@ -22,6 +23,7 @@ export const vocabularyContent: Record<Language, VocabularyCopy> = {
     retry: "Try again", back: "All sets", previous: "Previous", next: "Next", pagination: "Vocabulary pages",
     meaningLanguage: "Meaning language", showMeaning: "Show meaning and example", hideMeaning: "Hide meaning and example",
     meaning: "Meaning", example: "Example", englishExample: "English translation", wordList: "Words in this set",
+    missingMeaning: "The meaning in this language is not available yet.",
     currentWord: "Current word", firstWord: "Back to first word", lastWord: "This is the last word.",
   },
   id: {
@@ -32,6 +34,7 @@ export const vocabularyContent: Record<Language, VocabularyCopy> = {
     retry: "Coba lagi", back: "Semua set", previous: "Sebelumnya", next: "Berikutnya", pagination: "Halaman kosakata",
     meaningLanguage: "Bahasa arti", showMeaning: "Lihat arti dan contoh", hideMeaning: "Sembunyikan arti dan contoh",
     meaning: "Arti", example: "Contoh", englishExample: "Terjemahan bahasa Inggris", wordList: "Kata dalam set ini",
+    missingMeaning: "Arti dalam bahasa ini belum tersedia.",
     currentWord: "Kata saat ini", firstWord: "Kembali ke kata pertama", lastWord: "Ini kata terakhir.",
   },
 };

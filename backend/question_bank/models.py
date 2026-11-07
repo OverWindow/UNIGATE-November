@@ -20,6 +20,8 @@ class Vocabulary(models.Model):
     audio_source_hash = models.TextField(null=True)
     audio_generation_config = models.JSONField(null=True)
     audio_created_at = models.DateTimeField(null=True)
+    chinese_simplified = models.TextField(blank=True, default="", db_default="")
+    indonesian = models.TextField(blank=True, default="", db_default="")
 
     class Meta:
         managed = False

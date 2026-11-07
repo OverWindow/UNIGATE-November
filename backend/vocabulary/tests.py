@@ -45,6 +45,7 @@ class VocabularyTests(TransactionTestCase):
         Vocabulary.objects.bulk_create([Vocabulary(
             vocabulary_id=level * 10000 + number, korean=f"테스트{number}", part_of_speech="명사" if number != 1 else "",
             english=f"test {number}", vietnamese=f"thử {number}", japanese=f"テスト{number}",
+            chinese_simplified=f"测试{number}", indonesian=f"ujian {number}",
             example_korean="한국어 예문입니다.", example_english="An example sentence.", topik_level=level,
         ) for number in range(start, start + count)])
 
@@ -107,7 +108,7 @@ class VocabularyTests(TransactionTestCase):
         self.assertEqual(data["catalogPage"], 1)
         self.assertEqual(data["words"][0], {
             "id": "30001", "position": 1, "korean": "테스트1", "partOfSpeech": "",
-            "meanings": {"en": "test 1", "vi": "thử 1", "ja": "テスト1"},
+            "meanings": {"en": "test 1", "vi": "thử 1", "ja": "テスト1", "zh-Hans": "测试1", "id": "ujian 1"},
             "exampleKorean": "한국어 예문입니다.", "exampleEnglish": "An example sentence.",
         })
         self.assertEqual(self.client.get(path).json(), data)
@@ -116,6 +117,18 @@ class VocabularyTests(TransactionTestCase):
             for method in (self.client.post, self.client.put, self.client.delete):
                 self.assertEqual(method(endpoint).status_code, 405)
         self.assertEqual(self.client.put(path + "progress/").status_code, 404)
+
+    def test_untranslated_meanings_remain_empty_without_changing_source(self):
+        self.register()
+        group = VocabularySet.objects.filter(topik_level=3).first()
+        Vocabulary.objects.filter(pk=30001).update(chinese_simplified="", indonesian="")
+        before = list(Vocabulary.objects.order_by("pk").values())
+        result = self.client.get(f"/api/vocabulary/sets/{group.pk}/")
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.json()["words"][0]["meanings"], {
+            "en": "test 1", "vi": "thử 1", "ja": "テスト1", "zh-Hans": "", "id": "",
+        })
+        self.assertEqual(list(Vocabulary.objects.order_by("pk").values()), before)
 
     def test_pagination_and_invalid_parameters(self):
         self.add_words(6, 481)
@@ -138,7 +151,8 @@ class VocabularyTests(TransactionTestCase):
         group = VocabularySet.objects.filter(topik_level=6).first()
         catalog_fields = {"vocabulary_id", "korean", "topik_level"}
         detail_fields = catalog_fields | {
-            "part_of_speech", "english", "vietnamese", "japanese", "example_korean", "example_english",
+            "part_of_speech", "english", "vietnamese", "japanese", "chinese_simplified", "indonesian",
+            "example_korean", "example_english",
         }
         for path, expected_fields, result_key, count in (
             ("/api/vocabulary/sets/?level=4", catalog_fields, "sets", 1),

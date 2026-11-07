@@ -37,6 +37,7 @@ export default function VocabularyStudy({ id }: { id: string }) {
 
   const backHref = data ? `/vocabulary?level=${data.level}&page=${data.catalogPage}` : "/vocabulary";
   const word = data?.words[index];
+  const meaning = word?.meanings[meaningLanguage]?.trim();
   return <div className="page-container vocabulary-study">
     <Link className="vocabulary-back" href={backHref}>← {t.back}</Link>
     {error ? <div className="vocabulary-status vocabulary-error" role="alert">
@@ -62,6 +63,7 @@ export default function VocabularyStudy({ id }: { id: string }) {
             <p aria-live="polite">{t.currentWord} <strong>{index + 1} / {data.wordCount}</strong></p>
             <label>{t.meaningLanguage}<select value={meaningLanguage} onChange={event => setMeaningLanguage(event.target.value as MeaningLanguage)}>
               <option value="en" lang="en">English</option><option value="vi" lang="vi">Tiếng Việt</option><option value="ja" lang="ja">日本語</option>
+              <option value="zh-Hans" lang="zh-Hans">中文（简体）</option><option value="id" lang="id">Bahasa Indonesia</option>
             </select></label>
           </div>
           <article className="vocabulary-word-card" aria-labelledby="vocabulary-word">
@@ -70,7 +72,7 @@ export default function VocabularyStudy({ id }: { id: string }) {
               <button className="button vocabulary-reveal" aria-expanded={revealed} aria-controls="vocabulary-meaning" onClick={() => setRevealed(!revealed)}>{revealed ? t.hideMeaning : t.showMeaning}</button>
             </div>
             <div id="vocabulary-meaning" className="vocabulary-word-meaning" hidden={!revealed}>
-              <h3>{t.meaning}</h3><p className="vocabulary-definition" lang={meaningLanguage}>{word.meanings[meaningLanguage]}</p>
+              <h3>{t.meaning}</h3><p className="vocabulary-definition" lang={meaning ? meaningLanguage : language}>{meaning || t.missingMeaning}</p>
               <div className="vocabulary-example"><h3>{t.example}</h3><p lang="ko">{word.exampleKorean}</p>
                 <h3>{t.englishExample}</h3><p lang="en">{word.exampleEnglish}</p></div>
             </div>

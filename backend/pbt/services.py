@@ -3,6 +3,7 @@ from django.utils import timezone
 
 from .models import AttemptItem
 from .result_delivery import feedback_state, has_result_access
+from .sentence_order import choice_order
 
 
 def owner_filter(request):
@@ -20,7 +21,10 @@ def finalize(attempt, force=False):
         return
     items = list(attempt.items.all())
     for item in items:
-        item.is_correct = item.selected_option == item.correct_answer
+        if item.snapshot.get("answerMode") == "sentence_order":
+            item.is_correct = item.selected_order == choice_order(item.snapshot["choices"][item.correct_answer - 1])
+        else:
+            item.is_correct = item.selected_option == item.correct_answer
     AttemptItem.objects.bulk_update(items, ["is_correct"])
     attempt.status = "submitted"
     attempt.timed_out = expired
@@ -50,6 +54,11 @@ def attempt_data(attempt, include_items=False, results=False, request=None):
         data["items"] = []
         for item in attempt.items.all():
             question = {**item.snapshot, "position": item.position, "selectedOption": item.selected_option}
+            if item.snapshot.get("answerMode") == "sentence_order":
+                # Keep the original multiple-choice permutations only in the server snapshot.
+                question.update(choices=[], passage="", selectedOrder=item.selected_order or [None] * 4)
+                if results:
+                    question["correctOrder"] = choice_order(item.snapshot["choices"][item.correct_answer - 1])
             if results:
                 question.update(correctAnswer=item.correct_answer, explanation=item.explanation,
                                 transcript=item.transcript, isCorrect=item.is_correct, points=item.points)

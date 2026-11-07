@@ -11,7 +11,7 @@ AUDIO_TYPES = {
     "audio_generation_config": "jsonb", "audio_created_at": "timestamp with time zone",
 }
 
-# Match Hub 014 exactly; its transfer checks column order and constraint definitions.
+# Match Hub 014 audio types and constraint definitions.
 UPGRADE_SQL = r"""
 ALTER TABLE topik_bank.vocabulary
     ADD COLUMN IF NOT EXISTS audio_storage_bucket TEXT,
@@ -77,13 +77,19 @@ def apply_schema(apps, schema_editor):
                  True, "a" if name == "vocabulary_id" else "", "''::text" if name == "part_of_speech" else None)
                 for name in BASE_FIELDS]
         expected = base + [(name, kind, False, "", None) for name, kind in AUDIO_TYPES.items()]
-        if columns(cursor) not in (base, expected):
+        languages = [(name, "text", True, "", "''::text")
+                     for name in ("chinese_simplified", "indonesian")]
+        current = sorted(columns(cursor))
+        # Hub 015 may already be present, with either feature applied first.
+        if current not in [sorted(fields) for fields in (base, expected, base + languages, expected + languages)]:
             raise RuntimeError("Incompatible vocabulary columns; check the Hub schema before migrating.")
+        if any(field[0] == "chinese_simplified" for field in current):
+            expected += languages
         schema_editor.execute(UPGRADE_SQL, params=None)
         cursor.execute("""SELECT pg_get_constraintdef(oid),convalidated FROM pg_constraint
             WHERE conrelid='topik_bank.vocabulary'::regclass AND conname='vocabulary_audio_complete'""")
         constraint = cursor.fetchone()
-        if (columns(cursor) != expected or constraint is None or not constraint[1]
+        if (sorted(columns(cursor)) != sorted(expected) or constraint is None or not constraint[1]
                 or " ".join(constraint[0].split()) != EXPECTED_CONSTRAINT):
             raise RuntimeError("Incompatible vocabulary audio constraint; check the Hub schema before migrating.")
 

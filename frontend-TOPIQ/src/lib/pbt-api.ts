@@ -13,11 +13,28 @@ export interface Exam {
   myProgress: Record<Mode, ExamProgress> | null;
 }
 export interface Question {
+  answerMode?: "sentence_order";
+  sentences?: { id: string; text: string }[];
+  selectedOrder?: (string | null)[];
+  correctOrder?: string[];
   groupId?: string | null;
   position: number; itemType: string; prompt: string; passage: string; auxiliary: string;
   highlight: string; choices: string[]; visuals: Record<string, string>; materialUrl: string;
   audioUrl: string; selectedOption: number | null; correctAnswer?: number;
   explanation?: string; transcript?: string; isCorrect?: boolean; points?: number;
+}
+export type Answer = { selectedOption: number | null } | { selectedOrder: (string | null)[] };
+
+export function isAnswered(question: Question) {
+  return question.answerMode === "sentence_order"
+    ? question.selectedOrder?.length === 4 && question.selectedOrder.every(value => value !== null)
+    : question.selectedOption !== null;
+}
+
+export function answerText(question: Question) {
+  return question.answerMode === "sentence_order"
+    ? (question.selectedOrder ?? [null, null, null, null]).map(value => value ?? "—").join(" → ")
+    : String(question.selectedOption ?? "—");
 }
 export interface Attempt {
   examFormat: ExamFormat;

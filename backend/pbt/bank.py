@@ -5,6 +5,7 @@ from django.db.models import Prefetch
 
 from question_bank.models import Item, ItemAudioBinding, QuestionSet, VisualAsset
 from .formats import EXAM_FORMATS
+from .sentence_order import sentence_material
 
 
 class BankNotReady(Exception):
@@ -86,6 +87,13 @@ def load_set(set_id, section, exam_format="pbt"):
             "choices": choices, "visuals": visuals, "materialUrl": material,
             "audioUrl": audio_url if listening else "",
         }
+        if exam_format == "ibt" and not listening and item.item_type == "ibt_sentence_order":
+            try:
+                sentences = sentence_material(snapshot["passage"].removesuffix(prompt).strip(), choices)
+            except ValueError:
+                raise BankNotReady("invalid_sentence_order") from None
+            snapshot.update(answerMode="sentence_order", sentences=sentences,
+                            prompt="다음 문장들을 순서에 맞게 배열하십시오.")
         result.append({"position": item.position, "source_item_id": item.pk, "snapshot": snapshot,
                        "correct_answer": item.correct_answer, "explanation": item.explanation,
                        "points": 1 if exam_format == "ibt" else 2,

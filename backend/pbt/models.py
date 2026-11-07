@@ -66,6 +66,7 @@ class AttemptItem(models.Model):
     explanation = models.TextField(blank=True)
     transcript = models.TextField(blank=True)
     selected_option = models.PositiveSmallIntegerField(null=True)
+    selected_order = models.JSONField(null=True, blank=True)
     points = models.PositiveSmallIntegerField(default=2)
     is_correct = models.BooleanField(null=True)
     answered_at = models.DateTimeField(null=True)

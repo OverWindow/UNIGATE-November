@@ -22,6 +22,7 @@ from .result_delivery import (LINK_LIFETIME, feedback_state, has_result_access, 
 from .survey import validate_delivery, validate_survey
 from .formats import EXAM_FORMATS
 from .services import attempt_data, finalize, owner_filter
+from .sentence_order import valid_selected_order
 
 
 def response(data, status=200):
@@ -164,10 +165,16 @@ def detail(request, attempt_id, exam_format="pbt"):
 @available
 def answer(request, attempt_id, position, exam_format="pbt"):
     try:
-        data = payload(request, {"selectedOption"})
-        option = data["selectedOption"]
-        if option is not None and (type(option) is not int or not 1 <= option <= 4):
+        data = payload(request, set(), {"selectedOption", "selectedOrder"})
+        if len(data) != 1:
             raise ValueError
+        if "selectedOrder" in data:
+            if not valid_selected_order(data["selectedOrder"]):
+                raise ValueError
+        else:
+            option = data["selectedOption"]
+            if option is not None and (type(option) is not int or not 1 <= option <= 4):
+                raise ValueError
     except (ValueError, TypeError):
         return response({"error": "invalid_request"}, 400)
     with transaction.atomic():
@@ -176,10 +183,16 @@ def answer(request, attempt_id, position, exam_format="pbt"):
         if attempt.status != "in_progress":
             return response({"error": "attempt_closed", "attempt": attempt_data(attempt, request=request)}, 409)
         item = get_object_or_404(AttemptItem, attempt=attempt, position=position)
-        item.selected_option = option
+        ordering = item.snapshot.get("answerMode") == "sentence_order"
+        if ordering != ("selectedOrder" in data):
+            return response({"error": "invalid_request"}, 400)
+        if ordering:
+            item.selected_order = data["selectedOrder"]
+        else:
+            item.selected_option = data["selectedOption"]
         item.answered_at = timezone.now()
-        item.save(update_fields=["selected_option", "answered_at"])
-        return response({"position": position, "selectedOption": option, "serverNow": timezone.now().isoformat()})
+        item.save(update_fields=["selected_order" if ordering else "selected_option", "answered_at"])
+        return response({"position": position, **data, "serverNow": timezone.now().isoformat()})
 
 
 @require_POST

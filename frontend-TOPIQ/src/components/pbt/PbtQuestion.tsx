@@ -2,8 +2,9 @@
 
 import { Fragment } from "react";
 import { useApp } from "@/app/providers";
-import type { Question } from "@/lib/pbt-api";
+import { answerText, type Answer, type Question } from "@/lib/pbt-api";
 import { pbtContent } from "@/lib/pbt-content";
+import SentenceOrderQuestion from "./SentenceOrderQuestion";
 
 function Highlight({ text, highlight }: { text: string; highlight: string }) {
   if (!highlight || !text.includes(highlight)) return <>{text}</>;
@@ -21,15 +22,16 @@ export function QuestionMaterial({ question }: { question: Question }) {
 }
 
 export default function PbtQuestion({ question, onAnswer, disabled, shared = false, review = false }: {
-  question: Question; onAnswer?: (position: number, option: number | null) => void; disabled?: boolean; shared?: boolean; review?: boolean;
+  question: Question; onAnswer?: (position: number, answer: Answer) => void; disabled?: boolean; shared?: boolean; review?: boolean;
 }) {
   const { language } = useApp();
   const t = pbtContent[language];
+  const ordering = question.answerMode === "sentence_order";
   const hasMaterial = !shared && !!(question.passage || question.auxiliary || question.materialUrl);
   const split = !review && hasMaterial && (!!question.materialUrl || question.passage.length > 180);
   return <article className={`pbt-question${split ? " pbt-question-split" : ""}`} lang="ko">
     <h2><span className="pbt-question-number">{question.position}</span>{question.prompt}</h2>
-    <div className="pbt-question-body">
+    {ordering ? <SentenceOrderQuestion question={question} disabled={disabled} review={review} onChange={order => onAnswer?.(question.position, { selectedOrder: order })} /> : <div className="pbt-question-body">
       {hasMaterial && <div className="pbt-question-material"><QuestionMaterial question={question} /></div>}
       <div className="pbt-question-answer">
         {shared && question.highlight && !question.passage.includes(question.highlight) && <p><u>{question.highlight}</u></p>}
@@ -38,7 +40,7 @@ export default function PbtQuestion({ question, onAnswer, disabled, shared = fal
           {question.choices.map((choice, i) => {
             const number = i + 1;
             return <label key={number} className={`pbt-choice ${question.selectedOption === number ? "is-selected" : ""} ${review && question.correctAnswer === number ? "is-correct" : ""} ${review && question.selectedOption === number && !question.isCorrect ? "is-wrong" : ""}`}>
-              <input type="radio" name={`question-${question.position}`} value={number} checked={question.selectedOption === number} onChange={() => onAnswer?.(question.position, number)} />
+              <input type="radio" name={`question-${question.position}`} value={number} checked={question.selectedOption === number} onChange={() => onAnswer?.(question.position, { selectedOption: number })} />
               <span className="pbt-choice-number">{["①", "②", "③", "④"][i]}</span><span className="pbt-choice-content">
                 {question.visuals[number] ? <img src={question.visuals[number]} alt={`${t.choice} ${number}`} /> : choice}
               </span>{review && question.correctAnswer === number && <span className="pbt-correct-label">{t.correct}</span>}
@@ -46,9 +48,9 @@ export default function PbtQuestion({ question, onAnswer, disabled, shared = fal
           })}
         </fieldset>
       </div>
-    </div>
+    </div>}
     {review && <div className="pbt-explanation">
-      <p><strong>{t.yourAnswer}: {question.selectedOption ?? t.noAnswer}</strong><span>{t.correct}: {question.correctAnswer}</span></p>
+      <p><strong>{t.yourAnswer}: {ordering ? answerText(question) : question.selectedOption ?? t.noAnswer}</strong><span>{t.correct}: {ordering ? question.correctOrder?.join(" → ") : question.correctAnswer}</span></p>
       <h3>{t.explanation}</h3><div>{question.explanation}</div>
       {question.transcript && <details><summary>{t.transcript}</summary><p>{question.transcript}</p></details>}
     </div>}

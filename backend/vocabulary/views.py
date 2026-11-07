@@ -76,7 +76,8 @@ def detail(request, set_id):
         data["words"].append({
             "id": str(word.pk), "position": item.position, "korean": word.korean,
             "partOfSpeech": word.part_of_speech,
-            "meanings": {"en": word.english, "vi": word.vietnamese, "ja": word.japanese},
+            "meanings": {"en": word.english, "vi": word.vietnamese, "ja": word.japanese,
+                         "zh-Hans": word.chinese_simplified, "id": word.indonesian},
             "exampleKorean": word.example_korean, "exampleEnglish": word.example_english,
         })
     return response(data)
