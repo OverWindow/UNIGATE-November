@@ -7,7 +7,6 @@ import { homeContent } from "@/lib/home-content";
 import SiteHeader from "./SiteHeader";
 import HomeTestSelector from "./HomeTestSelector";
 import instituteLogo from "../../public/brand/niied-logo.png";
-import topiqLogo from "../../public/brand/topiq-logo.png";
 import styles from "./LandingPage.module.css";
 
 function UseIcon({ index }: { index: number }) {
@@ -32,7 +31,6 @@ export default function LandingPage() {
             <div className={styles.heroCopy}>
               <h1 id="hero-title">{t.hero.title}</h1>
               <p className={styles.description}>{t.hero.description}</p>
-              <a className={styles.introLink} href="#full-version">{t.hero.action}</a>
             </div>
             <div className={styles.preview} aria-hidden="true" lang="ko">
               <div className={styles.previewQuestion}>
@@ -49,19 +47,6 @@ export default function LandingPage() {
 
         <div className={styles.flow}>
           <HomeTestSelector />
-
-          <section id="full-version" className={`${styles.section} ${styles.about}`} aria-labelledby="about-title">
-            <div className={styles.container}>
-              <div className={styles.aboutIntro}>
-                <div><Image className={styles.aboutLogo} src={topiqLogo} alt="TOPIQ" sizes="87px" /><h2 id="about-title" className={styles.aboutTitle}>{t.about.title}</h2></div>
-                <p className={styles.description}>{t.about.description}</p>
-              </div>
-              <div className={styles.features}>
-                {t.about.features.map(feature => <article className={styles.feature} key={feature.title}><h3>{feature.title}</h3><p>{feature.description}</p></article>)}
-              </div>
-              <p className={styles.notice}>{t.about.notice}</p>
-            </div>
-          </section>
 
           <section id="topik-guide" className={`${styles.container} ${styles.section}`} aria-labelledby="guide-title">
             <div className={styles.guideGrid}>

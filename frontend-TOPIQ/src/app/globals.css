@@ -40,7 +40,6 @@ main:focus { outline: none; }
 .header-inner { display: flex; align-items: center; justify-content: space-between; height: 100%; gap: 24px; }
 .brand-link { display: inline-flex; align-items: center; gap: 13px; flex-shrink: 0; }
 .topiq-logo { display: block; width: 103px; height: auto; }
-.brand-tag { padding: 4px 6px; border-radius: 4px; background: #fff2ec; color: #aa4b35; font-size: 9px; font-weight: 700; letter-spacing: .04em; white-space: nowrap; }
 .desktop-navigation { display: flex; align-items: center; gap: 20px; margin-inline: auto; }
 .desktop-navigation a, .desktop-navigation button { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 4px; color: #42516b; font-size: 14px; font-weight: 550; white-space: nowrap; }
 .desktop-navigation a:hover, .desktop-navigation a[aria-current="page"], .mobile-navigation a:hover, .mobile-navigation a[aria-current="page"] { color: var(--color-primary); }
@@ -52,7 +51,9 @@ main:focus { outline: none; }
 .language-options, .account-menu { position: absolute; top: calc(100% + 8px); right: 0; z-index: 2; min-width: 190px; padding: 6px; border: 1px solid #e1e6ee; border-radius: 12px; background: #fff; box-shadow: 0 12px 32px #25416c1a; }
 .language-options[hidden], .account-menu[hidden] { display: none; }
 .language-options button, .account-menu button { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-height: 42px; padding: 10px 12px; border-radius: 7px; color: #42516b; font-size: 13px; line-height: 1.5; text-align: left; white-space: nowrap; }
-.language-options button:hover, .language-options button[aria-pressed="true"], .account-menu button:hover:not(:disabled) { background: #edf2ff; color: var(--color-primary); }
+.language-options button:hover { color: var(--color-primary); }
+.language-options button[aria-pressed="true"] { background: #edf2ff; color: var(--color-primary); }
+.account-menu button:hover:not(:disabled) { background: #edf2ff; color: var(--color-primary); }
 .language-check { min-width: 14px; font-weight: 600; }
 .header-login { flex-shrink: 0; min-height: 40px; padding: 8px; border: 0; background: transparent; color: #42516b; font-size: 12px; font-weight: 550; white-space: nowrap; }
 .header-login { display: inline-flex; align-items: center; justify-content: center; }
@@ -183,7 +184,6 @@ details[open] .faq-indicator::after { transform: rotate(0); }
 .site-footer { padding: 45px 0 24px; border-top: 1px solid #e9edf4; background: #fff; }
 .footer-main { display: flex; justify-content: space-between; align-items: center; gap: 30px; padding-bottom: 33px; }
 .footer-main .topiq-logo { width: 89px; }
-.footer-main p { margin: 12px 0 0; color: #5c6c84; font-size: 12px; line-height: 1.8; }
 .footer-links { display: flex; align-items: center; gap: 26px; }
 .footer-links a { display: inline-flex; align-items: center; gap: 9px; color: #63718a; font-size: 12px; }
 .footer-links a:hover { color: var(--color-primary); }
@@ -193,7 +193,6 @@ details[open] .faq-indicator::after { transform: rotate(0); }
 @media (min-width: 1200px) and (max-width: 1290px) {
   .header-inner { gap: 16px; }
   .desktop-navigation { gap: 16px; }
-  .brand-tag { display: none; }
 }
 
 @media (max-width: 1199px) {
@@ -229,7 +228,6 @@ details[open] .faq-indicator::after { transform: rotate(0); }
   .header-inner { width: calc(100% - 24px); gap: 8px; }
   .topiq-logo { width: 91px; }
   .brand-link .topiq-logo { width: 76px; }
-  .brand-tag { display: none; }
   .header-actions { gap: 6px; }
   .language-trigger { min-width: 44px; min-height: 36px; padding: 6px; }
   .header-login { min-height: 36px; padding: 6px; }
@@ -284,6 +282,8 @@ details[open] .faq-indicator::after { transform: rotate(0); }
 .auth-main { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: calc(100svh - var(--header-height)); padding: 56px 24px 36px; background: radial-gradient(ellipse at 80% 0%, #eaf0fe, transparent 60%), #fafbfe; }
 .auth-card { width: min(100%, 480px); padding: 38px 40px; border: 1px solid #e3e9f3; border-radius: 24px; background: #fff; box-shadow: 0 16px 50px -20px #2d4b7620; }
 .auth-card h1 { margin: 0; font-size: 29px; font-weight: 650; line-height: 1.4; letter-spacing: -.045em; word-break: keep-all; overflow-wrap: anywhere; }
+.auth-login-card h1 { margin-bottom: 28px; }
+.auth-signup-card > h1 + .auth-form { margin-top: 28px; }
 .auth-description { margin: 14px 0 28px; color: #647185; font-size: 14px; line-height: 1.85; word-break: keep-all; }
 .auth-form > fieldset { display: grid; gap: 20px; min-width: 0; margin: 0; padding: 0; border: 0; }
 .auth-form > fieldset:disabled { opacity: .7; }
@@ -296,15 +296,17 @@ details[open] .faq-indicator::after { transform: rotate(0); }
 .password-input { position: relative; }
 .password-input input { padding-right: 122px; }
 .password-toggle { position: absolute; top: 3px; right: 6px; display: flex; align-items: center; justify-content: center; height: 42px; max-width: 112px; padding: 4px 5px; color: #3c61a4; font-size: 10px; line-height: 1.35; text-align: center; }
+.auth-login-card .password-input input { padding-right: 54px; }
+.auth-login-card .password-toggle { width: 42px; padding: 0; }
 .field-hint { margin: 9px 0 0; color: #657186; font-size: 11px; line-height: 1.8; }
 .field-error { margin: 8px 0 0; color: #a0392c; font-size: 12px; line-height: 1.7; }
 .auth-error { margin: 0; padding: 12px 14px; border: 1px solid #efd7d0; border-radius: 9px; background: #fff6f3; color: #963e2f; font-size: 13px; line-height: 1.7; }
 .auth-submit { justify-content: space-between; width: 100%; margin-top: 4px; }
+.auth-compact-submit { justify-self: center; justify-content: center; width: auto; min-width: 160px; }
 .auth-submit:disabled { transform: none; }
 .auth-switch { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin: 26px 0 0; color: #637087; font-size: 12px; line-height: 1.8; }
 .auth-switch a { color: var(--color-primary); font-weight: 600; text-underline-offset: 4px; }
 .auth-switch a:hover { text-decoration: underline; }
-.auth-note { margin: 20px 0 0; padding-top: 17px; border-top: 1px solid #edf0f5; color: #657186; font-size: 11px; line-height: 1.8; }
 .auth-home-link { display: inline-flex; margin-top: 24px; padding: 8px; color: #60728f; font-size: 12px; }
 .auth-home-link:hover { color: var(--color-primary); }
 .auth-state { padding-block: 24px; color: #596d8d; font-size: 14px; line-height: 1.8; }

@@ -13,10 +13,7 @@ export default function SiteFooter() {
     <footer className="site-footer">
       <div className="page-container">
         <div className="footer-main">
-          <div>
-            <Link href="/#intro" aria-label={t.accessibility.home}><Logo /></Link>
-            <p>{t.footer.description}</p>
-          </div>
+          <Link href="/#intro" aria-label={t.accessibility.home}><Logo /></Link>
           <div className="footer-links">
             <a href="https://www.unigate.kr/" target="_blank" rel="noopener noreferrer">
               {t.footer.parent}
@@ -29,7 +26,6 @@ export default function SiteFooter() {
         </div>
         <div className="footer-bottom">
           <span>© 2026 UNIGATE. All rights reserved.</span>
-          <span>{t.footer.tagline}</span>
         </div>
       </div>
     </footer>

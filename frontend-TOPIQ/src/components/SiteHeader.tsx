@@ -81,7 +81,7 @@ export default function SiteHeader({ authHref }: { authHref?: string }) {
       }}>
         <div className="page-container header-inner">
           <Link className="brand-link" href="/#intro" aria-label={t.accessibility.home} onClick={() => setMenuOpen(false)}>
-            <Logo /><span className="brand-tag">TOPIK II</span>
+            <Logo />
           </Link>
           <nav className="desktop-navigation" aria-label={t.accessibility.navigation}>{navigation}</nav>
           <div className="header-actions">

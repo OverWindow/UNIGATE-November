@@ -53,7 +53,7 @@ interface LandingContent {
     description: string;
     items: { question: string; answer: string }[];
   };
-  footer: { description: string; parent: string; top: string; tagline: string };
+  footer: { parent: string; top: string };
 }
 
 export const landingContent: Record<Language, LandingContent> = {
@@ -134,7 +134,7 @@ export const landingContent: Record<Language, LandingContent> = {
         { question: "모바일에서도 볼 수 있나요?", answer: "네. 휴대폰, 태블릿, PC 화면에 맞춰 학습 소개를 살펴볼 수 있습니다. 모바일에서는 상단 메뉴 버튼으로 원하는 영역으로 이동할 수 있습니다." },
       ],
     },
-    footer: { description: "한국어 학습의 다음 단계, TOPIQ.", parent: "UNIGATE 소개", top: "맨 위로", tagline: "당신의 다음 단계를 함께합니다." },
+    footer: { parent: "UNIGATE 소개", top: "맨 위로" },
   },
   en: {
     navigation: ["Home", "PBT", "IBT", "Vocabulary", "AI Writing Tutor"],
@@ -213,7 +213,7 @@ export const landingContent: Record<Language, LandingContent> = {
         { question: "Can I view the page on my phone?", answer: "Yes. The page adapts to phones, tablets, and computers. On smaller screens, use the menu button in the header to jump to a section." },
       ],
     },
-    footer: { description: "Your next chapter in Korean, with TOPIQ.", parent: "About UNIGATE", top: "Back to top", tagline: "Made for your next chapter." },
+    footer: { parent: "About UNIGATE", top: "Back to top" },
   },
   id: {
     navigation: ["Beranda", "PBT", "IBT", "Kosakata", "Tutor Menulis AI"],
@@ -292,6 +292,6 @@ export const landingContent: Record<Language, LandingContent> = {
         { question: "Apakah halaman ini bisa dibuka di ponsel?", answer: "Ya. Tampilan menyesuaikan ponsel, tablet, dan komputer. Pada layar kecil, gunakan tombol menu di bagian atas untuk menuju bagian yang kamu inginkan." },
       ],
     },
-    footer: { description: "Langkah baru dalam bahasa Korea, bersama TOPIQ.", parent: "Tentang UNIGATE", top: "Kembali ke atas", tagline: "Untuk langkah berikutnya dalam belajarmu." },
+    footer: { parent: "Tentang UNIGATE", top: "Kembali ke atas" },
   },
 };
