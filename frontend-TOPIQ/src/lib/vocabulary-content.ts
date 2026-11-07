@@ -1,7 +1,7 @@
 import type { Language } from "./landing-content";
 
 const ko = {
-  title: "하루의 한국어, 단어부터.", intro: "급수에 맞는 단어를 약 20개씩, 뜻과 예문으로 살펴보세요.",
+  title: "TOPIK 단어장", intro: "급수에 맞는 단어를 약 20개씩, 뜻과 예문으로 살펴보세요.",
   vocabulary: "단어장", level: "급", words: "개 단어", sets: "개 세트", levelLabel: "급수 선택",
   browse: "단어 보기", loading: "단어장을 불러오는 중입니다.", empty: "이 급수의 단어장을 준비하고 있습니다.",
   error: "단어장을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.", notFound: "요청한 세트 또는 페이지를 찾을 수 없습니다.",

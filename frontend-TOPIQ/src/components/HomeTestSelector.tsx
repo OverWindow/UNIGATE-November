@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowRight } from "lucide-react";
 import { useApp } from "@/app/providers";
 import { homeContent } from "@/lib/home-content";
 import { pbtRequest, type Attempt, type Exam, type Mode, type Section } from "@/lib/pbt-api";
@@ -79,7 +80,7 @@ export default function HomeTestSelector() {
         <label><span>{t.mode}</span><select value={mode} disabled={unavailable} onChange={event => setMode(event.target.value as Mode)}><option value="timed">{t.timed}</option><option value="practice">{t.practice}</option></select></label>
         <button type="submit" className={styles.startButton} disabled={unavailable}>
           {waiting || starting ? p.loading : selectedExam && !selectedExam.accessible ? p.login : t.start}
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14m-7-7 7 7-7 7" /></svg>
+          <ArrowRight size={16} aria-hidden="true" />
         </button>
       </form>
       {(error || status === "error") ? <p className={styles.testError} role="alert">{pbtErrorMessage(error, p)}<button type="button" onClick={() => { if (status === "error") void refreshSession(); else setRevision(value => value + 1); }}>{p.retry}</button></p>

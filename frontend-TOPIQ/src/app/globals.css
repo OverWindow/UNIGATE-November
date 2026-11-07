@@ -307,18 +307,18 @@ details[open] .faq-indicator::after { transform: rotate(0); }
 .auth-switch { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin: 26px 0 0; color: #637087; font-size: 12px; line-height: 1.8; }
 .auth-switch a { color: var(--color-primary); font-weight: 600; text-underline-offset: 4px; }
 .auth-switch a:hover { text-decoration: underline; }
-.auth-home-link { display: inline-flex; margin-top: 24px; padding: 8px; color: #60728f; font-size: 12px; }
+.auth-home-link { display: inline-flex; align-items: center; gap: 5px; margin-top: 24px; padding: 8px; color: #60728f; font-size: 12px; }
 .auth-home-link:hover { color: var(--color-primary); }
 .auth-state { padding-block: 24px; color: #596d8d; font-size: 14px; line-height: 1.8; }
 .verification-steps { margin: -12px 0 24px; color: #536b94; font-size: 12px; line-height: 1.7; }
 .verification-sent { padding: 22px 18px; border: 1px solid #dce6f7; border-radius: 12px; background: #f5f8ff; }
-.verification-symbol { display: block; margin-bottom: 12px; color: #2d5ec5; font-size: 28px; }
-.verification-sent h2 { margin: 0 0 12px; color: #243f72; font-size: 20px; line-height: 1.5; }
+.verification-symbol { display: block; margin-bottom: 12px; color: #2d5ec5; }
+.verification-sent h2 { margin: 0 0 12px; color: #243f72; font-size: 20px; font-weight: 700; line-height: 1.5; }
 .verification-sent p { margin: 12px 0 0; color: #52657f; font-size: 13px; line-height: 1.8; }
 .verification-address { display: block; margin-top: 16px; color: #254c96; font-size: 15px; overflow-wrap: anywhere; }
 .verification-change { display: block; width: fit-content; margin: 18px auto 0; color: #2d5ec5; font-size: 12px; line-height: 1.8; text-align: center; text-decoration: underline; text-underline-offset: 4px; }
 .verification-error { margin-top: 24px; }
-.verified-email { margin: 8px 0 0; color: #286347; font-size: 12px; }
+.verified-email { display: flex; align-items: center; gap: 4px; margin: 8px 0 0; color: #286347; font-size: 12px; }
 .auth-field input[readonly] { background: #f6f8fc; color: #51647f; }
 .auth-submit:disabled { opacity: .7; cursor: wait; }
 .auth-connection-error p { color: #914332; font-size: 14px; line-height: 1.8; }
@@ -342,6 +342,7 @@ details[open] .faq-indicator::after { transform: rotate(0); }
 .auth-survey-card { width: min(100%, 720px); }
 .auth-survey-card .exam-survey-fields { margin-top: 0; }
 .signup-verified-email { margin: 0; padding: 14px 16px; border-radius: 10px; background: #f3f6fb; color: #416393; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.signup-verified-email svg { vertical-align: middle; }
 .signup-back { justify-self: start; color: var(--color-primary); font-size: 14px; }
 .auth-card h1 { scroll-margin-top: calc(var(--header-height) + 24px); }
 .auth-card h1:focus { outline: none; }

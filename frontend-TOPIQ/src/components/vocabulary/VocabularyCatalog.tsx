@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ExternalLink } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useApp } from "@/app/providers";
@@ -41,7 +42,6 @@ function CatalogPage({ level, page }: { level: number; page: number }) {
   const summary = data?.levels.find(item => item.level === level);
   return <>
     <section className="vocabulary-hero"><div className="page-container">
-      <p className="eyebrow">TOPIK II · {t.vocabulary}</p>
       <h1>{t.title}</h1><p>{t.intro}</p>
     </div></section>
     <div className="page-container vocabulary-catalog">
@@ -51,7 +51,7 @@ function CatalogPage({ level, page }: { level: number; page: number }) {
         </Link>)}
       </nav>
       <div className="vocabulary-catalog-heading"><h2>{vocabularyLevelLabel(level, language)}</h2>
-        {summary && <p>{summary.wordCount.toLocaleString()} {t.words}<span>·</span>{summary.setCount} {t.sets}</p>}
+        {summary && <p>{summary.wordCount.toLocaleString()}{language === "ko" ? "" : " "}{t.words}</p>}
       </div>
       {error ? <div className="vocabulary-status vocabulary-error" role="alert">
         <p>{error instanceof VocabularyError && error.status === 404 ? t.notFound : t.error}</p>
@@ -62,7 +62,7 @@ function CatalogPage({ level, page }: { level: number; page: number }) {
           {data.catalog.sets.map(group => <Link className="vocabulary-set-card" key={group.id} href={`/vocabulary/sets/${group.id}`}>
             <div className="vocabulary-set-top"><span>SET {String(group.number).padStart(2, "0")}</span><span>{group.wordCount} {t.words}</span></div>
             <h3>{group.preview.map((word, index) => <span key={index} lang="ko">{word}</span>)}</h3>
-            <div className="vocabulary-set-action">{t.browse}<span aria-hidden="true">↗</span></div>
+            <div className="vocabulary-set-action">{t.browse}<ExternalLink size={14} aria-hidden="true" /></div>
           </Link>)}
         </div>
         {!data.catalog.sets.length && <p className="vocabulary-status">{t.empty}</p>}

@@ -21,14 +21,13 @@
 .pbt-set-number { color: #9baecb; font-size: 32px; font-weight: 500; letter-spacing: -.05em; }
 .pbt-badge { padding: 5px 9px; border-radius: 6px; background: #f0f2f6; color: #657186; font-size: 11px; font-weight: 600; }
 .pbt-badge-free { background: #edf6f3; color: #28765d; }
-.pbt-badge-score { background: #eef3ff; color: #2d5ec5; white-space: nowrap; }
+.pbt-badge-score { display: inline-flex; align-items: center; gap: 4px; background: #eef3ff; color: #2d5ec5; white-space: nowrap; }
 .pbt-badge-score:hover { background: #e2eaff; text-decoration: underline; }
 .pbt-badge-score:focus-visible { outline: 2px solid #2d5ec5; outline-offset: 3px; }
 .pbt-exam-card h2 { font-size: 21px; font-weight: 650; margin: 25px 0 26px; }
 .pbt-exam-card .button { width: 100%; justify-content: space-between; }
 .pbt-card-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .pbt-card-actions .button { min-width: 0; padding-inline: 8px; justify-content: center; }
-.pbt-card-actions .button:only-child { grid-column: 1 / -1; }
 .pbt-card-actions .pbt-restart { background: #e9edf3; color: #42516b; }
 .pbt-card-actions .pbt-restart:hover:not(:disabled) { background: #dfe5ec; }
 .pbt-card-actions .button:disabled { transform: none; }
@@ -243,7 +242,7 @@ button.sentence-order-card { cursor: grab; }
   .pbt-test-navigation > div { gap: 8px; padding-block: 4px; }
   .pbt-test-navigation .button { min-width: 0; min-height: 36px; padding: 5px 10px; gap: 5px; }
   .pbt-test-navigation .pbt-all-questions svg { display: none; }
-  .pbt-test-navigation .button > span[aria-hidden] { display: none; }
+  .pbt-test-navigation .button > svg[aria-hidden] { display: none; }
   .pbt-dialog { padding: 24px 20px; }
   .pbt-dialog-actions .button { padding-inline: 14px; }
 }
@@ -299,24 +298,25 @@ button.sentence-order-card { cursor: grab; }
 }
 .exam-feedback-main { max-width: 800px; margin: 0 auto; padding: 40px 20px 80px; }
 .exam-feedback-card { margin-top: 24px; padding: 36px; border: 1px solid #d6dfec; border-radius: 20px; background: #fff; box-shadow: 0 10px 32px #162f7f08; }
-.exam-feedback-card h1 { font-size: clamp(1.5rem, 4vw, 2rem); line-height: 1.4; margin: 8px 0 16px; }
+.exam-feedback-card h1 { font-size: clamp(1.5rem, 4vw, 2rem); font-weight: 700; line-height: 1.4; margin: 8px 0 16px; }
 .exam-feedback-card p { line-height: 1.7; }
 .exam-feedback-controls, .exam-rating { min-width: 0; border: 0; padding: 0; margin: 0; }
 .exam-feedback-controls:disabled { opacity: .65; }
-.exam-rating legend { display: block; font-weight: 650; line-height: 1.6; margin-bottom: 10px; }
+.exam-rating legend { display: block; font-weight: 650; line-height: 1.6; margin-bottom: 16px; }
 .exam-rating small { color: #586a80; font-weight: 400; }
 .exam-feedback-card [aria-invalid=true] { border-color: #b42318; }
 .exam-feedback-card :is(input, select, textarea, button):focus-visible { outline: 3px solid #2d5ec5; outline-offset: 3px; }
-.exam-rating { text-align: center; margin: 30px 0; }
-.exam-rating legend { width: 100%; }
-.exam-stars { display: flex; justify-content: center; gap: 8px; }
+.exam-rating { text-align: center; margin: 30px 0; padding: 24px 20px; border: 1px solid #e4e9f1; border-radius: 16px; background: #f8fafc; }
+.exam-rating legend { width: 100%; padding-top: 24px; }
+.exam-stars { display: flex; justify-content: center; gap: 12px; }
 .exam-stars label { display: grid; position: relative; width: 48px; height: 52px; cursor: pointer; }
 .exam-stars input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
-.exam-stars span { font-size: 44px; line-height: 52px; color: #c4cdd9; border-radius: 8px; }
-.exam-stars span.is-filled { color: #c47200; }
+.exam-stars span { display: grid; place-items: center; color: #d5dbe4; border-radius: 8px; transition: color .15s, transform .15s; }
+.exam-stars label:hover span { transform: translateY(-2px) scale(1.08); }
+.exam-stars span.is-filled { color: #f2b544; }
+.exam-stars span.is-filled svg { fill: currentColor; }
 .exam-stars input:focus-visible + span { outline: 3px solid #2d5ec5; outline-offset: 2px; }
-.exam-rating-value { margin: 4px 0 0; color: #586a80; font-size: .9rem; }
-.exam-feedback-submit { width: 100%; margin-top: 20px; }
+.exam-feedback-submit { display: flex; width: fit-content; min-width: 160px; margin: 24px auto 0; padding-inline: 24px; }
 .exam-feedback-receipt { text-align: center; }
 .exam-masked-email { display: block; overflow-wrap: anywhere; padding: 16px; margin: 20px 0; background: #eef3ff; border-radius: 10px; }
 @media (max-width: 600px) {

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowRight, ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/app/providers";
@@ -9,7 +10,6 @@ import type { ExamFormat } from "@/lib/exam-content";
 import { examCopy, ibtTimedHints, pbtErrorMessage } from "@/lib/pbt-content";
 import SiteHeader from "../SiteHeader";
 import SiteFooter from "../SiteFooter";
-import { surveyCopy } from "@/lib/learner-survey";
 
 export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFormat }) {
   const basePath = `/${examFormat}`;
@@ -83,7 +83,7 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
             <div className="pbt-card-top">
               <span className="pbt-set-number">{String(exam.round).padStart(2, "0")}</span>
               {result ? <Link className="pbt-badge pbt-badge-score" href={`${basePath}/attempts/${result.id}/result`} title={resultLabel} aria-label={resultLabel}>
-                {result.score} / {result.maxScore} <span aria-hidden="true">↗</span>
+                {result.score} / {result.maxScore} <ExternalLink size={13} aria-hidden="true" />
               </Link> : <span className={`pbt-badge ${exam.guestAvailable ? "pbt-badge-free" : ""}`}>{exam.guestAvailable ? t.free : t.members}</span>}
             </div>
             <h2>{language === "ko" ? `${t[exam.section]} 모의고사 ${exam.round}회` : <>{t[exam.section]} · {t.round} {exam.round}</>}</h2>
@@ -91,7 +91,7 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
               <button type="button" className={`button ${inProgressId ? "pbt-restart" : "button-primary"}`} disabled={!!starting} onClick={() => void start(exam, inProgressId)}>{starting === exam.id ? t.loading : t.start}</button>
               {inProgressId && <Link className="button button-primary" href={`${basePath}/attempts/${inProgressId}`}>{t.resume}</Link>}
             </div>
-              : <Link className="button pbt-secondary" href={`/login?next=${basePath}`}>{t.login}<span aria-hidden="true">↗</span></Link>}
+              : <Link className="button pbt-secondary" href={`/login?next=${basePath}`}>{t.login}<ExternalLink size={14} aria-hidden="true" /></Link>}
           </article>;
         })}
         {!exams.some(exam => exam.section === section) && !error && <p>{t.empty}</p>}
@@ -100,8 +100,8 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
         {!loading && !attempts.length && <p className="pbt-muted">{t.noHistory}</p>}
         {attempts.map(attempt => <div className="pbt-history-row" key={attempt.id}>
           <div><strong>{language === "ko" ? attempt.title.replace(/ (\d+)$/, ` ${t[attempt.section]} 모의고사 $1회`) : `${attempt.title} · ${t[attempt.section]}`}</strong><small>{new Date(attempt.startedAt).toLocaleString(locale)}</small></div>
-          <span>{attempt.status === "submitted" ? (attempt.score === null ? surveyCopy[language].locked : `${attempt.score} / ${attempt.maxScore}`) : t.inProgress}</span>
-          <Link className="text-link" href={`${basePath}/attempts/${attempt.id}${attempt.status === "submitted" ? "/result" : ""}`}>{attempt.status === "submitted" ? t.result : t.resume} →</Link>
+          {attempt.status === "submitted" && attempt.score !== null && <span>{attempt.score} / {attempt.maxScore}</span>}
+          <Link className="text-link" href={`${basePath}/attempts/${attempt.id}${attempt.status === "submitted" ? "/result" : ""}`}>{attempt.status === "submitted" ? t.result : t.resume} <ArrowRight size={14} aria-hidden="true" /></Link>
         </div>)}
       </section>
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { Mail } from "lucide-react";
 import { useApp } from "@/app/providers";
 import { AuthError, sendEmailVerification } from "@/lib/auth-api";
 import { authContent } from "@/lib/auth-content";
@@ -17,7 +18,7 @@ export default function EmailVerificationRequest({ next }: { next: string }) {
   const [remaining, setRemaining] = useState(0);
   const t = emailContent[language];
   const a = authContent[language];
-  const message = (code: string) => code === "network_error" ? a.network : a.errors[code] || a.errors.server_error;
+  const message = (code: string) => language === "ko" && code === "required" ? "이메일을 입력해 주세요." : code === "network_error" ? a.network : a.errors[code] || a.errors.server_error;
 
   useEffect(() => {
     if (!cooldownUntil) return;
@@ -62,9 +63,9 @@ export default function EmailVerificationRequest({ next }: { next: string }) {
       <fieldset disabled={pending}>
         {sent ? (
           <div className="verification-sent" role="status">
-            <span className="verification-symbol" aria-hidden="true">✉</span>
-            <h2>{t.sentTitle}</h2><p>{t.sentDescription}</p>
-            <strong className="verification-address">{email}</strong><p>{t.expiry}</p>
+            <Mail className="verification-symbol" size={28} aria-hidden="true" />
+            <h2>{t.sentTitle}</h2>
+            {language === "ko" ? <p><strong className="verification-address">{email}</strong> 주소로 인증 링크를 보냈어요. 링크는 15분 동안 유효해요.</p> : <><p>{t.sentDescription}</p><strong className="verification-address">{email}</strong><p>{t.expiry}</p></>}
           </div>
         ) : (
           <div className="auth-field">

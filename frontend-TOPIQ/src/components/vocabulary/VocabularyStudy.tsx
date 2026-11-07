@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowLeft, ArrowRight, Minus, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useApp } from "@/app/providers";
 import { VocabularyError, vocabularyRequest, type MeaningLanguage, type VocabularyDetail } from "@/lib/vocabulary-api";
@@ -39,7 +40,7 @@ export default function VocabularyStudy({ id }: { id: string }) {
   const word = data?.words[index];
   const meaning = word?.meanings[meaningLanguage]?.trim();
   return <div className="page-container vocabulary-study">
-    <Link className="vocabulary-back" href={backHref}>← {t.back}</Link>
+    <Link className="vocabulary-back" href={backHref}><ArrowLeft size={14} aria-hidden="true" /> {t.back}</Link>
     {error ? <div className="vocabulary-status vocabulary-error" role="alert">
       <p>{error instanceof VocabularyError && error.status === 404 ? t.notFound : t.error}</p>
       <button className="button vocabulary-secondary" onClick={() => setRevision(value => value + 1)}>{t.retry}</button>
@@ -51,7 +52,7 @@ export default function VocabularyStudy({ id }: { id: string }) {
       <div className="vocabulary-study-grid">
         <aside className="vocabulary-word-list">
           <h2 className="vocabulary-list-title">{t.wordList}</h2>
-          <button className="vocabulary-list-toggle" aria-expanded={listOpen} aria-controls="vocabulary-words" onClick={() => setListOpen(!listOpen)}>{t.wordList}<span aria-hidden="true">{listOpen ? "−" : "+"}</span></button>
+          <button className="vocabulary-list-toggle" aria-expanded={listOpen} aria-controls="vocabulary-words" onClick={() => setListOpen(!listOpen)}>{t.wordList}<span aria-hidden="true">{listOpen ? <Minus size={16} /> : <Plus size={16} />}</span></button>
           <ol id="vocabulary-words" className={listOpen ? "is-open" : ""} aria-label={t.wordList}>
             {data.words.map((entry, position) => <li key={entry.id}>
               <button aria-current={index === position ? "true" : undefined} onClick={() => move(position)}><span>{position + 1}</span><span lang="ko">{entry.korean}</span></button>
@@ -78,9 +79,9 @@ export default function VocabularyStudy({ id }: { id: string }) {
             </div>
           </article>
           <nav className="vocabulary-card-navigation" aria-label={t.wordList}>
-            <button className="button vocabulary-secondary" disabled={index === 0} onClick={() => move(index - 1)}>← {t.previous}</button>
-            {index < data.words.length - 1 ? <button className="button button-primary" onClick={() => move(index + 1)}>{t.next} →</button>
-              : <Link className="button button-primary" href={backHref}>{t.back} →</Link>}
+            <button className="button vocabulary-secondary" disabled={index === 0} onClick={() => move(index - 1)}><ArrowLeft size={16} aria-hidden="true" /> {t.previous}</button>
+            {index < data.words.length - 1 ? <button className="button button-primary" onClick={() => move(index + 1)}>{t.next} <ArrowRight size={16} aria-hidden="true" /></button>
+              : <Link className="button button-primary" href={backHref}>{t.back} <ArrowRight size={16} aria-hidden="true" /></Link>}
           </nav>
           {index === data.words.length - 1 && <p className="vocabulary-end">{t.lastWord} <button onClick={() => move(0)}>{t.firstWord}</button></p>}
         </div>

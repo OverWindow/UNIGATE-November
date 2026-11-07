@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { BriefcaseBusiness, Check, Clock3, ExternalLink, GraduationCap, Minus, Plus, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { useApp } from "@/app/providers";
 import { homeContent } from "@/lib/home-content";
@@ -9,13 +10,7 @@ import HomeTestSelector from "./HomeTestSelector";
 import instituteLogo from "../../public/brand/niied-logo.png";
 import styles from "./LandingPage.module.css";
 
-function UseIcon({ index }: { index: number }) {
-  return <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    {index === 0 ? <><path d="m2 10 10-5 10 5-10 5-10-5ZM22 10v6M6 12v4a6 3 0 0 0 12 0v-4" /></>
-      : index === 1 ? <><rect x="2" y="6" width="20" height="14" rx="2" /><path d="M16 6V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2M22 13a18 18 0 0 1-20 0M12 12h.01" /></>
-        : <><path d="M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V6a1 1 0 0 1 1-1c2 0 4.5-1.2 7-3 2.5 1.8 5 3 7 3a1 1 0 0 1 1 1Z" /><path d="m9 12 2 2 4-4" /></>}
-  </svg>;
-}
+const useIcons = [GraduationCap, BriefcaseBusiness, ShieldCheck];
 
 export default function LandingPage() {
   const { language } = useApp();
@@ -40,7 +35,7 @@ export default function LandingPage() {
                   {["①", "②", "③", "④"].map((number, index) => <div className={styles.previewOption} key={number}><span>{number}</span><i style={{ width: `${54 + index * 8}%` }} /></div>)}
                 </div>
               </div>
-              <div className={styles.previewBottom}><span>24 / 50</span><span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6h4" /></svg>38:24</span></div>
+              <div className={styles.previewBottom}><span>24 / 50</span><span><Clock3 size={16} aria-hidden="true" />38:24</span></div>
             </div>
           </div>
         </section>
@@ -59,8 +54,8 @@ export default function LandingPage() {
                 </div>
               </div>
               <div>
-                <ul className={styles.guideList}>{t.guide.points.map(point => <li key={point}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5" /></svg><span>{point}</span></li>)}</ul>
-                <div className={styles.officialLink}><a href="https://www.topik.go.kr/" target="_blank" rel="noopener noreferrer">{t.guide.action}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg></a></div>
+                <ul className={styles.guideList}>{t.guide.points.map(point => <li key={point}><Check size={16} aria-hidden="true" /><span>{point}</span></li>)}</ul>
+                <div className={styles.officialLink}><a href="https://www.topik.go.kr/" target="_blank" rel="noopener noreferrer">{t.guide.action}<ExternalLink size={14} aria-hidden="true" /></a></div>
               </div>
             </div>
           </section>
@@ -68,7 +63,10 @@ export default function LandingPage() {
           <section id="topik-uses" className={styles.section} aria-labelledby="uses-title">
             <div className={styles.container}>
               <div className={styles.sectionIntro}><h2 id="uses-title" className={styles.heading}>{t.uses.title}</h2><p className={styles.description}>{t.uses.description}</p></div>
-              <div className={styles.useGrid}>{t.uses.cards.map((card, index) => <article className={styles.useCard} key={card.title}><span className={styles.useIcon}><UseIcon index={index} /></span><h3>{card.title}</h3><p>{card.description}</p></article>)}</div>
+              <div className={styles.useGrid}>{t.uses.cards.map((card, index) => {
+                const Icon = useIcons[index];
+                return <article className={styles.useCard} key={card.title}><span className={styles.useIcon}><Icon size={24} aria-hidden="true" /></span><h3>{card.title}</h3><p>{card.description}</p></article>;
+              })}</div>
             </div>
           </section>
 
@@ -76,7 +74,7 @@ export default function LandingPage() {
             <div className={`${styles.container} ${styles.faqContainer}`}>
               <h2 id="faq-title" className={styles.heading}>{t.faq.title}</h2>
               <div className={styles.faqList}>{t.faq.items.map(({ question, answer }, index) => <div className={styles.faqItem} key={index}>
-                <button id={`faq-question-${index}`} className={styles.faqTrigger} type="button" aria-expanded={openFaq === index} aria-controls={`faq-answer-${index}`} onClick={() => setOpenFaq(openFaq === index ? null : index)}>{question}<span aria-hidden="true">+</span></button>
+                <button id={`faq-question-${index}`} className={styles.faqTrigger} type="button" aria-expanded={openFaq === index} aria-controls={`faq-answer-${index}`} onClick={() => setOpenFaq(openFaq === index ? null : index)}>{question}<span aria-hidden="true">{openFaq === index ? <Minus size={16} /> : <Plus size={16} />}</span></button>
                 <div id={`faq-answer-${index}`} className={styles.faqAnswer} role="region" aria-labelledby={`faq-question-${index}`} aria-hidden={openFaq !== index} data-open={openFaq === index}><div><p>{answer}</p></div></div>
               </div>)}</div>
             </div>

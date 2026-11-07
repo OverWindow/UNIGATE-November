@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ExternalLink } from "lucide-react";
 import { useApp } from "@/app/providers";
 import { examContent, type ExamArea, type ExamFormat } from "@/lib/exam-content";
 import { landingContent } from "@/lib/landing-content";
@@ -25,9 +26,7 @@ export default function ExamPage({ format }: { format: ExamFormat }) {
             <p className="exam-description">{exam.description}</p>
             <a className="text-link" href="https://www.topik.go.kr/" target="_blank" rel="noopener noreferrer">
               {landing.guide.action}
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M6 18 18 6M6 6h12v12" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              <ExternalLink size={18} strokeWidth={1.7} aria-hidden="true" />
             </a>
           </div>
         </section>
