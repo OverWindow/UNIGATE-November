@@ -51,7 +51,7 @@ class Attempt(models.Model):
         constraints = [
             models.CheckConstraint(condition=models.Q(exam_format__in=["pbt", "ibt"]), name="attempt_exam_format_valid"),
             models.CheckConstraint(condition=(models.Q(user__isnull=False, guest_id__isnull=True) | models.Q(user__isnull=True, guest_id__isnull=False)), name="pbt_attempt_owner"),
-            models.CheckConstraint(condition=(models.Q(mode="practice", expires_at__isnull=True) | models.Q(mode="timed", expires_at__isnull=False)), name="pbt_attempt_deadline"),
+            models.CheckConstraint(condition=(models.Q(mode="practice", expires_at__isnull=True) | models.Q(mode="timed", expires_at__isnull=False) | models.Q(mode="timed", exam_format="ibt", section="listening")), name="pbt_attempt_deadline"),
             models.UniqueConstraint(fields=["user", "exam", "mode"], condition=models.Q(status="in_progress", user__isnull=False), name="pbt_active_user_attempt"),
             models.UniqueConstraint(fields=["guest_id", "exam", "mode"], condition=models.Q(status="in_progress", guest_id__isnull=False), name="pbt_active_guest_attempt"),
         ]

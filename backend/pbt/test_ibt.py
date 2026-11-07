@@ -31,7 +31,7 @@ class IbtTests(BankFixtures, TransactionTestCase):
 
     def test_catalog_separates_formats_counts_durations_and_guest_slots(self):
         for exam_format, count, durations in (("pbt", 50, {"reading": 4200, "listening": 3600}),
-                                               ("ibt", 30, {"reading": 2400, "listening": 2100})):
+                                               ("ibt", 30, {"reading": 2400, "listening": None})):
             rows = self.client.get(f"/api/{exam_format}/exams/").json()["exams"]
             self.assertEqual(len(rows), 2)
             for row in rows:
@@ -168,7 +168,7 @@ class IbtTests(BankFixtures, TransactionTestCase):
 
     def test_timed_deadlines_and_late_answers(self):
         self.client.force_login(self.user)
-        for exam, seconds in ((self.ibt_exam, 2400), (self.ibt_listen_exam, 2100)):
+        for exam, seconds in ((self.ibt_exam, 2400),):
             data = self.start(exam, "timed")
             attempt = Attempt.objects.get(pk=data["id"])
             self.assertEqual((attempt.expires_at - attempt.started_at).total_seconds(), seconds)
@@ -181,6 +181,32 @@ class IbtTests(BankFixtures, TransactionTestCase):
             self.assertTrue(result["timedOut"])
             self.assertEqual(result["score"], 3)
             self.assertEqual(result["submittedAt"], expiry.isoformat())
+
+    def test_listening_has_no_overall_deadline_and_submits_explicitly(self):
+        self.client.force_login(self.user)
+        data = self.start(self.ibt_listen_exam, "timed")
+        attempt = Attempt.objects.get(pk=data["id"])
+        self.assertIsNone(data["expiresAt"])
+        self.assertIsNone(attempt.expires_at)
+        Attempt.objects.filter(pk=attempt.pk).update(started_at=timezone.now() - timedelta(hours=2))
+        path = f"/api/ibt/attempts/{attempt.pk}/"
+        self.assertEqual(self.client.get(path).json()["status"], "in_progress")
+        self.assertEqual(self.client.put(path + "answers/30/", {"selectedOption": 2}, content_type="application/json").status_code, 200)
+        self.assertEqual(self.start(self.ibt_listen_exam, "timed")["id"], data["id"])
+        result = self.client.post(path + "submit/").json()
+        self.assertEqual((result["status"], result["score"], result["timedOut"]), ("submitted", 3, False))
+        self.assertEqual(self.client.post(path + "submit/").json()["submittedAt"], result["submittedAt"])
+
+    def test_only_timed_ibt_listening_allows_a_null_deadline(self):
+        for exam in (self.exam, self.ibt_exam, self.ibt_listen_exam):
+            with self.subTest(exam_format=exam.exam_format, section=exam.section):
+                fields = dict(exam=exam, exam_format=exam.exam_format, section=exam.section, title=exam.title,
+                              guest_id=uuid.uuid4(), mode="timed", started_at=timezone.now(), expires_at=None)
+                if exam == self.ibt_listen_exam:
+                    Attempt.objects.create(**fields)
+                else:
+                    with self.assertRaises(IntegrityError), transaction.atomic():
+                        Attempt.objects.create(**fields)
 
     def test_guest_restrictions_ownership_and_csrf(self):
         self.ibt_exam.guest_slot = None

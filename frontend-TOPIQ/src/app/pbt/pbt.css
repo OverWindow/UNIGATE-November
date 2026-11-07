@@ -217,6 +217,56 @@
   .pbt-dialog { padding: 24px 20px; }
   .pbt-dialog-actions .button { padding-inline: 14px; }
 }
+.ibt-timing-label { justify-self: end; font-size: 12px; }
+.ibt-listening-paper { padding: 26px 40px; }
+.ibt-listening-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); margin-bottom: 30px; padding-bottom: 24px; }
+.ibt-listening-heading .pbt-position { justify-self: end; }
+.ibt-phase-timers { display: flex; gap: 20px; }
+.ibt-phase-timer { position: relative; min-width: 76px; padding: 6px 8px 4px; border: 1px solid #ccd0d6; border-radius: 9px; color: #526176; text-align: center; font-variant-numeric: tabular-nums; }
+.ibt-phase-timer > span { position: absolute; top: -8px; left: 50%; transform: translateX(-50%); padding: 0 7px; border-radius: 4px; color: #fff; background: #767f8a; font-size: 10px; line-height: 14px; white-space: nowrap; }
+.ibt-phase-timer > strong { font-size: 13px; font-weight: 500; }
+.ibt-phase-timer.is-active { border-color: #4baf18; color: #34850c; }
+.ibt-phase-timer.is-active > span { background: #419710; }
+.ibt-listening-questions { max-width: 840px; margin: 0 auto; }
+.ibt-listening-questions .pbt-question { max-width: none; }
+.ibt-listening-questions .pbt-group-questions > .pbt-question + .pbt-question { border-top: 0; padding-top: 24px; }
+.ibt-audio-alert { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ibt-audio-bar { flex-shrink: 0; padding: 9px 0; background: #e0efff; border-top: 1px solid #255bb6; }
+.ibt-audio-controls { display: flex; justify-content: center; align-items: center; gap: 16px; }
+.ibt-audio-progress, .ibt-volume { display: flex; align-items: center; gap: 16px; min-height: 40px; padding: 6px 20px; border-radius: 24px; background: #fff; color: #173d84; }
+.ibt-audio-progress { flex: 1; max-width: 650px; min-width: 0; }
+.ibt-progress-time { white-space: nowrap; font-size: 12px; font-variant-numeric: tabular-nums; }
+.ibt-audio-progress progress { width: 100%; height: 4px; border: 0; border-radius: 3px; background: #ccd0d6; color: #285ab7; }
+.ibt-audio-progress progress::-webkit-progress-bar { background: #ccd0d6; border-radius: 3px; }
+.ibt-audio-progress progress::-webkit-progress-value { background: #285ab7; border-radius: 3px; }
+.ibt-audio-progress progress::-moz-progress-bar { background: #285ab7; border-radius: 3px; }
+.ibt-audio-controls input[type=range] { min-width: 0; height: 24px; margin: 0; accent-color: #234c92; cursor: pointer; }
+.ibt-audio-progress input { flex: 1; width: 100%; }
+.ibt-volume { flex-shrink: 0; gap: 12px; }
+.ibt-volume input { width: 85px; }
+.ibt-play-button { display: grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; color: #173d84; background: #edf4ff; cursor: pointer; }
+.ibt-audio-controls :focus-visible { outline: 2px solid #255bb6; outline-offset: 3px; }
+@media (max-width: 760px) {
+  .ibt-listening-paper { padding: 20px 18px; }
+  .ibt-listening-heading { gap: 12px; }
+  .ibt-phase-timers { gap: 8px; }
+  .ibt-phase-timer { min-width: 68px; padding-inline: 4px; }
+  .ibt-audio-controls { gap: 8px; }
+  .ibt-audio-progress, .ibt-volume { gap: 8px; padding-inline: 12px; }
+  .ibt-volume input { width: 60px; }
+}
+@media (max-width: 520px) {
+  .ibt-listening-heading { grid-template-columns: 1fr 1fr; }
+  .ibt-phase-timers { grid-column: 1 / -1; grid-row: 2; justify-content: center; margin-top: 6px; }
+  .ibt-listening-heading .pbt-position { grid-column: 2; grid-row: 1; }
+  .ibt-phase-timer { min-width: 76px; }
+  .ibt-audio-controls { gap: 6px; }
+  .ibt-audio-progress { flex-wrap: wrap; gap: 4px 8px; }
+  .ibt-audio-progress progress, .ibt-audio-progress input { flex-basis: 100%; }
+  .ibt-volume { padding-inline: 10px; gap: 6px; }
+  .ibt-volume svg { width: 19px; }
+  .ibt-volume input { width: 50px; }
+}
 .exam-feedback-main { max-width: 800px; margin: 0 auto; padding: 40px 20px 80px; }
 .exam-feedback-card { margin-top: 24px; padding: 36px; border: 1px solid #d6dfec; border-radius: 20px; background: #fff; box-shadow: 0 10px 32px #162f7f08; }
 .exam-feedback-card h1 { font-size: clamp(1.5rem, 4vw, 2rem); line-height: 1.4; margin: 8px 0 16px; }

@@ -24,12 +24,13 @@ export default function SiteHeader({ authHref }: { authHref?: string }) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const languagePicker = useRef<HTMLDivElement>(null);
   const languageButton = useRef<HTMLButtonElement>(null);
+  const accountPicker = useRef<HTMLDivElement>(null);
+  const accountButton = useRef<HTMLButtonElement>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState(false);
-  const [notice, setNotice] = useState<{ index: number; sequence: number } | null>(null);
-  const noticeSequence = useRef(0);
   const menuButton = useRef<HTMLButtonElement>(null);
   const t = landingContent[language];
   const a = authContent[language];
@@ -38,24 +39,21 @@ export default function SiteHeader({ authHref }: { authHref?: string }) {
     ? "/login" : `/login?next=${encodeURIComponent(pathname)}`);
 
   useEffect(() => {
-    if (!languageOpen) return;
+    if (!languageOpen && !accountOpen) return;
     function closeOutside(event: PointerEvent) {
-      if (event.target instanceof Node && !languagePicker.current?.contains(event.target)) setLanguageOpen(false);
+      if (!(event.target instanceof Node)) return;
+      if (!languagePicker.current?.contains(event.target)) setLanguageOpen(false);
+      if (!accountPicker.current?.contains(event.target)) setAccountOpen(false);
     }
     document.addEventListener("pointerdown", closeOutside);
     return () => document.removeEventListener("pointerdown", closeOutside);
-  }, [languageOpen]);
-
-  useEffect(() => {
-    if (!notice) return;
-    const timeout = window.setTimeout(() => setNotice(null), 4500);
-    return () => window.clearTimeout(timeout);
-  }, [notice]);
+  }, [languageOpen, accountOpen]);
 
   async function handleLogout() {
+    if (loggingOut) return;
     setLoggingOut(true);
     setLogoutError(false);
-    try { await logout(); } catch { setLogoutError(true); }
+    try { await logout(); setAccountOpen(false); } catch { setLogoutError(true); }
     finally { setLoggingOut(false); }
   }
 
@@ -64,14 +62,7 @@ export default function SiteHeader({ authHref }: { authHref?: string }) {
     return href ? (
       <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined} onClick={() => setMenuOpen(false)}>{label}</Link>
     ) : (
-      <div className="pending-nav-item" key={label}>
-        <button className="pending-nav-button" type="button" onClick={() => setNotice({ index, sequence: ++noticeSequence.current })}>
-          <span>{label}</span><span className="coming-soon-badge">{t.comingSoon.badge}</span>
-        </button>
-        {notice?.index === index && (
-          <p className="coming-soon-notice" role="status" key={notice.sequence}>{t.comingSoon.message}</p>
-        )}
-      </div>
+      <button className="pending-nav-button" type="button" key={label} disabled>{label}</button>
     );
   });
 
@@ -83,7 +74,6 @@ export default function SiteHeader({ authHref }: { authHref?: string }) {
         if (main) { event.preventDefault(); main.focus(); main.scrollIntoView(); }
       }}>{t.accessibility.skip}</a>
       <header className="site-header" onKeyDown={(event) => {
-        if (event.key === "Escape") setNotice(null);
         if (event.key === "Escape" && menuOpen) {
           setMenuOpen(false);
           menuButton.current?.focus();
@@ -104,9 +94,8 @@ export default function SiteHeader({ authHref }: { authHref?: string }) {
                 languageButton.current?.focus();
               }
             }}>
-              <button className="language-trigger" type="button" ref={languageButton} aria-label={`${t.accessibility.language}: ${languages.find(item => item.code === language)?.name}`} title={t.accessibility.language} aria-expanded={languageOpen} aria-controls="language-options" onClick={() => { setLanguageOpen(!languageOpen); setMenuOpen(false); }}>
+              <button className="language-trigger" type="button" ref={languageButton} aria-label={`${t.accessibility.language}: ${languages.find(item => item.code === language)?.name}`} title={t.accessibility.language} aria-expanded={languageOpen} aria-controls="language-options" onClick={() => { setLanguageOpen(!languageOpen); setMenuOpen(false); setAccountOpen(false); }}>
                 <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a17 17 0 0 1 0 18 17 17 0 0 1 0-18Z" /></svg>
-                <svg className="language-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
               </button>
               <div className="language-options" id="language-options" role="group" aria-label={t.accessibility.language} hidden={!languageOpen}>
                 {languages.map(({ code, name }) => <button key={code} type="button" lang={code} aria-pressed={language === code} onClick={() => { setLanguage(code); setLanguageOpen(false); languageButton.current?.focus(); }}>
@@ -115,9 +104,25 @@ export default function SiteHeader({ authHref }: { authHref?: string }) {
               </div>
             </div>
             {status === "authenticated" && user ? (
-              <div className="account-actions">
-                <span className="account-name" title={user.nickname}>{user.nickname}</span>
-                <button className="header-login" type="button" disabled={loggingOut} onClick={() => void handleLogout()}>{loggingOut ? a.submitting : a.logout}</button>
+              <div className="account-actions" ref={accountPicker} onBlur={event => {
+                // Disabling the logout button can blur it without moving focus elsewhere.
+                if (loggingOut && event.relatedTarget === null) return;
+                if (!event.currentTarget.contains(event.relatedTarget)) setAccountOpen(false);
+              }} onKeyDown={event => {
+                if (event.key === "Escape" && accountOpen) {
+                  event.stopPropagation();
+                  setAccountOpen(false);
+                  accountButton.current?.focus();
+                }
+              }}>
+                <button className="account-name" type="button" ref={accountButton} id="account-trigger" title={user.nickname}
+                  aria-expanded={accountOpen} aria-controls="account-menu" onClick={() => {
+                    setAccountOpen(!accountOpen); setLanguageOpen(false); setMenuOpen(false);
+                  }}>{user.nickname}</button>
+                <div className="account-menu" id="account-menu" role="group" aria-labelledby="account-trigger" hidden={!accountOpen}>
+                  <button type="button" disabled={loggingOut} aria-busy={loggingOut} onClick={() => void handleLogout()}>{loggingOut ? a.submitting : a.logout}</button>
+                  {logoutError && <p className="account-menu-error" role="alert">{a.network}</p>}
+                </div>
               </div>
             ) : status === "error" ? (
               <button className="header-login" type="button" aria-label={`${a.retry}: ${a.network}`} onClick={() => void refreshSession()}>{a.retry}</button>
@@ -131,7 +136,7 @@ export default function SiteHeader({ authHref }: { authHref?: string }) {
                 router.push(`/login?next=${encodeURIComponent(current)}`);
               }}>{a.login}</Link>
             )}
-            <button className="menu-toggle" type="button" ref={menuButton} aria-label={menuOpen ? t.accessibility.closeMenu : t.accessibility.openMenu} aria-controls="mobile-navigation" aria-expanded={menuOpen} onClick={() => { setMenuOpen(!menuOpen); setNotice(null); }}>
+            <button className="menu-toggle" type="button" ref={menuButton} aria-label={menuOpen ? t.accessibility.closeMenu : t.accessibility.openMenu} aria-controls="mobile-navigation" aria-expanded={menuOpen} onClick={() => { setMenuOpen(!menuOpen); setLanguageOpen(false); setAccountOpen(false); }}>
               <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
                 <path d={menuOpen ? "m6 6 12 12M6 18 18 6" : "M4 6h16M4 12h16M4 18h16"} />
               </svg>
@@ -139,7 +144,6 @@ export default function SiteHeader({ authHref }: { authHref?: string }) {
           </div>
         </div>
         <nav className="mobile-navigation" id="mobile-navigation" aria-label={t.accessibility.navigation} hidden={!menuOpen}>{navigation}</nav>
-        {logoutError && <p className="header-auth-notice" role="alert">{a.network}</p>}
       </header>
     </>
   );

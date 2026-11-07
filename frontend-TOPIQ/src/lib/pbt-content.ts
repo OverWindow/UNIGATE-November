@@ -76,22 +76,37 @@ export const pbtContent: Record<Language, Copy> = {
   },
 };
 
+export const ibtTimedHints: Record<Language, Record<"reading" | "listening", string>> = {
+  ko: {
+    reading: "제한 시간 40분. 시간이 끝나면 자동 제출됩니다.",
+    listening: "지문별 대기 3초 → 음원 → 풀이 13초(1문항)·20초(2문항). 풀이 종료 시 다음 지문으로 이동하고, 마지막에 자동 제출됩니다.",
+  },
+  en: {
+    reading: "Time limit: 40 minutes. Answers submit automatically when time runs out.",
+    listening: "Per passage: 3s wait → audio → 13s for one question or 20s for two. Moves to the next passage when time runs out and submits automatically after the last passage.",
+  },
+  id: {
+    reading: "Batas waktu 40 menit. Jawaban dikirim otomatis saat waktu habis.",
+    listening: "Per teks: tunggu 3 detik → audio → 13 detik untuk 1 soal atau 20 detik untuk 2 soal. Berpindah ke teks berikutnya saat waktu habis dan dikirim otomatis setelah teks terakhir.",
+  },
+};
+
 const ibtCopy: Record<Language, Pick<Copy, "intro" | "timedHint" | "guestNote" | "score">> = {
   ko: {
     intro: "영역과 응시 방식을 선택하세요. 한 세트는 30문항이며, 모의고사 점수는 정답률을 100점으로 환산합니다.",
-    timedHint: "듣기 35분 · 읽기 40분. 시간이 끝나면 자동 제출됩니다.",
+    timedHint: ibtTimedHints.ko.reading,
     guestNote: "비회원 공개 세트는 영역별 최대 3세트입니다. 로그인하면 공개된 모든 세트를 이용할 수 있습니다.",
     score: "모의고사 환산 점수",
   },
   en: {
     intro: "Choose a section and mode. Each set has 30 questions. Mock scores convert your accuracy to a 100-point scale.",
-    timedHint: "Listening: 35 min · Reading: 40 min. Answers submit when time runs out.",
+    timedHint: ibtTimedHints.en.reading,
     guestNote: "Up to 3 sets per section are available to guests. Sign in to access all published sets.",
     score: "Converted mock score",
   },
   id: {
     intro: "Pilih bidang dan mode. Setiap set berisi 30 soal. Nilai simulasi dikonversi dari persentase jawaban benar ke skala 100.",
-    timedHint: "Menyimak 35 menit · Membaca 40 menit. Jawaban dikirim saat waktu habis.",
+    timedHint: ibtTimedHints.id.reading,
     guestNote: "Tamu dapat mengakses hingga 3 set per bidang. Masuk untuk mengakses semua set yang dipublikasikan.",
     score: "Nilai konversi simulasi",
   },

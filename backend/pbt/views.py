@@ -140,8 +140,9 @@ def attempts(request, exam_format="pbt"):
         if restart is not None:
             finalize(restart, force=True)
         now = timezone.now()
+        duration = EXAM_FORMATS[exam_format]["duration"][exam.section]
         attempt = Attempt.objects.create(exam=exam, exam_format=exam_format, title=exam.title, section=exam.section, mode=data["mode"],
-            started_at=now, expires_at=now + timedelta(seconds=EXAM_FORMATS[exam_format]["duration"][exam.section]) if data["mode"] == "timed" else None, **owner)
+            started_at=now, expires_at=now + timedelta(seconds=duration) if data["mode"] == "timed" and duration is not None else None, **owner)
         AttemptItem.objects.bulk_create([AttemptItem(attempt=attempt, **q) for q in questions])
         return response(attempt_data(attempt, request=request), 201)
 

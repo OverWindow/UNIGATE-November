@@ -17,7 +17,7 @@ export const homeContent: Record<Language, HomeContent> = {
       description: "TOPIK II 읽기와 듣기 50문항을 실전 또는 연습 모드로 풀고,\n정확한 응답 분석과 오답 해설을 확인할 수 있습니다.",
       action: "TOPIQ 소개",
     },
-    tests: { title: "모의고사 선택", description: "읽기 또는 듣기 모의고사를 선택하세요.\n각 회차는 50문항, 총 100점입니다.", round: "회차", section: "영역", mode: "모드", timed: "실전 모드", practice: "연습 모드", start: "모의고사 시작" },
+    tests: { title: "PBT 모의고사 선택", description: "읽기 또는 듣기 모의고사를 선택하세요.\n각 회차는 50문항, 총 100점입니다.", round: "회차", section: "영역", mode: "모드", timed: "실전 모드", practice: "연습 모드", start: "모의고사 시작" },
     about: {
       title: "TOPIK 문제 풀이와\n결과 확인을 한곳에서",
       description: "TOPIQ는 외국인 한국어 학습자를 위한 AI 기반 TOPIK 학습 서비스입니다. 다양한 문제를 풀고 정답과 해설을 확인하며 한국어 학습을 이어갈 수 있습니다.",
@@ -59,7 +59,7 @@ export const homeContent: Record<Language, HomeContent> = {
       description: "Take 50-question TOPIK II reading and listening tests in timed or practice mode,\nthen review detailed response analysis and explanations.",
       action: "About TOPIQ",
     },
-    tests: { title: "Choose a Mock Test", description: "Choose a TOPIK II reading or listening test.\nEach set has 50 questions and a maximum score of 100.", round: "Set", section: "Section", mode: "Mode", timed: "Timed Mode", practice: "Practice Mode", start: "Start Mock Test" },
+    tests: { title: "Choose a PBT Mock Test", description: "Choose a TOPIK II reading or listening test.\nEach set has 50 questions and a maximum score of 100.", round: "Set", section: "Section", mode: "Mode", timed: "Timed Mode", practice: "Practice Mode", start: "Start Mock Test" },
     about: {
       title: "TOPIK practice and\nresults in one place",
       description: "TOPIQ is an AI-powered TOPIK learning service for international Korean learners. Practice a range of questions, check your answers, and learn from explanations.",
@@ -101,7 +101,7 @@ export const homeContent: Record<Language, HomeContent> = {
       description: "Kerjakan 50 soal membaca dan menyimak TOPIK II dalam mode simulasi atau latihan,\nlalu tinjau analisis jawaban dan pembahasannya.",
       action: "Tentang TOPIQ",
     },
-    tests: { title: "Pilih Simulasi TOPIK", description: "Pilih simulasi membaca atau menyimak TOPIK II.\nSetiap set berisi 50 soal dengan nilai maksimal 100.", round: "Set", section: "Bidang", mode: "Mode", timed: "Mode Simulasi", practice: "Mode Latihan", start: "Mulai Simulasi" },
+    tests: { title: "Pilih Simulasi PBT", description: "Pilih simulasi membaca atau menyimak TOPIK II.\nSetiap set berisi 50 soal dengan nilai maksimal 100.", round: "Set", section: "Bidang", mode: "Mode", timed: "Mode Simulasi", practice: "Mode Latihan", start: "Mulai Simulasi" },
     about: {
       title: "Latihan dan hasil TOPIK\ndi satu tempat",
       description: "TOPIQ adalah layanan belajar TOPIK berbasis AI untuk pelajar bahasa Korea internasional. Kerjakan beragam soal, periksa jawaban, dan pelajari pembahasannya.",
