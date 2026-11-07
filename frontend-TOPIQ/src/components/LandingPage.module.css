@@ -67,16 +67,16 @@
 .officialLink { display: flex; justify-content: flex-end; margin-top: 16px; }
 .officialLink a { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 8px 12px; color: #2d5ec5; font-size: 12px; font-weight: 600; line-height: 16px; }
 .officialLink a:hover { color: #ea6641; text-decoration: underline; text-underline-offset: 4px; }
-.useGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 36px; }
+.useGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 48px; }
 .useCard { position: relative; min-width: 0; min-height: 240px; padding: 24px; border: 1px solid #1118271a; border-radius: 22.4px 22.4px 7.2px; background: linear-gradient(145deg, #fffffff0, #f8faffcc); box-shadow: 0 12px 36px #1118270b; overflow: hidden; transition: transform .3s, border-color .22s, box-shadow .3s; }
-.useCard::before { position: absolute; top: 0; left: 24px; width: 44px; height: 2px; content: ""; background: #ea6641; transition: width .32s; }
+.useCard::before { position: absolute; top: 0; left: 24px; width: 44px; height: 2px; content: ""; background: #2d5ec5; transition: width .32s; }
 .useCard:nth-child(2) { border-radius: 7.2px 22.4px 22.4px; background: linear-gradient(160deg, #f5f8ffeb, #fffffff0); }
 .useCard:nth-child(3) { border-radius: 22.4px 7.2px 22.4px 22.4px; }
-.useCard:hover { border-color: #ea66413d; box-shadow: 0 22px 48px #162f7f17; transform: translateY(-5px); }
+.useCard:hover { border-color: #2d5ec53d; box-shadow: 0 22px 48px #162f7f17; transform: translateY(-5px); }
 .useCard:hover::before { width: 88px; }
 .useIcon { position: absolute; top: 20px; right: 20.8px; color: #2d5ec529; transform: rotate(-7deg); transition: color .25s, transform .32s; }
 .useIcon svg { width: 57.6px; height: 57.6px; stroke-width: 1.15px; }
-.useCard:hover .useIcon { color: #ea66414d; transform: rotate(0) translateY(-2px); }
+.useCard:hover .useIcon { color: #2d5ec54d; transform: rotate(0) translateY(-2px); }
 .useCard h3 { position: relative; margin: 48px 0 0; font-size: 18px; font-weight: 600; line-height: 28px; }
 .useCard p { position: relative; margin: 8px 0 0; color: #4b5563; font-size: 14px; line-height: 24px; }
 .faq { border-top: 1px solid #e5e7ebcc; }

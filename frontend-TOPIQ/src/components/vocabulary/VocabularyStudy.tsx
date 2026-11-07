@@ -40,14 +40,16 @@ export default function VocabularyStudy({ id }: { id: string }) {
   const word = data?.words[index];
   const meaning = word?.meanings[meaningLanguage]?.trim();
   return <div className="page-container vocabulary-study">
-    <Link className="vocabulary-back" href={backHref}><ArrowLeft size={14} aria-hidden="true" /> {t.back}</Link>
+    <div className="vocabulary-study-top">
+      <Link className="vocabulary-back" href={backHref}><ArrowLeft size={14} aria-hidden="true" /> {t.back}</Link>
+      {data && word && !error && <div className="vocabulary-study-heading">
+        <h1>{vocabularyLevelLabel(data.level, language)} <span>·</span> SET {String(data.number).padStart(2, "0")}</h1>
+      </div>}
+    </div>
     {error ? <div className="vocabulary-status vocabulary-error" role="alert">
       <p>{error instanceof VocabularyError && error.status === 404 ? t.notFound : t.error}</p>
       <button className="button vocabulary-secondary" onClick={() => setRevision(value => value + 1)}>{t.retry}</button>
     </div> : !data || !word ? <p className="vocabulary-status" role="status">{t.loading}</p> : <>
-      <div className="vocabulary-study-heading"><div>
-        <h1>{vocabularyLevelLabel(data.level, language)} <span>·</span> SET {String(data.number).padStart(2, "0")}</h1>
-      </div><p>{data.wordCount} {t.words}</p></div>
       <div className="vocabulary-study-grid">
         <aside className="vocabulary-word-list">
           <h2 className="vocabulary-list-title">{t.wordList}</h2>
@@ -71,10 +73,12 @@ export default function VocabularyStudy({ id }: { id: string }) {
               {word.partOfSpeech && <span className="vocabulary-pos" lang="ko">{word.partOfSpeech}</span>}
               <button className="button vocabulary-reveal" aria-expanded={revealed} aria-controls="vocabulary-meaning" onClick={() => setRevealed(!revealed)}>{revealed ? t.hideMeaning : t.showMeaning}</button>
             </div>
-            <div id="vocabulary-meaning" className="vocabulary-word-meaning" hidden={!revealed}>
-              <h3>{t.meaning}</h3><p className="vocabulary-definition" lang={meaning ? meaningLanguage : language}>{meaning || t.missingMeaning}</p>
-              <div className="vocabulary-example"><h3>{t.example}</h3><p lang="ko">{word.exampleKorean}</p>
-                <h3>{t.englishExample}</h3><p lang="en">{word.exampleEnglish}</p></div>
+            <div id="vocabulary-meaning" className={`vocabulary-meaning-region${revealed ? " is-open" : ""}`} aria-hidden={!revealed}>
+              <div className="vocabulary-meaning-inner"><div className="vocabulary-word-meaning">
+                <h3>{t.meaning}</h3><p className="vocabulary-definition" lang={meaning ? meaningLanguage : language}>{meaning || t.missingMeaning}</p>
+                <div className="vocabulary-example"><h3>{t.example}</h3><p lang="ko">{word.exampleKorean}</p>
+                  <h3>{t.englishExample}</h3><p lang="en">{word.exampleEnglish}</p></div>
+              </div></div>
             </div>
           </article>
           <nav className="vocabulary-card-navigation" aria-label={t.wordList}>

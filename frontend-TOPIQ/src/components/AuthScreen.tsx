@@ -164,8 +164,10 @@ export default function AuthScreen({ mode, verification, returnPath }: {
                   }} />}
                 {error && <p className="auth-error" role="alert">{message(error)}</p>}
                 {fields.verification_token && <div className="auth-error" role="alert"><p>{fieldMessage("verification_token")}</p><Link className="verification-change" href={signupHref}>{e.restart}</Link></div>}
-                {isSurvey && <button type="button" className="text-link signup-back" onClick={() => { setSignupStep("account"); setError(""); focusField("nickname"); }}><ArrowLeft size={16} aria-hidden="true" /> {s.back}</button>}
-                <button type="submit" className="button button-primary auth-submit auth-compact-submit" aria-busy={pending}>{pending ? t.submitting : isSignup ? isSurvey ? s.finish : s.next : t.login}</button>
+                <div className="auth-form-actions">
+                  {isSurvey && <button type="button" className="text-link signup-back" onClick={() => { setSignupStep("account"); setError(""); focusField("nickname"); }}><ArrowLeft size={16} aria-hidden="true" /> {s.back}</button>}
+                  <button type="submit" className="button button-primary auth-submit auth-compact-submit" aria-busy={pending}>{pending ? t.submitting : isSignup ? isSurvey ? s.finish : s.next : t.login}</button>
+                </div>
               </fieldset>
             </form>
           )}
