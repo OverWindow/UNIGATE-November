@@ -21,6 +21,7 @@ const nextConfig: NextConfig = {
       { source: "/api/auth/:path*", destination: `${backendOrigin.origin}/api/auth/:path*/` },
       { source: "/api/pbt/:path*", destination: `${backendOrigin.origin}/api/pbt/:path*/` },
       { source: "/api/ibt/:path*", destination: `${backendOrigin.origin}/api/ibt/:path*/` },
+      { source: "/api/vocabulary/:path*", destination: `${backendOrigin.origin}/api/vocabulary/:path*/` },
       { source: "/api/csrf/", destination: `${backendOrigin.origin}/api/csrf/` },
     ];
   },

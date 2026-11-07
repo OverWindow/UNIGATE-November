@@ -4,6 +4,68 @@
 단일 페이지에서 안내 콘텐츠, 비용 비교, 대학 갤러리와 통계 팝업을 제공하고, PDF 신청 정보를 PostgreSQL에 저장합니다.
 PDF 파일은 운영자가 나중에 수동으로 보냅니다. 이 랜딩페이지에는 자동 다운로드·메일 발송·회원가입·이용자 로그인·결제·백그라운드 작업이 없습니다. 별도 TOPIQ의 인증 기능은 공유 백엔드에 유지합니다.
 
+## TOPIQ 급수별 단어장
+
+`/vocabulary`에서 3~6급 세트를 선택하고 `/vocabulary/sets/[id]`에서 단어·품사·뜻·예문을 봅니다.
+비회원도 동일하게 이용하며 이어서 학습, 완료 표시, 단어별 암기 상태, 오늘의 복습은 제공하지 않습니다.
+세트를 다시 열면 첫 단어에서 시작합니다. 사이트 UI 언어(한국어·영어·인도네시아어)와 뜻 언어(영어·베트남어·일본어)는 별개이며,
+뜻은 영어가 기본입니다. 예문은 한국어와 영어 번역을 제공합니다. 원본에 없는 인도네시아어 뜻이나 다른 언어의 예문 번역은 만들지 않습니다.
+
+원본 `topik_bank.vocabulary`는 읽기 전용 unmanaged 모델로 연결합니다. 원본 테이블·컬럼·단어 데이터는 변경하지 않습니다.
+서비스용 테이블은 `vocabulary_sets`(급수·세트 번호), `vocabulary_set_items`(원본 단어 ID·세트 내 순서) 두 개입니다.
+원본 ID는 Hub의 데이터 관리를 막는 외래키 없이 참조하며, 등록 시와 세트 조회 시 원본 존재·급수 일치를 검사합니다.
+원본 단어 삭제·급수 변경으로 연결이 맞지 않으면 자동 재배치하지 않고 명령을 중단하거나 API가 503을 반환합니다.
+
+### 적용 순서와 초기 세트 등록
+
+로컬에서는 사용자가 `backend/`에서 아래 명령을 **수동 실행**합니다. 첫 두 단계가 완료된 뒤 기능을 사용하세요.
+
+```powershell
+# 1. 서비스 테이블 생성. 원본 vocabulary는 생성·변경하지 않습니다.
+.\.venv\Scripts\python.exe manage.py migrate
+
+# 2. 등록 예상 수량 점검 후, 세트·연결 데이터 등록
+.\.venv\Scripts\python.exe manage.py create_vocabulary_sets --check
+.\.venv\Scripts\python.exe manage.py create_vocabulary_sets
+```
+
+스키마 변경은 `migration/vocabulary/0001_initial.py`로만 적용합니다.
+`migration/question_bank/0005_vocabulary.py`는 기존 원본의 Django 모델 상태만 등록하며 DB 테이블을 만들지 않습니다.
+`create_vocabulary_sets --check`는 읽기 전용 트랜잭션으로 예정 수량과 기존 연결을 점검하고 **데이터를 쓰지 않습니다**.
+옵션 없는 명령은 두 서비스 테이블에만 데이터를 추가하며, 단어와 사용자 데이터는 변경하지 않습니다.
+급수별 미배정 단어를 `vocabulary_id` 순으로 정렬한 뒤 최대 20개씩 균등 분배합니다.
+처음 확인한 8,258개 기준 3급 80·4급 104·5급 107·6급 124세트이며 각 세트는 19~20개입니다.
+재실행 시 기존 세트·순서는 유지하고 새 단어만 뒷번호 세트로 추가합니다. 소량 추가 시 새 세트는 20개보다 작을 수 있습니다.
+동시 등록은 테이블 잠금으로 직렬화하고, 오류 시 해당 실행의 쓰기를 롤백합니다.
+
+운영은 기존 `deploy/start.sh`가 migration을 **자동 실행**한 후 Gunicorn을 시작합니다.
+배포 및 Hub 원본 준비 후 운영 컨테이너 `/app/backend`에서 다음을 **수동 실행**해야 실제 세트가 표시됩니다.
+
+```sh
+python manage.py create_vocabulary_sets --check
+python manage.py create_vocabulary_sets
+```
+
+세트 구성 명령은 서버 시작 시 자동 실행하지 않으며 별도 워커·스케줄러는 없습니다.
+TOPIQ 프론트엔드는 새 `/api/vocabulary/` rewrite를 포함해 다시 빌드·배포해야 합니다.
+
+### 조회 API와 검증
+
+| 메서드 | 경로 | 목적 |
+| --- | --- | --- |
+| GET | `/api/vocabulary/levels/` | 등록된 급수별 단어·세트 수 |
+| GET | `/api/vocabulary/sets/?level=3&page=1` | 급수별 세트 목록, 24세트씩 페이지 구분 |
+| GET | `/api/vocabulary/sets/{id}/` | 세트의 단어·세 언어 뜻·한국어/영어 예문 |
+
+조회는 회원 인증 없이 가능하며 사용자별 상태나 학습 기록을 저장하지 않습니다. 쓰기 API는 없습니다.
+등록된 세트가 없으면 빈 목록을 반환합니다. 잘못된 급수·페이지는 400, 없는 세트·페이지는 404,
+테이블 미적용·원본 연결 오류 등은 연결 정보를 노출하지 않는 503 응답으로 처리합니다.
+
+백엔드는 `backend/`에서 `.\.venv\Scripts\python.exe manage.py test vocabulary question_bank.tests config.test_routes --noinput`으로 검사합니다.
+Django 테스트 러너가 별도 테스트 DB를 생성·삭제하므로 운영 연결 설정으로 실행하지 않습니다.
+균등 배정·누락/중복·반복 실행·추가 등록·읽기 전용 점검·페이지 구분·원본 누락·쓰기 차단을 합성 데이터로 검증합니다.
+프론트엔드는 `frontend-TOPIQ/`에서 `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`를 실행합니다.
+
 ## 구성
 
 - 프론트엔드: Node.js 24, npm, Next.js 16, React 19, TypeScript, 일반 CSS. `frontend/out/`으로 정적 내보내기합니다.

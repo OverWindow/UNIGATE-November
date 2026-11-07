@@ -2,6 +2,22 @@
 from django.db import models
 
 
+class Vocabulary(models.Model):
+    vocabulary_id = models.BigIntegerField(primary_key=True)
+    korean = models.TextField()
+    part_of_speech = models.TextField()
+    english = models.TextField()
+    vietnamese = models.TextField()
+    japanese = models.TextField()
+    example_korean = models.TextField()
+    example_english = models.TextField()
+    topik_level = models.SmallIntegerField()
+
+    class Meta:
+        managed = False
+        db_table = '"topik_bank"."vocabulary"'
+
+
 class QuestionSet(models.Model):
     set_id = models.UUIDField(primary_key=True)
     exam_format = models.TextField(default="pbt", choices=[("pbt", "PBT"), ("ibt", "IBT")])
