@@ -7,6 +7,7 @@ import { useApp } from "@/app/providers";
 import { homeContent } from "@/lib/home-content";
 import { pbtRequest, type Attempt, type Exam, type Mode, type Section } from "@/lib/pbt-api";
 import { pbtContent, pbtErrorMessage } from "@/lib/pbt-content";
+import InteractiveDots from "./InteractiveDots";
 import styles from "./LandingPage.module.css";
 
 export default function HomeTestSelector() {
@@ -66,6 +67,7 @@ export default function HomeTestSelector() {
   }
 
   return <section id="tests" className={styles.tests} aria-labelledby="tests-title">
+    <InteractiveDots />
     <div className={styles.container}>
       <div className={styles.sectionIntro}><h2 id="tests-title" className={styles.heading}>{t.title}</h2><p className={styles.description}>{t.description}</p></div>
       <form className={styles.testForm} onSubmit={event => void start(event)} aria-busy={waiting || starting}>

@@ -28,6 +28,7 @@
 .pbt-exam-card .button { width: 100%; justify-content: space-between; }
 .pbt-card-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .pbt-card-actions .button { min-width: 0; padding-inline: 8px; justify-content: center; }
+.pbt-card-actions .button:only-child { grid-column: 1 / -1; justify-self: center; width: calc(50% - 4px); }
 .pbt-card-actions .pbt-restart { background: #e9edf3; color: #42516b; }
 .pbt-card-actions .pbt-restart:hover:not(:disabled) { background: #dfe5ec; }
 .pbt-card-actions .button:disabled { transform: none; }

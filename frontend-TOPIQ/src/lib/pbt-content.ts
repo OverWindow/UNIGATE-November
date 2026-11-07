@@ -79,15 +79,15 @@ export const pbtContent: Record<Language, Copy> = {
 export const ibtTimedHints: Record<Language, Record<"reading" | "listening", string>> = {
   ko: {
     reading: "제한 시간 40분. 시간이 끝나면 자동 제출됩니다.",
-    listening: "지문별 대기 3초 → 음원 → 풀이 13초(1문항)·20초(2문항). 풀이 종료 시 다음 지문으로 이동하고, 마지막에 자동 제출됩니다.",
+    listening: "음원 재생 후 풀이 시간이 끝나면 다음 지문으로 이동합니다. 마지막 지문 후 자동 제출됩니다.",
   },
   en: {
     reading: "Time limit: 40 minutes. Answers submit automatically when time runs out.",
-    listening: "Per passage: 3s wait → audio → 13s for one question or 20s for two. Moves to the next passage when time runs out and submits automatically after the last passage.",
+    listening: "After audio playback, each passage advances when its answer time ends. The test submits after the final passage.",
   },
   id: {
     reading: "Batas waktu 40 menit. Jawaban dikirim otomatis saat waktu habis.",
-    listening: "Per teks: tunggu 3 detik → audio → 13 detik untuk 1 soal atau 20 detik untuk 2 soal. Berpindah ke teks berikutnya saat waktu habis dan dikirim otomatis setelah teks terakhir.",
+    listening: "Setelah audio diputar, ujian beralih ke teks berikutnya saat waktu menjawab habis. Jawaban dikirim otomatis setelah teks terakhir.",
   },
 };
 

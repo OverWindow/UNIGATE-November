@@ -1,12 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { BriefcaseBusiness, Check, Clock3, ExternalLink, GraduationCap, Minus, Plus, ShieldCheck } from "lucide-react";
+import { BriefcaseBusiness, Check, ExternalLink, GraduationCap, Minus, Plus, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { useApp } from "@/app/providers";
 import { homeContent } from "@/lib/home-content";
 import SiteHeader from "./SiteHeader";
 import HomeTestSelector from "./HomeTestSelector";
+import LandingCharacter from "./LandingCharacter";
 import instituteLogo from "../../public/brand/niied-logo.png";
 import styles from "./LandingPage.module.css";
 
@@ -27,16 +28,7 @@ export default function LandingPage() {
               <h1 id="hero-title">{t.hero.title}</h1>
               <p className={styles.description}>{t.hero.description}</p>
             </div>
-            <div className={styles.preview} aria-hidden="true" lang="ko">
-              <div className={styles.previewQuestion}>
-                <p className={styles.previewLabel}>QUESTION 25</p>
-                <p className={styles.previewPrompt}>다음 신문 기사의 제목을 가장 잘 설명한 것을 고르십시오.</p>
-                <div className={styles.previewOptions}>
-                  {["①", "②", "③", "④"].map((number, index) => <div className={styles.previewOption} key={number}><span>{number}</span><i style={{ width: `${54 + index * 8}%` }} /></div>)}
-                </div>
-              </div>
-              <div className={styles.previewBottom}><span>24 / 50</span><span><Clock3 size={16} aria-hidden="true" />38:24</span></div>
-            </div>
+            <LandingCharacter />
           </div>
         </section>
 
