@@ -132,10 +132,44 @@ class VocabularyTests(TransactionTestCase):
         self.assertEqual(self.client.get("/api/vocabulary/sets/99999999999999999999/").status_code, 404)
         self.assertEqual(self.client.get("/api/vocabulary/sets/?level=5").json()["sets"], [])
 
+    def test_source_columns_are_limited_without_per_word_queries(self):
+        self.add_words(6, 480)
+        self.register()
+        group = VocabularySet.objects.filter(topik_level=6).first()
+        catalog_fields = {"vocabulary_id", "korean", "topik_level"}
+        detail_fields = catalog_fields | {
+            "part_of_speech", "english", "vietnamese", "japanese", "example_korean", "example_english",
+        }
+        for path, expected_fields, result_key, count in (
+            ("/api/vocabulary/sets/?level=4", catalog_fields, "sets", 1),
+            ("/api/vocabulary/sets/?level=6", catalog_fields, "sets", 24),
+            (f"/api/vocabulary/sets/{group.pk}/", detail_fields, "words", 20),
+        ):
+            with self.subTest(path=path):
+                with self.assertNumQueries(4) as queries:
+                    result = self.client.get(path)
+                self.assertEqual(result.status_code, 200)
+                self.assertEqual(len(result.json()[result_key]), count)
+                source_queries = [query["sql"] for query in queries
+                                  if 'FROM "topik_bank"."vocabulary"' in query["sql"]]
+                self.assertEqual(len(source_queries), 1)
+                selected = source_queries[0].split(" FROM ", 1)[0]
+                self.assertEqual({field.name for field in Vocabulary._meta.concrete_fields
+                                  if f'."{field.column}"' in selected}, expected_fields)
+
     def test_source_removal_reports_unavailable_instead_of_partial_set(self):
         self.register()
         group = VocabularySet.objects.filter(topik_level=3).first()
-        Vocabulary.objects.filter(pk=30001).delete()
+        Vocabulary.objects.filter(pk=group.items.last().vocabulary_id).delete()
+        for path in (f"/api/vocabulary/sets/{group.pk}/", "/api/vocabulary/sets/?level=3"):
+            result = self.client.get(path)
+            self.assertEqual(result.status_code, 503)
+            self.assertEqual(result.json(), {"error": "vocabulary_unavailable"})
+
+    def test_source_level_change_outside_preview_reports_unavailable(self):
+        self.register()
+        group = VocabularySet.objects.filter(topik_level=3).first()
+        Vocabulary.objects.filter(pk=group.items.last().vocabulary_id).update(topik_level=5)
         for path in (f"/api/vocabulary/sets/{group.pk}/", "/api/vocabulary/sets/?level=3"):
             result = self.client.get(path)
             self.assertEqual(result.status_code, 503)

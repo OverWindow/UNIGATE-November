@@ -66,7 +66,7 @@ def detail(request, set_id):
     group = VocabularySet.objects.prefetch_related("items").filter(pk=set_id).first()
     if group is None:
         return response({"error": "not_found"}, 404)
-    words = source_words([group])
+    words = source_words([group], include_details=True)
     data = set_summary(group, words)
     data["catalogPage"] = (VocabularySet.objects.filter(
         topik_level=group.topik_level, set_number__lt=group.set_number).count() // PAGE_SIZE) + 1

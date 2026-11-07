@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { getEventListeners } from "node:events";
 import { readFile } from "node:fs/promises";
 import { after, test } from "node:test";
 import ts from "typescript";
@@ -37,5 +38,91 @@ test("catalog URLs preserve valid levels and pages and reject malformed selectio
   assert.deepEqual(api.catalogSelection(new URLSearchParams("level=6&page=4")), { level: 6, page: 4 });
   for (const query of ["", "level=2&page=0", "level=3.5&page=-1", "level=3x&page=1e3", "level=&page=99999999999999"]) {
     assert.deepEqual(api.catalogSelection(new URLSearchParams(query)), { level: 3, page: 1 });
+  }
+});
+
+test("a screen signal cancels both catalog requests", async () => {
+  const controller = new AbortController();
+  const signals = [];
+  globalThis.fetch = (_path, { signal }) => new Promise((_resolve, reject) => {
+    signals.push(signal);
+    signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+  });
+  const requests = ["levels/", "sets/?level=3&page=1"].map(path => api.vocabularyRequest(path, controller.signal));
+  const cancelled = Promise.all(requests.map(request => assert.rejects(request, { name: "AbortError" })));
+  controller.abort();
+  await cancelled;
+  assert.equal(signals.length, 2);
+  assert.ok(signals.every(signal => signal.aborted));
+  assert.equal(getEventListeners(controller.signal, "abort").length, 0);
+});
+
+test("an already cancelled request does not start fetching or a timer", async t => {
+  const controller = new AbortController();
+  controller.abort();
+  globalThis.fetch = () => assert.fail("A cancelled request must not fetch");
+  const timer = t.mock.method(globalThis, "setTimeout");
+  await assert.rejects(api.vocabularyRequest("sets/1/", controller.signal), { name: "AbortError" });
+  assert.equal(timer.mock.callCount(), 0);
+  assert.equal(getEventListeners(controller.signal, "abort").length, 0);
+});
+
+test("cancellation and the 15-second deadline cover fetching and reading JSON", async t => {
+  for (const phase of ["fetch", "body"]) {
+    for (const reason of ["navigation", "timeout"]) {
+      await t.test(`${phase}: ${reason}`, async t => {
+        t.mock.timers.enable({ apis: ["setTimeout"] });
+        const controller = new AbortController();
+        let requestSignal;
+        let markStarted;
+        const started = new Promise(resolve => { markStarted = resolve; });
+        globalThis.fetch = async (_path, { signal }) => {
+          requestSignal = signal;
+          const waitForAbort = () => new Promise((_resolve, reject) => {
+            signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+            markStarted();
+          });
+          return phase === "fetch" ? waitForAbort() : { ok: true, status: 200, json: waitForAbort };
+        };
+        const request = api.vocabularyRequest("sets/1/", controller.signal);
+        const rejected = assert.rejects(request, error => reason === "navigation"
+          ? error.name === "AbortError"
+          : error instanceof api.VocabularyError && error.code === "network_error");
+        await started;
+        if (reason === "navigation") {
+          controller.abort();
+        } else {
+          t.mock.timers.tick(14999);
+          assert.equal(requestSignal.aborted, false);
+          t.mock.timers.tick(1);
+        }
+        await rejected;
+        assert.equal(requestSignal.aborted, true);
+        assert.equal(getEventListeners(controller.signal, "abort").length, 0);
+      });
+    }
+  }
+});
+
+test("completed and failed requests clear their deadline and caller listener", async t => {
+  for (const status of [200, 503]) {
+    await t.test(`status ${status}`, async t => {
+      t.mock.timers.enable({ apis: ["setTimeout"] });
+      const controller = new AbortController();
+      const clearTimer = t.mock.method(globalThis, "clearTimeout");
+      let requestSignal;
+      globalThis.fetch = async (_path, { signal }) => {
+        requestSignal = signal;
+        return Response.json(status === 200 ? { sets: [] } : { error: "vocabulary_unavailable" }, { status });
+      };
+      const request = api.vocabularyRequest("sets/?level=3&page=1", controller.signal);
+      if (status === 200) await request;
+      else await assert.rejects(request, error => error.status === 503);
+      assert.equal(clearTimer.mock.callCount(), 1);
+      assert.equal(getEventListeners(controller.signal, "abort").length, 0);
+      controller.abort();
+      t.mock.timers.tick(15000);
+      assert.equal(requestSignal.aborted, false);
+    });
   }
 });

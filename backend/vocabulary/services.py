@@ -23,9 +23,12 @@ def split_words(word_ids):
     return groups
 
 
-def source_words(sets):
+def source_words(sets, *, include_details=False):
     entries = [(group, list(group.items.all())) for group in sets]
-    words = Vocabulary.objects.in_bulk([item.vocabulary_id for _, items in entries for item in items])
+    fields = ("vocabulary_id", "korean", "topik_level")
+    if include_details:
+        fields += ("part_of_speech", "english", "vietnamese", "japanese", "example_korean", "example_english")
+    words = Vocabulary.objects.only(*fields).in_bulk([item.vocabulary_id for _, items in entries for item in items])
     for group, items in entries:
         if not 1 <= len(items) <= 20 or [item.position for item in items] != list(range(1, len(items) + 1)):
             raise VocabularyUnavailable

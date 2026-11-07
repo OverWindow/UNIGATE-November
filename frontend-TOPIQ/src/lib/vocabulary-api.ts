@@ -16,8 +16,11 @@ export class VocabularyError extends Error {
   constructor(public code: string, public status = 0) { super(code); }
 }
 
-export async function vocabularyRequest<T>(path: string): Promise<T> {
+export async function vocabularyRequest<T>(path: string, signal?: AbortSignal): Promise<T> {
+  signal?.throwIfAborted();
   const controller = new AbortController();
+  const abort = () => controller.abort(signal?.reason);
+  signal?.addEventListener("abort", abort, { once: true });
   const timer = setTimeout(() => controller.abort(), 15000);
   try {
     const response = await fetch(`/api/vocabulary/${path}`, {
@@ -25,13 +28,20 @@ export async function vocabularyRequest<T>(path: string): Promise<T> {
     });
     let data;
     try { data = await response.json(); }
-    catch { throw new VocabularyError("server_error", response.status); }
+    catch (error) {
+      if (controller.signal.aborted) throw error;
+      throw new VocabularyError("server_error", response.status);
+    }
     if (!response.ok) throw new VocabularyError(typeof data?.error === "string" ? data.error : "server_error", response.status);
     return data as T;
   } catch (error) {
+    signal?.throwIfAborted();
     if (error instanceof VocabularyError) throw error;
     throw new VocabularyError("network_error");
-  } finally { clearTimeout(timer); }
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", abort);
+  }
 }
 
 export function catalogSelection(params: Pick<URLSearchParams, "get">) {

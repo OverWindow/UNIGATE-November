@@ -24,10 +24,11 @@ export default function VocabularyStudy({ id }: { id: string }) {
       setError(new VocabularyError("not_found", 404));
       return;
     }
-    void vocabularyRequest<VocabularyDetail>(`sets/${id}/`).then(result => {
+    const controller = new AbortController();
+    void vocabularyRequest<VocabularyDetail>(`sets/${id}/`, controller.signal).then(result => {
       if (active) setData(result);
     }).catch(cause => { if (active) setError(cause); });
-    return () => { active = false; };
+    return () => { active = false; controller.abort(); };
   }, [id, revision]);
 
   function move(next: number) {

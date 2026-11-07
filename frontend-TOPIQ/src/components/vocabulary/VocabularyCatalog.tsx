@@ -26,15 +26,16 @@ function CatalogPage({ level, page }: { level: number; page: number }) {
 
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
     setError(null);
     setData(null);
     void Promise.all([
-      vocabularyRequest<{ levels: VocabularyLevel[] }>("levels/"),
-      vocabularyRequest<VocabularyCatalogData>(`sets/?level=${level}&page=${page}`),
+      vocabularyRequest<{ levels: VocabularyLevel[] }>("levels/", controller.signal),
+      vocabularyRequest<VocabularyCatalogData>(`sets/?level=${level}&page=${page}`, controller.signal),
     ]).then(([summary, catalog]) => {
       if (active) setData({ levels: summary.levels, catalog });
     }).catch(cause => { if (active) setError(cause); });
-    return () => { active = false; };
+    return () => { active = false; controller.abort(); };
   }, [level, page, revision]);
 
   const summary = data?.levels.find(item => item.level === level);
