@@ -8,7 +8,6 @@ import { answerText, isAnswered, clockText, pbtRequest, PbtError, remainingSecon
 import type { ExamFormat } from "@/lib/exam-content";
 import { examCopy, pbtErrorMessage } from "@/lib/pbt-content";
 import SiteHeader from "../SiteHeader";
-import { surveyCopy } from "@/lib/learner-survey";
 import PbtQuestion, { QuestionMaterial } from "./PbtQuestion";
 import ListeningPlayer, { type AudioProgress } from "./ListeningPlayer";
 import ListeningSession from "./ListeningSession";
@@ -193,7 +192,6 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
             </div>}
           </div></div>
           <div className="pbt-exam-width pbt-exam-alerts">
-            {attempt.guestAttempt && <p className="pbt-muted">{surveyCopy[language].notice}</p>}
             {saveError && <p role="alert" className="pbt-alert">{t.saveFailed}</p>}
             {remaining === 0 && <p role="status" className="pbt-alert">{t.expired}</p>}
             {submitError && <div role="alert" className="pbt-alert">{t.submitFailed} <button onClick={() => void submit()}>{t.retry}</button></div>}
