@@ -76,9 +76,8 @@ export default function EmailVerificationRequest({ next }: { next: string }) {
           </div>
         )}
         {error && <p className="auth-error" role="alert">{fieldError ? message(fieldError) : message(error)}</p>}
-        <button type="submit" className="button button-primary auth-submit" disabled={pending || remaining > 0} aria-busy={pending}>
+        <button type="submit" className="button button-primary auth-submit auth-compact-submit" disabled={pending || remaining > 0} aria-busy={pending}>
           {pending ? a.submitting : remaining > 0 ? t.cooldown.replace("{seconds}", String(remaining)) : sent ? t.resend : t.send}
-          <span aria-hidden="true">→</span>
         </button>
         {sent && <button className="verification-change" type="button" onClick={() => {
           setSent(false); setError(""); setFieldError(""); setCooldownUntil(0); setRemaining(0);

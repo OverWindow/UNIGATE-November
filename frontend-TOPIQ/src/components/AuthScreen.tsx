@@ -34,7 +34,7 @@ export default function AuthScreen({ mode, verification, returnPath }: {
   const s = signupSurveyCopy[language];
   const isSignup = mode === "signup";
   const isSurvey = isSignup && signupStep === "survey";
-  const title = isSignup ? isSurvey ? s.title : t.signupTitle : t.loginTitle;
+  const title = isSignup ? isSurvey ? s.title : t.signup : t.login;
   const loginHref = `/login?next=${encodeURIComponent(next)}`;
   const signupHref = `/signup?next=${encodeURIComponent(next)}`;
 
@@ -114,11 +114,10 @@ export default function AuthScreen({ mode, verification, returnPath }: {
     <>
       <SiteHeader authHref={loginHref} />
       <main className="auth-main" id="main-content" tabIndex={-1}>
-        <div className={`auth-card${isSurvey ? " auth-survey-card" : ""}`}>
-          <p className="eyebrow">TOPIQ / {isSignup ? t.signup : t.login}</p>
+        <div className={`auth-card${isSignup ? " auth-signup-card" : " auth-login-card"}${isSurvey ? " auth-survey-card" : ""}`}>
           <h1 ref={headingRef} tabIndex={-1}>{title}</h1>
-          <p className="auth-description">{isSignup ? isSurvey ? s.description : verification ? e.finish : e.start : t.loginDescription}</p>
-          {isSignup && <p className="verification-steps">{isSurvey ? s.step : e.steps}</p>}
+          {isSignup && (isSurvey || verification) && <p className="auth-description">{isSurvey ? s.description : e.finish}</p>}
+          {isSurvey && <p className="verification-steps">{s.step}</p>}
           {status === "loading" || status === "authenticated" ? (
             <p className="auth-state" role="status">{t.loading}</p>
           ) : status === "error" ? (
@@ -142,7 +141,7 @@ export default function AuthScreen({ mode, verification, returnPath }: {
                 </div>}
                 <div className="auth-field">
                   <label htmlFor="password">{t.password}</label>
-                  <div className="password-input"><input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete={isSignup ? "new-password" : "current-password"} maxLength={4096} required aria-invalid={!!fields.password} aria-describedby={fields.password ? "password-error" : isSignup ? "password-hint" : undefined} /><button type="button" className="password-toggle" aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? t.hide : t.show}</button></div>
+                  <div className="password-input"><input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete={isSignup ? "new-password" : "current-password"} maxLength={4096} required aria-invalid={!!fields.password} aria-describedby={fields.password ? "password-error" : isSignup ? "password-hint" : undefined} /><button type="button" className="password-toggle" aria-label={!isSignup ? showPassword ? t.hide : t.show : undefined} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{isSignup ? showPassword ? t.hide : t.show : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z" /><circle cx="12" cy="12" r="3" />{showPassword && <path d="M3 3l18 18" />}</svg>}</button></div>
                   {fields.password && <p className="field-error" id="password-error">{fieldMessage("password")}</p>}
                   {isSignup && <p className="field-hint" id="password-hint">{t.passwordHint}</p>}
                 </div>
@@ -163,12 +162,11 @@ export default function AuthScreen({ mode, verification, returnPath }: {
                 {error && <p className="auth-error" role="alert">{message(error)}</p>}
                 {fields.verification_token && <div className="auth-error" role="alert"><p>{fieldMessage("verification_token")}</p><Link className="verification-change" href={signupHref}>{e.restart}</Link></div>}
                 {isSurvey && <button type="button" className="text-link signup-back" onClick={() => { setSignupStep("account"); setError(""); focusField("nickname"); }}>← {s.back}</button>}
-                <button type="submit" className="button button-primary auth-submit" aria-busy={pending}>{pending ? t.submitting : isSignup ? isSurvey ? s.finish : s.next : t.login}<span aria-hidden="true">→</span></button>
+                <button type="submit" className={`button button-primary auth-submit${isSignup ? "" : " auth-compact-submit"}`} aria-busy={pending}>{pending ? t.submitting : isSignup ? isSurvey ? s.finish : s.next : t.login}{isSignup && <span aria-hidden="true">→</span>}</button>
               </fieldset>
             </form>
           )}
           <p className="auth-switch">{isSignup ? t.hasAccount : t.noAccount}<Link href={isSignup ? loginHref : signupHref}>{isSignup ? t.login : t.signup}</Link></p>
-          {isSignup && <p className="auth-note">{t.signupNote}</p>}
         </div>
         <Link className="auth-home-link" href="/">← {t.home}</Link>
       </main>

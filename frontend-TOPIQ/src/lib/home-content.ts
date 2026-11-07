@@ -1,9 +1,8 @@
 import type { Language } from "./landing-content";
 
 interface HomeContent {
-  hero: { title: string; description: string; action: string };
+  hero: { title: string; description: string };
   tests: { title: string; description: string; round: string; section: string; mode: string; timed: string; practice: string; start: string };
-  about: { title: string; description: string; features: { title: string; description: string }[]; notice: string };
   guide: { title: string; organizations: string; ministry: string; institute: string; points: string[]; action: string };
   uses: { title: string; description: string; cards: { title: string; description: string }[] };
   faq: { title: string; items: { question: string; answer: string }[] };
@@ -15,18 +14,8 @@ export const homeContent: Record<Language, HomeContent> = {
     hero: {
       title: "TOPIK II 실력을\n확인해보세요.",
       description: "TOPIK II 읽기와 듣기 50문항을 실전 또는 연습 모드로 풀고,\n정확한 응답 분석과 오답 해설을 확인할 수 있습니다.",
-      action: "TOPIQ 소개",
     },
     tests: { title: "PBT 모의고사 선택", description: "읽기 또는 듣기 모의고사를 선택하세요.\n각 회차는 50문항, 총 100점입니다.", round: "회차", section: "영역", mode: "모드", timed: "실전 모드", practice: "연습 모드", start: "모의고사 시작" },
-    about: {
-      title: "TOPIK 문제 풀이와\n결과 확인을 한곳에서",
-      description: "TOPIQ는 외국인 한국어 학습자를 위한 AI 기반 TOPIK 학습 서비스입니다. 다양한 문제를 풀고 정답과 해설을 확인하며 한국어 학습을 이어갈 수 있습니다.",
-      features: [
-        { title: "더 풍부하고 정교한 문제를 만듭니다", description: "LLM을 활용해 TOPIK 유형에 맞는 문제를 생성하고 검토·최적화합니다. 축적된 문항은 지속적으로 관리되어 폭넓은 학습 기반이 됩니다." },
-        { title: "풀이 결과를 확인하고 복습합니다", description: "모의시험을 마치면 점수와 문항별 정오답을 확인할 수 있습니다. 정답과 해설을 살펴보며 틀린 문제를 복습해보세요." },
-      ],
-      notice: "현재 베타 버전에서는 읽기·듣기 모의고사와\n풀이 결과 및 해설을 제공합니다.",
-    },
     guide: {
       title: "TOPIK 시험이란 무엇인가요?", organizations: "TOPIK 주관 기관", ministry: "대한민국 교육부", institute: "국립국제교육원",
       points: ["한국어가 모국어가 아닌 외국인과 재외동포를 위한 시험", "TOPIK I은 1급과 2급, TOPIK II는 3급부터 6급까지 평가", "공식 성적은 성적 발표일부터 2년 동안 유효", "대한민국 교육부 국립국제교육원이 주관"],
@@ -57,18 +46,8 @@ export const homeContent: Record<Language, HomeContent> = {
     hero: {
       title: "Find out where you stand in TOPIK II.",
       description: "Take 50-question TOPIK II reading and listening tests in timed or practice mode,\nthen review detailed response analysis and explanations.",
-      action: "About TOPIQ",
     },
     tests: { title: "Choose a PBT Mock Test", description: "Choose a TOPIK II reading or listening test.\nEach set has 50 questions and a maximum score of 100.", round: "Set", section: "Section", mode: "Mode", timed: "Timed Mode", practice: "Practice Mode", start: "Start Mock Test" },
-    about: {
-      title: "TOPIK practice and\nresults in one place",
-      description: "TOPIQ is an AI-powered TOPIK learning service for international Korean learners. Practice a range of questions, check your answers, and learn from explanations.",
-      features: [
-        { title: "A richer, more refined question bank", description: "TOPIQ uses LLMs to generate, review, and optimize questions aligned with TOPIK formats. Each item is continuously managed as part of a broad learning foundation." },
-        { title: "Review your results and learn from mistakes", description: "After a mock test, check your score and see which answers were correct. Review the answers and explanations to learn from your mistakes." },
-      ],
-      notice: "The current beta offers reading and listening mock tests,\nresults, and answer explanations.",
-    },
     guide: {
       title: "What is the TOPIK test?", organizations: "TOPIK organizers", ministry: "Ministry of Education, Republic of Korea", institute: "National Institute for International Education",
       points: ["For overseas Koreans and international learners whose first language is not Korean", "TOPIK I awards Levels 1 and 2. TOPIK II awards Levels 3 to 6", "Official scores are valid for two years from the result date", "Administered by the National Institute for International Education in Korea"],
@@ -99,18 +78,8 @@ export const homeContent: Record<Language, HomeContent> = {
     hero: {
       title: "Ketahui kemampuan TOPIK II Anda.",
       description: "Kerjakan 50 soal membaca dan menyimak TOPIK II dalam mode simulasi atau latihan,\nlalu tinjau analisis jawaban dan pembahasannya.",
-      action: "Tentang TOPIQ",
     },
     tests: { title: "Pilih Simulasi PBT", description: "Pilih simulasi membaca atau menyimak TOPIK II.\nSetiap set berisi 50 soal dengan nilai maksimal 100.", round: "Set", section: "Bidang", mode: "Mode", timed: "Mode Simulasi", practice: "Mode Latihan", start: "Mulai Simulasi" },
-    about: {
-      title: "Latihan dan hasil TOPIK\ndi satu tempat",
-      description: "TOPIQ adalah layanan belajar TOPIK berbasis AI untuk pelajar bahasa Korea internasional. Kerjakan beragam soal, periksa jawaban, dan pelajari pembahasannya.",
-      features: [
-        { title: "Bank soal yang lebih beragam dan teruji", description: "TOPIQ menggunakan LLM untuk membuat, meninjau, dan menyempurnakan soal sesuai format TOPIK. Setiap soal terus dikelola untuk membangun sumber belajar yang luas." },
-        { title: "Tinjau hasil dan belajar dari kesalahan", description: "Setelah simulasi, lihat nilai serta jawaban yang benar dan salah. Pelajari kembali jawaban dan pembahasannya untuk memahami kesalahan Anda." },
-      ],
-      notice: "Versi beta saat ini menyediakan simulasi membaca dan menyimak,\nhasil ujian, serta pembahasan jawaban.",
-    },
     guide: {
       title: "Apa itu ujian TOPIK?", organizations: "Penyelenggara TOPIK", ministry: "Kementerian Pendidikan Republik Korea", institute: "National Institute for International Education",
       points: ["Untuk warga Korea di luar negeri dan pelajar yang bahasa ibunya bukan bahasa Korea", "TOPIK I menilai level 1 dan 2. TOPIK II menilai level 3 hingga 6", "Nilai resmi berlaku selama dua tahun sejak pengumuman hasil", "Diselenggarakan oleh National Institute for International Education di Korea"],

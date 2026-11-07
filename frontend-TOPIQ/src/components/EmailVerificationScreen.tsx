@@ -49,7 +49,6 @@ export default function EmailVerificationScreen() {
       <SiteHeader />
       <main className="auth-main" id="main-content" tabIndex={-1}>
         <div className="auth-card">
-          <p className="eyebrow">TOPIQ / {a.signup}</p>
           <h1>{error ? t.invalidTitle : t.checking}</h1>
           {error ? <>
             <p className="auth-error verification-error" role="alert">{error === "network_error" ? a.network : a.errors[error] || a.errors.server_error}</p>

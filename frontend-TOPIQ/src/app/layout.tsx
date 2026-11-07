@@ -4,7 +4,7 @@ import Providers from "./providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "TOPIQ | 한국어 학습의 다음 단계",
+  title: "UNIGATE TOPIQ",
   description: "TOPIK II 읽기부터 쓰기, 단어장까지. TOPIQ이 준비하는 한국어 학습을 만나보세요.",
 };
 

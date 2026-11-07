@@ -26,8 +26,6 @@
 .heroCopy { text-align: center; }
 .heroCopy h1 { max-width: 768px; margin: 0 auto; font-size: 34px; font-weight: 600; line-height: 1.22; letter-spacing: -.045em; white-space: pre-line; text-wrap: balance; }
 .heroCopy .description { max-width: 576px; margin: 20px auto 0; }
-.introLink { display: inline-flex; align-items: center; min-height: 40px; margin-top: 28px; padding: 10px 24px; border: 1px solid #2d5ec5; border-radius: 999px; background: #fff; color: #2d5ec5; font-size: 14px; font-weight: 600; line-height: 20px; transition: background-color .15s; }
-.introLink:hover { background: #edf2fc; }
 .preview { display: none; width: 100%; max-width: 448px; margin-inline: auto; padding: 24px; border-radius: 20px; background: #ffffffe6; box-shadow: 0 24px 70px #162f7f1a; transition: transform .28s, box-shadow .28s; }
 .preview:hover { transform: translateY(-5px); box-shadow: 0 30px 80px #162f7f26; }
 .previewQuestion { margin-top: 16px; padding-block: 16px; }
@@ -54,22 +52,6 @@
 .testStatus { margin: 16px 0 0; color: #4b5563; font-size: 14px; line-height: 24px; }
 .testError { margin: 16px 0 0; padding: 14px 18px; border: 1px solid #efd7d0; border-radius: 12px; background: #fff8f5; color: #914332; font-size: 14px; line-height: 24px; }
 .testError button { margin-left: 12px; color: #2d5ec5; text-decoration: underline; text-underline-offset: 3px; }
-.about { background: radial-gradient(circle at 82% 22%, #2d5ec50f, transparent 448px); }
-.aboutIntro { display: grid; align-items: end; gap: 32px; text-align: center; }
-.aboutLogo { display: block; width: auto; height: 32px; margin: 0 auto 24px; }
-.aboutTitle { margin: 0; font-size: 30px; font-weight: 600; line-height: 1.18; letter-spacing: -.04em; white-space: pre-line; text-wrap: balance; }
-.aboutIntro .description { max-width: 576px; margin: 0 auto; font-size: 14px; }
-.features { display: grid; margin-top: 48px; border: 1px solid #1118271a; border-radius: 24px; background: #ffffffc7; backdrop-filter: blur(12px); box-shadow: 0 18px 50px #162f7f12; overflow: hidden; }
-.feature { position: relative; min-width: 0; padding: 28px; transition: background-color .25s; }
-.feature:first-child { border-bottom: 1px solid #11182717; }
-.feature:last-child { background: #edf2fc61; }
-.feature::before { position: absolute; top: 0; left: 28px; width: 48px; height: 2px; background: #ea6641; content: ""; transition: width .32s; }
-.feature:last-child::before { background: #2d5ec5; }
-.feature:hover { background: #edf2fc8c; }
-.feature:hover::before { width: 76px; }
-.feature h3 { margin: 0; font-size: 20px; font-weight: 600; line-height: 1.35; letter-spacing: -.025em; }
-.feature p { margin: 12px 0 0; color: #4b5563; font-size: 14px; line-height: 24px; }
-.notice { margin: 20px 0 0; color: #6b7280; font-size: 12px; line-height: 20px; white-space: pre-line; text-align: center; text-wrap: pretty; }
 .guideGrid { display: grid; gap: 40px; }
 .guideIntro { text-align: center; }
 .organizations { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 20px 28px; margin-top: 32px; }
@@ -123,11 +105,8 @@
   .heroGrid, .tests { padding-block: 80px; }
   .heroCopy h1 { font-size: 48px; line-height: 1.18; }
   .heroCopy .description { font-size: 18px; }
-  .tests .description, .aboutIntro .description { font-size: 16px; }
+  .tests .description { font-size: 16px; }
   .testForm { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 24px; }
-  .aboutLogo { height: 36px; }
-  .aboutTitle { font-size: 48px; }
-  .feature h3 { font-size: 24px; line-height: 32px; }
   .organizationDivider { display: block; }
   .footerLine { flex-direction: row; }
 }
@@ -146,13 +125,6 @@
   .preview { display: block; }
   .sectionIntro { margin-inline: 0; text-align: left; }
   .testForm { grid-template-columns: repeat(3, minmax(0, 1fr)) auto; align-items: end; }
-  .aboutIntro { grid-template-columns: 1.05fr .95fr; gap: 64px; text-align: left; }
-  .aboutLogo { margin-inline: 0; }
-  .aboutIntro .description { margin-inline: 0; }
-  .features { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 64px; }
-  .feature { padding: 36px; }
-  .feature:first-child { border-bottom: 0; border-right: 1px solid #11182717; }
-  .feature::before { left: 36px; }
   .guideGrid { grid-template-columns: .8fr 1.2fr; gap: 64px; }
   .guideIntro, .faq .heading, .footerContent p { text-align: left; }
   .organizations { justify-content: flex-start; }

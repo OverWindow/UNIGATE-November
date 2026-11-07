@@ -2,25 +2,21 @@ import type { Language } from "./landing-content";
 
 interface AuthContent {
   login: string; signup: string; logout: string; retry: string;
-  loginTitle: string; signupTitle: string; loginDescription: string; signupDescription: string;
   email: string; nickname: string; password: string; confirm: string; passwordHint: string;
   emailPlaceholder: string; nicknamePlaceholder: string;
   show: string; hide: string; submitting: string; loading: string;
-  noAccount: string; hasAccount: string; home: string; signupNote: string;
+  noAccount: string; hasAccount: string; home: string;
   network: string; errors: Record<string, string>;
 }
 
 export const authContent: Record<Language, AuthContent> = {
   ko: {
     login: "로그인", signup: "회원가입", logout: "로그아웃", retry: "다시 연결",
-    loginTitle: "다시 만나 반가워요.", signupTitle: "한국어 학습의 다음 단계, 함께해요.",
-    loginDescription: "내 TOPIQ 계정으로 로그인하세요.", signupDescription: "읽기·쓰기·단어장에 사용할 하나의 계정을 만드세요.",
     email: "이메일", nickname: "닉네임", password: "비밀번호", confirm: "비밀번호 확인",
     passwordHint: "8자 이상으로, 흔한 비밀번호나 숫자만으로 된 비밀번호는 사용할 수 없어요.",
     emailPlaceholder: "you@example.com", nicknamePlaceholder: "어떻게 불러 드릴까요?",
     show: "비밀번호 표시", hide: "비밀번호 숨기기", submitting: "처리 중…", loading: "로그인 상태를 확인하고 있어요.",
     noAccount: "아직 계정이 없으신가요?", hasAccount: "이미 계정이 있으신가요?", home: "홈으로 돌아가기",
-    signupNote: "이메일 인증을 마친 뒤 계정을 만들어요. 본인이 사용하는 이메일로 시작해 주세요.",
     network: "서버에 연결하지 못했어요. 연결을 확인하고 다시 시도해 주세요.",
     errors: {
       required: "입력해 주세요.", invalid: "올바른 형식으로 입력해 주세요.",
@@ -44,14 +40,11 @@ export const authContent: Record<Language, AuthContent> = {
   },
   en: {
     login: "Log in", signup: "Sign up", logout: "Log out", retry: "Reconnect",
-    loginTitle: "Good to see you again.", signupTitle: "Your next chapter in Korean starts here.",
-    loginDescription: "Log in to your TOPIQ account.", signupDescription: "One account for reading, writing, and vocabulary.",
     email: "Email", nickname: "Nickname", password: "Password", confirm: "Confirm password",
     passwordHint: "Use at least 8 characters. Avoid common passwords and passwords made up of only numbers.",
     emailPlaceholder: "you@example.com", nicknamePlaceholder: "What should we call you?",
     show: "Show password", hide: "Hide password", submitting: "Please wait…", loading: "Checking your login status…",
     noAccount: "New to TOPIQ?", hasAccount: "Already have an account?", home: "Back to home",
-    signupNote: "Verify your email before creating an account. Start with an email address you own.",
     network: "We couldn't connect to the server. Check your connection and try again.",
     errors: {
       required: "Please fill in this field.", invalid: "Please enter a valid value.",
@@ -75,14 +68,11 @@ export const authContent: Record<Language, AuthContent> = {
   },
   id: {
     login: "Masuk", signup: "Daftar", logout: "Keluar", retry: "Hubungkan lagi",
-    loginTitle: "Senang bertemu kembali.", signupTitle: "Langkah baru dalam bahasa Korea dimulai di sini.",
-    loginDescription: "Masuk ke akun TOPIQ milikmu.", signupDescription: "Satu akun untuk membaca, menulis, dan kosakata.",
     email: "Email", nickname: "Nama panggilan", password: "Kata sandi", confirm: "Konfirmasi kata sandi",
     passwordHint: "Gunakan minimal 8 karakter. Hindari kata sandi umum atau yang hanya berisi angka.",
     emailPlaceholder: "you@example.com", nicknamePlaceholder: "Kami harus memanggilmu apa?",
     show: "Tampilkan kata sandi", hide: "Sembunyikan kata sandi", submitting: "Sedang diproses…", loading: "Memeriksa status masuk…",
     noAccount: "Belum punya akun?", hasAccount: "Sudah punya akun?", home: "Kembali ke beranda",
-    signupNote: "Verifikasi email sebelum membuat akun. Gunakan alamat email milikmu sendiri.",
     network: "Tidak dapat terhubung ke server. Periksa koneksi dan coba lagi.",
     errors: {
       required: "Harap isi kolom ini.", invalid: "Masukkan nilai dengan format yang benar.",
