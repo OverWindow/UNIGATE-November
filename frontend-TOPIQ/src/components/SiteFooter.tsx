@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowUp, ExternalLink } from "lucide-react";
 import { useApp } from "@/app/providers";
 import { landingContent } from "@/lib/landing-content";
 import { Logo } from "./SiteHeader";
@@ -17,11 +18,9 @@ export default function SiteFooter() {
           <div className="footer-links">
             <a href="https://www.unigate.kr/" target="_blank" rel="noopener noreferrer">
               {t.footer.parent}
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M6 18 18 6M6 6h12v12" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              <ExternalLink size={18} strokeWidth={1.7} aria-hidden="true" />
             </a>
-            <a href="#main-content">{t.footer.top}<span aria-hidden="true">↑</span></a>
+            <a href="#main-content">{t.footer.top}<ArrowUp size={14} aria-hidden="true" /></a>
           </div>
         </div>
         <div className="footer-bottom">

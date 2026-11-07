@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowLeft, ArrowRight, Grid3x3, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
@@ -176,7 +177,7 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
   return <div className={!review && attempt ? "pbt-session" : undefined}><SiteHeader /><main id="main-content" className={`pbt-workspace${review ? "" : " pbt-exam"}`} tabIndex={-1}>
     <div className={review ? "page-container" : "pbt-exam-content"}>
       {(review || !attempt) && <div className={review ? undefined : "pbt-exam-width pbt-exam-loading"}>
-        <Link className="text-link pbt-back" href={basePath}>← {t.back}</Link>
+        <Link className="text-link pbt-back" href={basePath}><ArrowLeft size={14} aria-hidden="true" /> {t.back}</Link>
         {error ? <div className="pbt-alert" role="alert">{pbtErrorMessage(error, t)} <button onClick={retry}>{t.retry}</button></div> : !attempt && <p role="status">{t.loading}</p>}
       </div>}
       {attempt && <>
@@ -185,8 +186,8 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
           <div className="pbt-score"><span>{t.score}</span><strong>{attempt.score}<small> / {attempt.maxScore}</small></strong><span>{t.correct} {attempt.items.length - wrong.length} / {attempt.items.length}</span></div>
         </section> : <>
           <div className="pbt-exam-toolbar"><div className="pbt-exam-width pbt-exam-toolbar-inner">
-            <Link className="pbt-exam-back" href={basePath} onClick={event => { if (busy || submitting) event.preventDefault(); }}><span aria-hidden="true">←</span> {t.back}</Link>
-            <h1>{attempt.title} <span>· {t[attempt.mode]}</span></h1>
+            <Link className="pbt-exam-back" href={basePath} onClick={event => { if (busy || submitting) event.preventDefault(); }}><ArrowLeft size={14} aria-hidden="true" /> {t.back}</Link>
+            <h1>{language === "ko" ? attempt.title.replace(/ (\d+)$/, " 모의고사 $1회") : attempt.title}</h1>
             {isListening ? <span className="ibt-timing-label">{timedListening ? listeningCopy[language].estimatedDuration[examFormat] : t.unlimited}</span> : <div className={`pbt-timer ${remaining !== null && remaining < 300 ? "is-urgent" : ""}`} role="timer" aria-label={remaining === null ? t.unlimited : `${t.remainingTime} ${clockText(remaining)}`} title={attempt.mode === "timed" ? t.timeHint : t.practiceHint}>
               {remaining !== null && <small>{t.remainingTime}</small>}<span>{remaining === null ? t.unlimited : clockText(remaining)}</span>
             </div>}
@@ -222,21 +223,21 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
             {questions}
           </section>}
           {!timedListening && <nav className="pbt-test-navigation" aria-label={t.questionNavigation}><div className="pbt-exam-width">
-            <button className="button pbt-secondary" disabled={first.position <= 1 || busy || submitting || audioPlaying} onClick={() => go(first.position - 1)}><span aria-hidden="true">←</span> {t.previous}</button>
+            <button className="button pbt-secondary" disabled={first.position <= 1 || busy || submitting || audioPlaying} onClick={() => go(first.position - 1)}><ArrowLeft size={16} aria-hidden="true" /> {t.previous}</button>
             <button className="button pbt-secondary pbt-all-questions" aria-haspopup="dialog" onClick={() => setDialog("questions")} disabled={busy || submitting}>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M1 1h3v3H1zm5 0h3v3H6zm5 0h3v3h-3zM1 6h3v3H1zm5 0h3v3H6zm5 0h3v3h-3zM1 11h3v3H1zm5 0h3v3H6zm5 0h3v3h-3z" /></svg>
+              <Grid3x3 size={16} aria-hidden="true" />
               {t.allQuestions}
             </button>
             {last.position >= total
               ? <button className="button button-primary" disabled={disabled} onClick={() => setDialog("submit")}>{submitting ? t.submitting : t.submit}</button>
-              : <button className="button pbt-secondary" disabled={busy || submitting || audioPlaying} onClick={() => go(last.position + 1)}>{t.next} <span aria-hidden="true">→</span></button>}
+              : <button className="button pbt-secondary" disabled={busy || submitting || audioPlaying} onClick={() => go(last.position + 1)}>{t.next} <ArrowRight size={16} aria-hidden="true" /></button>}
           </div></nav>}
         </>}
       </>}
     </div>
     <dialog ref={dialogRef} className={`pbt-dialog${dialog === "questions" ? " pbt-navigator-dialog" : ""}`} onCancel={() => setDialog(null)} aria-labelledby="pbt-dialog-title">
       {dialog === "questions" && <button className="pbt-dialog-close" type="button" aria-label={t.close} onClick={() => setDialog(null)}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6" /></svg>
+        <X size={18} strokeWidth={1.7} aria-hidden="true" />
       </button>}
       <h2 ref={dialogTitleRef} id="pbt-dialog-title" tabIndex={-1}>{dialog === "questions" ? t.allQuestions : t.confirm}</h2>
       {dialog === "questions" ? <>

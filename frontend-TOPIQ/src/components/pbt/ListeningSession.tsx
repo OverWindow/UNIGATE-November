@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { Pause, Play, Volume2 } from "lucide-react";
 import { useApp } from "@/app/providers";
 import { clockText, type Mode } from "@/lib/pbt-api";
 import type { ExamFormat } from "@/lib/exam-content";
@@ -133,7 +134,7 @@ export default function ListeningSession({ examFormat, attemptId, position, last
         <div className="ibt-audio-progress">
           {!timed && <button type="button" className="ibt-play-button" aria-label={playing ? t.pause : t.play} disabled={stopped} onClick={() => {
             if (playing) audioRef.current?.pause(); else void play();
-          }}>{playing ? <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M3 2h4v12H3zm6 0h4v12H9z" /></svg> : <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 1v14l11-7z" /></svg>}</button>}
+          }}>{playing ? <Pause size={16} fill="currentColor" aria-hidden="true" /> : <Play size={16} fill="currentColor" aria-hidden="true" />}</button>}
           <span className="ibt-progress-time">{progressTime}</span>
           {timed ? <progress aria-label={t.progress} max={checkpoint.duration || 1} value={checkpoint.elapsed} />
             : <input type="range" aria-label={t.progress} min="0" max={checkpoint.duration || 1} step="0.1" value={checkpoint.elapsed} disabled={stopped || !checkpoint.duration} onChange={event => {
@@ -143,7 +144,7 @@ export default function ListeningSession({ examFormat, attemptId, position, last
             }} />}
         </div>
         <label className="ibt-volume">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="m11 4-6 5H2v6h3l6 5z" fill="currentColor" /><path d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14" /></svg>
+          <Volume2 size={24} strokeWidth={1.8} aria-hidden="true" />
           <input type="range" aria-label={t.volume} min="0" max="1" step="0.01" value={checkpoint.volume} onChange={event => {
             const volume = Number(event.target.value);
             if (audioRef.current) audioRef.current.volume = volume;

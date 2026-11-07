@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
 import { AuthError, verifyEmail, type VerifiedEmail } from "@/lib/auth-api";
@@ -58,7 +59,7 @@ export default function EmailVerificationScreen() {
             <Link className="verification-change" href="/signup">{t.restart}</Link>
           </> : <p className="auth-state" role="status">{t.checking}</p>}
         </div>
-        <Link className="auth-home-link" href="/">← {a.home}</Link>
+        <Link className="auth-home-link" href="/"><ArrowLeft size={14} aria-hidden="true" /> {a.home}</Link>
       </main>
     </>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/app/providers";
@@ -94,14 +95,14 @@ export default function ExamFeedback({ id, examFormat }: { id: string; examForma
     : code === "result_email_rate_limited" ? t.limited : ["invalid_survey", "survey_required", "validation_error"].includes(code) ? t.invalid : pbtErrorMessage(error, p);
   const accepted = feedback.emailStatus === "accepted" && !editing;
   return <><SiteHeader /><main className="exam-feedback-main" id="main-content" tabIndex={-1}>
-    <Link className="text-link" href={`/${examFormat}`}>← {t.back}</Link>
+    <Link className="text-link" href={`/${examFormat}`}><ArrowLeft size={14} aria-hidden="true" /> {t.back}</Link>
     {!attempt ? <div className="exam-feedback-card">{error ? <><p role="alert">{message}</p><p>{t.sessionHelp}</p><button className="button button-primary" onClick={() => setRevision(n => n + 1)}>{p.retry}</button></> : <p role="status">{p.loading}</p>}</div>
       : accepted ? <section className="exam-feedback-card exam-feedback-receipt" aria-live="polite">
         <p className="eyebrow">TOPIQ · {examFormat.toUpperCase()}</p><h1>{t.sentTitle}</h1><p>{t.sent}</p><strong className="exam-masked-email">{feedback.maskedEmail}</strong>
         {feedback.expiresAt && <p>{t.expiry}: {new Date(feedback.expiresAt).toLocaleDateString(language)}</p>}
         <p className="pbt-muted">{t.resendHint}</p><button className="button button-primary" onClick={() => { setEditing(true); setError(null); }}>{t.resend}</button>
       </section> : <form ref={form} className="exam-feedback-card" noValidate onSubmit={submit}>
-        <p className="eyebrow">{attempt.title} · {p[attempt.section]} · {p[attempt.mode]}</p><h1>{t.title}</h1><p>{t.description}</p>
+        <h1>{t.title}</h1><p>{t.description}</p>
         <fieldset className="exam-feedback-controls" disabled={pending}>
           <StarRating value={rating} onChange={value => { setRating(value); setErrors(current => current.filter(name => name !== "rating")); }} language={language} invalid={errors.includes("rating")} />
           <div className="exam-survey-field"><label htmlFor="result-email">{t.email} <small>({t.required})</small></label>

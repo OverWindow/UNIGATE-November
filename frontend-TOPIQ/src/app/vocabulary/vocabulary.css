@@ -27,7 +27,7 @@
 .vocabulary-secondary:hover:not(:disabled) { border-color: #91afe9; background: #f1f5ff; }
 .vocabulary-secondary:disabled { opacity: .45; }
 .vocabulary-study { padding-top: 32px; }
-.vocabulary-back { display: inline-block; color: var(--color-muted); font-size: 14px; padding: 8px 0; }
+.vocabulary-back { display: inline-flex; align-items: center; gap: 5px; color: var(--color-muted); font-size: 14px; padding: 8px 0; }
 .vocabulary-study-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin: 28px 0; }
 .vocabulary-study-heading .eyebrow { margin-bottom: 10px; }
 .vocabulary-study-heading h1 { margin: 0; font-size: clamp(24px, 3vw, 32px); font-weight: 650; }
@@ -72,7 +72,7 @@
   .vocabulary-word-list ol:not(.is-open) { display: none; }
   .vocabulary-list-title { display: none; }
   .vocabulary-word-list ol { max-height: 270px; }
-  .vocabulary-list-toggle span { display: inline; }
+  .vocabulary-list-toggle span { display: inline-flex; }
   .vocabulary-study-heading { align-items: start; }
   .vocabulary-word-front { padding: 36px 20px 28px; }
   .vocabulary-word-meaning { padding: 24px 20px; }

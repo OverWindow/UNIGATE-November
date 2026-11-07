@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { Check, Globe, Menu, X } from "lucide-react";
 import { useApp } from "@/app/providers";
 import { authContent } from "@/lib/auth-content";
 import { landingContent, type Language } from "@/lib/landing-content";
@@ -95,11 +96,11 @@ export default function SiteHeader({ authHref }: { authHref?: string }) {
               }
             }}>
               <button className="language-trigger" type="button" ref={languageButton} aria-label={`${t.accessibility.language}: ${languages.find(item => item.code === language)?.name}`} title={t.accessibility.language} aria-expanded={languageOpen} aria-controls="language-options" onClick={() => { setLanguageOpen(!languageOpen); setMenuOpen(false); setAccountOpen(false); }}>
-                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a17 17 0 0 1 0 18 17 17 0 0 1 0-18Z" /></svg>
+                <Globe size={21} strokeWidth={1.6} aria-hidden="true" />
               </button>
               <div className="language-options" id="language-options" role="group" aria-label={t.accessibility.language} hidden={!languageOpen}>
                 {languages.map(({ code, name }) => <button key={code} type="button" lang={code} aria-pressed={language === code} onClick={() => { setLanguage(code); setLanguageOpen(false); languageButton.current?.focus(); }}>
-                  <span>{name}</span><span className="language-check" aria-hidden="true">{language === code ? "✓" : ""}</span>
+                  <span>{name}</span><span className="language-check" aria-hidden="true">{language === code && <Check size={14} />}</span>
                 </button>)}
               </div>
             </div>
@@ -137,9 +138,7 @@ export default function SiteHeader({ authHref }: { authHref?: string }) {
               }}>{a.login}</Link>
             )}
             <button className="menu-toggle" type="button" ref={menuButton} aria-label={menuOpen ? t.accessibility.closeMenu : t.accessibility.openMenu} aria-controls="mobile-navigation" aria-expanded={menuOpen} onClick={() => { setMenuOpen(!menuOpen); setLanguageOpen(false); setAccountOpen(false); }}>
-              <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
-                <path d={menuOpen ? "m6 6 12 12M6 18 18 6" : "M4 6h16M4 12h16M4 18h16"} />
-              </svg>
+              {menuOpen ? <X size={23} strokeWidth={1.7} aria-hidden="true" /> : <Menu size={23} strokeWidth={1.7} aria-hidden="true" />}
             </button>
           </div>
         </div>
