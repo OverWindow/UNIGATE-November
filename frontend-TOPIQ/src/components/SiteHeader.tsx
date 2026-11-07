@@ -8,10 +8,10 @@ import { useApp } from "@/app/providers";
 import { authContent } from "@/lib/auth-content";
 import { landingContent, type Language } from "@/lib/landing-content";
 
-const languages: { code: Language; label: string; name: string }[] = [
-  { code: "ko", label: "한국어", name: "한국어" },
-  { code: "en", label: "EN", name: "English" },
-  { code: "id", label: "ID", name: "Bahasa Indonesia" },
+const languages: { code: Language; name: string }[] = [
+  { code: "ko", name: "한국어" },
+  { code: "en", name: "English" },
+  { code: "id", name: "Bahasa Indonesia" },
 ];
 
 export function Logo({ className = "" }: { className?: string }) {
@@ -23,6 +23,9 @@ export default function SiteHeader({ authHref }: { authHref?: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [languageOpen, setLanguageOpen] = useState(false);
+  const languagePicker = useRef<HTMLDivElement>(null);
+  const languageButton = useRef<HTMLButtonElement>(null);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState(false);
   const [notice, setNotice] = useState<{ index: number; sequence: number } | null>(null);
@@ -33,6 +36,15 @@ export default function SiteHeader({ authHref }: { authHref?: string }) {
   const isAuthPage = ["/login", "/signup", "/verify-email"].includes(pathname);
   const loginHref = authHref || (isAuthPage
     ? "/login" : `/login?next=${encodeURIComponent(pathname)}`);
+
+  useEffect(() => {
+    if (!languageOpen) return;
+    function closeOutside(event: PointerEvent) {
+      if (event.target instanceof Node && !languagePicker.current?.contains(event.target)) setLanguageOpen(false);
+    }
+    document.addEventListener("pointerdown", closeOutside);
+    return () => document.removeEventListener("pointerdown", closeOutside);
+  }, [languageOpen]);
 
   useEffect(() => {
     if (!notice) return;
@@ -83,10 +95,24 @@ export default function SiteHeader({ authHref }: { authHref?: string }) {
           </Link>
           <nav className="desktop-navigation" aria-label={t.accessibility.navigation}>{navigation}</nav>
           <div className="header-actions">
-            <div className="language-switcher" role="group" aria-label={t.accessibility.language}>
-              {languages.map(({ code, label, name }) => (
-                <button key={code} type="button" lang={code} aria-label={name} aria-pressed={language === code} onClick={() => setLanguage(code)}>{label}</button>
-              ))}
+            <div className="language-picker" ref={languagePicker} onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) setLanguageOpen(false);
+            }} onKeyDown={(event) => {
+              if (event.key === "Escape" && languageOpen) {
+                event.stopPropagation();
+                setLanguageOpen(false);
+                languageButton.current?.focus();
+              }
+            }}>
+              <button className="language-trigger" type="button" ref={languageButton} aria-label={`${t.accessibility.language}: ${languages.find(item => item.code === language)?.name}`} title={t.accessibility.language} aria-expanded={languageOpen} aria-controls="language-options" onClick={() => { setLanguageOpen(!languageOpen); setMenuOpen(false); }}>
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a17 17 0 0 1 0 18 17 17 0 0 1 0-18Z" /></svg>
+                <svg className="language-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+              </button>
+              <div className="language-options" id="language-options" role="group" aria-label={t.accessibility.language} hidden={!languageOpen}>
+                {languages.map(({ code, name }) => <button key={code} type="button" lang={code} aria-pressed={language === code} onClick={() => { setLanguage(code); setLanguageOpen(false); languageButton.current?.focus(); }}>
+                  <span>{name}</span><span className="language-check" aria-hidden="true">{language === code ? "✓" : ""}</span>
+                </button>)}
+              </div>
             </div>
             {status === "authenticated" && user ? (
               <div className="account-actions">
