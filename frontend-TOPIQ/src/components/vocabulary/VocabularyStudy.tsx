@@ -5,7 +5,7 @@ import { ArrowLeft, ArrowRight, Minus, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useApp } from "@/app/providers";
 import { VocabularyError, vocabularyRequest, type MeaningLanguage, type VocabularyDetail } from "@/lib/vocabulary-api";
-import { vocabularyContent, vocabularyLevelLabel } from "@/lib/vocabulary-content";
+import { vocabularyContent } from "@/lib/vocabulary-content";
 
 export default function VocabularyStudy({ id }: { id: string }) {
   const { language } = useApp();
@@ -42,9 +42,6 @@ export default function VocabularyStudy({ id }: { id: string }) {
   return <div className="page-container vocabulary-study">
     <div className="vocabulary-study-top">
       <Link className="vocabulary-back" href={backHref}><ArrowLeft size={14} aria-hidden="true" /> {t.back}</Link>
-      {data && word && !error && <div className="vocabulary-study-heading">
-        <h1>{vocabularyLevelLabel(data.level, language)} <span>·</span> SET {String(data.number).padStart(2, "0")}</h1>
-      </div>}
     </div>
     {error ? <div className="vocabulary-status vocabulary-error" role="alert">
       <p>{error instanceof VocabularyError && error.status === 404 ? t.notFound : t.error}</p>

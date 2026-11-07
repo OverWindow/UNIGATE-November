@@ -33,9 +33,6 @@
 .vocabulary-study { padding-top: 32px; }
 .vocabulary-back { display: inline-flex; align-items: center; gap: 5px; color: var(--color-muted); font-size: 14px; padding: 8px 0; }
 .vocabulary-study-top { display: flex; align-items: center; gap: 24px; }
-.vocabulary-study-heading { margin: 0 0 28px; }
-.vocabulary-study-heading h1 { margin: 0; font-size: clamp(24px, 3vw, 32px); font-weight: 650; }
-.vocabulary-study-heading h1 span { padding: 0 8px; color: #a3adbd; }
 .vocabulary-study-grid { display: grid; grid-template-columns: 240px minmax(0, 1fr); align-items: start; gap: 28px; }
 .vocabulary-word-list { border: 1px solid #e0e6f0; border-radius: 14px; background: #fff; overflow: hidden; }
 .vocabulary-list-toggle { width: 100%; display: flex; justify-content: space-between; gap: 12px; padding: 18px; border: 0; border-bottom: 1px solid #edf0f5; background: #fff; text-align: left; color: #526078; font-size: 13px; font-weight: 600; }
@@ -89,6 +86,5 @@
   .vocabulary-catalog-heading { flex-wrap: wrap; gap: 8px; }
   .vocabulary-toolbar { align-items: flex-start; }
   .vocabulary-toolbar label { margin-left: auto; }
-  .vocabulary-study-heading > p { white-space: nowrap; }
   .vocabulary-card-navigation .button { padding-inline: 16px; }
 }
