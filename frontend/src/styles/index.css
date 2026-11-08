@@ -120,7 +120,7 @@ html{overflow-x:clip}.hero{padding-top:78px;padding-bottom:50px;min-height:640px
 .cost-note,.section-copy,.topic-name{text-wrap:pretty}
 .university-counter{white-space:nowrap;font-variant-numeric:tabular-nums}
 .guide-limit-note{width:100%;margin-top:10px;color:var(--muted);font-size:11px;line-height:1.5;text-align:center;white-space:nowrap}
-.cta-action{width:min(100%,340px)}
+.cta-action{width:min(100%,340px);margin-inline:auto}
 .cta-action .primary{width:100%;min-width:0}
 .cta .guide-limit-note{margin-top:10px;font-size:11px;max-width:none}
 @media(max-width:650px){
