@@ -15,7 +15,7 @@ export default function Home() {
 <canvas id="ambient-dots" aria-hidden="true"></canvas>
 <main>
 <section className="hero" aria-labelledby="hero-title">
-<div><h1 id="hero-title">Mau Lanjut Kuliah <span>di Korea Selatan?</span></h1><p className="hero-subtitle">Dapatkan Panduan Transfer ke Universitas di Korea!</p><p className="hero-subtitle">Diberikan kepada 500 pendaftar pertama.</p><button className="primary" type="button" data-open-guide>Dapatkan Panduan PDF Gratis</button></div>
+<div><h1 id="hero-title">Mau Lanjut Kuliah <span>di Korea Selatan?</span></h1><p className="hero-subtitle">Dapatkan Panduan Transfer ke Universitas di Korea!</p><p className="hero-subtitle">Diberikan kepada 500 pendaftar pertama!</p><button className="primary" type="button" data-open-guide>Dapatkan Panduan PDF Gratis</button></div>
 <div className="character-stage" role="img" aria-label="Karakter krom interaktif yang mengikuti gerakan penunjuk">
 <div className="orbital orbital-one"></div><div className="orbital orbital-two"></div><div className="orbit-dot"></div><div className="character-shadow"></div>
 <div className="character-float"><div className="character-tilt"><svg className="character" viewBox="0 0 420 420" fill="none" aria-hidden="true">
@@ -78,7 +78,7 @@ export default function Home() {
     </div>
   </article>
 ))}</div></div><div className="university-meta"><div className="university-more"><button className="text-link" type="button" data-open-stats>Lihat selengkapnya</button></div><p className="university-counter" aria-label="Kartu 1 dari 10"><span>01</span>/{String(universities.length).padStart(2, "0")}</p></div></div></section>
-<section className="cta" aria-labelledby="cta-title"><div><h2 id="cta-title">Mulai Persiapan Kuliahmu Sekarang!</h2></div><div className="cta-action"><button className="primary" type="button" data-open-guide>Dapatkan Panduan PDF Gratis</button><p className="guide-limit-note">Diberikan kepada 500 pendaftar pertama.</p></div></section>
+<section className="cta" aria-labelledby="cta-title"><div><h2 id="cta-title">Mulai Persiapan Kuliahmu Sekarang!</h2></div><div className="cta-action"><button className="primary" type="button" data-open-guide>Dapatkan Panduan PDF Gratis</button><p className="guide-limit-note">Diberikan kepada 500 pendaftar pertama!</p></div></section>
 </main>
 <footer className="site-footer"><p className="footer-name">UNIGATE</p><p>Platform pembelajaran bahasa Korea dan layanan transfer ke universitas di Korea.</p><p>Merek terdaftar di Indonesia: IDM001488588.</p></footer>
 <TransferRequest />
