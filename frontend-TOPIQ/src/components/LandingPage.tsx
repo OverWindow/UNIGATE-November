@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { BriefcaseBusiness, Check, ExternalLink, GraduationCap, Minus, Plus, ShieldCheck } from "lucide-react";
+import { Check, ExternalLink, Minus, Plus } from "lucide-react";
 import { useState } from "react";
 import { useApp } from "@/app/providers";
 import { homeContent } from "@/lib/home-content";
@@ -10,8 +10,6 @@ import HomeTestSelector from "./HomeTestSelector";
 import LandingCharacter from "./LandingCharacter";
 import instituteLogo from "../../public/brand/niied-logo.png";
 import styles from "./LandingPage.module.css";
-
-const useIcons = [GraduationCap, BriefcaseBusiness, ShieldCheck];
 
 export default function LandingPage() {
   const { language } = useApp();
@@ -55,10 +53,7 @@ export default function LandingPage() {
           <section id="topik-uses" className={styles.section} aria-labelledby="uses-title">
             <div className={styles.container}>
               <div className={styles.sectionIntro}><h2 id="uses-title" className={styles.heading}>{t.uses.title}</h2><p className={styles.description}>{t.uses.description}</p></div>
-              <div className={styles.useGrid}>{t.uses.cards.map((card, index) => {
-                const Icon = useIcons[index];
-                return <article className={styles.useCard} key={card.title}><span className={styles.useIcon}><Icon size={24} aria-hidden="true" /></span><h3>{card.title}</h3><p>{card.description}</p></article>;
-              })}</div>
+              <div className={styles.useGrid}>{t.uses.cards.map(card => <article className={styles.useItem} key={card.title}><h3>{card.title}</h3><p>{card.description}</p></article>)}</div>
             </div>
           </section>
 
