@@ -15,7 +15,7 @@ export default function Home() {
 <canvas id="ambient-dots" aria-hidden="true"></canvas>
 <main>
 <section className="hero" aria-labelledby="hero-title">
-<div><h1 id="hero-title">Mau Lanjut Kuliah <span>di Korea Selatan?</span></h1><p className="hero-subtitle">Dapatkan Panduan Transfer ke Universitas di Korea!</p><button className="primary" type="button" data-open-guide>Dapatkan Panduan PDF Gratis</button><p className="guide-limit-note">Gratis untuk 500 pendaftar pertama.</p></div>
+<div><h1 id="hero-title">Mau Lanjut Kuliah <span>di Korea Selatan?</span></h1><p className="hero-subtitle">Dapatkan Panduan Transfer ke Universitas di Korea!</p><div className="cta-action"><button className="primary" type="button" data-open-guide>Dapatkan Panduan PDF Gratis</button><p className="guide-limit-note">Gratis untuk 500 pendaftar pertama.</p></div></div>
 <div className="character-stage" role="img" aria-label="Karakter krom interaktif yang mengikuti gerakan penunjuk">
 <div className="orbital orbital-one"></div><div className="orbital orbital-two"></div><div className="orbit-dot"></div><div className="character-shadow"></div>
 <div className="character-float"><div className="character-tilt"><svg className="character" viewBox="0 0 420 420" fill="none" aria-hidden="true">

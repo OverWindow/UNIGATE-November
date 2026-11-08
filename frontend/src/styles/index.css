@@ -125,6 +125,7 @@ html{overflow-x:clip}.hero{padding-top:78px;padding-bottom:50px;min-height:640px
 .cta-action .primary{width:100%}
 .cta .guide-limit-note{margin-top:10px;font-size:11px;max-width:none}
 @media(max-width:650px){
+  .hero .cta-action{width:100%}
   .contents{width:calc(100% - 16px);max-width:340px;margin-inline:auto;text-align:left;align-self:center}
   .cost-option::after{grid-column:1/-1;margin-top:5px}
 }
