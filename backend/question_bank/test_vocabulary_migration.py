@@ -163,7 +163,7 @@ class VocabularyAudioMigrationTests(VocabularyMigrationTestCase):
         result = self.client.get(f"/api/vocabulary/sets/{group.pk}/")
         self.assertEqual(result.status_code, 200)
         self.assertEqual(set(result.json()["words"][0]), {
-            "id", "position", "korean", "partOfSpeech", "meanings", "exampleKorean", "exampleEnglish",
+            "id", "position", "korean", "partOfSpeech", "meanings", "exampleKorean", "exampleEnglish", "audioUrl",
         })
         self.assertEqual((self.schema(), self.rows(), self.sequence()), before)
 

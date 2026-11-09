@@ -1,3 +1,7 @@
+import re
+
+from django.conf import settings
+
 from question_bank.models import Vocabulary
 
 
@@ -7,6 +11,19 @@ PAGE_SIZE = 24
 
 class VocabularyUnavailable(Exception):
     pass
+
+
+def audio_url(word):
+    if not settings.CLOUDFRONT_BASE_URL or not (word.audio_storage_bucket or "").strip():
+        return None
+    checksum = word.audio_file_sha256 or ""
+    if not re.fullmatch(r"[a-f0-9]{64}", checksum):
+        return None
+    # Hub uses immutable, content-addressed MP3 paths for vocabulary audio.
+    path = f"media/vocabulary-audio/{checksum}.mp3"
+    if word.audio_storage_path != path:
+        return None
+    return f"{settings.CLOUDFRONT_BASE_URL}/{path}"
 
 
 def split_words(word_ids):
@@ -28,7 +45,7 @@ def source_words(sets, *, include_details=False):
     fields = ("vocabulary_id", "korean", "topik_level")
     if include_details:
         fields += ("part_of_speech", "english", "vietnamese", "japanese", "chinese_simplified", "indonesian",
-                   "example_korean", "example_english")
+                   "example_korean", "example_english", "audio_storage_bucket", "audio_storage_path", "audio_file_sha256")
     words = Vocabulary.objects.only(*fields).in_bulk([item.vocabulary_id for _, items in entries for item in items])
     for group, items in entries:
         if not 1 <= len(items) <= 20 or [item.position for item in items] != list(range(1, len(items) + 1)):

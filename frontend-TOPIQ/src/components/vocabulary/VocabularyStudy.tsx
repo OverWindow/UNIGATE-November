@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useApp } from "@/app/providers";
 import { VocabularyError, vocabularyRequest, type MeaningLanguage, type VocabularyDetail } from "@/lib/vocabulary-api";
 import { vocabularyContent } from "@/lib/vocabulary-content";
+import VocabularyAudio from "./VocabularyAudio";
 
 export default function VocabularyStudy({ id }: { id: string }) {
   const { language } = useApp();
@@ -66,7 +67,8 @@ export default function VocabularyStudy({ id }: { id: string }) {
             </select></label>
           </div>
           <article className="vocabulary-word-card" aria-labelledby="vocabulary-word">
-            <div className="vocabulary-word-front"><h2 id="vocabulary-word" lang="ko">{word.korean}</h2>
+            <div className="vocabulary-word-front">
+              <VocabularyAudio key={`${word.id}:${word.audioUrl ?? ""}`} word={word.korean} url={word.audioUrl} />
               {word.partOfSpeech && <span className="vocabulary-pos" lang="ko">{word.partOfSpeech}</span>}
               <button className="button vocabulary-reveal" aria-expanded={revealed} aria-controls="vocabulary-meaning" onClick={() => setRevealed(!revealed)}>{revealed ? t.hideMeaning : t.showMeaning}</button>
             </div>

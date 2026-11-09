@@ -9,6 +9,9 @@ const ko = {
   meaningLanguage: "뜻 언어", showMeaning: "뜻과 예문 보기", hideMeaning: "뜻과 예문 접기",
   meaning: "뜻", example: "예문", englishExample: "영어 번역", wordList: "세트의 전체 단어",
   missingMeaning: "이 언어의 뜻은 아직 등록되지 않았습니다.",
+  audioPlay: "한국어 발음 듣기", audioReplay: "처음부터 다시 듣기", audioRetry: "음성 다시 재생",
+  audioMissing: "음성 준비 중", audioLoading: "음성을 불러오는 중입니다.", audioPlaying: "음성 재생 중",
+  audioError: "음성을 재생하지 못했습니다. 스피커 버튼을 눌러 다시 시도해 주세요.",
   currentWord: "현재 단어", firstWord: "처음으로", lastWord: "마지막 단어입니다.",
 };
 type VocabularyCopy = { [Key in keyof typeof ko]: string };
@@ -24,6 +27,9 @@ export const vocabularyContent: Record<Language, VocabularyCopy> = {
     meaningLanguage: "Meaning language", showMeaning: "Show meaning and example", hideMeaning: "Hide meaning and example",
     meaning: "Meaning", example: "Example", englishExample: "English translation", wordList: "Words in this set",
     missingMeaning: "The meaning in this language is not available yet.",
+    audioPlay: "Play Korean pronunciation", audioReplay: "Replay from the start", audioRetry: "Retry audio playback",
+    audioMissing: "Audio coming soon", audioLoading: "Loading audio…", audioPlaying: "Playing audio",
+    audioError: "Couldn't play the audio. Press the speaker button to try again.",
     currentWord: "Current word", firstWord: "Back to first word", lastWord: "This is the last word.",
   },
   id: {
@@ -35,6 +41,9 @@ export const vocabularyContent: Record<Language, VocabularyCopy> = {
     meaningLanguage: "Bahasa arti", showMeaning: "Lihat arti dan contoh", hideMeaning: "Sembunyikan arti dan contoh",
     meaning: "Arti", example: "Contoh", englishExample: "Terjemahan bahasa Inggris", wordList: "Kata dalam set ini",
     missingMeaning: "Arti dalam bahasa ini belum tersedia.",
+    audioPlay: "Dengarkan pelafalan bahasa Korea", audioReplay: "Putar ulang dari awal", audioRetry: "Coba putar audio lagi",
+    audioMissing: "Audio segera tersedia", audioLoading: "Memuat audio…", audioPlaying: "Audio sedang diputar",
+    audioError: "Audio tidak dapat diputar. Tekan tombol speaker untuk mencoba lagi.",
     currentWord: "Kata saat ini", firstWord: "Kembali ke kata pertama", lastWord: "Ini kata terakhir.",
   },
 };

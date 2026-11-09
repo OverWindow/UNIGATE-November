@@ -6,6 +6,7 @@ export interface VocabularySet {
 export interface VocabularyWord {
   id: string; position: number; korean: string; partOfSpeech: string;
   meanings: Record<MeaningLanguage, string>; exampleKorean: string; exampleEnglish: string;
+  audioUrl: string | null;
 }
 export interface VocabularyDetail extends VocabularySet { catalogPage: number; words: VocabularyWord[] }
 export interface VocabularyCatalogData {

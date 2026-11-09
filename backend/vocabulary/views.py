@@ -7,7 +7,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
 from .models import VocabularySet
-from .services import LEVELS, PAGE_SIZE, VocabularyUnavailable, set_summary, source_words
+from .services import LEVELS, PAGE_SIZE, VocabularyUnavailable, audio_url, set_summary, source_words
 
 
 def response(data, status=200):
@@ -79,5 +79,6 @@ def detail(request, set_id):
             "meanings": {"en": word.english, "vi": word.vietnamese, "ja": word.japanese,
                          "zh-Hans": word.chinese_simplified, "id": word.indonesian},
             "exampleKorean": word.example_korean, "exampleEnglish": word.example_english,
+            "audioUrl": audio_url(word),
         })
     return response(data)

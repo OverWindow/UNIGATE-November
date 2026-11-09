@@ -4,11 +4,12 @@ from unittest.mock import patch
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.db import DatabaseError, IntegrityError, connection, transaction
-from django.test import SimpleTestCase, TransactionTestCase
+from django.test import SimpleTestCase, TransactionTestCase, override_settings
+from django.utils import timezone
 
 from question_bank.models import Vocabulary
 from .models import VocabularySet, VocabularySetItem
-from .services import split_words
+from .services import audio_url, split_words
 
 
 class VocabularySplitTests(SimpleTestCase):
@@ -24,6 +25,33 @@ class VocabularySplitTests(SimpleTestCase):
         self.assertEqual(split_words([]), [])
         self.assertEqual(split_words([42]), [[42]])
         self.assertEqual([len(group) for group in split_words(list(range(21)))], [11, 10])
+
+
+@override_settings(CLOUDFRONT_BASE_URL="https://media.example.com")
+class VocabularyAudioURLTests(SimpleTestCase):
+    def test_only_hub_audio_paths_matching_the_checksum_are_exposed(self):
+        checksum = "a" * 64
+        path = f"media/vocabulary-audio/{checksum}.mp3"
+        word = Vocabulary(audio_storage_bucket="synthetic", audio_storage_path=path, audio_file_sha256=checksum)
+        self.assertEqual(audio_url(word), f"https://media.example.com/{path}")
+        for invalid in (None, "", "https://other.example.com/audio.mp3", "/" + path, "../" + path,
+                        path + "?token=synthetic", path.replace(checksum, "b" * 64)):
+            with self.subTest(path=invalid):
+                word.audio_storage_path = invalid
+                self.assertIsNone(audio_url(word))
+        word.audio_storage_path = path
+        word.audio_file_sha256 = "invalid"
+        self.assertIsNone(audio_url(word))
+        word.audio_file_sha256 = checksum
+        word.audio_storage_bucket = " "
+        self.assertIsNone(audio_url(word))
+        self.assertIsNone(audio_url(Vocabulary()))
+
+    @override_settings(CLOUDFRONT_BASE_URL="")
+    def test_missing_configuration_leaves_audio_unavailable(self):
+        word = Vocabulary(audio_storage_bucket="synthetic", audio_storage_path=f"media/vocabulary-audio/{'a' * 64}.mp3",
+                          audio_file_sha256="a" * 64)
+        self.assertIsNone(audio_url(word))
 
 
 class VocabularyTests(TransactionTestCase):
@@ -110,6 +138,7 @@ class VocabularyTests(TransactionTestCase):
             "id": "30001", "position": 1, "korean": "테스트1", "partOfSpeech": "",
             "meanings": {"en": "test 1", "vi": "thử 1", "ja": "テスト1", "zh-Hans": "测试1", "id": "ujian 1"},
             "exampleKorean": "한국어 예문입니다.", "exampleEnglish": "An example sentence.",
+            "audioUrl": None,
         })
         self.assertEqual(self.client.get(path).json(), data)
         self.assertNotIn("progress", data)
@@ -129,6 +158,31 @@ class VocabularyTests(TransactionTestCase):
             "en": "test 1", "vi": "thử 1", "ja": "テスト1", "zh-Hans": "", "id": "",
         })
         self.assertEqual(list(Vocabulary.objects.order_by("pk").values()), before)
+
+    @override_settings(CLOUDFRONT_BASE_URL="https://media.example.com")
+    def test_audio_urls_are_read_only_and_follow_newly_transferred_audio(self):
+        self.register()
+        group = VocabularySet.objects.filter(topik_level=3).first()
+        path = f"/api/vocabulary/sets/{group.pk}/"
+        self.assertIsNone(self.client.get(path).json()["words"][0]["audioUrl"])
+        key = f"media/vocabulary-audio/{'a' * 64}.mp3"
+        Vocabulary.objects.filter(pk=30001).update(
+            audio_storage_bucket="synthetic", audio_storage_path=key, audio_file_sha256="a" * 64,
+            audio_byte_size=1024, audio_duration_ms=1000, audio_source_hash="b" * 64,
+            audio_generation_config={"text": "테스트1"}, audio_created_at=timezone.now(),
+        )
+        before = list(Vocabulary.objects.order_by("pk").values())
+        with self.assertNumQueries(4):
+            result = self.client.get(path)
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.json()["words"][0]["audioUrl"], f"https://media.example.com/{key}")
+        self.assertIsNone(result.json()["words"][1]["audioUrl"])
+        self.assertNotIn("audio_storage_bucket", result.json()["words"][0])
+        self.assertEqual(list(Vocabulary.objects.order_by("pk").values()), before)
+        with self.settings(CLOUDFRONT_BASE_URL=""):
+            result = self.client.get(path)
+            self.assertEqual(result.status_code, 200)
+            self.assertIsNone(result.json()["words"][0]["audioUrl"])
 
     def test_pagination_and_invalid_parameters(self):
         self.add_words(6, 481)
@@ -153,6 +207,7 @@ class VocabularyTests(TransactionTestCase):
         detail_fields = catalog_fields | {
             "part_of_speech", "english", "vietnamese", "japanese", "chinese_simplified", "indonesian",
             "example_korean", "example_english",
+            "audio_storage_bucket", "audio_storage_path", "audio_file_sha256",
         }
         for path, expected_fields, result_key, count in (
             ("/api/vocabulary/sets/?level=4", catalog_fields, "sets", 1),

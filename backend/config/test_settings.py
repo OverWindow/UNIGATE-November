@@ -57,6 +57,21 @@ class EnvironmentSettingsTests(unittest.TestCase):
         self.assertEqual(settings["SECRET_KEY"], "process-test-key")
         self.assertEqual(settings["ALLOWED_HOSTS"], ["process.example.com"])
 
+    def test_vocabulary_media_origin_is_optional_and_normalized(self):
+        settings, _ = self.read_settings({"DJANGO_SECRET_KEY": "test"})
+        self.assertEqual(settings["CLOUDFRONT_BASE_URL"], "")
+        settings, _ = self.read_settings({"DJANGO_SECRET_KEY": "test", "CLOUDFRONT_BASE_URL": " https://media.example.com/ "})
+        self.assertEqual(settings["CLOUDFRONT_BASE_URL"], "https://media.example.com")
+
+    def test_vocabulary_media_origin_rejects_invalid_configuration_without_exposing_it(self):
+        for value in ("http://media.example.com", "//media.example.com", "https://user:secret@media.example.com",
+                      "https://media.example.com/media", "https://media.example.com/?key=secret",
+                      "https://media.example.com/#fragment", "https://media.example.com:8443",
+                      "https://media.example.com:invalid", "https://[invalid", "https://bad host.example.com"):
+            with self.subTest(value=value), self.assertRaises(ImproperlyConfigured) as error:
+                self.read_settings({"DJANGO_SECRET_KEY": "test", "CLOUDFRONT_BASE_URL": value})
+            self.assertEqual(str(error.exception), "CLOUDFRONT_BASE_URL must be an HTTPS origin without credentials or a path.")
+
     def test_process_only_configuration(self):
         settings, _ = self.read_settings({
             "DJANGO_ENV": "production", "DJANGO_SECRET_KEY": "test-only",

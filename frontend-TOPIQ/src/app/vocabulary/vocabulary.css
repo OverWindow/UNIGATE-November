@@ -51,6 +51,17 @@
 .vocabulary-word-card { overflow: hidden; border: 1px solid #dbe2ed; border-radius: 20px; background: #fff; box-shadow: 0 8px 28px #25456c06; }
 .vocabulary-word-front { display: flex; flex-direction: column; align-items: center; padding: 48px 32px 36px; min-height: 260px; }
 .vocabulary-word-front h2 { margin: 0; font-size: clamp(32px, 4vw, 48px); font-weight: 650; letter-spacing: -.03em; line-height: 1.5; overflow-wrap: anywhere; text-align: center; max-width: 100%; }
+.vocabulary-pronunciation { width: 100%; }
+.vocabulary-word-heading { display: flex; justify-content: center; align-items: center; gap: 12px; }
+.vocabulary-word-heading h2 { min-width: 0; }
+.vocabulary-audio-button { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 44px; width: 44px; height: 44px; border: 1px solid #d5e1fa; border-radius: 50%; background: #f1f5ff; color: #2d5ec5; }
+.vocabulary-audio-button:hover:not(:disabled), .vocabulary-audio-button.is-playing { background: #e1eaff; border-color: #91afe9; }
+.vocabulary-audio-button:focus-visible { outline: 3px solid #2d5ec5; outline-offset: 3px; }
+.vocabulary-audio-button:disabled { color: #7a8494; border-color: #e0e6f0; background: #f1f4f9; cursor: default; }
+.vocabulary-audio-status { min-height: 1.6em; margin: 8px 0 0; font-size: 12px; line-height: 1.6; text-align: center; color: #617086; }
+.vocabulary-audio-spinner { animation: vocabulary-audio-spin 1s linear infinite; }
+@keyframes vocabulary-audio-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .vocabulary-audio-spinner { animation: none; } }
 .vocabulary-pos { margin-top: 12px; padding: 4px 12px; border-radius: 6px; background: #f1f4f9; color: #617086; font-size: 12px; }
 .vocabulary-reveal { margin-top: 30px; min-height: 44px; padding: 10px 20px; border-color: #d5e1fa; background: #f1f5ff; color: #2d5ec5; font-size: 13px; }
 .vocabulary-meaning-region { display: grid; grid-template-rows: 0fr; opacity: 0; visibility: hidden; transition: grid-template-rows .24s ease, opacity .2s ease, visibility .24s; }

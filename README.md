@@ -88,9 +88,49 @@ Hub 전송은 단어·음성 메타데이터를 추가·갱신하며 S3 음성 �
 새 단어를 전송했다면 위 `create_vocabulary_sets --check`와 `create_vocabulary_sets`를 수동 실행합니다.
 음성 정보만 갱신한 경우 기존 세트를 다시 만들 필요는 없습니다.
 
-이 변경은 새 API·테이블·관리 명령·워커를 추가하지 않으며 기존 API 응답과 프론트엔드는 유지합니다.
-음성 재생 UI는 포함하지 않습니다. 음성 데이터 유실을 막기 위해 migration 역적용은 지원하지 않습니다.
+음성 구조 migration은 새 API·테이블·관리 명령·워커를 추가하지 않습니다.
+음성 데이터 유실을 막기 위해 migration 역적용은 지원하지 않습니다.
 이전 구조 복원이 필요하면 적용 전 DB 백업을 사용해야 합니다.
+
+### 단어 발음 재생
+
+단어 제목 옆 스피커 버튼으로 한국어 발음을 듣습니다. 뜻 언어·뜻 펼침 상태와 관계없이 재생하며,
+재생 중 다시 누르면 처음부터 듣습니다. 불러오는 동안에는 중복 클릭을 막고, 실패하면 안내와 함께 재시도할 수 있습니다.
+음성이 없는 단어는 회색 버튼과 `음성 준비 중` 안내를 표시합니다. 단어 이동·페이지 이탈 시 이전 재생과 파일 요청을 정리합니다.
+파일은 클릭할 때만 요청하며 자동 재생하지 않습니다. 안내와 접근성 이름은 한국어·영어·인도네시아어 UI를 지원합니다.
+
+기존 `GET /api/vocabulary/sets/{id}/` 응답의 각 단어에 `audioUrl`을 추가합니다.
+백엔드의 `CLOUDFRONT_BASE_URL`과 기존 `audio_storage_path`로 URL을 만들며,
+버킷 정보가 있고 경로가 `media/vocabulary-audio/<audio_file_sha256>.mp3` 형식과 일치해야 합니다.
+설정 또는 유효한 음성 정보가 없으면 `null`을 반환하고 단어 학습은 계속 사용할 수 있습니다.
+CloudFront에 파일이 없거나 접근할 수 없는 경우에는 재생 시 오류를 안내합니다.
+API 조회 시 외부 파일 확인 요청은 하지 않으며, 필요한 음성 필드는 기존 단어 조회에 함께 포함합니다.
+기존 PBT/IBT의 `storage_url`과 응시 스냅샷은 그대로 사용합니다.
+
+**설정과 실행:** 백엔드 시작 전에 환경 변수 `CLOUDFRONT_BASE_URL`에 Hub와 동일한 HTTPS origin을 설정합니다.
+경로·쿼리·인증정보 없이 배포 도메인 또는 사용자 지정 도메인만 사용합니다. 빈 값은 단어장 음성 기능을 비활성화합니다.
+값이 있으면 HTTPS origin 형식을 검사하며 잘못된 값은 시작 시 오류로 알립니다. 실제 설정 값은 저장소에 기록하지 않습니다.
+브라우저가 해당 배포의 단어 음성 경로에 접근할 수 있어야 하며, TOPIQ에는 S3 인증키나 새 AWS 라이브러리가 필요하지 않습니다.
+
+로컬에서는 `backend/.env.development`에 값을 설정한 후 기존 백엔드를 종료하고 **사용자가 수동 실행**합니다.
+실행 위치는 `backend/`입니다. 환경 변수 변경은 프로세스 재시작 후 반영됩니다.
+
+```powershell
+$env:DJANGO_ENV = 'development'
+.\.venv\Scripts\python.exe manage.py runserver
+```
+
+운영은 백엔드 서비스의 환경 변수에 같은 설정을 추가하고 백엔드를 재배포합니다.
+기존 `deploy/start.sh`의 migrate 후 Gunicorn 자동 시작 절차는 유지합니다.
+프론트 배포 전 `frontend-TOPIQ/`에서 `npm run build`를 수동 실행하거나 기존 배포 빌드 절차로 반영합니다.
+이 재생 기능에는 새 migration·API 경로·테이블·DB 컬럼 추가/변경·워커·관리 명령이 없습니다.
+위 실행 명령은 DB 구조나 데이터를 변경하지 않습니다. 기존 음성·언어 migration과 Hub 데이터 전송은 준비되어 있어야 합니다.
+
+추후 음성을 Hub에서 생성하고 대상 DB로 전송하면 단어장을 다시 열거나 새로고침할 때 활성화됩니다.
+기존 단어에 음성만 추가한 경우 세트 재등록이나 프론트 재배포는 필요하지 않습니다.
+검증은 격리된 PostgreSQL 테스트 DB에서 `backend/`의
+`.\.venv\Scripts\python.exe manage.py test vocabulary question_bank config.test_settings config.test_routes --noinput`으로 수행합니다.
+프론트 검증은 `frontend-TOPIQ/`에서 `npm test`, `npm run lint`, `npm run typecheck`, `npm run build`를 실행합니다.
 
 ### Hub 중국어·인도네시아어 컬럼
 
@@ -129,7 +169,7 @@ Hub 구조 일치·기존 데이터 보존·DB 기본값과 NOT NULL·재적용�
 | --- | --- | --- |
 | GET | `/api/vocabulary/levels/` | 등록된 급수별 단어·세트 수 |
 | GET | `/api/vocabulary/sets/?level=3&page=1` | 급수별 세트 목록, 24세트씩 페이지 구분 |
-| GET | `/api/vocabulary/sets/{id}/` | 세트의 단어·다섯 언어 뜻·한국어/영어 예문 |
+| GET | `/api/vocabulary/sets/{id}/` | 세트의 단어·다섯 언어 뜻·한국어/영어 예문·발음 URL |
 
 조회는 회원 인증 없이 가능하며 사용자별 상태나 학습 기록을 저장하지 않습니다. 쓰기 API는 없습니다.
 등록된 세트가 없으면 빈 목록을 반환합니다. 잘못된 급수·페이지는 400, 없는 세트·페이지는 404,

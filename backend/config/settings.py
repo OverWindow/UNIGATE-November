@@ -2,7 +2,8 @@ import os
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, ValidationError
+from django.core.validators import URLValidator
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -34,6 +35,20 @@ topiq_url = urlsplit(TOPIQ_PUBLIC_URL)
 if (topiq_url.scheme not in ({"http", "https"} if DEBUG else {"https"}) or not topiq_url.netloc
         or topiq_url.username or topiq_url.password or topiq_url.path or topiq_url.query or topiq_url.fragment):
     raise ImproperlyConfigured("TOPIQ_PUBLIC_URL must be a trusted origin (HTTPS in production).")
+
+CLOUDFRONT_BASE_URL = os.environ.get("CLOUDFRONT_BASE_URL", "").strip()
+if CLOUDFRONT_BASE_URL:
+    try:
+        URLValidator(schemes=["https"])(CLOUDFRONT_BASE_URL)
+        media_origin = urlsplit(CLOUDFRONT_BASE_URL)
+        if (media_origin.username is not None or media_origin.password is not None
+                or media_origin.port not in (None, 443) or media_origin.path not in ("", "/")
+                or media_origin.query or media_origin.fragment):
+            raise ValueError
+    except (ValidationError, ValueError):
+        raise ImproperlyConfigured("CLOUDFRONT_BASE_URL must be an HTTPS origin without credentials or a path.") from None
+    CLOUDFRONT_BASE_URL = f"https://{media_origin.netloc}"
+
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.environ.get(
