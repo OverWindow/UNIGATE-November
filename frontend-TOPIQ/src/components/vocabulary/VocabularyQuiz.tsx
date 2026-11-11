@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
 import { VocabularyError, vocabularyRequest, type MeaningLanguage, type VocabularyAnswer,
   type VocabularyQuestion, type VocabularyQuiz as QuizData } from "@/lib/vocabulary-api";
-import { vocabularyContent, vocabularyLevelLabel } from "@/lib/vocabulary-content";
+import { vocabularyContent } from "@/lib/vocabulary-content";
 
 export default function VocabularyQuiz({ id }: { id: string }) {
   const { language } = useApp();
@@ -80,12 +80,9 @@ export default function VocabularyQuiz({ id }: { id: string }) {
   return <div className="page-container vocabulary-quiz">
     <div className="vocabulary-study-top">
       <Link className="vocabulary-back" href={backHref}><ArrowLeft size={14} aria-hidden="true" /> {t.back}</Link>
-      {data && <Link className="vocabulary-back" href={`/vocabulary/sets/${id}`}>{t.browse}</Link>}
     </div>
     <header className="vocabulary-quiz-header">
-      {data && <p>{vocabularyLevelLabel(data.level, language)} · {t.quizSet} {String(data.number).padStart(2, "0")}</p>}
       <h1>{t.quizTitle}</h1>
-      <p>{t.quizIntro}</p>
     </header>
     {error ? <div className="vocabulary-status" role="alert">
       <p>{error instanceof VocabularyError && error.status === 404 ? t.notFound : t.quizError}</p>
@@ -101,11 +98,12 @@ export default function VocabularyQuiz({ id }: { id: string }) {
           <button className="button vocabulary-secondary" onClick={() => setRevision(value => value + 1)}>{t.quizRestart}</button>
           <Link className="button vocabulary-secondary" href={`/vocabulary/sets/${id}`}>{t.browse}</Link>
         </div>
-        <p className="vocabulary-quiz-note">{t.quizSessionOnly}</p>
       </section> : <>
         <div className="vocabulary-quiz-progress">
           <span>{reviewing ? t.reviewing : t.question} <strong>{index + 1} / {questions.length}</strong></span>
-          <progress value={index} max={questions.length} aria-label={t.quizTitle} />
+          <div className="vocabulary-quiz-progress-track" role="progressbar" aria-label={t.quizTitle} aria-valuemin={0} aria-valuemax={questions.length} aria-valuenow={index}>
+            <span style={{ width: `${index / questions.length * 100}%` }} />
+          </div>
         </div>
         {!reviewing && questions.length < data.wordCount && <p className="vocabulary-quiz-note">{t.quizPartial}</p>}
         <form className="vocabulary-quiz-card" onSubmit={event => { event.preventDefault(); void check(); }}>
@@ -130,7 +128,7 @@ export default function VocabularyQuiz({ id }: { id: string }) {
           <div aria-live="polite">
             {answer && <section className={`vocabulary-quiz-feedback${answer.isCorrect ? " is-correct" : ""}`}>
               <h3>{answer.isCorrect ? t.correct : t.incorrect}</h3>
-              <p><strong>{t.correctAnswer}: </strong><span lang="ko">{answer.correctAnswer}. {question.choices[answer.correctAnswer - 1]}</span></p>
+              <h4>{t.correctAnswer}</h4><p lang="ko">{answer.correctAnswer}. {question.choices[answer.correctAnswer - 1]}</p>
               <h4>{t.explanation}</h4><p lang="ko">{answer.explanation}</p>
               <div className="vocabulary-toolbar"><strong lang="ko">{answer.word.korean}</strong>
                 <label>{t.meaningLanguage}<select value={meaningLanguage} onChange={event => setMeaningLanguage(event.target.value as MeaningLanguage)}>
@@ -146,7 +144,6 @@ export default function VocabularyQuiz({ id }: { id: string }) {
               : <button type="submit" className="button button-primary" disabled={selected === null || checking || changed}>{checking ? t.checking : t.checkAnswer}</button>}
           </div>
         </form>
-        <p className="vocabulary-quiz-note">{t.quizSessionOnly}</p>
       </>}
   </div>;
 }

@@ -13,8 +13,8 @@ const ko = {
   audioMissing: "음성 준비 중", audioLoading: "음성을 불러오는 중입니다.", audioPlaying: "음성 재생 중",
   audioError: "음성을 재생하지 못했습니다. 스피커 버튼을 눌러 다시 시도해 주세요.",
   currentWord: "현재 단어", firstWord: "처음으로", lastWord: "마지막 단어입니다.",
-  quiz: "문제 풀기", quizTitle: "문장 빈칸 퀴즈", quizCount: "문제", quizPreparing: "문제 준비 중", quizSet: "세트",
-  quizUnavailable: "문제 확인 불가", quizIntro: "세트의 단어마다 한 문제씩 풀어 보세요. 답을 확인하면 해설과 뜻을 볼 수 있습니다.",
+  quiz: "문제 풀기", quizTitle: "문장 빈칸 퀴즈", quizPreparing: "문제 준비 중",
+  quizUnavailable: "문제 확인 불가",
   quizPartial: "문제가 준비된 단어만 출제됩니다.", quizLoading: "문제를 불러오는 중입니다.",
   quizError: "문제를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
   quizEmpty: "이 세트의 문장 빈칸 문제를 준비하고 있습니다.", question: "문제", checkAnswer: "정답 확인", checking: "채점 중…",
@@ -23,7 +23,6 @@ const ko = {
   questionChanged: "문제가 변경되었거나 더 이상 제공되지 않습니다. 새 문제로 다시 시작해 주세요.",
   quizRestart: "새 퀴즈 시작", quizResult: "퀴즈 결과", reviewResult: "오답 복습 결과", correctCount: "맞힌 문제",
   retryWrong: "틀린 문제 다시 풀기", reviewing: "틀린 문제 복습", allCorrect: "모든 문제를 맞혔어요!", showResult: "결과 보기",
-  quizSessionOnly: "결과는 이 화면에서만 유지됩니다. 새로고침하거나 나가면 초기화됩니다.",
 };
 type VocabularyCopy = { [Key in keyof typeof ko]: string };
 
@@ -42,8 +41,8 @@ export const vocabularyContent: Record<Language, VocabularyCopy> = {
     audioMissing: "Audio coming soon", audioLoading: "Loading audio…", audioPlaying: "Playing audio",
     audioError: "Couldn't play the audio. Press the speaker button to try again.",
     currentWord: "Current word", firstWord: "Back to first word", lastWord: "This is the last word.",
-    quiz: "Take quiz", quizTitle: "Fill in the blank", quizCount: "questions", quizPreparing: "Quiz coming soon", quizSet: "Set",
-    quizUnavailable: "Quiz unavailable", quizIntro: "Try one question per word in this set. Check your answer to see the explanation and meaning.",
+    quiz: "Take quiz", quizTitle: "Fill in the blank", quizPreparing: "Quiz coming soon",
+    quizUnavailable: "Quiz unavailable",
     quizPartial: "Only words with available questions are included.", quizLoading: "Loading questions…",
     quizError: "Couldn't load the quiz. Please try again shortly.",
     quizEmpty: "Fill-in-the-blank questions for this set are coming soon.", question: "Question", checkAnswer: "Check answer", checking: "Checking…",
@@ -52,7 +51,6 @@ export const vocabularyContent: Record<Language, VocabularyCopy> = {
     questionChanged: "This question has changed or is no longer available. Please start a new quiz.",
     quizRestart: "Start a new quiz", quizResult: "Quiz results", reviewResult: "Review results", correctCount: "Correct answers",
     retryWrong: "Retry missed questions", reviewing: "Reviewing missed questions", allCorrect: "You got every question right!", showResult: "See results",
-    quizSessionOnly: "Results stay on this screen only. Refreshing or leaving resets them.",
   },
   id: {
     title: "Bahasa Korea dimulai dari satu kata.", intro: "Pelajari kata sesuai level dalam set berisi sekitar 20 kata, dengan arti dan contoh.",
@@ -67,8 +65,8 @@ export const vocabularyContent: Record<Language, VocabularyCopy> = {
     audioMissing: "Audio segera tersedia", audioLoading: "Memuat audio…", audioPlaying: "Audio sedang diputar",
     audioError: "Audio tidak dapat diputar. Tekan tombol speaker untuk mencoba lagi.",
     currentWord: "Kata saat ini", firstWord: "Kembali ke kata pertama", lastWord: "Ini kata terakhir.",
-    quiz: "Kerjakan kuis", quizTitle: "Kuis melengkapi kalimat", quizCount: "soal", quizPreparing: "Kuis segera tersedia", quizSet: "Set",
-    quizUnavailable: "Kuis tidak tersedia", quizIntro: "Kerjakan satu soal untuk setiap kata dalam set ini. Periksa jawaban untuk melihat penjelasan dan arti.",
+    quiz: "Kerjakan kuis", quizTitle: "Kuis melengkapi kalimat", quizPreparing: "Kuis segera tersedia",
+    quizUnavailable: "Kuis tidak tersedia",
     quizPartial: "Hanya kata yang memiliki soal yang disertakan.", quizLoading: "Memuat soal…",
     quizError: "Kuis tidak dapat dimuat. Silakan coba lagi sebentar lagi.",
     quizEmpty: "Soal melengkapi kalimat untuk set ini sedang disiapkan.", question: "Soal", checkAnswer: "Periksa jawaban", checking: "Memeriksa…",
@@ -77,7 +75,6 @@ export const vocabularyContent: Record<Language, VocabularyCopy> = {
     questionChanged: "Soal ini telah berubah atau tidak tersedia lagi. Silakan mulai kuis baru.",
     quizRestart: "Mulai kuis baru", quizResult: "Hasil kuis", reviewResult: "Hasil latihan ulang", correctCount: "Jawaban benar",
     retryWrong: "Ulangi soal yang salah", reviewing: "Mengulang soal yang salah", allCorrect: "Semua jawaban Anda benar!", showResult: "Lihat hasil",
-    quizSessionOnly: "Hasil hanya tersimpan di layar ini. Memuat ulang atau keluar akan menghapus hasil.",
   },
 };
 

@@ -67,7 +67,7 @@ function CatalogPage({ level, page }: { level: number; page: number }) {
             <div className="vocabulary-set-actions">
               <Link className="vocabulary-set-action" href={`/vocabulary/sets/${group.id}`}>{t.browse}<ExternalLink size={14} aria-hidden="true" /></Link>
               {group.quizQuestionCount ? <Link className="vocabulary-set-action" href={`/vocabulary/sets/${group.id}/quiz`}>
-                {t.quiz}<span>{group.quizQuestionCount} {t.quizCount}</span>
+                {t.quiz}<ExternalLink size={14} aria-hidden="true" />
               </Link> : <span className="vocabulary-set-action vocabulary-quiz-unavailable">{group.quizQuestionCount === null ? t.quizUnavailable : t.quizPreparing}</span>}
             </div>
           </article>)}
