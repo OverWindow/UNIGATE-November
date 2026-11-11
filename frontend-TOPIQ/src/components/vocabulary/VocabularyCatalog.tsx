@@ -61,11 +61,16 @@ function CatalogPage({ level, page }: { level: number; page: number }) {
         {page !== 1 && <Link className="button vocabulary-secondary" href={`/vocabulary?level=${level}&page=1`}>{t.back}</Link>}
       </div> : !currentData ? <p className="vocabulary-status" role="status">{t.loading}</p> : <>
         <div className="vocabulary-set-grid">
-          {currentData.catalog.sets.map(group => <Link className="vocabulary-set-card" key={group.id} href={`/vocabulary/sets/${group.id}`}>
+          {currentData.catalog.sets.map(group => <article className="vocabulary-set-card" key={group.id}>
             <span className="vocabulary-set-number">{String(group.number).padStart(2, "0")}</span>
             <h3>{group.preview.map((word, index) => <span key={index} lang="ko">{word}</span>)}</h3>
-            <div className="vocabulary-set-action">{t.browse}<ExternalLink size={14} aria-hidden="true" /></div>
-          </Link>)}
+            <div className="vocabulary-set-actions">
+              <Link className="vocabulary-set-action" href={`/vocabulary/sets/${group.id}`}>{t.browse}<ExternalLink size={14} aria-hidden="true" /></Link>
+              {group.quizQuestionCount ? <Link className="vocabulary-set-action" href={`/vocabulary/sets/${group.id}/quiz`}>
+                {t.quiz}<span>{group.quizQuestionCount} {t.quizCount}</span>
+              </Link> : <span className="vocabulary-set-action vocabulary-quiz-unavailable">{group.quizQuestionCount === null ? t.quizUnavailable : t.quizPreparing}</span>}
+            </div>
+          </article>)}
         </div>
         {!currentData.catalog.sets.length && <p className="vocabulary-status">{t.empty}</p>}
         {currentData.catalog.pageCount > 1 && <nav className="vocabulary-pagination" aria-label={t.pagination}>

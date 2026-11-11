@@ -7,7 +7,7 @@ from django.db import DatabaseError, IntegrityError, connection, transaction
 from django.test import SimpleTestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 
-from question_bank.models import Vocabulary
+from question_bank.models import Vocabulary, VocabularyQuestion
 from .models import VocabularySet, VocabularySetItem
 from .services import audio_url, split_words
 
@@ -60,11 +60,13 @@ class VocabularyTests(TransactionTestCase):
             cursor.execute("CREATE SCHEMA topik_bank")
         with connection.schema_editor() as editor:
             editor.create_model(Vocabulary)
+            editor.create_model(VocabularyQuestion)
         self.add_words(3, 41)
         self.add_words(4, 20)
 
     def tearDown(self):
         with connection.schema_editor() as editor:
+            editor.delete_model(VocabularyQuestion)
             editor.delete_model(Vocabulary)
         with connection.cursor() as cursor:
             cursor.execute("DROP SCHEMA topik_bank")
@@ -172,7 +174,7 @@ class VocabularyTests(TransactionTestCase):
             audio_generation_config={"text": "테스트1"}, audio_created_at=timezone.now(),
         )
         before = list(Vocabulary.objects.order_by("pk").values())
-        with self.assertNumQueries(4):
+        with self.assertNumQueries(7):
             result = self.client.get(path)
         self.assertEqual(result.status_code, 200)
         self.assertEqual(result.json()["words"][0]["audioUrl"], f"https://media.example.com/{key}")
@@ -215,7 +217,7 @@ class VocabularyTests(TransactionTestCase):
             (f"/api/vocabulary/sets/{group.pk}/", detail_fields, "words", 20),
         ):
             with self.subTest(path=path):
-                with self.assertNumQueries(4) as queries:
+                with self.assertNumQueries(7) as queries:
                     result = self.client.get(path)
                 self.assertEqual(result.status_code, 200)
                 self.assertEqual(len(result.json()[result_key]), count)

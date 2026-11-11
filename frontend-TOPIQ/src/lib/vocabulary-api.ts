@@ -1,7 +1,7 @@
 export type MeaningLanguage = "en" | "vi" | "ja" | "zh-Hans" | "id";
 export interface VocabularyLevel { level: number; wordCount: number; setCount: number }
 export interface VocabularySet {
-  id: string; level: number; number: number; wordCount: number; preview: string[];
+  id: string; level: number; number: number; wordCount: number; preview: string[]; quizQuestionCount: number | null;
 }
 export interface VocabularyWord {
   id: string; position: number; korean: string; partOfSpeech: string;
@@ -12,29 +12,53 @@ export interface VocabularyDetail extends VocabularySet { catalogPage: number; w
 export interface VocabularyCatalogData {
   level: number; page: number; pageCount: number; totalSets: number; sets: VocabularySet[];
 }
+export interface VocabularyQuestion {
+  id: string; instruction: string; stem: string; choices: string[]; version: string;
+}
+export interface VocabularyQuiz {
+  id: string; level: number; number: number; wordCount: number; catalogPage: number; questions: VocabularyQuestion[];
+}
+export interface VocabularyAnswer {
+  isCorrect: boolean; correctAnswer: number; explanation: string;
+  word: { korean: string; meanings: Record<MeaningLanguage, string> };
+}
 
 export class VocabularyError extends Error {
   constructor(public code: string, public status = 0) { super(code); }
 }
 
-export async function vocabularyRequest<T>(path: string, signal?: AbortSignal): Promise<T> {
+export async function vocabularyRequest<T>(path: string, signal?: AbortSignal, body?: unknown): Promise<T> {
   signal?.throwIfAborted();
   const controller = new AbortController();
   const abort = () => controller.abort(signal?.reason);
   signal?.addEventListener("abort", abort, { once: true });
   const timer = setTimeout(() => controller.abort(), 15000);
   try {
-    const response = await fetch(`/api/vocabulary/${path}`, {
-      method: "GET", credentials: "same-origin", cache: "no-store", signal: controller.signal,
-    });
-    let data;
-    try { data = await response.json(); }
-    catch (error) {
-      if (controller.signal.aborted) throw error;
-      throw new VocabularyError("server_error", response.status);
+    async function send(url: string, options: RequestInit): Promise<unknown> {
+      const response = await fetch(url, {
+        ...options, credentials: "same-origin", cache: "no-store", signal: controller.signal,
+      });
+      let data;
+      try { data = await response.json(); }
+      catch (error) {
+        if (controller.signal.aborted) throw error;
+        throw new VocabularyError("server_error", response.status);
+      }
+      if (!response.ok) throw new VocabularyError(typeof data?.error === "string" ? data.error : "server_error", response.status);
+      return data;
     }
-    if (!response.ok) throw new VocabularyError(typeof data?.error === "string" ? data.error : "server_error", response.status);
-    return data as T;
+    const headers: Record<string, string> = {};
+    if (body !== undefined) {
+      const csrf = await send("/api/csrf/", { method: "GET" }) as { csrfToken?: unknown };
+      if (!csrf || typeof csrf.csrfToken !== "string" || !csrf.csrfToken) throw new VocabularyError("server_error");
+      headers["Content-Type"] = "application/json";
+      headers["X-CSRFToken"] = csrf.csrfToken;
+    }
+    controller.signal.throwIfAborted();
+    return await send(`/api/vocabulary/${path}`, {
+      method: body === undefined ? "GET" : "POST", headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }) as T;
   } catch (error) {
     signal?.throwIfAborted();
     if (error instanceof VocabularyError) throw error;

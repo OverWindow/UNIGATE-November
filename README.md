@@ -163,21 +163,64 @@ $env:DJANGO_ENV = 'development'
 `.\.venv\Scripts\python.exe manage.py test question_bank.test_vocabulary_migration vocabulary --noinput`으로 실행합니다.
 Hub 구조 일치·기존 데이터 보존·DB 기본값과 NOT NULL·재적용·음성/언어 적용 순서·잘못된 구조의 롤백을 검사합니다.
 
-### 조회 API와 검증
+### 세트별 문장 빈칸 퀴즈
+
+세트 목록의 `문제 풀기` 또는 단어 학습 마지막 버튼에서 `/vocabulary/sets/[id]/quiz`로 이동합니다.
+기존 세트에 연결된 단어 중 `sentence_blank` 문제가 있는 단어마다 한 문제를 무작위로 선택하고 출제 순서를 섞습니다.
+단어당 최대 한 문제, 세트당 최대 20문제이며 목록의 문제 수는 전체 원본 문제 수가 아닌 출제 가능한 단어 수입니다.
+일부 단어에만 문제가 있으면 해당 단어만 출제합니다. 문제가 없는 세트는 `문제 준비 중`으로 표시합니다.
+
+보기 선택 후 `정답 확인`을 누르면 서버가 채점하고 정답·한국어 해설·단어·다섯 언어의 뜻을 반환합니다.
+제출 전 응답에는 정답 번호·허용 정답·해설·단어 제목·뜻·생성 메타데이터를 포함하지 않습니다.
+원본의 `updated_at`을 문제 버전으로 전달하며, 채점 시 버전이 다르면 409로 새 퀴즈 시작을 안내합니다.
+Hub에서 문제를 수정할 때는 `updated_at`도 갱신해야 합니다. 삭제되거나 세트에 속하지 않는 문제는 404입니다.
+정답 확인 후 선택을 바꿀 수 없으며 마지막에 이번 회차의 정답 수를 보여줍니다.
+`틀린 문제 다시 풀기`는 같은 문제·보기로 오답만 다시 출제하고, 복습 결과에서 계속 틀린 문제만 재시도할 수 있습니다.
+`새 퀴즈 시작`은 세트에서 다시 문제를 뽑습니다. 비회원도 이용하며 시간 제한·진행 저장·응시 테이블은 없습니다.
+결과와 오답 목록은 화면 메모리에만 유지되어 새로고침·이탈 시 초기화됩니다.
+
+원본 `topik_bank.vocabulary_questions`는 Hub가 관리하며 `question_bank.VocabularyQuestion`의 unmanaged 모델로 조회합니다.
+`migration/question_bank/0008_vocabulary_questions.py`는 Django 모델 상태만 등록합니다.
+새 DB 테이블·컬럼·인덱스를 만들거나 기존 문제·세트·사용자 데이터를 변경하지 않습니다.
+문제 테이블 조회가 실패해도 단어 목록·학습은 유지하고 `문제 확인 불가`를 표시하며, 퀴즈 API는 503을 반환합니다.
+
+로컬 적용은 사용자가 **기존 `0007_vocabulary_languages`까지 적용된 개발 DB**에서 아래 명령을 수동 실행합니다.
+목적은 기존 문제 테이블의 모델 매핑 이력 등록이며 `django_migrations`에 적용 이력만 기록합니다.
+백엔드 재시작 전에 실행하고, 에이전트나 `runserver`는 자동 적용하지 않습니다.
+
+```powershell
+cd backend
+$env:DJANGO_ENV = 'development'
+.\.venv\Scripts\python.exe manage.py migrate question_bank 0008_vocabulary_questions
+```
+
+운영 배포 전에는 대상 DB에 Hub의 `topik_bank.vocabulary_questions` 테이블과 문제 데이터가 준비되어 있는지 확인합니다.
+이 migration은 원본 문제 테이블을 생성하거나 데이터를 전송하지 않습니다. 원본이 없으면 Hub의 단어 문제 전송을 먼저 수행합니다.
+운영은 기존 `deploy/start.sh`의 자동 `migrate` 후 Gunicorn 시작 절차를 유지합니다.
+기존 세트 재등록 명령은 필요하지 않으며, 프론트는 `frontend-TOPIQ/`에서 `npm run build` 후 기존 절차로 재배포합니다.
+새 관리 명령·백그라운드 작업·의존성은 없습니다.
+
+### 단어장 API와 검증
 
 | 메서드 | 경로 | 목적 |
 | --- | --- | --- |
 | GET | `/api/vocabulary/levels/` | 등록된 급수별 단어·세트 수 |
 | GET | `/api/vocabulary/sets/?level=3&page=1` | 급수별 세트 목록, 24세트씩 페이지 구분 |
 | GET | `/api/vocabulary/sets/{id}/` | 세트의 단어·다섯 언어 뜻·한국어/영어 예문·발음 URL |
+| GET | `/api/vocabulary/sets/{id}/questions/` | 단어당 하나의 문장 빈칸 문제·보기·버전 조회 |
+| POST | `/api/vocabulary/sets/{id}/questions/{question_id}/check/` | 선택 답 채점, 정답·해설·단어 뜻 반환. DB 저장 없음 |
 
-조회는 회원 인증 없이 가능하며 사용자별 상태나 학습 기록을 저장하지 않습니다. 쓰기 API는 없습니다.
+조회·채점은 회원 인증 없이 가능하며 사용자별 상태나 학습 기록을 저장하지 않습니다.
+세트 목록·상세 응답의 `quizQuestionCount`는 출제 가능 단어 수이며, 문제 테이블 조회 실패 시 `null`입니다.
+채점 요청은 JSON `{ "selectedOption": 1, "version": "조회 응답의 version" }` 형식이며 1~4의 정수만 허용합니다.
+기존 `GET /api/csrf/`에서 받은 CSRF 토큰을 `X-CSRFToken` 헤더로 전송합니다. 모든 퀴즈 응답은 `no-store`입니다.
 등록된 세트가 없으면 빈 목록을 반환합니다. 잘못된 급수·페이지는 400, 없는 세트·페이지는 404,
 테이블 미적용·원본 연결 오류 등은 연결 정보를 노출하지 않는 503 응답으로 처리합니다.
 
 백엔드는 `backend/`에서 `.\.venv\Scripts\python.exe manage.py test vocabulary question_bank config.test_routes --noinput`으로 검사합니다.
 Django 테스트 러너가 별도 테스트 DB를 생성·삭제하므로 운영 연결 설정으로 실행하지 않습니다.
 균등 배정·누락/중복·반복 실행·추가 등록·읽기 전용 점검·페이지 구분·원본 누락·쓰기 차단을 합성 데이터로 검증합니다.
+퀴즈는 단어당 한 문제 선택·정답 미노출·세트 경계·빈 세트·정답/오답 채점·CSRF·변경된 문제 거부·원본 읽기 전용을 검증합니다.
 음성 migration은 Hub 구조 일치·기존 데이터/세트/자동 증가 보존·이미 적용된 구조·잘못된 구조의 롤백과 음성 제약을 검증합니다.
 프론트엔드는 `frontend-TOPIQ/`에서 `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`를 실행합니다.
 

@@ -1,8 +1,9 @@
 import re
 
 from django.conf import settings
+from django.db import DatabaseError, transaction
 
-from question_bank.models import Vocabulary
+from question_bank.models import Vocabulary, VocabularyQuestion
 
 
 LEVELS = (3, 4, 5, 6)
@@ -57,9 +58,35 @@ def source_words(sets, *, include_details=False):
     return words
 
 
-def set_summary(group, words):
+def quiz_word_ids(words):
+    try:
+        # An unavailable question bank must not prevent word study.
+        with transaction.atomic():
+            return set(VocabularyQuestion.objects.filter(
+                vocabulary_id__in=words, question_type="sentence_blank",
+            ).values_list("vocabulary_id", flat=True).distinct())
+    except DatabaseError:
+        return None
+
+
+def validate_question(question):
+    if (not question.instruction.strip() or not question.stem.strip() or not question.explanation.strip()
+            or not isinstance(question.choices, list) or len(question.choices) != 4
+            or any(not isinstance(choice, str) or not choice.strip() for choice in question.choices)
+            or not 1 <= question.correct_answer <= 4):
+        raise VocabularyUnavailable
+
+
+def word_meanings(word):
+    return {"en": word.english, "vi": word.vietnamese, "ja": word.japanese,
+            "zh-Hans": word.chinese_simplified, "id": word.indonesian}
+
+
+def set_summary(group, words, quiz_words):
     items = list(group.items.all())
     return {
         "id": str(group.pk), "level": group.topik_level, "number": group.set_number,
         "wordCount": len(items), "preview": [words[item.vocabulary_id].korean for item in items[:3]],
+        "quizQuestionCount": (sum(item.vocabulary_id in quiz_words for item in items)
+                              if quiz_words is not None else None),
     }

@@ -41,6 +41,47 @@ test("catalog URLs preserve valid levels and pages and reject malformed selectio
   }
 });
 
+test("quiz checks fetch fresh CSRF and send only the chosen answer and question version", async () => {
+  const calls = [];
+  const body = { selectedOption: 3, version: "2026-11-11T01:00:00+00:00" };
+  globalThis.fetch = async (path, options) => {
+    calls.push({ path, options });
+    return Response.json(path === "/api/csrf/" ? { csrfToken: "synthetic" } : { isCorrect: false });
+  };
+  assert.deepEqual(await api.vocabularyRequest("sets/1/questions/2/check/", undefined, body), { isCorrect: false });
+  assert.deepEqual(calls.map(call => call.path), ["/api/csrf/", "/api/vocabulary/sets/1/questions/2/check/"]);
+  assert.equal(calls[1].options.method, "POST");
+  assert.equal(calls[1].options.headers["X-CSRFToken"], "synthetic");
+  assert.equal(calls[1].options.headers["Content-Type"], "application/json");
+  assert.deepEqual(JSON.parse(calls[1].options.body), body);
+  assert.ok(calls.every(call => call.options.credentials === "same-origin" && call.options.cache === "no-store"));
+});
+
+test("quiz checks preserve stale-question errors and never submit without valid CSRF", async () => {
+  globalThis.fetch = async path => Response.json(path === "/api/csrf/" ? { csrfToken: "synthetic" }
+    : { error: "question_changed" }, { status: path === "/api/csrf/" ? 200 : 409 });
+  await assert.rejects(api.vocabularyRequest("sets/1/questions/2/check/", undefined, { selectedOption: 1, version: "old" }),
+    error => error.code === "question_changed" && error.status === 409);
+  for (const payload of [{}, { csrfToken: 3 }, null]) {
+    const calls = [];
+    globalThis.fetch = async path => { calls.push(path); return Response.json(payload); };
+    await assert.rejects(api.vocabularyRequest("sets/1/questions/2/check/", undefined, {}), error => error.code === "server_error");
+    assert.deepEqual(calls, ["/api/csrf/"]);
+  }
+});
+
+test("leaving during CSRF acquisition prevents quiz submission", async () => {
+  const controller = new AbortController();
+  const calls = [];
+  globalThis.fetch = async path => {
+    calls.push(path);
+    controller.abort();
+    return Response.json({ csrfToken: "synthetic" });
+  };
+  await assert.rejects(api.vocabularyRequest("sets/1/questions/2/check/", controller.signal, {}), { name: "AbortError" });
+  assert.deepEqual(calls, ["/api/csrf/"]);
+});
+
 test("a screen signal cancels both catalog requests", async () => {
   const controller = new AbortController();
   const signals = [];

@@ -28,6 +28,29 @@ class Vocabulary(models.Model):
         db_table = '"topik_bank"."vocabulary"'
 
 
+class VocabularyQuestion(models.Model):
+    question_id = models.BigIntegerField(primary_key=True)
+    vocabulary_id = models.BigIntegerField()
+    question_type = models.TextField()
+    position = models.SmallIntegerField()
+    instruction = models.TextField()
+    stem = models.TextField()
+    choices = models.JSONField()
+    correct_answer = models.SmallIntegerField()
+    accepted_answers = models.JSONField()
+    explanation = models.TextField()
+    provider = models.TextField()
+    model = models.TextField()
+    generation_id = models.UUIDField()
+    source_hash = models.TextField()
+    created_at = models.DateTimeField()
+    updated_at = models.DateTimeField()
+
+    class Meta:
+        managed = False
+        db_table = '\"topik_bank\".\"vocabulary_questions\"'
+
+
 class QuestionSet(models.Model):
     set_id = models.UUIDField(primary_key=True)
     exam_format = models.TextField(default="pbt", choices=[("pbt", "PBT"), ("ibt", "IBT")])
