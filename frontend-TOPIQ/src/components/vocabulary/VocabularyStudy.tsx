@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Minus, Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createExampleAnalyzer } from "@/lib/vocabulary-analysis";
 import { useApp } from "@/app/providers";
 import { VocabularyError, vocabularyRequest, type MeaningLanguage, type VocabularyDetail } from "@/lib/vocabulary-api";
 import { vocabularyContent } from "@/lib/vocabulary-content";
 import VocabularyAudio from "./VocabularyAudio";
+import VocabularyExample from "./VocabularyExample";
 
 export default function VocabularyStudy({ id }: { id: string }) {
   const { language } = useApp();
@@ -18,6 +20,12 @@ export default function VocabularyStudy({ id }: { id: string }) {
   const [revealed, setRevealed] = useState(false);
   const [meaningLanguage, setMeaningLanguage] = useState<MeaningLanguage>("en");
   const [listOpen, setListOpen] = useState(false);
+  const analyzer = useRef<ReturnType<typeof createExampleAnalyzer> | null>(null);
+
+  useEffect(() => {
+    analyzer.current = createExampleAnalyzer();
+    return () => { analyzer.current?.dispose(); analyzer.current = null; };
+  }, [id]);
 
   useEffect(() => {
     let active = true;
@@ -75,7 +83,9 @@ export default function VocabularyStudy({ id }: { id: string }) {
             <div id="vocabulary-meaning" className={`vocabulary-meaning-region${revealed ? " is-open" : ""}`} aria-hidden={!revealed}>
               <div className="vocabulary-meaning-inner"><div className="vocabulary-word-meaning">
                 <h3>{t.meaning}</h3><p className="vocabulary-definition" lang={meaning ? meaningLanguage : language}>{meaning || t.missingMeaning}</p>
-                <div className="vocabulary-example"><h3>{t.example}</h3><p lang="ko">{word.exampleKorean}</p>
+                <div className="vocabulary-example"><h3>{t.example}</h3>
+                  {revealed ? <VocabularyExample key={`${word.id}:${word.exampleKorean}`} wordId={word.id} text={word.exampleKorean}
+                    analyzer={analyzer.current!} meaningLanguage={meaningLanguage} reload={() => setRevision(value => value + 1)} /> : <p lang="ko">{word.exampleKorean}</p>}
                   <h3>{t.englishExample}</h3><p lang="en">{word.exampleEnglish}</p></div>
               </div></div>
             </div>

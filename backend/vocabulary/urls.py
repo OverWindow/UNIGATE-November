@@ -1,9 +1,10 @@
 from django.urls import path
 
-from . import views
+from . import example_views, views
 
 
 urlpatterns = [
+    path("words/<int:word_id>/example-meaning/", example_views.example_meaning),
     path("levels/", views.levels),
     path("sets/", views.sets),
     path("sets/<int:set_id>/", views.detail),

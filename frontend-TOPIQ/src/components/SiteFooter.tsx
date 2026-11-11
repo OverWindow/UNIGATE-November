@@ -25,6 +25,7 @@ export default function SiteFooter() {
         </div>
         <div className="footer-bottom">
           <span>© 2026 UNIGATE. All rights reserved.</span>
+          <Link href="/open-source-licenses">{t.footer.licenses}</Link>
         </div>
       </div>
     </footer>

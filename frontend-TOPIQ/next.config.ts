@@ -11,6 +11,11 @@ if (!["http:", "https:"].includes(backendOrigin.protocol) || backendOrigin.usern
 const nextConfig: NextConfig = {
   output: "standalone",
   reactStrictMode: true,
+  async headers() {
+    return [{ source: "/garu-0.13.0/:path*", headers: [
+      { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+    ] }];
+  },
   // Preserve Django's trailing-slash API URLs through the proxy.
   skipTrailingSlashRedirect: true,
   turbopack: {

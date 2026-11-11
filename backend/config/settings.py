@@ -26,6 +26,7 @@ if not SECRET_KEY:
 
 DEBUG = DJANGO_ENV == "development"
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "").strip()
+KRDICT_API_KEY = os.environ.get("KRDICT_API_KEY", "").strip()
 BREVO_SENDER_EMAIL = os.environ.get("BREVO_SENDER_EMAIL", "").strip()
 BREVO_SENDER_NAME = os.environ.get("BREVO_SENDER_NAME", "TOPIQ").strip() or "TOPIQ"
 TOPIQ_PUBLIC_URL = os.environ.get(

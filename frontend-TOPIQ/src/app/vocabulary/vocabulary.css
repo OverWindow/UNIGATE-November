@@ -77,6 +77,25 @@
 .vocabulary-example { padding: 20px; border-radius: 12px; background: #f7f9fc; }
 .vocabulary-example p { margin: 0 0 20px; line-height: 1.9; font-size: 16px; overflow-wrap: anywhere; }
 .vocabulary-example p:last-child { margin-bottom: 0; color: #59677b; font-size: 14px; }
+.vocabulary-example-text { white-space: pre-wrap; }
+.vocabulary-example-word { display: inline; padding: 2px 0; border: 0; border-radius: 3px; background: transparent; color: inherit; font: inherit; line-height: inherit; text-decoration: underline dotted #97a9c4; text-underline-offset: 5px; cursor: pointer; }
+.vocabulary-example-word:hover, .vocabulary-example-word[aria-expanded="true"] { color: #214fa7; background: #e3ecff; }
+.vocabulary-example-word:focus-visible, .vocabulary-dictionary-popup button:focus-visible, .vocabulary-dictionary-link:focus-visible { outline: 2px solid #2d5ec5; outline-offset: 3px; }
+.vocabulary-dictionary-status { margin: -8px 0 20px; color: #64748b; font-size: 12px; line-height: 1.7; }
+.vocabulary-dictionary-link { padding: 0; border: 0; background: transparent; color: #214fa7; font: inherit; text-decoration: underline; cursor: pointer; }
+.vocabulary-dictionary-popup { position: fixed; z-index: 1000; width: min(360px, calc(100vw - 24px)); max-height: min(480px, 65dvh); box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; padding: 20px; border: 1px solid #cdd9eb; border-radius: 14px; background: #fff; color: #24334b; box-shadow: 0 12px 40px #162f7f26; font-size: 14px; line-height: 1.7; overflow-wrap: anywhere; }
+.vocabulary-dictionary-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.vocabulary-dictionary-heading > strong { font-size: 18px; }
+.vocabulary-dictionary-close { display: grid; place-items: center; flex: 0 0 36px; height: 36px; border: 0; border-radius: 8px; background: #f1f5fb; color: #526078; font-size: 24px; cursor: pointer; }
+.vocabulary-dictionary-popup p { margin: 8px 0; }
+.vocabulary-dictionary-entry { padding-top: 16px; margin-top: 16px; border-top: 1px solid #e6edf6; }
+.vocabulary-dictionary-entry h4 { margin: 0; font-size: 18px; }
+.vocabulary-dictionary-entry h4 span { margin-left: 6px; font-size: 12px; font-weight: 400; color: #64748b; }
+.vocabulary-dictionary-entry ol { padding-left: 20px; margin: 12px 0; list-style: decimal; }
+.vocabulary-dictionary-entry li + li { margin-top: 16px; }
+.vocabulary-dictionary-entry a, .vocabulary-dictionary-popup footer a { color: #214fa7; text-decoration: underline; }
+.vocabulary-dictionary-note { color: #64748b; }
+.vocabulary-dictionary-popup footer { display: grid; gap: 4px; margin-top: 20px; padding-top: 12px; border-top: 1px solid #e6edf6; color: #64748b; font-size: 11px; }
 .vocabulary-card-navigation { display: flex; justify-content: space-between; gap: 16px; margin-top: 20px; }
 .vocabulary-end { margin-top: 24px; color: var(--color-muted); font-size: 13px; text-align: center; line-height: 1.8; }
 .vocabulary-end button { border: 0; background: transparent; color: #2d5ec5; text-decoration: underline; margin-left: 8px; }

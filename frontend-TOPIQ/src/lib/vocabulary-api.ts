@@ -9,6 +9,13 @@ export interface VocabularyWord {
   audioUrl: string | null;
 }
 export interface VocabularyDetail extends VocabularySet { catalogPage: number; words: VocabularyWord[] }
+export interface ExampleMeaning {
+  surface: string;
+  entries: {
+    id: string; headword: string; partOfSpeech: string; sourceUrl: string;
+    senses: { definition: string; translation: string; translatedDefinition: string }[];
+  }[];
+}
 export interface VocabularyCatalogData {
   level: number; page: number; pageCount: number; totalSets: number; sets: VocabularySet[];
 }

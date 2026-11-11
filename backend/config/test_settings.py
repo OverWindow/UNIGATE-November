@@ -13,6 +13,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 class EnvironmentSettingsTests(unittest.TestCase):
+    def test_dictionary_is_optional_and_needs_no_cache_alias(self):
+        settings, _ = self.read_settings({"DJANGO_SECRET_KEY": "test"})
+        self.assertEqual(settings["KRDICT_API_KEY"], "")
+        self.assertNotIn("vocabulary_dictionary", settings["CACHES"])
+        settings, _ = self.read_settings({"DJANGO_SECRET_KEY": "test", "KRDICT_API_KEY": " synthetic "})
+        self.assertEqual(settings["KRDICT_API_KEY"], "synthetic")
+
     def read_settings(self, environment=None, files=None):
         files = files or {}
         selected = []
