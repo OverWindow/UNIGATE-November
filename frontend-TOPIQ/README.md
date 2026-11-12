@@ -86,7 +86,7 @@ HTTPS 또는 localhost와 WebAssembly·Web Crypto가 필요합니다. Worker는 
 `/open-source-licenses`와 공통 푸터에서 소프트웨어 버전·라이선스 원문·Garu 사전 데이터의 출처를 안내합니다.
 Garu 엔진의 Apache-2.0과 포함 사전 데이터의 Apache-2.0 / CC BY-SA 2.0 KR 조건을 구분하여 표시합니다.
 분석 계약 버전이 바뀌므로 프론트·백엔드를 함께 배포하고 기존 학습 화면을 새로고침합니다.
-사전 DB 준비·검사·수동 적재 명령은 [루트 README](../README.md#한국어기초사전-db-준비)를 참고하세요.
+등록된 사전 데이터는 기존 DB에서 조회하며 별도 등록 명령은 필요하지 않습니다.
 
 ## 환경 변수와 백엔드
 

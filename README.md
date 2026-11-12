@@ -191,21 +191,19 @@ Hub 구조 일치·기존 데이터 보존·DB 기본값과 NOT NULL·재적용�
 검색 결과가 없으면 200과 빈 `entries`를 반환합니다. API는 SELECT만 수행하고 세션·학습 기록을 생성하지 않습니다.
 표제어·품사·단어 유형으로 정확히 검색하고 동형어별로 묶습니다. 구·문법 표현·속담·관용구도 보관하지만 현재 단어 클릭 조회에서는 제외합니다.
 누락된 번역은 빈 문자열로 반환하여 한국어 뜻풀이를 유지합니다. 외부 요청용 동시성·분당 제한·타임아웃·XML 파서는 제거했습니다.
-응답 `id`는 각 항목의 첫 뜻풀이 행의 내부 ID이며, 같은 원본 재적재 시 유지합니다.
+응답 `id`는 각 항목의 첫 뜻풀이 행의 내부 ID입니다.
 XLS에는 국립국어원 `target_code`가 없으므로 `sourceUrl`은 사전 홈페이지를 가리키며 “사전 출처 보기”로 표시합니다.
 
-신규 테이블은 사전 뜻풀이용 `korean_dictionary_senses` 하나입니다. 기존 테이블의 컬럼 추가·수정과 새 API는 없습니다.
+사전 뜻풀이용 기존 테이블 `korean_dictionary_senses`를 사용합니다.
 `backend/migration/vocabulary/0002_korean_dictionary_senses.py`가 테이블·검색 인덱스·원본 행 고유 제약을 생성합니다.
 기존 단어장·퀴즈 API와 프록시는 유지하며 별도 작업자·Redis·예약 작업은 추가하지 않습니다.
 
-#### 한국어기초사전 DB 준비
+#### 한국어기초사전 데이터
 
-XLS 원본은 전체 분할 파일을 같은 디렉터리에 보관합니다. 현재 `backend/temp/`의
-`1_30000_20261019.xls`, `2_30000_20261019.xls`, `3_16833_20261019.xls`가 대상입니다.
-헤더를 제외한 76,833행을 각각 하나의 뜻풀이로 저장합니다.
-단어 71,120행, 구 1,141행, 문법 표현 1,375행, 속담 704행, 관용구 2,493행입니다.
+등록된 사전 데이터를 DB에서 조회하며, XLS 파일이나 별도 등록 명령은 필요하지 않습니다.
+XLS 등록용 관리 명령은 제공하지 않습니다. 기존 사전 모델·테이블·마이그레이션은 유지합니다.
 
-| 새 테이블 컬럼 | 내용 |
+| 테이블 컬럼 | 내용 |
 | --- | --- |
 | `id` | 내부 자동 증가 기본키 |
 | `headword` | 검색 표제어. 앞뒤 공백 제거·Unicode NFC 정규화 |
@@ -222,79 +220,9 @@ XLS 원본은 전체 분할 파일을 같은 디렉터리에 보관합니다. �
 부표제어는 별도 뜻풀이·용례·번역 열을 사용합니다. 부모의 표제어·동형어 번호·품사는
 metadata에 보존하고, 부표제어 자체의 품사는 빈 값·동형어 번호는 0으로 저장합니다.
 11개 언어는 mn, ar, zh-Hans, vi, th, id, ru, en, ja, fr, es입니다.
-일부 항목의 번역 누락은 허용하며 --check가 언어별 불완전한 번역 쌍의 수를 출력합니다.
+일부 항목에는 번역이 없으며, 조회 시 한국어 뜻풀이를 유지합니다.
 뜻풀이 문장이 같아도 서로 다른 원본 행은 합치지 않습니다.
 
-**개발 DB를 준비할 때는 사용자가 아래 명령을 순서대로 수동 실행합니다.** 코드를 받은 뒤,
-백엔드를 새 코드로 실행하기 전에 수행합니다. 기존 .env.development의 DB 설정을 사용합니다.
-
-```powershell
-Set-Location C:\Users\khyun\Projects\unigate-main\backend
-$env:DJANGO_ENV = 'development'
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -u manage.py import_korean_dictionary --directory .\temp --check
-.\.venv\Scripts\python.exe manage.py migrate
-.\.venv\Scripts\python.exe -u manage.py import_korean_dictionary --directory .\temp
-```
-
-- 의존성 설치는 xlrd==2.0.2를 포함하며 DB를 변경하지 않습니다.
-- --check는 XLS 형식·74개 열·필수값·유형·건수를 검사합니다. DB에 연결하지 않으며 migration 전에도 실행할 수 있습니다.
-- migrate는 DB 구조를 변경합니다. 이 작업의 migration은 빈 사전 테이블만 만들고 XLS를 적재하지 않습니다.
-- 마지막 명령은 사전 데이터를 DB에 기록합니다. 전체 파일을 검증한 후 500행씩 전송하고, 전체 성공 시 한 트랜잭션으로 확정합니다. 커밋 전 오류는 전체 롤백합니다.
-- 같은 파일명·행 번호로 재실행하면 기존 행의 ID를 유지하면서 값을 갱신합니다. 중복 삽입이나 삭제는 하지 않습니다.
-- 기존 자료와 파일명 또는 행 번호 집합이 다르면 적재를 거부합니다. 일부 파일만 재적재하거나 이름이 바뀐 새 배포본을 섞지 마세요. 다른 스냅샷 교체는 별도 검토 후 진행합니다.
-- XLS는 요청마다 읽지 않습니다. 적재 후 원본 파일은 별도 보관할 수 있습니다. 재실행 시 같은 전체 파일을 준비합니다.
-- KRDICT_API_KEY는 더 이상 읽지 않습니다. 기존 환경 파일에 남아 있어도 조회에 사용하지 않습니다.
-
-적재 성공 후 **backend 폴더에서** `.\.venv\Scripts\python.exe manage.py runserver`로 로컬 서버를 재시작합니다.
-runserver는 migration이나 적재를 자동 실행하지 않습니다.
-
-**운영 DB 적재도 로컬 PC에서 실행합니다.** 로컬 PC가 XLS를 검증하고 임시 파일에 준비한 뒤,
-운영 PostgreSQL로 500행씩 직접 전송합니다. 운영 Django 서버는 XLS를 읽지 않습니다.
-Hub 실행이나 새 API는 필요하지 않습니다. `xlrd`는 시트 단위로 데이터를 읽으므로 배치 전송이
-XLS 파싱 메모리를 줄여 주지는 않습니다. 메모리가 250MB인 운영 서버에서 이 명령을 실행하지 마세요.
-
-실행 전 준비:
-
-1. 기존 운영 배포 `deploy/start.sh`가 **migrate 후 Gunicorn 시작** 절차를 완료하여
-   운영 DB에 `korean_dictionary_senses`가 있어야 합니다. 이 적재 명령은 테이블을 생성하지 않습니다.
-2. 로컬 PC에 전체 XLS 원본과 백엔드 의존성을 준비합니다. 개발 DB에 먼저 적재할 필요는 없습니다.
-3. 로컬 `backend/.env.production`에 기존 운영 설정 형식대로 필수 Django 설정과 운영 DB의
-   `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, 필요한 `DB_SSLMODE`를 설정합니다.
-   로컬 PC에서 접속할 수 있는 운영 DB 주소와 권한이 필요하며, 연결값은 문서·명령행·로그에 넣지 않습니다.
-   프로세스의 `DB_*` 환경변수는 파일보다 우선하므로 다른 DB 설정과 혼용하지 마세요.
-   `PYTHON_DOTENV_DISABLED=1`인 환경에서는 파일을 읽지 않으므로 기존 운영 환경변수를 사용해야 합니다.
-
-운영 migration 적용 후, **로컬 PC의 별도 PowerShell 터미널에서** 사용자가 아래 명령을 **수동 실행**합니다.
-첫 명령은 파일 검사만 하며 DB에 연결하지 않습니다. 두 번째 명령은 운영 DB의 사전 데이터를 추가·갱신합니다.
-
-```powershell
-Set-Location C:\Users\khyun\Projects\unigate-main\backend
-$env:DJANGO_ENV = 'production'
-try {
-    .\.venv\Scripts\python.exe -u manage.py import_korean_dictionary --directory .\temp --check
-    if ($LASTEXITCODE -ne 0) { throw 'XLS validation failed; import was not started.' }
-    .\.venv\Scripts\python.exe -u manage.py import_korean_dictionary --directory .\temp
-    if ($LASTEXITCODE -ne 0) { throw 'Import did not report success; inspect the command output before retrying.' }
-} finally {
-    $env:DJANGO_ENV = 'development'
-}
-```
-
-명령은 XLS를 열기 전과 검증 완료 후 파일별 로그를 즉시 출력합니다. DB 연결·테이블 잠금 대기·
-기존 원본 검사 단계를 구분하고, 각 배치 완료 시 `Transferred 15,000/76,833 rows ...; pending final commit.`처럼
-건수·진행률을 출력합니다. `100.0%`여도 커밋 전이며, `Imported and committed ...`가 최종 성공 표시입니다.
-배치별 커밋은 하지 않으므로 최초 적재 중 일부 데이터만 서비스에 노출되지 않고, 재적재 중에는 기존 데이터를 조회합니다.
-
-DB 연결 제한은 기존 10초이며, 이 명령의 PostgreSQL 트랜잭션 안에서 잠금 대기는 8초로 제한합니다.
-다른 적재·migration과 잠금이 충돌하면 무한 대기 대신 실패 단계와 재시도 안내를 출력합니다.
-커밋 도중 연결 오류가 나면 반영 여부를 확정할 수 없으므로 롤백됐다고 안내하지 않습니다.
-대상 DB 상태를 확인한 뒤 같은 전체 원본으로 재실행하세요. 재실행은 기존 ID를 유지하며 중복 행을 만들지 않습니다.
-`--check`는 DB 접속·권한·migration 준비 상태를 검사하지 않습니다.
-
-적재는 자동 실행하지 않으며, 운영 migration 적용 후 최초 한 번 수동 수행합니다.
-최초 적재 성공 전까지 사전 팝업은 준비 중으로 표시됩니다. 데이터 적재만을 위한 서버 재시작은 필요하지 않습니다.
-이번 명령 보완으로 추가되는 API·테이블·컬럼·의존성은 없습니다. XLS 원본과 제외 규칙도 그대로 유지합니다.
 출처·CC BY-SA 2.0 KR 안내와 정규화 변경 고지는 유지합니다.
 
 #### 브라우저 자산과 라이선스
@@ -319,10 +247,9 @@ HTTPS(로컬 localhost 허용), WebAssembly, Web Crypto를 지원하는 브라�
    `npm run build`를 **수동 실행**합니다. `predev`·`prebuild`가 자산·라이선스 준비를 **자동 실행**합니다.
    준비만 다시 할 때에는 같은 폴더에서 `npm run prepare:assets`를 **수동 실행**합니다.
    기존 Docker 빌드도 이 절차와 public 복사를 사용합니다. 모든 명령은 DB에 접근하지 않습니다.
-3. 백엔드는 위 **한국어기초사전 DB 준비** 절차에 따라 의존성 설치·검사·migration·적재를 수동 수행합니다.
-4. 프론트·백엔드의 분석 버전을 맞추어 함께 배포하고 기존 학습 페이지를 새로고침합니다.
+3. 프론트·백엔드의 분석 버전을 맞추어 함께 배포하고 기존 학습 페이지를 새로고침합니다.
    로컬 백엔드는 **backend 폴더에서** `.\.venv\Scripts\python.exe manage.py runserver`로 **수동 재시작**합니다.
-   사전 테이블 생성과 최초 적재가 필요합니다. 기존 운영 `deploy/start.sh` 절차는 유지합니다.
+   등록된 사전 데이터를 그대로 사용하며 추가 등록이나 DB 변경은 필요하지 않습니다. 기존 운영 `deploy/start.sh` 절차는 유지합니다.
 
 #### 검증
 
@@ -356,17 +283,13 @@ WASM 영역·JS heap·브라우저 프로세스 메모리는 서로 다른 측�
 학습 이탈 시 Garu 인스턴스는 해제되지만 WASM 영역은 탭에 유지됩니다. 8회 생성·해제를 반복해 같은
 18.625MiB 영역을 재사용함을 확인했습니다. 초기화 중 약 0.5초의 화면 멈춤이 있으며 워커는 도입하지 않았습니다.
 
-사전 DB 전환 후 프론트 테스트 51개, 격리 PostgreSQL의 백엔드 테스트 67개, lint·typecheck를 통과했습니다.
-실제 XLS 3개 76,833행의 --check와 모델·migration 일치 검사를 통과했습니다.
 아래는 기존 Garu 화면의 브라우저·프로덕션 빌드 검증 기록입니다.
 모바일 브라우저에서 실제 Garu 분석, 20개 단어 이동·재사용, 기존 음성 재생, 사전 팝업·언어·닫기,
 20문항 채점 화면·해설·결과·오답 복습, 모델 다운로드 실패 후 재시도와 퀴즈 이용을 확인했습니다.
 라이선스 페이지의 세 UI 언어·모바일/PC 레이아웃을 확인했습니다. 최종 standalone 빌드에서
 고지 링크 150개, 배포 모델·WASM 무결성과 캐시 헤더, Garu 예문 표시를 확인했습니다.
 브라우저의 단어장·퀴즈 데이터는 실제 읽기 전용 스냅샷이며 사전·채점 응답은 테스트 응답입니다.
-사전 DB 전환은 별도 테스트 DB에서 동형어·품사·번역 누락·조회 응답과 적재 재실행·롤백을 검증합니다.
-실제 XLS 전체 자료는 DB에 쓰지 않는 --check로 검증하며, 서비스 DB의 migration과 최초 적재는 사용자가 수행합니다.
-이번 사전 전환은 위 korean_dictionary_senses 테이블을 추가하며 기존 테이블의 컬럼과 API 경로는 유지합니다.
+사전 조회는 별도 테스트 DB에서 동형어·품사·번역 누락·조회 응답과 읽기 전용 동작을 검증합니다.
 
 ### 세트별 문장 빈칸 퀴즈
 
