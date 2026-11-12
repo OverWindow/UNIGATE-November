@@ -120,8 +120,6 @@ export default function VocabularyExample({ wordId, text, analyzer, meaningLangu
   }, [analyzer, wordId, text, revision]);
 
   const changed = error instanceof VocabularyError && error.code === "example_changed";
-  const disabled = error instanceof VocabularyError && error.code === "dictionary_disabled";
-  const busy = error instanceof VocabularyError && error.status === 429;
   return <>
     <p lang="ko" className="vocabulary-example-text">{data ? data.segments.map((segment, index) => !segment.candidates.length ? segment.text
       : <button key={index} type="button" className="vocabulary-example-word" aria-label={`${segment.text}: ${t.dictionaryLookup}`}
@@ -130,8 +128,8 @@ export default function VocabularyExample({ wordId, text, analyzer, meaningLangu
           {segment.text}
         </button>) : text}</p>
     {error ? <div className="vocabulary-dictionary-status" role="status">
-      {disabled ? t.dictionaryPreparing : changed ? t.dictionaryChanged : busy ? t.dictionaryBusy : t.dictionaryError}
-      {!disabled && <> <button type="button" className="vocabulary-dictionary-link" onClick={changed ? reload : () => setRevision(value => value + 1)}>{changed ? t.dictionaryReload : t.retry}</button></>}
+      {changed ? t.dictionaryChanged : t.dictionaryError}{" "}
+      <button type="button" className="vocabulary-dictionary-link" onClick={changed ? reload : () => setRevision(value => value + 1)}>{changed ? t.dictionaryReload : t.retry}</button>
     </div> : !data ? <div className="vocabulary-dictionary-status" role="status">{t.analysisLoading}</div>
       : data.segments.some(segment => segment.candidates.length) && <div className="vocabulary-dictionary-status">{t.dictionaryHint}</div>}
     {data && selection && <MeaningPopup key={`${data.version}:${selection.start}:${meaningLanguage}`} wordId={wordId}

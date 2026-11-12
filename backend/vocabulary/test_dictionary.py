@@ -1,137 +1,103 @@
-import io
-import time
+import json
 import uuid
-from concurrent.futures import ThreadPoolExecutor
-from http.client import IncompleteRead
-from threading import Event
 from unittest.mock import patch
-from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qs, urlsplit
 
-from django.conf import settings
-from django.db import connection
-from django.test import SimpleTestCase, TransactionTestCase, override_settings
+from django.db import DatabaseError, connection
+from django.http import QueryDict
+from django.test import RequestFactory, SimpleTestCase, TestCase, TransactionTestCase
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from question_bank.models import Vocabulary, VocabularyQuestion
 from . import dictionary
-from .dictionary import ExampleLookupError, fetch_entries, lookup_candidate
+from .dictionary import ExampleLookupError, lookup_candidate, lookup_meaning
 from .example_analysis import example_version, parse_selection, validate_example
-from django.http import QueryDict
-import json
-from .models import VocabularySet, VocabularySetItem
+from .models import KoreanDictionarySense, VocabularySet, VocabularySetItem
 
 
 SENTENCE = "친구가 사과를 먹었어요."
-XML = '''<channel><total>1</total><item><target_code>123</target_code>
-<word>먹다</word><pos>동사</pos><link>https://untrusted.invalid/</link>
-<sense><definition>음식을 먹다.</definition><translation><trans_word>eat</trans_word>
-<trans_dfn>To eat food.</trans_dfn></translation></sense></item></channel>'''.encode()
 
 
-@override_settings(KRDICT_API_KEY="synthetic-key", CACHES={})
-class DictionaryClientTests(SimpleTestCase):
-    def setUp(self):
-        dictionary._request_times.clear()
-        dictionary._retry_at = 0.0
-        dictionary._last_failure = None
+def add_sense(**overrides):
+    row = KoreanDictionarySense.objects.count() + 2
+    return KoreanDictionarySense.objects.create(
+        **{"headword": "먹다", "homonym_number": 0, "part_of_speech": "동사", "entry_type": "word",
+           "sense_order": 1, "definition": "음식을 먹다.", "translations": {
+               language: {"translation": f"eat-{language}", "translatedDefinition": f"To eat-{language}."}
+               for language in dictionary.LANGUAGES
+           }, "source_file": "fixture.xls", "source_row": row, **overrides},
+    )
 
-    def test_language_mapping_exact_search_and_trusted_source_links(self):
-        for language, expected in dictionary.LANGUAGES.items():
-            with self.subTest(language=language), patch("vocabulary.dictionary.build_opener") as opener:
-                opener.return_value.open.return_value = io.BytesIO(XML)
-                entries = fetch_entries("먹다", 5, language)
-                request = opener.return_value.open.call_args.args[0]
-                query = parse_qs(urlsplit(request.full_url).query)
-                self.assertEqual(query["q"], ["먹다"])
-                self.assertEqual(query["trans_lang"], [expected])
-                self.assertEqual(query["method"], ["exact"])
-                self.assertEqual(query["pos"], ["5"])
-                self.assertEqual(opener.return_value.open.call_args.kwargs["timeout"], 3)
-                self.assertEqual(entries[0]["senses"][0]["translation"], "eat")
-                self.assertEqual(entries[0]["sourceUrl"], "https://krdict.korean.go.kr/dicSearch/SearchView?ParaWordNo=123")
 
-    def test_missing_translation_preserves_korean_definition(self):
-        body = b"<channel><total>1</total><item><target_code>1</target_code><word>test</word><sense><definition>definition</definition></sense></item></channel>"
-        entry = dictionary.parse_entries(body)[0]
-        self.assertEqual(entry["senses"][0], {"definition": "definition", "translation": "", "translatedDefinition": ""})
+class DictionaryLookupTests(TestCase):
+    def test_lookup_is_read_only_and_uses_all_five_languages_without_http(self):
+        sense = add_sense()
+        with patch("urllib.request.OpenerDirector.open", side_effect=AssertionError("No HTTP")):
+            for language in dictionary.LANGUAGES:
+                with self.subTest(language=language), CaptureQueriesContext(connection) as queries:
+                    result = lookup_meaning([("먹다", 5)], language)
+                    self.assertEqual(result[0]["id"], str(sense.pk))
+                    self.assertEqual(result[0]["senses"][0]["translation"], f"eat-{language}")
+                    self.assertEqual(result[0]["sourceUrl"], dictionary.SOURCE_URL)
+                self.assertTrue(all(q["sql"].lstrip().upper().startswith("SELECT") for q in queries))
 
-    def test_malformed_oversized_and_entity_xml_are_not_empty_results(self):
-        bodies = [b"<html>error</html>", b"not XML", b"<error><error_code>010</error_code></error>",
-                  b"<channel><total>1</total></channel>", b"<channel><total>no</total></channel>",
-                  b'<!DOCTYPE channel [<!ENTITY x "expanded">]><channel><total>0</total>&x;</channel>',
-                  b"x" * (dictionary.MAX_RESPONSE_BYTES + 1)]
-        for body in bodies:
-            with self.subTest(size=len(body)), patch("vocabulary.dictionary.build_opener") as opener:
-                opener.return_value.open.return_value = io.BytesIO(body)
-                with self.assertRaises(ExampleLookupError) as error:
-                    fetch_entries("먹다", 5, "en")
-                self.assertEqual(str(error.exception), "dictionary_unavailable")
+    def test_homonyms_and_senses_are_ordered_then_limited(self):
+        for homonym in (4, 2, 3, 1):
+            for order in (4, 2, 3, 1):
+                add_sense(homonym_number=homonym, sense_order=order, definition=f"{homonym}:{order}")
+        result = lookup_candidate("먹다", 5, "en")
+        self.assertEqual([[s["definition"] for s in entry["senses"]] for entry in result],
+                         [[f"{h}:{s}" for s in (1, 2, 3)] for h in (1, 2, 3)])
 
-    def test_upstream_errors_are_sanitized_and_timeouts_are_distinct(self):
-        for failure, status in [(TimeoutError("secret-url"), 504), (URLError(TimeoutError("secret")), 504),
-                                (URLError("secret-url"), 503), (IncompleteRead(b"private"), 503),
-                                (HTTPError("https://example.invalid/?key=synthetic-key", 403, "private", {}, None), 503)]:
-            with self.subTest(failure=type(failure).__name__), patch("vocabulary.dictionary.build_opener") as opener:
-                opener.return_value.open.side_effect = failure
-                with self.assertRaises(ExampleLookupError) as error:
-                    fetch_entries("먹다", 5, "en")
-                self.assertEqual(error.exception.status, status)
-                self.assertNotIn("secret", str(error.exception))
-                self.assertNotIn("synthetic-key", str(error.exception))
+    def test_exact_word_and_pos_filter_excludes_phrases_and_subentries(self):
+        for overrides in ({"headword": "잘먹다"}, {"part_of_speech": "명사"},
+                          {"entry_type": "phrase"}, {"entry_type": "idiom", "part_of_speech": ""}):
+            add_sense(**overrides)
+        expected = add_sense()
+        self.assertEqual([e["id"] for e in lookup_candidate("먹다", 5, "en")], [str(expected.pk)])
+        auxiliary = add_sense(headword="보다", part_of_speech="보조 동사")
+        add_sense(headword="보다", part_of_speech="동사")
+        self.assertEqual(lookup_candidate("보다", 12, "en")[0]["id"], str(auxiliary.pk))
 
-    def test_success_and_empty_results_are_fetched_on_every_lookup(self):
-        for entries in ([], dictionary.parse_entries(XML)):
-            with self.subTest(entries=bool(entries)), patch("vocabulary.dictionary.fetch_entries", return_value=entries) as fetch:
-                for language, pos in (("en", 5), ("en", 5), ("ja", 5), ("en", 6)):
-                    self.assertEqual(lookup_candidate("먹다", pos, language), entries)
-                    fetch.assert_called_with("먹다", pos, language)
-                self.assertEqual(fetch.call_count, 4)
+    def test_missing_translation_preserves_definition_and_partial_translation(self):
+        add_sense(translations={"id": {"translation": "", "translatedDefinition": "Definisi."}})
+        self.assertEqual(lookup_candidate("먹다", 5, "ja")[0]["senses"][0],
+                         {"definition": "음식을 먹다.", "translation": "", "translatedDefinition": ""})
+        self.assertEqual(lookup_candidate("먹다", 5, "id")[0]["senses"][0]["translatedDefinition"], "Definisi.")
 
-    def test_failure_cooldown_preserves_status_then_retries_after_expiry(self):
-        with patch("vocabulary.dictionary.time.monotonic", return_value=100) as clock, \
-                patch("vocabulary.dictionary.fetch_entries", return_value=[]) as fetch:
-            lookup_candidate("먹다", 5, "en")
-            fetch.side_effect = ExampleLookupError("dictionary_timeout", 504)
-            for headword in ("보다", "가다", "먹다"):
-                with self.assertRaises(ExampleLookupError) as error:
-                    lookup_candidate(headword, 5, "en")
-                self.assertEqual((error.exception.code, error.exception.status), ("dictionary_timeout", 504))
-            self.assertEqual(fetch.call_count, 2)
-            clock.return_value = 115
-            fetch.side_effect = None
-            self.assertEqual(lookup_candidate("먹다", 5, "en"), [])
-            self.assertEqual(fetch.call_count, 3)
+    def test_candidate_order_deduplication_limit_and_no_match(self):
+        for word in ("먹다", "보다", "가다"):
+            add_sense(headword=word)
+        result = lookup_meaning([("보다", 5), ("먹다", 5), ("보다", 5)], "en")
+        self.assertEqual([e["headword"] for e in result], ["보다", "먹다"])
+        self.assertEqual(lookup_meaning([("없는단어", 1)], "en"), [])
 
-    def test_busy_and_rate_limited_calls_do_not_start_network_requests(self):
-        with patch("vocabulary.dictionary.fetch_entries") as fetch:
-            with dictionary._lookup_lock:
-                with self.assertRaises(ExampleLookupError) as error:
-                    lookup_candidate("먹다", 5, "en")
-            self.assertEqual(error.exception.status, 429)
-            dictionary._request_times.extend([time.monotonic()] * 60)
+    def test_empty_or_unavailable_dictionary_is_not_a_successful_empty_search(self):
+        with self.assertRaises(ExampleLookupError) as error:
+            lookup_meaning([("먹다", 5)], "en")
+        self.assertEqual(error.exception.code, "dictionary_disabled")
+        with patch.object(KoreanDictionarySense.objects, "filter", side_effect=DatabaseError("private")):
             with self.assertRaises(ExampleLookupError) as error:
-                lookup_candidate("먹다", 5, "en")
-            self.assertEqual(error.exception.status, 429)
-            fetch.assert_not_called()
+                lookup_meaning([("먹다", 5)], "en")
+        self.assertEqual((error.exception.code, error.exception.status), ("dictionary_unavailable", 503))
 
-    def test_repeated_requests_count_towards_limit_and_resume_after_window(self):
-        with patch("vocabulary.dictionary.time.monotonic", return_value=100) as clock, \
-                patch("vocabulary.dictionary.fetch_entries", return_value=[]) as fetch:
-            for _ in range(60):
-                lookup_candidate("먹다", 5, "en")
-            with self.assertRaises(ExampleLookupError) as error:
-                lookup_candidate("먹다", 5, "en")
-            self.assertEqual(error.exception.status, 429)
-            self.assertEqual(fetch.call_count, 60)
-            clock.return_value = 160
-            self.assertEqual(lookup_candidate("먹다", 5, "en"), [])
-            self.assertEqual(fetch.call_count, 61)
-            self.assertEqual(len(dictionary._request_times), 1)
-
-    def test_redirects_are_not_followed(self):
-        self.assertIsNone(dictionary.NoRedirect().redirect_request(None, None, 302, "", {}, "https://other.invalid/"))
+    def test_view_keeps_selection_validation_and_returns_db_senses(self):
+        from .example_views import example_meaning
+        add_sense()
+        params = {"start": "8", "end": "12", "surface": "먹었어요",
+                  "candidates": json.dumps([["먹다", 5]]), "version": example_version(SENTENCE), "lang": "en"}
+        factory = RequestFactory()
+        with patch("vocabulary.example_views.source_example", return_value=SENTENCE):
+            result = example_meaning(factory.get("/", params), 100)
+            self.assertEqual(result.status_code, 200)
+            self.assertEqual(json.loads(result.content)["entries"][0]["senses"][0]["translation"], "eat-en")
+            self.assertEqual(result["Cache-Control"], "no-store")
+            self.assertFalse(result.cookies)
+            for change, status in (({"surface": "다른단어"}, 400), ({"version": "0" * 64}, 409)):
+                with patch("vocabulary.example_views.lookup_meaning") as lookup:
+                    result = example_meaning(factory.get("/", params | change), 100)
+                    self.assertEqual(result.status_code, status)
+                    lookup.assert_not_called()
 
 
 class ExampleSelectionTests(SimpleTestCase):
@@ -167,12 +133,9 @@ class ExampleSelectionTests(SimpleTestCase):
                 validate_example(SENTENCE, example_version(SENTENCE), start, end, surface)
 
 
-@override_settings(KRDICT_API_KEY="synthetic-key", CACHES={})
 class ExampleAPITests(TransactionTestCase):
     def setUp(self):
-        dictionary._request_times.clear()
-        dictionary._retry_at = 0.0
-        dictionary._last_failure = None
+        add_sense()
         with connection.cursor() as cursor:
             cursor.execute("CREATE SCHEMA topik_bank")
         with connection.schema_editor() as editor:
@@ -205,15 +168,14 @@ class ExampleAPITests(TransactionTestCase):
         })
 
     def test_endpoints_are_read_only_and_only_lookup_calls_the_dictionary(self):
-        with patch("vocabulary.dictionary.fetch_entries", return_value=dictionary.parse_entries(XML)) as fetch:
-            with CaptureQueriesContext(connection) as queries:
-                meaning = self.meaning()
-                self.assertEqual(meaning.status_code, 200)
-                self.assertEqual(meaning.json()["surface"], "먹었어요")
-                fetch.assert_called_once_with("먹다", 5, "en")
-            self.assertTrue(all(query["sql"].lstrip().upper().startswith("SELECT") for query in queries))
-            self.assertEqual(meaning["Cache-Control"], "no-store")
-            self.assertFalse(meaning.cookies)
+        with CaptureQueriesContext(connection) as queries:
+            meaning = self.meaning()
+            self.assertEqual(meaning.status_code, 200)
+            self.assertEqual(meaning.json()["surface"], "먹었어요")
+            self.assertEqual(meaning.json()["entries"][0]["senses"][0]["translation"], "eat-en")
+        self.assertTrue(all(query["sql"].lstrip().upper().startswith("SELECT") for query in queries))
+        self.assertEqual(meaning["Cache-Control"], "no-store")
+        self.assertFalse(meaning.cookies)
 
     def test_membership_level_and_missing_ids_are_checked(self):
         self.assertEqual(self.meaning(word_id=999).status_code, 404)
@@ -240,8 +202,8 @@ class ExampleAPITests(TransactionTestCase):
             self.assertEqual(self.meaning(version=old_version).status_code, 409)
             lookup.assert_not_called()
 
-    @override_settings(KRDICT_API_KEY="")
     def test_disabled_lookup_does_not_affect_study_and_quiz(self):
+        KoreanDictionarySense.objects.all().delete()
         self.assertEqual(self.meaning().json(), {"error": "dictionary_disabled"})
         self.assert_study_and_quiz()
 
@@ -257,38 +219,13 @@ class ExampleAPITests(TransactionTestCase):
         self.assertTrue(result.json()["isCorrect"])
 
     def test_dictionary_failure_does_not_affect_study_or_quiz(self):
-        with patch("vocabulary.dictionary.fetch_entries", side_effect=ExampleLookupError("dictionary_timeout", 504)):
-            self.assertEqual(self.meaning().status_code, 504)
-            self.assert_study_and_quiz()
-
-    def test_saturated_dictionary_limit_does_not_affect_study_or_quiz(self):
-        dictionary._request_times.extend([time.monotonic()] * 60)
-        with patch("vocabulary.dictionary.fetch_entries") as fetch:
+        with patch("vocabulary.dictionary.lookup_candidate", side_effect=DatabaseError("private")):
             result = self.meaning()
-            self.assertEqual(result.status_code, 429)
-            self.assertEqual(result["Retry-After"], "5")
-            fetch.assert_not_called()
+            self.assertEqual(result.status_code, 503)
+            self.assertEqual(result.json(), {"error": "dictionary_unavailable"})
             self.assert_study_and_quiz()
-
-    def test_slow_lookup_leaves_study_and_quiz_available(self):
-        entered, release = Event(), Event()
-
-        def slow_fetch(*args):
-            entered.set()
-            release.wait(5)
-            return []
-
-        with patch("vocabulary.dictionary.fetch_entries", side_effect=slow_fetch), ThreadPoolExecutor(max_workers=1) as pool:
-            future = pool.submit(lookup_candidate, "먹다", 5, "en")
-            try:
-                self.assertTrue(entered.wait(2))
-                self.assert_study_and_quiz()
-                self.assertFalse(future.done())
-            finally:
-                release.set()
-            self.assertEqual(future.result(), [])
 
     def test_post_is_rejected_and_no_results_are_successful(self):
         self.assertEqual(self.client.post("/api/vocabulary/words/100/example-meaning/").status_code, 405)
-        with patch("vocabulary.dictionary.fetch_entries", return_value=[]):
-            self.assertEqual(self.meaning().json(), {"surface": "먹었어요", "entries": []})
+        self.assertEqual(self.meaning(candidates=json.dumps([["없는단어", 1]])).json(),
+                         {"surface": "먹었어요", "entries": []})

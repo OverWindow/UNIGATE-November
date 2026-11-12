@@ -4,7 +4,7 @@ from django.db.models import Exists, OuterRef
 from django.views.decorators.http import require_GET
 
 from question_bank.models import Vocabulary
-from .dictionary import ExampleLookupError, ensure_configured, lookup_meaning
+from .dictionary import ExampleLookupError, lookup_meaning
 from .example_analysis import parse_selection, validate_example
 from .models import VocabularySetItem
 from .views import available, response
@@ -16,10 +16,7 @@ def lookup_errors(view):
         try:
             return view(*args, **kwargs)
         except ExampleLookupError as error:
-            result = response({"error": error.code}, error.status)
-            if error.status == 429:
-                result["Retry-After"] = "5"
-            return result
+            return response({"error": error.code}, error.status)
     return wrapped
 
 
@@ -40,7 +37,6 @@ def source_example(word_id):
 @lookup_errors
 def example_meaning(request, word_id):
     start, end, candidates = parse_selection(request.GET)
-    ensure_configured()
     text = source_example(word_id)
     surface = request.GET["surface"]
     validate_example(text, request.GET["version"], start, end, surface)

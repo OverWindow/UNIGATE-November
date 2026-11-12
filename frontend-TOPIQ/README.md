@@ -37,10 +37,10 @@ PC는 옆의 전체 단어 목록, 모바일은 접이식 목록으로 원하는
 
 한국어 예문을 펼치면 브라우저 메인 스레드에서 Garu WASM을 지연 로딩해 분석하고, 단어를 누를 때만 백엔드에 사전 뜻을 요청합니다.
 Web Worker는 사용하지 않습니다. 모델은 학습 화면에서 재사용하고 이탈 시 Garu 인스턴스를 destroy합니다. 공유 WASM 메모리는 탭에서 재사용될 수 있습니다.
-팝업은 현재 뜻 언어를 사용하며 기본형·품사·뜻 후보·사전 원문과 이용조건 링크를 표시합니다.
+팝업은 현재 뜻 언어를 사용하며 기본형·품사·뜻 후보·사전 출처와 이용조건 링크를 표시합니다.
 키보드로 단어를 선택할 수 있고 Escape·바깥 클릭으로 닫습니다. 예문을 접거나 다음 단어로 이동하면 조회를 취소합니다.
-사전 설정이 없거나 조회에 실패해도 기존 뜻·예문·발음·퀴즈는 이용할 수 있습니다.
-사전 키는 백엔드에만 유지합니다. 공개 Garu 모델·WASM은 빌드 때 준비하며 버전별 HTTP 캐시로 재사용합니다.
+사전 데이터가 아직 적재되지 않았거나 조회에 실패해도 기존 뜻·예문·발음·퀴즈는 이용할 수 있습니다.
+사전 뜻은 백엔드 DB에서 조회하며 한국어기초사전 API 키를 사용하지 않습니다. 공개 Garu 모델·WASM은 빌드 때 준비하며 버전별 HTTP 캐시로 재사용합니다.
 초기화 중 잠깐의 화면 정지와 기본형 분석 오류가 있을 수 있습니다. 상세 측정·API 버전 변경·적용 순서는
 [루트 README의 예문 단어 뜻 조회](../README.md#예문-단어-뜻-조회)를 참고하세요.
 
@@ -86,7 +86,7 @@ HTTPS 또는 localhost와 WebAssembly·Web Crypto가 필요합니다. Worker는 
 `/open-source-licenses`와 공통 푸터에서 소프트웨어 버전·라이선스 원문·Garu 사전 데이터의 출처를 안내합니다.
 Garu 엔진의 Apache-2.0과 포함 사전 데이터의 Apache-2.0 / CC BY-SA 2.0 KR 조건을 구분하여 표시합니다.
 분석 계약 버전이 바뀌므로 프론트·백엔드를 함께 배포하고 기존 학습 화면을 새로고침합니다.
-사전 API 키는 백엔드에만 유지합니다.
+사전 DB 준비·검사·수동 적재 명령은 [루트 README](../README.md#한국어기초사전-db-준비)를 참고하세요.
 
 ## 환경 변수와 백엔드
 
@@ -211,11 +211,10 @@ PBT 읽기 70분·IBT 읽기 40분 제한은 유지됩니다. 에이전트가 �
 | `src/components/LandingPage.tsx` | 랜딩 화면과 학습 소개 |
 | `src/lib/landing-content.ts` | 한국어·영어·인도네시아어 문구 |
 | `src/app/pbt/page.tsx`, `src/app/ibt/page.tsx` | PBT·IBT 페이지 진입점과 메타데이터 |
-| `src/components/ExamPage.tsx` | 공통 시험 안내와 모의고사 응시 준비 화면 |
 | `src/components/pbt/` | PBT 목록·응시·결과·문항·음성 화면 |
 | `src/lib/pbt-api.ts`, `src/lib/pbt-content.ts` | PBT API·시간 계산·세 언어 문구 |
 | `src/app/pbt/pbt.css` | PBT 반응형 화면 스타일 |
-| `src/lib/exam-content.ts` | 세 언어의 시험 설명과 응시 패널 문구 |
+| `src/lib/exam-content.ts` | 시험 형식 공통 타입과 시험 설명·메타데이터 |
 | `src/components/SiteFooter.tsx` | 랜딩·시험 페이지의 공통 푸터 |
 | `src/app/providers.tsx` | 공통 언어·인증 상태 |
 | `src/components/AuthScreen.tsx` | 로그인·가입 화면 |

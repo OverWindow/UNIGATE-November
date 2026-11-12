@@ -71,19 +71,6 @@ main:focus { outline: none; }
 .mobile-navigation { display: none; }
 
 :is(.desktop-navigation, .mobile-navigation) .pending-nav-button:disabled { color: #a1a8b4; cursor: default; }
-.coming-soon-badge { display: inline-flex; align-items: center; padding: 3px 7px; border: 1px solid #dce5f5; border-radius: 999px; background: #f0f4fc; color: #526b98; font-size: 9px; font-weight: 600; line-height: 1.3; white-space: nowrap; }
-
-.coming-soon-main { display: grid; place-items: center; min-height: calc(100svh - var(--header-height) - 200px); padding: 80px 20px; background: radial-gradient(ellipse at 50% 20%, #eaf0fd, transparent 65%), #fbfcff; }
-.coming-soon-card { width: min(100%, 580px); text-align: center; }
-.coming-soon-orbit { display: grid; place-items: center; width: 88px; height: 88px; margin: 0 auto 30px; border: 1px solid #dce5f5; border-radius: 50%; background: #ffffffa6; }
-.coming-soon-orbit span { width: 16px; height: 16px; border-radius: 50%; background: #5982d6; box-shadow: 0 0 0 12px #5982d610; animation: coming-soon-pulse 3s ease-in-out infinite; }
-@keyframes coming-soon-pulse {
-  0%, 100% { transform: translateY(2px); box-shadow: 0 0 0 10px #5982d610; }
-  50% { transform: translateY(-3px); box-shadow: 0 0 0 18px #5982d608; }
-}
-.coming-soon-card .eyebrow { margin-bottom: 12px; }
-.coming-soon-card h1 { margin: 22px 0 0; font-size: clamp(28px, 4vw, 40px); font-weight: 650; line-height: 1.3; letter-spacing: -.04em; word-break: keep-all; overflow-wrap: anywhere; }
-.coming-soon-description { margin: 20px 0 32px; color: var(--color-muted); font-size: 15px; line-height: 1.9; word-break: keep-all; overflow-wrap: anywhere; }
 
 /* The preview is an illustration, with no test or scoring behavior. */
 .hero-section { position: relative; isolation: isolate; overflow: hidden; background: radial-gradient(ellipse at 89% 21%, #e6edfc 0%, transparent 47%), radial-gradient(ellipse at 47% 102%, #f4eae9 0%, transparent 33%), #fbfcff; }
@@ -114,21 +101,6 @@ main:focus { outline: none; }
 .question-caption { display: flex; justify-content: center; gap: 7px; margin: 18px 0 0; color: #596b86; font-size: 11px; text-align: center; }
 .question-caption span { color: #d0826f; }
 
-.learning-section { background-color: #f8f9fc; background-image: radial-gradient(#d7e0ec 1px, transparent 1px); background-size: 25px 25px; }
-.learning-section .section-description { max-width: none; }
-.learning-panel { display: grid; grid-template-columns: 230px minmax(0, 1fr) auto; align-items: end; gap: 32px; margin-top: 34px; padding: 28px; border: 1px solid #e6eaf1; border-radius: 20px; background: #fff; box-shadow: 0 8px 25px #1d3a6310; }
-.learning-select { min-width: 0; }
-.learning-select label { display: block; margin-bottom: 10px; color: #5b6472; font-size: 12px; font-weight: 500; }
-.learning-select select { width: 100%; min-width: 0; min-height: 49px; padding: 12px 16px; border: 1px solid #dce2eb; border-radius: 10px; background: #fff; color: #25324a; font-size: 14px; }
-.learning-select select:disabled { background: #f6f8fb; color: #657186; opacity: 1; cursor: not-allowed; }
-.learning-panel .button { min-height: 49px; }
-.learning-panel .button:disabled { border-color: #d9e1ef; background: #e9eef7; color: #596b86; cursor: not-allowed; transform: none; }
-
-.exam-intro { padding-block: 72px; border-bottom: 1px solid #eef1f6; background: #fbfcff; }
-.exam-intro h1 { margin: 0; font-size: clamp(36px, 4vw, 48px); font-weight: 650; line-height: 1.25; letter-spacing: -.045em; }
-.exam-description { max-width: 760px; margin: 24px 0 16px; color: var(--color-muted); font-size: 16px; line-height: 1.9; word-break: keep-all; overflow-wrap: anywhere; }
-.exam-focus { margin: 18px 0 0; color: #52657f; font-size: 13px; line-height: 1.8; word-break: keep-all; overflow-wrap: anywhere; }
-
 .about-section { background: linear-gradient(120deg, #f0f4fb, #fafbfe 68%, #f3f6fd); }
 .about-intro { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 100px; }
 .about-logo { width: 90px; margin-bottom: 23px; }
@@ -147,8 +119,6 @@ main:focus { outline: none; }
 .feature-points { display: grid; gap: 11px; margin: 0; padding: 18px 0 0; border-top: 1px solid #e9edf4; list-style: none; }
 .feature-points li { display: flex; align-items: baseline; gap: 9px; color: #4d5e78; font-size: 12px; line-height: 1.65; }
 .feature-points li span { flex-shrink: 0; color: #6285c5; }
-.development-note { display: flex; align-items: baseline; justify-content: center; gap: 9px; margin: 24px 0 0; color: #647185; font-size: 12px; line-height: 1.8; text-align: center; }
-.status-dot { display: inline-block; flex-shrink: 0; width: 5px; height: 5px; border-radius: 50%; background: #9aacc9; }
 
 .guide-grid { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 100px; }
 .guide-description { max-width: 475px; margin: 20px 0 27px; color: #626d7c; font-size: 15px; line-height: 1.9; word-break: keep-all; overflow-wrap: anywhere; }
@@ -216,8 +186,6 @@ details[open] .faq-indicator::after { transform: rotate(0); }
   .question-card { padding: 21px; }
   .question-prompt { font-size: 13px; }
   .answer-options li { font-size: 10px; }
-  .learning-panel { grid-template-columns: 190px 1fr; gap: 24px; }
-  .learning-panel .button { grid-column: 1 / -1; justify-self: end; min-width: 180px; }
   .about-intro, .guide-grid { gap: 48px; }
   .feature-card { padding: 25px 20px; }
   .feature-card h3 { font-size: 19px; }
@@ -247,11 +215,6 @@ details[open] .faq-indicator::after { transform: rotate(0); }
   .question-passage { font-size: 12px; }
   .answer-options li { font-size: 11px; }
   .question-caption { font-size: 10px; }
-  .learning-panel { grid-template-columns: 1fr; gap: 22px; margin-top: 28px; padding: 24px; }
-  .learning-panel .button { justify-self: stretch; }
-  .learning-select select { font-size: 16px; }
-  .exam-intro { padding-block: 48px; }
-  .exam-description { font-size: 15px; }
   .section-description { font-size: 14px; }
   .section-heading { font-size: 29px; }
   .about-intro, .guide-grid, .faq-grid { grid-template-columns: 1fr; gap: 30px; }
@@ -263,7 +226,6 @@ details[open] .faq-indicator::after { transform: rotate(0); }
   .feature-topline { margin-bottom: 20px; }
   .feature-card h3 { font-size: 22px; }
   .feature-description { font-size: 14px; }
-  .development-note { font-size: 11px; text-align: left; justify-content: flex-start; }
   .guide-description { font-size: 14px; }
   .guide-panel { padding: 26px; }
   .guide-panel li { font-size: 13px; }
@@ -333,7 +295,6 @@ details[open] .faq-indicator::after { transform: rotate(0); }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .coming-soon-orbit span { animation: none; }
   *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; }
 }
 
