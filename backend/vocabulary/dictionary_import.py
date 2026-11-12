@@ -93,9 +93,11 @@ def parse_row(row, source_file, source_row, orders):
     }
 
 
-def read_senses(paths):
+def read_senses(paths, *, progress=None):
     orders = Counter()
-    for path in paths:
+    for number, path in enumerate(paths, 1):
+        if progress:
+            progress(f"Reading XLS {number}/{len(paths)}: {path.name}")
         try:
             book = xlrd.open_workbook(str(path), on_demand=True)
         except (OSError, xlrd.XLRDError) as error:
@@ -114,3 +116,5 @@ def read_senses(paths):
                 yield parse_row(row, path.name, index + 1, orders)
         finally:
             book.release_resources()
+        if progress:
+            progress(f"Validated XLS {number}/{len(paths)}: {path.name}; {sheet.nrows - 1:,} rows")
