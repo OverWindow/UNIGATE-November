@@ -1,5 +1,6 @@
 import logging
 from contextlib import contextmanager
+from uuid import uuid4
 
 from django.db import DatabaseError, connection, transaction
 from django.utils.crypto import salted_hmac
@@ -16,6 +17,17 @@ class RateLimitUnavailable(Exception):
 
 def _key_hash(value):
     return salted_hmac("topiq-auth-rate-limit", value, algorithm="sha256").hexdigest()
+
+
+def request_subject(request):
+    if request.user.is_authenticated:
+        return f"user:{request.user.pk}"
+    # Keep the anonymous identity across session-key rotation, without trusting headers.
+    identity = request.session.get("rate_limit_id")
+    if not identity:
+        identity = uuid4().hex
+        request.session["rate_limit_id"] = identity
+    return f"session:{identity}"
 
 
 @contextmanager

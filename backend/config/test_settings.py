@@ -13,6 +13,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 class EnvironmentSettingsTests(unittest.TestCase):
+    def test_request_limits_need_no_proxy_cidrs_and_preserve_https_trust(self):
+        for legacy_value in (None, "", "obsolete-value"):
+            environment = {"DJANGO_SECRET_KEY": "test", "DJANGO_TRUST_PROXY": "1"}
+            if legacy_value is not None:
+                environment["DJANGO_TRUSTED_PROXY_CIDRS"] = legacy_value
+            settings, _ = self.read_settings(environment)
+            self.assertNotIn("TRUSTED_PROXY_NETWORKS", settings)
+            self.assertEqual(settings["SECURE_PROXY_SSL_HEADER"], ("HTTP_X_FORWARDED_PROTO", "https"))
+
     def test_dictionary_needs_no_api_key_or_cache_alias(self):
         settings, _ = self.read_settings({"DJANGO_SECRET_KEY": "test"})
         self.assertNotIn("KRDICT_API_KEY", settings)

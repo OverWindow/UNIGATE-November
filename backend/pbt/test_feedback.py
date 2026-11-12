@@ -12,6 +12,8 @@ from django.test import Client, SimpleTestCase, TestCase, TransactionTestCase
 from django.utils import timezone
 
 from accounts.email_delivery import EmailDeliveryError
+from accounts.models import RateLimit
+from accounts.rate_limits import record_attempt
 from .models import Attempt, AttemptItem, Exam, ExamAttemptFeedback
 from .result_delivery import build_result_email, token_hash
 from .survey import CATALOG, validate_survey
@@ -63,6 +65,69 @@ class FeedbackFixture:
 
 
 class FeedbackTests(FeedbackFixture, TestCase):
+    @patch("pbt.views.send_result_email")
+    def test_exhausting_link_checks_does_not_block_another_proxy_client(self, send):
+        for attempt in (self.attempt, self.make_attempt("ibt")):
+            self.assertEqual(self.send(attempt).status_code, 202)
+            token = send.call_args.args[2]
+            a = Client(enforce_csrf_checks=True, REMOTE_ADDR="192.0.2.10")
+            b = Client(enforce_csrf_checks=True, REMOTE_ADDR="192.0.2.10")
+            a.defaults["HTTP_X_CSRFTOKEN"] = a.get("/api/csrf/").json()["csrfToken"]
+            b.defaults["HTTP_X_CSRFTOKEN"] = b.get("/api/csrf/").json()["csrfToken"]
+            self.assertEqual(self.verify("x" * 43, attempt, a).status_code, 400)
+            RateLimit.objects.filter(scope="result-access-subject").update(attempts=99)
+            self.assertEqual(self.verify("x" * 43, attempt, a).status_code, 400)
+            a.defaults.update(REMOTE_ADDR="203.0.113.10", HTTP_X_FORWARDED_FOR="198.51.100.99")
+            blocked = self.verify("x" * 43, attempt, a)
+            self.assertEqual(blocked.status_code, 429)
+            self.assertGreater(int(blocked["Retry-After"]), 0)
+            self.assertEqual(self.verify(token, attempt, b).status_code, 200)
+            self.assertEqual(b.get(self.path(attempt) + "result/").status_code, 200)
+            RateLimit.objects.filter(scope="result-access-subject").delete()
+
+    @patch("pbt.views.send_result_email")
+    def test_result_email_quota_is_separate_for_clients_behind_one_proxy(self, send):
+        for attempt in (self.attempt, self.make_attempt("ibt")):
+            self.client.defaults["REMOTE_ADDR"] = "192.0.2.10"
+            self.assertEqual(self.send(attempt).status_code, 202)
+            RateLimit.objects.filter(scope="result-subject").update(attempts=100)
+            another = self.make_attempt(attempt.exam_format)
+            self.assertEqual(self.send(another, email="other@example.invalid").status_code, 429)
+            self.assertFalse(ExamAttemptFeedback.objects.filter(attempt=another).exists())
+            b = Client(REMOTE_ADDR="192.0.2.10")
+            other = self.make_attempt(attempt.exam_format)
+            other.guest_id = uuid.uuid4()
+            other.save(update_fields=["guest_id"])
+            session = b.session
+            session["pbt_guest_id"] = str(other.guest_id)
+            session.save()
+            self.assertEqual(self.send(other, b, email="other@example.invalid").status_code, 202)
+            RateLimit.objects.filter(scope="result-subject").delete()
+        self.assertEqual(send.call_count, 4)
+
+    @patch("pbt.views.send_result_email")
+    def test_result_access_limit_follows_account_across_sessions(self, send):
+        self.assertEqual(self.send().status_code, 202)
+        token = send.call_args.args[2]
+        a, same_account, other_account = Client(), Client(), Client()
+        a.force_login(self.user)
+        same_account.force_login(self.user)
+        other_account.force_login(get_user_model().objects.create_user(username="other-reader"))
+        self.assertEqual(self.verify("x" * 43, client=a).status_code, 400)
+        RateLimit.objects.filter(scope="result-access-subject").update(attempts=100)
+        self.assertEqual(self.verify(token, client=same_account).status_code, 429)
+        self.assertEqual(self.verify(token, client=other_account).status_code, 200)
+
+    @patch("pbt.views.send_result_email")
+    def test_obsolete_peer_limits_do_not_block_result_requests(self, send):
+        for scope in ("result-peer", "result-access-peer"):
+            record_attempt(scope, "127.0.0.1", 100, 3600)
+            RateLimit.objects.filter(scope=scope).update(attempts=100)
+        self.assertEqual(self.send().status_code, 202)
+        self.assertEqual(self.verify(send.call_args.args[2], client=Client()).status_code, 200)
+        self.assertEqual(list(RateLimit.objects.filter(scope__in=("result-peer", "result-access-peer"))
+                              .values_list("attempts", flat=True)), [100, 100])
+
     @patch("pbt.views.send_result_email")
     def test_both_formats_require_email_link_and_cross_browser_access_is_read_only(self, send):
         for attempt in (self.attempt, self.make_attempt("ibt")):
@@ -170,6 +235,13 @@ class FeedbackTests(FeedbackFixture, TestCase):
         self.assertEqual(self.send().status_code, 429)
         another = self.make_attempt()
         self.assertEqual(self.send(another).status_code, 429)
+        other = Client()
+        session = other.session
+        session["pbt_guest_id"] = str(uuid.uuid4())
+        session.save()
+        another.guest_id = session["pbt_guest_id"]
+        another.save(update_fields=["guest_id"])
+        self.assertEqual(self.send(another, other).status_code, 429)
         self.assertEqual(send.call_count, 5)
 
     @patch("pbt.views.send_result_email")
@@ -214,6 +286,23 @@ class FeedbackTests(FeedbackFixture, TestCase):
 
 
 class FeedbackConcurrencyTests(FeedbackFixture, TransactionTestCase):
+    def test_parallel_link_checks_share_one_session_limit(self):
+        self.assertEqual(self.verify("x" * 43).status_code, 400)
+        RateLimit.objects.filter(scope="result-access-subject").update(attempts=99)
+
+        def request(_):
+            client = Client()
+            client.cookies = self.client.cookies.copy()
+            try:
+                return self.verify("x" * 43, client=client).status_code
+            finally:
+                connections.close_all()
+
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            statuses = sorted(pool.map(request, range(4)))
+        self.assertEqual(statuses, [400, 429, 429, 429])
+        self.assertEqual(RateLimit.objects.filter(scope="result-access-subject").count(), 1)
+
     @patch("pbt.views.send_result_email")
     def test_simultaneous_requests_send_once_without_holding_database_lock_during_delivery(self, send):
         entered, release = Event(), Event()

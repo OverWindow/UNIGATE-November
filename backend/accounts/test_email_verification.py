@@ -4,10 +4,11 @@ from datetime import timedelta
 from unittest.mock import patch
 from urllib.error import HTTPError, URLError
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import signing
 from django.db import connection
-from django.test import SimpleTestCase, TestCase, override_settings
+from django.test import Client, SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
 from .email_delivery import EmailDeliveryError, build_verification_email, send_verification_email
@@ -20,6 +21,60 @@ from .tests import AuthClientMixin, FAST_HASHERS
 class EmailVerificationApiTests(AuthClientMixin, TestCase):
     def setUp(self):
         self.client, self.token = self.csrf_client()
+
+    @patch("accounts.views.send_verification_email")
+    def test_one_proxy_client_cannot_exhaust_another_clients_email_quota(self, deliver):
+        self.client.defaults["REMOTE_ADDR"] = "192.0.2.10"
+        other, token = self.csrf_client()
+        other.defaults["REMOTE_ADDR"] = "192.0.2.10"
+        path = "/api/auth/email/send/"
+        self.assertEqual(self.post(path, {"email": "first@example.invalid"}).status_code, 202)
+        RateLimit.objects.filter(scope="email-send-subject").update(attempts=99)
+        self.assertEqual(self.post(path, {"email": "hundredth@example.invalid"}).status_code, 202)
+        blocked = self.post(path, {"email": "other@example.invalid"})
+        self.assertEqual(blocked.status_code, 429)
+        self.assertGreater(int(blocked["Retry-After"]), 0)
+        # The blocked caller must not consume the next recipient's quota.
+        self.assertEqual(self.post(path, {"email": "other@example.invalid"}, other, token).status_code, 202)
+        self.assertEqual(deliver.call_count, 3)
+
+    @patch("accounts.views.send_verification_email")
+    def test_email_quota_survives_ip_changes_new_requests_and_session_key_rotation(self, deliver):
+        path = "/api/auth/email/send/"
+        self.assertEqual(self.post(path, {"email": "first@example.invalid"}).status_code, 202)
+        RateLimit.objects.filter(scope="email-send-subject").update(attempts=100)
+        session = self.client.session
+        session.cycle_key()
+        resumed = Client(enforce_csrf_checks=True, REMOTE_ADDR="203.0.113.10",
+                         HTTP_X_FORWARDED_FOR="198.51.100.99")
+        resumed.cookies.update(self.client.cookies)
+        resumed.cookies[settings.SESSION_COOKIE_NAME] = session.session_key
+        self.assertEqual(self.post(path, {"email": "second@example.invalid"}, resumed).status_code, 429)
+        self.assertEqual(RateLimit.objects.filter(scope="email-send-subject").count(), 1)
+        deliver.assert_called_once()
+        RateLimit.objects.filter(scope="email-send-subject").update(expires_at=timezone.now() - timedelta(seconds=1))
+        self.assertEqual(self.post(path, {"email": "second@example.invalid"}, resumed).status_code, 202)
+        self.assertEqual(RateLimit.objects.get(scope="email-send-subject").attempts, 1)
+
+    @patch("accounts.views.send_verification_email")
+    def test_new_sessions_do_not_reset_recipient_limits(self, deliver):
+        for _ in range(5):
+            client, token = self.csrf_client()
+            self.assertEqual(self.post("/api/auth/email/send/", {"email": "learner@example.invalid"}, client, token).status_code, 202)
+            RateLimit.objects.filter(scope="email-resend").update(expires_at=timezone.now() - timedelta(seconds=1))
+        client, token = self.csrf_client()
+        self.assertEqual(self.post("/api/auth/email/send/", {"email": "LEARNER@example.invalid"}, client, token).status_code, 429)
+        self.assertEqual(deliver.call_count, 5)
+
+    @patch("accounts.views.send_verification_email")
+    def test_obsolete_peer_limits_do_not_block_new_sessions(self, deliver):
+        from .rate_limits import record_attempt
+
+        record_attempt("email-send-peer", "127.0.0.1", 100, 3600)
+        RateLimit.objects.filter(scope="email-send-peer").update(attempts=100)
+        self.assertEqual(self.post("/api/auth/email/send/", {"email": "learner@example.invalid"}).status_code, 202)
+        self.assertEqual(RateLimit.objects.get(scope="email-send-peer").attempts, 100)
+        deliver.assert_called_once()
 
     @patch("accounts.views.send_verification_email")
     def test_send_verify_and_signup_without_temporary_user_or_schema_changes(self, deliver):
@@ -68,7 +123,7 @@ class EmailVerificationApiTests(AuthClientMixin, TestCase):
         self.assertFalse(get_user_model().objects.exists())
 
     @patch("accounts.views.send_verification_email")
-    def test_resend_email_limit_expiration_and_peer_limit(self, deliver):
+    def test_resend_email_limit_and_expiration(self, deliver):
         for _ in range(5):
             response = self.post("/api/auth/email/send/", {"email": "learner@example.invalid"})
             self.assertEqual(response.status_code, 202)
@@ -79,12 +134,6 @@ class EmailVerificationApiTests(AuthClientMixin, TestCase):
         self.assertEqual(self.post("/api/auth/email/send/", {"email": "learner@example.invalid"}).status_code, 429)
         RateLimit.objects.update(expires_at=timezone.now() - timedelta(seconds=1))
         self.assertEqual(self.post("/api/auth/email/send/", {"email": "learner@example.invalid"}).status_code, 202)
-        RateLimit.objects.all().delete()
-        from .rate_limits import record_attempt
-        for _ in range(100):
-            record_attempt("email-send-peer", "127.0.0.1", 100, 3600)
-        response = self.post("/api/auth/email/send/", {"email": "new@example.invalid"})
-        self.assertEqual(response.status_code, 429)
         self.assertEqual(deliver.call_count, 6)
 
     @patch("accounts.views.send_verification_email", side_effect=EmailDeliveryError())

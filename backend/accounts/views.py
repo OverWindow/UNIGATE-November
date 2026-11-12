@@ -19,7 +19,7 @@ from surveys.learner import CATALOG, validate_survey
 from surveys.models import SignupSurveyResponse
 
 from .forms import LoginForm, SignupForm, normalize_email, users_for_email
-from .rate_limits import RateLimitUnavailable, check_limit, clear_login_failures, login_rate_limit_lock, record_attempt
+from .rate_limits import RateLimitUnavailable, check_limit, clear_login_failures, login_rate_limit_lock, record_attempt, request_subject
 from .email_delivery import EmailDeliveryError, send_verification_email
 from .email_verification import LANGUAGES, make_verification_token, read_verification_token
 
@@ -196,11 +196,10 @@ def send_email_verification(request):
     language = data.get("language", "ko")
     if language not in LANGUAGES:
         return api_response({"error": "validation_error", "fields": {"language": ["invalid"]}}, status=400)
-    # Use the socket peer rather than trusting a caller-supplied forwarded IP.
     for action, key, limit, window in (
+        ("email-send-subject", request_subject(request), 100, 3600),
         ("email-resend", email, 1, 60),
         ("email-send", email, 5, 600),
-        ("email-send-peer", request.META.get("REMOTE_ADDR", "unknown"), 100, 3600),
     ):
         wait = record_attempt(action, key, limit, window)
         if wait:

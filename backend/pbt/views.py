@@ -12,7 +12,7 @@ from django.utils.crypto import constant_time_compare
 from django.views.decorators.debug import sensitive_variables, sensitive_post_parameters
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
-from accounts.rate_limits import record_attempt, RateLimitUnavailable
+from accounts.rate_limits import record_attempt, request_subject, RateLimitUnavailable
 from accounts.email_delivery import EmailDeliveryError
 from question_bank.models import QuestionSet
 from .bank import BankNotReady, load_set
@@ -243,6 +243,9 @@ def result_email(request, attempt_id, exam_format="pbt"):
         finalize(attempt)
         if attempt.user_id is not None or attempt.status != "submitted":
             return response({"error": "feedback_not_available"}, 409)
+        wait = record_attempt("result-subject", request_subject(request), limit=100, window=3600)
+        if wait:
+            return limited(wait)
         feedback = ExamAttemptFeedback.objects.filter(attempt=attempt).first()
         if feedback is None:
             try:
@@ -255,8 +258,7 @@ def result_email(request, attempt_id, exam_format="pbt"):
         if feedback.email_requested_at and feedback.email_requested_at + timedelta(seconds=60) > now:
             return limited(max(1, int((feedback.email_requested_at + timedelta(seconds=60) - now).total_seconds()) + 1))
         for scope, key, limit in (("result-attempt", str(attempt.pk), 5),
-                                  ("result-recipient", delivery["email"], 5),
-                                  ("result-peer", request.META.get("REMOTE_ADDR", "unknown"), 100)):
+                                  ("result-recipient", delivery["email"], 5)):
             wait = record_attempt(scope, key, limit=limit, window=3600)
             if wait:
                 return limited(wait)
@@ -299,7 +301,7 @@ def result_access(request, exam_format="pbt"):
             raise ValueError
     except (ValueError, TypeError, AttributeError):
         return response({"error": "result_link_invalid"}, 400)
-    wait = record_attempt("result-access-peer", request.META.get("REMOTE_ADDR", "unknown"), limit=100, window=600)
+    wait = record_attempt("result-access-subject", request_subject(request), limit=100, window=600)
     if wait:
         return limited(wait)
     with transaction.atomic():
