@@ -5,10 +5,10 @@ from django.test import Client, SimpleTestCase, TransactionTestCase
 from django.utils import timezone
 
 from question_bank.models import Item
-from .bank import BankNotReady, load_set
-from .models import Attempt, Exam
-from .sentence_order import choice_order, sentence_material, valid_selected_order
-from .tests import BankFixtures
+from ..bank import BankNotReady, load_set
+from ..models import Attempt, Exam
+from ..sentence_order import choice_order, sentence_material, valid_selected_order
+from .test_core import BankFixtures
 
 
 PASSAGE = "(가) 첫 번째 문장입니다.\n(나) 두 번째 문장입니다.\n(다) 세 번째 문장입니다.\n(라) 네 번째 문장입니다."

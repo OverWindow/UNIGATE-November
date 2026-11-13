@@ -15,9 +15,9 @@ from django.db.migrations.executor import MigrationExecutor
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 
-from .models import RateLimit
-from .rate_limits import RateLimitUnavailable, check_limit, clear_login_failures, record_attempt, cleanup_expired
-from .tests import AuthClientMixin, FAST_HASHERS, PASSWORD
+from ..models import RateLimit
+from ..rate_limits import RateLimitUnavailable, check_limit, clear_login_failures, record_attempt, cleanup_expired
+from .test_core import AuthClientMixin, FAST_HASHERS, PASSWORD
 
 
 class RateLimitStorageTests(TestCase):
@@ -130,7 +130,7 @@ class ConcurrentLoginTests(AuthClientMixin, TransactionTestCase):
         )
 
     def overlapping_logins(self, first_password="wrong", second_email="LEARNER@example.invalid", timeout=False):
-        from .views import authenticate as original_authenticate
+        from ..views import authenticate as original_authenticate
 
         first_in_auth = Event()
         release_first = Event()

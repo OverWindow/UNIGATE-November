@@ -129,7 +129,7 @@ $env:DJANGO_ENV = 'development'
 추후 음성을 Hub에서 생성하고 대상 DB로 전송하면 단어장을 다시 열거나 새로고침할 때 활성화됩니다.
 기존 단어에 음성만 추가한 경우 세트 재등록이나 프론트 재배포는 필요하지 않습니다.
 검증은 격리된 PostgreSQL 테스트 DB에서 `backend/`의
-`.\.venv\Scripts\python.exe manage.py test vocabulary question_bank config.test_settings config.test_routes --noinput`으로 수행합니다.
+`.\.venv\Scripts\python.exe manage.py test vocabulary question_bank config.tests.test_settings config.tests.test_routes --noinput`으로 수행합니다.
 프론트 검증은 `frontend-TOPIQ/`에서 `npm test`, `npm run lint`, `npm run typecheck`, `npm run build`를 실행합니다.
 
 ### Hub 중국어·인도네시아어 컬럼
@@ -160,7 +160,7 @@ $env:DJANGO_ENV = 'development'
 번역 유실을 막기 위해 역적용은 지원하지 않습니다.
 
 검증은 격리된 PostgreSQL 테스트 DB에 합성 데이터를 만들어 `backend/`에서
-`.\.venv\Scripts\python.exe manage.py test question_bank.test_vocabulary_migration vocabulary --noinput`으로 실행합니다.
+`.\.venv\Scripts\python.exe manage.py test question_bank.tests.test_vocabulary_migration vocabulary --noinput`으로 실행합니다.
 Hub 구조 일치·기존 데이터 보존·DB 기본값과 NOT NULL·재적용·음성/언어 적용 순서·잘못된 구조의 롤백을 검사합니다.
 
 ### 예문 단어 뜻 조회
@@ -256,7 +256,7 @@ HTTPS(로컬 localhost 허용), WebAssembly, Web Crypto를 지원하는 브라�
 **frontend-TOPIQ 폴더에서** `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`를 수동 실행합니다.
 프론트 테스트는 설치된 Garu WASM으로 기본형·접미사·이모지·클릭 구간·문장부호 처리를 확인합니다.
 **backend 폴더에서**, 서비스와 분리된 일회용 PostgreSQL 연결 설정으로
-`.\.venv\Scripts\python.exe manage.py test vocabulary config.test_settings --noinput`을 수동 실행합니다.
+`.\.venv\Scripts\python.exe manage.py test vocabulary config.tests.test_settings --noinput`을 수동 실행합니다.
 Django가 임시 테스트 DB만 생성·삭제합니다. 서비스 DB에 테스트 명령이나 migrate를 실행하지 않습니다.
 
 Garu는 사전 검색용 기본형을 항상 정확하게 복원하지는 않습니다.
@@ -345,7 +345,7 @@ $env:DJANGO_ENV = 'development'
 등록된 세트가 없으면 빈 목록을 반환합니다. 잘못된 급수·페이지는 400, 없는 세트·페이지는 404,
 테이블 미적용·원본 연결 오류 등은 연결 정보를 노출하지 않는 503 응답으로 처리합니다.
 
-백엔드는 `backend/`에서 `.\.venv\Scripts\python.exe manage.py test vocabulary question_bank config.test_routes --noinput`으로 검사합니다.
+백엔드는 `backend/`에서 `.\.venv\Scripts\python.exe manage.py test vocabulary question_bank config.tests.test_routes --noinput`으로 검사합니다.
 Django 테스트 러너가 별도 테스트 DB를 생성·삭제하므로 운영 연결 설정으로 실행하지 않습니다.
 균등 배정·누락/중복·반복 실행·추가 등록·읽기 전용 점검·페이지 구분·원본 누락·쓰기 차단을 합성 데이터로 검증합니다.
 퀴즈는 단어당 한 문제 선택·정답 미노출·세트 경계·빈 세트·정답/오답 채점·CSRF·변경된 문제 거부·원본 읽기 전용을 검증합니다.
@@ -484,16 +484,19 @@ PowerShell에서는 먼저 `$env:NEXT_PUBLIC_BACKEND_URL="http://localhost:8000"
 타입 생성과 빌드에도 백엔드 origin이 필요합니다. `preview`는 기본 `http://127.0.0.1:3000`에서 `out/`만 제공합니다.
 미리보기로 신청을 검증할 때는 브라우저에서 `http://localhost:3000`을 사용하거나 프론트·백엔드 호스트명을 함께 맞춥니다.
 
+백엔드 테스트는 `accounts/`, `surveys/`, `pbt/`, `question_bank/`, `vocabulary/`, `config/` 각각의 `tests/`에 둡니다.
+앱 단위 실행(`manage.py test accounts`)은 그대로 사용할 수 있고, 개별 파일은 `accounts.tests.test_core`처럼 지정합니다.
+
 격리된 PostgreSQL 테스트 환경을 지정한 후 `backend/`에서:
 
 ```sh
 .venv/bin/python manage.py check
 .venv/bin/python manage.py makemigrations --check --dry-run
-.venv/bin/python manage.py test accounts surveys config.test_settings config.test_health config.test_cors config.test_routes --noinput
+.venv/bin/python manage.py test accounts surveys config.tests.test_settings config.tests.test_health config.tests.test_cors config.tests.test_routes --noinput
 ```
 
 테스트는 합성 데이터와 `test_<DB_NAME>`을 사용하며 테스트 계정에는 CREATEDB 권한이 필요합니다. 운영 DB 연결 설정으로 실행하지 않습니다.
-환경 설정 파싱 테스트만 실행하려면 `.venv/bin/python -m unittest config.test_settings`를 사용합니다.
+환경 설정 파싱 테스트만 실행하려면 `.venv/bin/python -m unittest config.tests.test_settings`를 사용합니다.
 
 ## 공유 백엔드의 TOPIQ 인증
 
@@ -875,7 +878,7 @@ $env:DJANGO_ENV = 'development'
 
 ```powershell
 .\.venv\Scripts\python.exe manage.py makemigrations pbt --check --dry-run
-.\.venv\Scripts\python.exe manage.py test pbt surveys.test_learner_csv_admin --noinput
+.\.venv\Scripts\python.exe manage.py test pbt surveys.tests.test_learner_csv_admin --noinput
 ```
 
 답 변경·취소·중복 저장·동시 요청, 순서형 부분 입력·완성, 제출·시간 초과·재시작,
@@ -1036,7 +1039,7 @@ CSV 전용 실행 명령·예약 작업·환경 변수나 프론트엔드 배포
 분리된 PostgreSQL 테스트 설정에서 `backend/`를 실행 위치로 사용해 검증합니다.
 
 ```powershell
-.\.venv\Scripts\python.exe manage.py test surveys pbt.test_feedback accounts.test_signup_survey --noinput
+.\.venv\Scripts\python.exe manage.py test surveys pbt.tests.test_feedback accounts.tests.test_signup_survey --noinput
 ```
 
 Django 테스트 러너가 테스트 DB를 생성·삭제하며 운영·개발 DB 설정으로 실행하지 않습니다.

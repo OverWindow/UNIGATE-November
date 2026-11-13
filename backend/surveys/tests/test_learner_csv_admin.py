@@ -14,9 +14,9 @@ from django.utils.html import escape
 
 from pbt.admin import ExamAttemptFeedbackAdmin
 from pbt.models import Attempt, Exam, ExamAttemptFeedback
-from .admin import SignupSurveyResponseAdmin
-from .learner_csv import EXAM_COLUMNS, SIGNUP_COLUMNS, write_exam_survey_csv, write_signup_survey_csv
-from .models import SignupSurveyResponse
+from ..admin import SignupSurveyResponseAdmin
+from ..learner_csv import EXAM_COLUMNS, SIGNUP_COLUMNS, write_exam_survey_csv, write_signup_survey_csv
+from ..models import SignupSurveyResponse
 
 
 STAMP = datetime(2026, 11, 6, 18, 4, 5, tzinfo=dt_timezone.utc)

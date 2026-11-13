@@ -5,7 +5,7 @@ from django.db import IntegrityError, transaction
 from django.test import Client, TestCase
 from django.utils import timezone
 
-from .models import EducationType, SurveyResponse
+from ..models import EducationType, SurveyResponse
 
 
 class SurveyResponseTests(TestCase):

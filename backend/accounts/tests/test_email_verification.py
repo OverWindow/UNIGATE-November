@@ -11,10 +11,10 @@ from django.db import connection
 from django.test import Client, SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 
-from .email_delivery import EmailDeliveryError, build_verification_email, send_verification_email
-from .email_verification import TOKEN_SALT, make_verification_token
-from .models import RateLimit
-from .tests import AuthClientMixin, FAST_HASHERS
+from ..email_delivery import EmailDeliveryError, build_verification_email, send_verification_email
+from ..email_verification import TOKEN_SALT, make_verification_token
+from ..models import RateLimit
+from .test_core import AuthClientMixin, FAST_HASHERS
 
 
 @override_settings(PASSWORD_HASHERS=FAST_HASHERS)
@@ -68,7 +68,7 @@ class EmailVerificationApiTests(AuthClientMixin, TestCase):
 
     @patch("accounts.views.send_verification_email")
     def test_obsolete_peer_limits_do_not_block_new_sessions(self, deliver):
-        from .rate_limits import record_attempt
+        from ..rate_limits import record_attempt
 
         record_attempt("email-send-peer", "127.0.0.1", 100, 3600)
         RateLimit.objects.filter(scope="email-send-peer").update(attempts=100)

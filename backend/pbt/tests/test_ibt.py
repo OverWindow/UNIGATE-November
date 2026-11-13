@@ -8,9 +8,9 @@ from django.test import Client, TransactionTestCase
 from django.utils import timezone
 
 from question_bank.models import Item, VisualAsset
-from .bank import BankNotReady, load_set
-from .models import Attempt, Exam
-from .tests import BankFixtures
+from ..bank import BankNotReady, load_set
+from ..models import Attempt, Exam
+from .test_core import BankFixtures
 
 
 class IbtTests(BankFixtures, TransactionTestCase):

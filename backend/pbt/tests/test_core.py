@@ -12,8 +12,8 @@ from django.test import Client, TransactionTestCase
 from django.utils import timezone
 
 from question_bank.models import AudioAsset, Item, ItemAudioBinding, QuestionSet, VisualAsset
-from .bank import BankNotReady, load_set
-from .models import Attempt, AttemptItem, Exam
+from ..bank import BankNotReady, load_set
+from ..models import Attempt, AttemptItem, Exam
 
 
 class BankFixtures:

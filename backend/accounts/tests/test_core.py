@@ -13,10 +13,10 @@ from django.utils import timezone
 from surveys.learner import CATALOG
 from surveys.models import SignupSurveyResponse
 
-from .forms import SignupForm
-from .models import RateLimit
-from .rate_limits import check_limit, record_attempt
-from .email_verification import make_verification_token
+from ..forms import SignupForm
+from ..models import RateLimit
+from ..rate_limits import check_limit, record_attempt
+from ..email_verification import make_verification_token
 
 
 PASSWORD = "Korean!Study-6048"

@@ -14,9 +14,9 @@ from django.utils import timezone
 from accounts.email_delivery import EmailDeliveryError
 from accounts.models import RateLimit
 from accounts.rate_limits import record_attempt
-from .models import Attempt, AttemptItem, Exam, ExamAttemptFeedback
-from .result_delivery import build_result_email, token_hash
-from .survey import CATALOG, validate_survey
+from ..models import Attempt, AttemptItem, Exam, ExamAttemptFeedback
+from ..result_delivery import build_result_email, token_hash
+from ..survey import CATALOG, validate_survey
 
 
 def survey_input(**changes):
@@ -344,7 +344,7 @@ class FeedbackConcurrencyTests(FeedbackFixture, TransactionTestCase):
 
 class SurveyContractTests(SimpleTestCase):
     def test_frontend_and_backend_catalogs_match(self):
-        frontend = Path(__file__).resolve().parents[2] / "frontend-TOPIQ/src/lib/survey-catalog.json"
+        frontend = Path(__file__).resolve().parents[3] / "frontend-TOPIQ/src/lib/survey-catalog.json"
         self.assertEqual(json.loads(frontend.read_text(encoding="utf-8")), CATALOG)
 
     def test_conditional_fields_normalize_and_all_languages_have_mail(self):

@@ -12,7 +12,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils.html import escape
 
-from .models import SurveyResponse
+from ..models import SurveyResponse
 
 
 class SurveyAdminTests(TestCase):

@@ -9,7 +9,7 @@ from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parents[2]
 
 
 class EnvironmentSettingsTests(unittest.TestCase):

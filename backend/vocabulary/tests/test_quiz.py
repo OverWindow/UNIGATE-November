@@ -11,7 +11,7 @@ from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from question_bank.models import Vocabulary, VocabularyQuestion
-from .models import VocabularySet, VocabularySetItem
+from ..models import VocabularySet, VocabularySetItem
 
 
 class VocabularyQuizTests(TransactionTestCase):

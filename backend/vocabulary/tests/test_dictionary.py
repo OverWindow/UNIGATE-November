@@ -9,10 +9,10 @@ from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from question_bank.models import Vocabulary, VocabularyQuestion
-from . import dictionary
-from .dictionary import ExampleLookupError, lookup_candidate, lookup_meaning
-from .example_analysis import example_version, parse_selection, validate_example
-from .models import KoreanDictionarySense, VocabularySet, VocabularySetItem
+from .. import dictionary
+from ..dictionary import ExampleLookupError, lookup_candidate, lookup_meaning
+from ..example_analysis import example_version, parse_selection, validate_example
+from ..models import KoreanDictionarySense, VocabularySet, VocabularySetItem
 
 
 SENTENCE = "친구가 사과를 먹었어요."
@@ -82,7 +82,7 @@ class DictionaryLookupTests(TestCase):
         self.assertEqual((error.exception.code, error.exception.status), ("dictionary_unavailable", 503))
 
     def test_view_keeps_selection_validation_and_returns_db_senses(self):
-        from .example_views import example_meaning
+        from ..example_views import example_meaning
         add_sense()
         params = {"start": "8", "end": "12", "surface": "먹었어요",
                   "candidates": json.dumps([["먹다", 5]]), "version": example_version(SENTENCE), "lang": "en"}

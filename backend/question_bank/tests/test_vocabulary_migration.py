@@ -10,7 +10,7 @@ from django.test import TransactionTestCase
 from django.utils import timezone
 
 from vocabulary.models import VocabularySet, VocabularySetItem
-from .models import Vocabulary
+from ..models import Vocabulary
 
 
 BASE_SCHEMA = """

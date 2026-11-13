@@ -6,7 +6,7 @@ from django.core.management import call_command
 from django.db import connection
 from django.test import TransactionTestCase
 
-from .models import AudioAsset, Item, ItemAudioBinding, QuestionSet, VisualAsset
+from ..models import AudioAsset, Item, ItemAudioBinding, QuestionSet, VisualAsset
 
 
 class QuestionBankTests(TransactionTestCase):

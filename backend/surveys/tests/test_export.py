@@ -16,7 +16,7 @@ from django.core.management.base import CommandError
 from django.db import DatabaseError, connection
 from django.test import TestCase, TransactionTestCase, override_settings
 
-from .models import SurveyResponse
+from ..models import SurveyResponse
 
 
 HEADER = ["id", "email", "age", "education_type", "desired_university", "created_at"]

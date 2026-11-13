@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from surveys.learner import CATALOG
 from surveys.models import SignupSurveyResponse
-from .tests import AuthClientMixin, FAST_HASHERS, signup_survey_input
+from .test_core import AuthClientMixin, FAST_HASHERS, signup_survey_input
 
 
 @override_settings(PASSWORD_HASHERS=FAST_HASHERS)

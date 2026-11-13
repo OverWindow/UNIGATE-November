@@ -8,8 +8,8 @@ from django.test import SimpleTestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 
 from question_bank.models import Vocabulary, VocabularyQuestion
-from .models import VocabularySet, VocabularySetItem
-from .services import audio_url, split_words
+from ..models import VocabularySet, VocabularySetItem
+from ..services import audio_url, split_words
 
 
 class VocabularySplitTests(SimpleTestCase):

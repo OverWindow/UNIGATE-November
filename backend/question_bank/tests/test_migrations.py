@@ -12,7 +12,7 @@ from django.test import TransactionTestCase
 from django.utils import timezone
 
 from pbt.models import Attempt, AttemptItem, Exam
-from .models import AudioAsset, Item, ItemAudioBinding, QuestionSet, VisualAsset
+from ..models import AudioAsset, Item, ItemAudioBinding, QuestionSet, VisualAsset
 
 
 # Frozen Hub consumer schema before 010/011; no sibling checkout is needed by tests.
