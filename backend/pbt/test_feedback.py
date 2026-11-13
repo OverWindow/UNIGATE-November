@@ -276,6 +276,17 @@ class FeedbackTests(FeedbackFixture, TestCase):
         self.assertEqual(self.send().status_code, 202)
 
     @patch("pbt.views.send_result_email")
+    def test_result_email_finalizes_expired_answered_count(self, send):
+        for attempt in (self.attempt, self.make_attempt("ibt")):
+            attempt.status = "in_progress"
+            attempt.mode = "timed"
+            attempt.expires_at = timezone.now() - timedelta(seconds=1)
+            attempt.save()
+            self.assertEqual(self.send(attempt).status_code, 202)
+            attempt.refresh_from_db()
+            self.assertEqual((attempt.status, attempt.timed_out, attempt.answered_count), ("submitted", True, 1))
+
+    @patch("pbt.views.send_result_email")
     def test_database_rating_and_one_to_one_constraints(self, send):
         self.send()
         with self.assertRaises(IntegrityError), transaction.atomic():

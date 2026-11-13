@@ -83,6 +83,88 @@ class PbtTests(BankFixtures, TransactionTestCase):
         self.assertIn(result.status_code, (200, 201), result.content)
         return result.json()
 
+    def test_answered_count_tracks_changes_clears_resume_and_submission(self):
+        for member in (False, True):
+            client = Client()
+            if member:
+                client.force_login(self.user)
+            for mode in ("practice", "timed"):
+                with self.subTest(member=member, mode=mode):
+                    data = self.start(mode=mode, client=client)
+                    self.assertEqual(data["answeredCount"], 0)
+                    path = f"/api/pbt/attempts/{data['id']}/"
+                    for position, option, expected in (
+                        (1, 1, 1), (1, 1, 1), (1, 2, 1), (2, 1, 2),
+                        (1, None, 1), (1, None, 1), (2, None, 0), (50, 1, 1),
+                    ):
+                        response = client.put(path + f"answers/{position}/",
+                            {"selectedOption": option}, content_type="application/json")
+                        self.assertEqual(response.status_code, 200)
+                        self.assertEqual(Attempt.objects.get(pk=data["id"]).answered_count, expected)
+                        self.assertEqual(client.get(path).json()["answeredCount"], expected)
+                    self.assertIsNotNone(AttemptItem.objects.get(attempt_id=data["id"], position=1).answered_at)
+                    self.assertEqual(self.start(mode=mode, client=client)["answeredCount"], 1)
+                    history = client.get("/api/pbt/attempts/").json()["attempts"]
+                    self.assertEqual(next(row for row in history if row["id"] == data["id"])["answeredCount"], 1)
+                    Attempt.objects.filter(pk=data["id"]).update(answered_count=9)
+                    submitted = client.post(path + "submit/").json()
+                    self.assertEqual(submitted["answeredCount"], 1)
+                    self.assertEqual(client.post(path + "submit/").json()["answeredCount"], 1)
+                    result = client.get(path + "result/")
+                    if member:
+                        self.assertEqual((result.json()["answeredCount"], result.json()["score"]), (1, 0))
+                    else:
+                        self.assertEqual(result.status_code, 403)
+                    closed = client.put(path + "answers/50/", {"selectedOption": None}, content_type="application/json")
+                    self.assertEqual(closed.status_code, 409)
+                    self.assertEqual(closed.json()["attempt"]["answeredCount"], 1)
+
+    def test_answer_and_count_roll_back_together(self):
+        data = self.start()
+        path = f"/api/pbt/attempts/{data['id']}/answers/1/"
+        with patch("pbt.views.Attempt.save", side_effect=DatabaseError("synthetic")):
+            response = self.client.put(path, {"selectedOption": 1}, content_type="application/json")
+        self.assertEqual(response.status_code, 503)
+        attempt = Attempt.objects.get(pk=data["id"])
+        self.assertEqual(attempt.answered_count, 0)
+        item = attempt.items.get(position=1)
+        self.assertIsNone(item.selected_option)
+        self.assertIsNone(item.answered_at)
+
+    def test_concurrent_answers_and_submission_keep_count_consistent(self):
+        data = self.start()
+        path = f"/api/pbt/attempts/{data['id']}/"
+        clients = [Client(), Client()]
+        for client in clients:
+            client.cookies.update(self.client.cookies)
+
+        def run_requests(positions):
+            barrier = Barrier(2)
+
+            def send(pair):
+                client, position = pair
+                try:
+                    barrier.wait(timeout=10)
+                    if position is None:
+                        return client.post(path + "submit/").status_code
+                    return client.put(path + f"answers/{position}/",
+                        {"selectedOption": 1}, content_type="application/json").status_code
+                finally:
+                    connections.close_all()
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                return list(executor.map(send, zip(clients, positions)))
+
+        self.assertEqual(run_requests([1, 2]), [200, 200])
+        self.assertEqual(Attempt.objects.get(pk=data["id"]).answered_count, 2)
+        statuses = run_requests([3, None])
+        self.assertIn(statuses[0], (200, 409))
+        self.assertEqual(statuses[1], 200)
+        attempt = Attempt.objects.get(pk=data["id"])
+        self.assertEqual(attempt.status, "submitted")
+        self.assertEqual(attempt.answered_count, 3 if statuses[0] == 200 else 2)
+        self.assertEqual(attempt.answered_count, attempt.items.filter(selected_option__isnull=False).count())
+
     def test_guest_catalog_and_direct_member_access(self):
         for n in (2, 3, 4):
             for section in ("reading", "listening"):
@@ -227,6 +309,7 @@ class PbtTests(BankFixtures, TransactionTestCase):
             progress = next(e for e in self.client.get("/api/pbt/exams/").json()["exams"] if e["id"] == str(self.exam.pk))["myProgress"]["timed"]
             self.assertIsNone(progress["inProgressId"])
             self.assertEqual(progress["latestResult"], {"id": active["id"], "score": 2, "maxScore": 100, "submittedAt": expiry.isoformat()})
+            self.assertEqual(Attempt.objects.get(pk=active["id"]).answered_count, 1)
         result = self.client.get(path + "result/").json()
         self.assertTrue(result["timedOut"])
         self.assertEqual(result["score"], 2)
@@ -299,6 +382,8 @@ class PbtTests(BankFixtures, TransactionTestCase):
                     old.refresh_from_db()
                     self.assertNotEqual(new.pk, old.pk)
                     self.assertEqual((old.status, old.score, old.timed_out), ("submitted", 2, False))
+                    self.assertEqual(old.answered_count, 2)
+                    self.assertEqual((new.answered_count, response.json()["answeredCount"]), (0, 0))
                     self.assertIsNotNone(old.submitted_at)
                     self.assertEqual(old.items.get(position=1).selected_option, 2)
                     self.assertTrue(old.items.get(position=1).is_correct)
@@ -451,6 +536,7 @@ class PbtTests(BankFixtures, TransactionTestCase):
         self.assertTrue(result["timedOut"])
         self.assertEqual(result["score"], 2)
         self.assertIsNone(result["items"][1]["selectedOption"])
+        self.assertEqual(result["answeredCount"], 1)
         self.assertEqual(Attempt.objects.get(pk=data["id"]).submitted_at, expiry)
 
     def test_history_finalizes_expired_attempt(self):
@@ -459,6 +545,7 @@ class PbtTests(BankFixtures, TransactionTestCase):
         row = self.client.get("/api/pbt/attempts/").json()["attempts"][0]
         self.assertEqual(row["status"], "submitted")
         self.assertIsNone(row["score"])
+        self.assertEqual(row["answeredCount"], 0)
         self.assertEqual(Attempt.objects.get(pk=data["id"]).score, 0)
 
     def test_ownership_survives_login_but_not_another_guest(self):

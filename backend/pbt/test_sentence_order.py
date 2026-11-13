@@ -62,6 +62,7 @@ class SentenceOrderTests(BankFixtures, TransactionTestCase):
         path = self.start("ibt")
         partial = ["나", None, "가", None]
         self.assertEqual(self.save(path, {"selectedOrder": partial}).status_code, 200)
+        self.assertEqual(self.client.get(path).json()["answeredCount"], 0)
         item = self.client.get(path).json()["items"][12]
         self.assertEqual(item["selectedOrder"], partial)
         self.assertEqual(item["answerMode"], "sentence_order")
@@ -72,8 +73,12 @@ class SentenceOrderTests(BankFixtures, TransactionTestCase):
         for order in permutations("가나다라"):
             self.assertEqual(self.save(path, {"selectedOrder": list(order)}).status_code, 200)
             self.assertEqual(self.client.get(path).json()["items"][12]["selectedOrder"], list(order))
+            self.assertEqual(self.client.get(path).json()["answeredCount"], 1)
+        self.assertEqual(self.save(path, {"selectedOrder": partial}).status_code, 200)
+        self.assertEqual(self.client.get(path).json()["answeredCount"], 0)
         self.assertEqual(self.save(path, {"selectedOrder": [None] * 4}).status_code, 200)
         self.assertEqual(self.client.get(path).json()["items"][12]["selectedOrder"], [None] * 4)
+        self.assertEqual(Attempt.objects.get(pk=path.split("/")[-2]).answered_count, 0)
 
     def test_pbt_sentence_order_keeps_choices_saves_resumes_and_grades(self):
         path = self.start("pbt")
@@ -93,6 +98,7 @@ class SentenceOrderTests(BankFixtures, TransactionTestCase):
         resumed = self.client.post("/api/pbt/attempts/", {"examId": str(self.exam.pk), "mode": "practice"}, content_type="application/json")
         self.assertEqual(resumed.status_code, 200)
         self.assertEqual(resumed.json()["id"], path.split("/")[-2])
+        self.assertEqual(resumed.json()["answeredCount"], 2)
         self.assertEqual([item["selectedOption"] for item in self.client.get(path).json()["items"][12:15]], [2, 1, None])
         Item.objects.filter(set=self.reading, position=13).update(correct_answer=1)
         self.assertEqual(self.client.post(path + "submit/").json()["score"], 2)
@@ -110,6 +116,7 @@ class SentenceOrderTests(BankFixtures, TransactionTestCase):
         Item.objects.filter(set=self.ibt_reading, position=13).update(correct_answer=1)
         result = self.client.post(path + "submit/").json()
         self.assertEqual(result["score"], 3)
+        self.assertEqual(result["answeredCount"], 1)
         items = self.client.get(path + "result/").json()["items"]
         self.assertTrue(items[12]["isCorrect"])
         self.assertFalse(items[13]["isCorrect"])
@@ -131,6 +138,7 @@ class SentenceOrderTests(BankFixtures, TransactionTestCase):
         self.assertEqual(self.client.get(path + "result/").status_code, 403)
         stored = Attempt.objects.get(pk=path.split("/")[-2]).items.get(position=13)
         self.assertFalse(stored.is_correct)
+        self.assertEqual(stored.attempt.answered_count, 1)
 
     def test_bad_payload_wrong_mode_and_foreign_owner_are_rejected(self):
         path = self.start("ibt")
@@ -159,6 +167,7 @@ class SentenceOrderTests(BankFixtures, TransactionTestCase):
         self.assertEqual(self.save(path, {"selectedOrder": [None] * 4}).status_code, 409)
         result = self.client.get(path + "result/").json()
         self.assertTrue(result["timedOut"])
+        self.assertEqual(result["answeredCount"], 2)
         self.assertTrue(result["items"][12]["isCorrect"])
         self.assertEqual(result["items"][12]["selectedOrder"], CORRECT)
         self.assertTrue(result["items"][13]["isCorrect"])

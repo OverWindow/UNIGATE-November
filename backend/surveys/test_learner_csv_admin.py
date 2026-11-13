@@ -46,7 +46,8 @@ class LearnerCsvAdminTests(TestCase):
                 exam_format=exam_format, section=section, display_order=1)
             attempt = Attempt.objects.create(exam=exam, exam_format=exam_format, guest_id=uuid.uuid4(),
                 title=exam.title, section=section, mode=mode, status="submitted", started_at=STAMP,
-                submitted_at=STAMP, expires_at=STAMP if mode == "timed" else None, score=0 if exam_format == "pbt" else 88)
+                submitted_at=STAMP, expires_at=STAMP if mode == "timed" else None, score=0 if exam_format == "pbt" else 88,
+                answered_count=0 if exam_format == "pbt" else 29)
             cls.feedbacks.append(ExamAttemptFeedback.objects.create(attempt=attempt, email="+exam@example.invalid",
                 rating=5, **answers, survey_version="post_exam_survey_v1", privacy_consent_version="topiq_exam_privacy_v1",
                 email_status="accepted", result_token_hash="never-export-this-token-hash"))
@@ -121,6 +122,8 @@ class LearnerCsvAdminTests(TestCase):
                     self.assertEqual(values["이메일"], "'+exam@example.invalid")
                     self.assertEqual(values["시험명"], '\'=1,"모의고사"\n다음 줄')
                     self.assertEqual(values["점수"], "0" if values["시험 방식"] == "PBT" else "88")
+                    self.assertEqual(values["푼 문제 수"], "0" if values["시험 방식"] == "PBT" else "29")
+                    self.assertEqual(columns[columns.index("점수") + 1], "푼 문제 수")
                     self.assertEqual(values["영역"], "읽기" if values["시험 방식"] == "PBT" else "듣기")
                     self.assertEqual(values["모드"], "연습" if values["시험 방식"] == "PBT" else "실전")
                     self.assertEqual(values["별점"], "5")

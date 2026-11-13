@@ -88,6 +88,7 @@ class IbtTests(BankFixtures, TransactionTestCase):
     def test_save_resume_clear_rounding_snapshot_and_idempotent_submit(self):
         self.client.force_login(self.user)
         data = self.start()
+        self.assertEqual(data["answeredCount"], 0)
         path = f"/api/ibt/attempts/{data['id']}/"
         self.assertIsNone(data["expiresAt"])
         self.assertEqual(data["id"], self.start()["id"])
@@ -95,15 +96,19 @@ class IbtTests(BankFixtures, TransactionTestCase):
             self.assertEqual(self.client.put(path + f"answers/{position}/", {"selectedOption": 2}, content_type="application/json").status_code, 200)
         self.client.put(path + "answers/3/", {"selectedOption": 2}, content_type="application/json")
         self.client.put(path + "answers/3/", {"selectedOption": None}, content_type="application/json")
+        self.assertEqual(Attempt.objects.get(pk=data["id"]).answered_count, 2)
+        self.assertEqual(self.start()["answeredCount"], 2)
         saved = self.client.get(path).json()["items"]
         self.assertEqual(saved[0]["selectedOption"], 2)
         self.assertIsNone(saved[2]["selectedOption"])
         Item.objects.filter(set=self.ibt_reading).update(correct_answer=3, explanation="UPDATED")
         first = self.client.post(path + "submit/").json()
+        self.assertEqual(first["answeredCount"], 2)
         self.assertEqual(first["score"], 7)
         self.assertEqual(first["maxScore"], 100)
         self.assertEqual(first["submittedAt"], self.client.post(path + "submit/").json()["submittedAt"])
         result = self.client.get(path + "result/").json()
+        self.assertEqual(result["answeredCount"], 2)
         self.assertEqual(result["items"][0]["explanation"], "SECRET EXPLANATION")
         self.assertEqual(result["items"][22]["groupId"], result["items"][23]["groupId"])
         self.assertEqual(self.client.put(path + "answers/3/", {"selectedOption": 2}, content_type="application/json").status_code, 409)
@@ -136,6 +141,8 @@ class IbtTests(BankFixtures, TransactionTestCase):
                     self.assertEqual(response.status_code, 201)
                     old.refresh_from_db()
                     self.assertEqual((old.status, old.score), ("submitted", 7))
+                    self.assertEqual(old.answered_count, 2)
+                    self.assertEqual(response.json()["answeredCount"], 0)
                     result = client.get(f"/api/ibt/attempts/{old.pk}/result/")
                     if member:
                         self.assertEqual(result.json()["score"], 7)
@@ -180,6 +187,7 @@ class IbtTests(BankFixtures, TransactionTestCase):
             result = self.client.get(path + "result/").json()
             self.assertTrue(result["timedOut"])
             self.assertEqual(result["score"], 3)
+            self.assertEqual(result["answeredCount"], 1)
             self.assertEqual(result["submittedAt"], expiry.isoformat())
 
     def test_listening_has_no_overall_deadline_and_submits_explicitly(self):

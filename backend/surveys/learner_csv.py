@@ -10,7 +10,7 @@ SURVEY_COLUMNS = (
 )
 SIGNUP_COLUMNS = ("회원 ID", "이메일", "닉네임", "언어") + SURVEY_COLUMNS
 EXAM_COLUMNS = (
-    "응시 ID", "이메일", "시험 방식", "시험명", "영역", "모드", "점수", "별점", "언어", "시험 제출 시각", "메일 상태",
+    "응시 ID", "이메일", "시험 방식", "시험명", "영역", "모드", "점수", "푼 문제 수", "별점", "언어", "시험 제출 시각", "메일 상태",
 ) + SURVEY_COLUMNS
 REASONS = {row[0]: row[1] for row in CATALOG["reasons"]}
 STUDY_DURATIONS = {row[0]: row[1] for row in CATALOG["studyDurations"]}
@@ -50,6 +50,7 @@ def write_exam_survey_csv(stream, queryset):
         row = (
             response.attempt_id, response.email, attempt.exam_format.upper(), attempt.title,
             {"reading": "읽기", "listening": "듣기"}.get(attempt.section, attempt.section), attempt.get_mode_display(),
-            attempt.score, response.rating, response.language, seoul_time(attempt.submitted_at), response.get_email_status_display(),
+            attempt.score, attempt.answered_count, response.rating, response.language,
+            seoul_time(attempt.submitted_at), response.get_email_status_display(),
         ) + survey_values(response)
         writer.writerow(spreadsheet_text(value) for value in row)

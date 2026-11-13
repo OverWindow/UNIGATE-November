@@ -21,7 +21,7 @@ from .result_delivery import (LINK_LIFETIME, feedback_state, has_result_access, 
                               send_result_email, token_hash)
 from .survey import validate_delivery, validate_survey
 from .formats import EXAM_FORMATS
-from .services import attempt_data, finalize, owner_filter
+from .services import attempt_data, finalize, is_answered, owner_filter
 from .sentence_order import valid_selected_order
 
 
@@ -192,6 +192,9 @@ def answer(request, attempt_id, position, exam_format="pbt"):
             item.selected_option = data["selectedOption"]
         item.answered_at = timezone.now()
         item.save(update_fields=["selected_order" if ordering else "selected_option", "answered_at"])
+        attempt.answered_count = sum(is_answered(row) for row in
+            attempt.items.only("snapshot", "selected_option", "selected_order"))
+        attempt.save(update_fields=["answered_count"])
         return response({"position": position, **data, "serverNow": timezone.now().isoformat()})
 
 

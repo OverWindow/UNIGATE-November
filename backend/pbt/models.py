@@ -43,6 +43,7 @@ class Attempt(models.Model):
     submitted_at = models.DateTimeField(null=True)
     timed_out = models.BooleanField(default=False)
     score = models.PositiveSmallIntegerField(null=True)
+    answered_count = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
         db_table = "pbt_attempts"

@@ -3,7 +3,7 @@ from django.utils import timezone
 
 from .models import AttemptItem
 from .result_delivery import feedback_state, has_result_access
-from .sentence_order import choice_order
+from .sentence_order import choice_order, valid_selected_order
 
 
 def owner_filter(request):
@@ -12,6 +12,12 @@ def owner_filter(request):
     if guest:
         owner |= Q(user__isnull=True, guest_id=guest)
     return owner
+
+
+def is_answered(item):
+    if item.snapshot.get("answerMode") == "sentence_order":
+        return valid_selected_order(item.selected_order) and None not in item.selected_order
+    return item.selected_option is not None
 
 
 def finalize(attempt, force=False):
@@ -29,18 +35,19 @@ def finalize(attempt, force=False):
     attempt.status = "submitted"
     attempt.timed_out = expired
     attempt.submitted_at = attempt.expires_at if expired else timezone.now()
+    attempt.answered_count = sum(is_answered(item) for item in items)
     attempt.score = sum(item.points for item in items if item.is_correct)
     if attempt.exam_format == "ibt":
         correct = sum(item.is_correct for item in items)
         attempt.score = (correct * 100 + len(items) // 2) // len(items) if items else 0
-    attempt.save(update_fields=["status", "timed_out", "submitted_at", "score"])
+    attempt.save(update_fields=["status", "timed_out", "submitted_at", "score", "answered_count"])
 
 
 def attempt_data(attempt, include_items=False, results=False, request=None):
     allowed = request is not None and has_result_access(request, attempt)
     results = results and allowed
     data = {"id": str(attempt.pk), "examId": str(attempt.exam_id), "title": attempt.title,
-            "examFormat": attempt.exam_format,
+            "examFormat": attempt.exam_format, "answeredCount": attempt.answered_count,
             "section": attempt.section, "mode": attempt.mode, "status": attempt.status,
             "startedAt": attempt.started_at.isoformat(),
             "expiresAt": attempt.expires_at.isoformat() if attempt.expires_at else None,
