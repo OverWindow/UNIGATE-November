@@ -70,14 +70,18 @@ async function json(response: Response) {
   catch { throw new PbtError("server_error", response.status); }
 }
 
-export async function pbtRequest<T>(path: string, method = "GET", body?: object, examFormat: ExamFormat = "pbt"): Promise<T> {
+let lastCsrfToken = "";
+
+export async function pbtRequest<T>(path: string, method = "GET", body?: object, examFormat: ExamFormat = "pbt", sessionToken?: string): Promise<T> {
   // Fetch fresh CSRF after login/logout, which rotates Django's token.
   const headers: Record<string, string> = {};
+  if (sessionToken) headers["X-Exam-Session"] = sessionToken;
   if (method !== "GET") {
     const csrf = await fetchResponse("/api/csrf/", {});
     if (!csrf.ok) throw new PbtError("server_error", csrf.status);
     const token = (await json(csrf)).csrfToken;
     if (typeof token !== "string") throw new PbtError("server_error");
+    lastCsrfToken = token;
     headers["X-CSRFToken"] = token;
     headers["Content-Type"] = "application/json";
   }
@@ -87,6 +91,15 @@ export async function pbtRequest<T>(path: string, method = "GET", body?: object,
   if (!response.ok) throw new PbtError(typeof data?.error === "string" ? data.error : "server_error", response.status,
     Array.isArray(data?.fields) ? data.fields : [], data?.feedback, Number(data?.retryAfter) || 0);
   return data as T;
+}
+
+export function submitOnPageExit(id: string, examFormat: ExamFormat) {
+  if (!lastCsrfToken) return;
+  // Re-entry closes the attempt if the browser cannot deliver this request.
+  void fetch(`/api/${examFormat}/attempts/${id}/submit/`, {
+    method: "POST", credentials: "same-origin", keepalive: true,
+    headers: { "X-CSRFToken": lastCsrfToken, "Content-Type": "application/json" }, body: "{}",
+  }).catch(() => {});
 }
 
 export function remainingSeconds(attempt: Pick<Attempt, "expiresAt" | "serverNow">, elapsedMs: number) {

@@ -5,7 +5,7 @@ from functools import wraps
 
 from django.core.exceptions import RequestDataTooBig, ValidationError
 from django.db import DatabaseError, transaction
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.crypto import constant_time_compare
@@ -37,6 +37,8 @@ def available(view):
     def wrapped(*args, **kwargs):
         try:
             return view(*args, **kwargs)
+        except BankNotReady:
+            return response({"error": "exam_not_ready"}, 409)
         except (DatabaseError, RateLimitUnavailable):
             return response({"error": f"{kwargs.get('exam_format', 'pbt')}_unavailable"}, 503)
     return wrapped
@@ -135,7 +137,7 @@ def attempts(request, exam_format="pbt"):
             result["Retry-After"] = str(wait)
             return result
         try:
-            questions = load_set(exam.source_set_id, exam.section, exam_format)
+            load_set(exam.source_set_id, exam.section, exam_format)
         except BankNotReady:
             return response({"error": "exam_not_ready"}, 409)
         if restart is not None:
@@ -144,12 +146,44 @@ def attempts(request, exam_format="pbt"):
         duration = EXAM_FORMATS[exam_format]["duration"][exam.section]
         attempt = Attempt.objects.create(exam=exam, exam_format=exam_format, title=exam.title, section=exam.section, mode=data["mode"],
             started_at=now, expires_at=now + timedelta(seconds=duration) if data["mode"] == "timed" and duration is not None else None, **owner)
-        AttemptItem.objects.bulk_create([AttemptItem(attempt=attempt, **q) for q in questions])
         return response(attempt_data(attempt, request=request), 201)
 
 
 def owned_attempt(request, attempt_id, exam_format):
     return get_object_or_404(Attempt.objects.select_for_update().filter(owner_filter(request), exam_format=exam_format), pk=attempt_id)
+
+
+@sensitive_variables("token")
+def same_timed_session(request, attempt):
+    token = request.headers.get("X-Exam-Session", "")
+    return bool(attempt.timed_session_token_hash and len(token) == 36 and
+                constant_time_compare(attempt.timed_session_token_hash, token_hash(token)))
+
+
+@require_POST
+@available
+@sensitive_post_parameters("sessionToken")
+@sensitive_variables("data", "token", "session_hash")
+def enter(request, attempt_id, exam_format="pbt"):
+    try:
+        data = payload(request, {"sessionToken"})
+        token = data["sessionToken"]
+        if not isinstance(token, str) or str(uuid.UUID(token)) != token:
+            raise ValueError
+    except (ValueError, TypeError, AttributeError):
+        return response({"error": "invalid_request"}, 400)
+    with transaction.atomic():
+        attempt = owned_attempt(request, attempt_id, exam_format)
+        finalize(attempt)
+        if attempt.mode == "timed" and attempt.status == "in_progress":
+            session_hash = token_hash(token)
+            if attempt.timed_session_token_hash and not constant_time_compare(attempt.timed_session_token_hash, session_hash):
+                # A new page cannot resume a timed attempt, even if its exit request was lost.
+                finalize(attempt, force=True)
+            elif not attempt.timed_session_token_hash:
+                attempt.timed_session_token_hash = session_hash
+                attempt.save(update_fields=["timed_session_token_hash"])
+        return response(attempt_data(attempt, include_items=attempt.status == "in_progress", request=request))
 
 
 @require_GET
@@ -158,6 +192,8 @@ def detail(request, attempt_id, exam_format="pbt"):
     with transaction.atomic():
         attempt = owned_attempt(request, attempt_id, exam_format)
         finalize(attempt)
+        if attempt.mode == "timed" and attempt.status == "in_progress" and not same_timed_session(request, attempt):
+            return response({"error": "attempt_session_required"}, 409)
         return response(attempt_data(attempt, include_items=True, request=request))
 
 
@@ -182,7 +218,15 @@ def answer(request, attempt_id, position, exam_format="pbt"):
         finalize(attempt)
         if attempt.status != "in_progress":
             return response({"error": "attempt_closed", "attempt": attempt_data(attempt, request=request)}, 409)
-        item = get_object_or_404(AttemptItem, attempt=attempt, position=position)
+        if attempt.mode == "timed" and not same_timed_session(request, attempt):
+            return response({"error": "attempt_session_required"}, 409)
+        if not 1 <= position <= EXAM_FORMATS[exam_format]["question_count"]:
+            raise Http404
+        item = attempt.items.filter(position=position).first()
+        if item is None:
+            question = load_set(attempt.exam.source_set_id, attempt.section, exam_format)[position - 1]
+            item = AttemptItem(attempt=attempt, **question)
+            item.snapshot = {**item.snapshot, "_answerOnly": True}
         ordering = item.snapshot.get("answerMode") == "sentence_order"
         if ordering != ("selectedOrder" in data):
             return response({"error": "invalid_request"}, 400)
@@ -190,8 +234,13 @@ def answer(request, attempt_id, position, exam_format="pbt"):
             item.selected_order = data["selectedOrder"]
         else:
             item.selected_option = data["selectedOption"]
-        item.answered_at = timezone.now()
-        item.save(update_fields=["selected_order" if ordering else "selected_option", "answered_at"])
+        has_input = any(value is not None for value in item.selected_order) if ordering else item.selected_option is not None
+        if not has_input and item.snapshot.get("_answerOnly"):
+            if item.pk is not None:
+                item.delete()
+        else:
+            item.answered_at = timezone.now()
+            item.save()
         attempt.answered_count = sum(is_answered(row) for row in
             attempt.items.only("snapshot", "selected_option", "selected_order"))
         attempt.save(update_fields=["answered_count"])

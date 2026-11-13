@@ -79,3 +79,19 @@ test("IBT groups use snapshot IDs; ordinary repeated types stay separate", () =>
   const legacy = [{ position: 49, itemType: "paired_reading" }, { position: 50, itemType: "paired_reading" }];
   assert.deepEqual(api.questionGroup(legacy, legacy[1]), legacy);
 });
+
+test("timed answer writes include the current page session and exit uses keepalive with cached CSRF", async () => {
+  const calls = [];
+  globalThis.fetch = async (path, options) => {
+    calls.push({ path, options });
+    return path === "/api/csrf/" ? json({ csrfToken: "synthetic-exit" }) : json({ status: "submitted" });
+  };
+  await api.pbtRequest("attempts/test/answers/1/", "PUT", { selectedOption: 2 }, "ibt", "page-session");
+  assert.equal(calls[1].options.headers["X-Exam-Session"], "page-session");
+  api.submitOnPageExit("test", "ibt");
+  assert.equal(calls.length, 3);
+  assert.equal(calls[2].path, "/api/ibt/attempts/test/submit/");
+  assert.equal(calls[2].options.keepalive, true);
+  assert.equal(calls[2].options.credentials, "same-origin");
+  assert.equal(calls[2].options.headers["X-CSRFToken"], "synthetic-exit");
+});

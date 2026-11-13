@@ -27,6 +27,7 @@ class IbtTests(BankFixtures, TransactionTestCase):
             "examId": str((exam or self.ibt_exam).pk), "mode": mode,
         }, content_type="application/json")
         self.assertIn(result.status_code, (200, 201), result.content)
+        self.enter_timed(result.json(), client or self.client)
         return result.json()
 
     def test_catalog_separates_formats_counts_durations_and_guest_slots(self):
@@ -117,7 +118,9 @@ class IbtTests(BankFixtures, TransactionTestCase):
         self.client.force_login(self.user)
         data = self.start()
         attempt = Attempt.objects.get(pk=data["id"])
-        attempt.items.update(selected_option=2)
+        for position in range(1, 31):
+            self.assertEqual(self.client.put(f"/api/ibt/attempts/{attempt.pk}/answers/{position}/",
+                {"selectedOption": 2}, content_type="application/json").status_code, 200)
         self.assertEqual(self.client.post(f"/api/ibt/attempts/{attempt.pk}/submit/").json()["score"], 100)
         next_attempt = self.start()
         row = next(row for row in self.client.get("/api/ibt/exams/").json()["exams"] if row["id"] == str(self.ibt_exam.pk))
@@ -135,7 +138,9 @@ class IbtTests(BankFixtures, TransactionTestCase):
                 with self.subTest(member=member, mode=mode):
                     original = self.start(mode=mode, client=client)
                     old = Attempt.objects.get(pk=original["id"])
-                    old.items.filter(position__in=[1, 2]).update(selected_option=2)
+                    for position in (1, 2):
+                        self.assertEqual(client.put(f"/api/ibt/attempts/{old.pk}/answers/{position}/",
+                            {"selectedOption": 2}, content_type="application/json").status_code, 200)
                     payload = {"examId": str(self.ibt_exam.pk), "mode": mode, "restartAttemptId": original["id"]}
                     response = client.post("/api/ibt/attempts/", payload, content_type="application/json")
                     self.assertEqual(response.status_code, 201)
@@ -150,7 +155,7 @@ class IbtTests(BankFixtures, TransactionTestCase):
                         self.assertEqual(result.status_code, 403)
                     new = Attempt.objects.get(pk=response.json()["id"])
                     self.assertEqual(new.exam_format, "ibt")
-                    self.assertEqual(new.items.count(), 30)
+                    self.assertEqual(new.items.count(), 0)
                     self.assertFalse(new.items.filter(selected_option__isnull=False).exists())
                     if mode == "timed":
                         self.assertEqual((new.expires_at - new.started_at).total_seconds(), 2400)

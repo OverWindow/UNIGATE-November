@@ -44,6 +44,7 @@ class Attempt(models.Model):
     timed_out = models.BooleanField(default=False)
     score = models.PositiveSmallIntegerField(null=True)
     answered_count = models.PositiveSmallIntegerField(default=0)
+    timed_session_token_hash = models.CharField(max_length=64, blank=True, default="", editable=False)
 
     class Meta:
         db_table = "pbt_attempts"

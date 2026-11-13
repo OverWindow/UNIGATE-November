@@ -1,6 +1,8 @@
 from django.db.models import Q
 from django.utils import timezone
 
+from .bank import load_set
+from .formats import EXAM_FORMATS
 from .models import AttemptItem
 from .result_delivery import feedback_state, has_result_access
 from .sentence_order import choice_order, valid_selected_order
@@ -18,6 +20,19 @@ def is_answered(item):
     if item.snapshot.get("answerMode") == "sentence_order":
         return valid_selected_order(item.selected_order) and None not in item.selected_order
     return item.selected_option is not None
+
+
+def display_items(attempt):
+    items = list(attempt.items.all())
+    count = EXAM_FORMATS[attempt.exam_format]["question_count"]
+    # Legacy attempts keep their complete, unmarked snapshots.
+    if len(items) == count or any(not item.snapshot.get("_answerOnly") for item in items):
+        return items
+    saved = {item.position: item for item in items}
+    questions = load_set(attempt.exam.source_set_id, attempt.section, attempt.exam_format)
+    return [saved[q["position"]] if q["position"] in saved else AttemptItem(
+        attempt=attempt, is_correct=False if attempt.status == "submitted" else None, **q,
+    ) for q in questions]
 
 
 def finalize(attempt, force=False):
@@ -39,7 +54,8 @@ def finalize(attempt, force=False):
     attempt.score = sum(item.points for item in items if item.is_correct)
     if attempt.exam_format == "ibt":
         correct = sum(item.is_correct for item in items)
-        attempt.score = (correct * 100 + len(items) // 2) // len(items) if items else 0
+        count = EXAM_FORMATS[attempt.exam_format]["question_count"]
+        attempt.score = (correct * 100 + count // 2) // count
     attempt.save(update_fields=["status", "timed_out", "submitted_at", "score", "answered_count"])
 
 
@@ -59,8 +75,9 @@ def attempt_data(attempt, include_items=False, results=False, request=None):
         data["feedback"] = feedback_state(attempt)
     if include_items:
         data["items"] = []
-        for item in attempt.items.all():
+        for item in display_items(attempt):
             question = {**item.snapshot, "position": item.position, "selectedOption": item.selected_option}
+            question.pop("_answerOnly", None)
             if item.snapshot.get("answerMode") == "sentence_order":
                 # Keep the original multiple-choice permutations only in the server snapshot.
                 question.update(choices=[], passage="", selectedOrder=item.selected_order or [None] * 4)

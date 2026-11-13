@@ -53,6 +53,7 @@ class SentenceOrderTests(BankFixtures, TransactionTestCase):
         exam = self.ibt_exam if exam_format == "ibt" else self.exam
         result = self.client.post(f"/api/{exam_format}/attempts/", {"examId": str(exam.pk), "mode": mode}, content_type="application/json")
         self.assertEqual(result.status_code, 201, result.content)
+        self.enter_timed(result.json(), self.client)
         return f"/api/{exam_format}/attempts/{result.json()['id']}/"
 
     def save(self, path, value, position=13, client=None):
@@ -60,8 +61,11 @@ class SentenceOrderTests(BankFixtures, TransactionTestCase):
 
     def test_partial_restore_and_all_24_permutations_are_saved(self):
         path = self.start("ibt")
+        attempt = Attempt.objects.get(pk=path.split("/")[-2])
+        self.assertFalse(attempt.items.exists())
         partial = ["나", None, "가", None]
         self.assertEqual(self.save(path, {"selectedOrder": partial}).status_code, 200)
+        self.assertEqual(attempt.items.count(), 1)
         self.assertEqual(self.client.get(path).json()["answeredCount"], 0)
         item = self.client.get(path).json()["items"][12]
         self.assertEqual(item["selectedOrder"], partial)
@@ -79,6 +83,7 @@ class SentenceOrderTests(BankFixtures, TransactionTestCase):
         self.assertEqual(self.save(path, {"selectedOrder": [None] * 4}).status_code, 200)
         self.assertEqual(self.client.get(path).json()["items"][12]["selectedOrder"], [None] * 4)
         self.assertEqual(Attempt.objects.get(pk=path.split("/")[-2]).answered_count, 0)
+        self.assertFalse(attempt.items.exists())
 
     def test_pbt_sentence_order_keeps_choices_saves_resumes_and_grades(self):
         path = self.start("pbt")
@@ -155,8 +160,9 @@ class SentenceOrderTests(BankFixtures, TransactionTestCase):
 
     def test_expiry_grades_last_saved_order_and_legacy_stays_multiple_choice(self):
         path = self.start("ibt", mode="timed")
-        self.save(path, {"selectedOrder": CORRECT})
         attempt = Attempt.objects.get(pk=path.split("/")[-2])
+        self.store_legacy_items(attempt)
+        self.save(path, {"selectedOrder": CORRECT})
         legacy = attempt.items.get(position=14)
         legacy.snapshot.pop("answerMode")
         legacy.snapshot.pop("sentences")

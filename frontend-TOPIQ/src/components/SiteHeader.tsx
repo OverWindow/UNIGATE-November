@@ -19,7 +19,7 @@ export function Logo({ className = "" }: { className?: string }) {
   return <Image className={`topiq-logo ${className}`} src="/brand/topiq-logo.png" alt="TOPIQ" width={1945} height={808} sizes="112px" />;
 }
 
-export default function SiteHeader({ authHref }: { authHref?: string }) {
+export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: string; onBeforeLogout?: (logout: () => void) => void }) {
   const { language, setLanguage, user, status, refreshSession, logout } = useApp();
   const pathname = usePathname();
   const router = useRouter();
@@ -121,7 +121,7 @@ export default function SiteHeader({ authHref }: { authHref?: string }) {
                     setAccountOpen(!accountOpen); setLanguageOpen(false); setMenuOpen(false);
                   }}>{user.nickname}</button>
                 <div className="account-menu" id="account-menu" role="group" aria-labelledby="account-trigger" hidden={!accountOpen}>
-                  <button type="button" disabled={loggingOut} aria-busy={loggingOut} onClick={() => void handleLogout()}>{loggingOut ? a.submitting : a.logout}</button>
+                  <button type="button" disabled={loggingOut} aria-busy={loggingOut} onClick={() => onBeforeLogout ? onBeforeLogout(() => void handleLogout()) : void handleLogout()}>{loggingOut ? a.submitting : a.logout}</button>
                   {logoutError && <p className="account-menu-error" role="alert">{a.network}</p>}
                 </div>
               </div>

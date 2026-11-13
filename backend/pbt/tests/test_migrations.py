@@ -45,6 +45,38 @@ class ExamFormatMigrationTests(TransactionTestCase):
             display_order=1, guest_slot=1)
 
 
+class TimedSessionMigrationTests(TransactionTestCase):
+    def test_adds_empty_session_hash_without_closing_or_changing_existing_attempts(self):
+        before = [("pbt", "0007_attempt_answered_count")]
+        executor = MigrationExecutor(connection)
+        after = executor.loader.graph.leaf_nodes("pbt")
+        executor.migrate(before)
+        try:
+            apps = executor.loader.project_state(before).apps
+            Attempt = apps.get_model("pbt", "Attempt")
+            AttemptItem = apps.get_model("pbt", "AttemptItem")
+            for status in ("in_progress", "submitted"):
+                exam = apps.get_model("pbt", "Exam").objects.create(source_set_id=uuid.uuid4(),
+                    title="Existing timed exam", section="listening", display_order=1)
+                attempt = Attempt.objects.create(exam=exam, guest_id=uuid.uuid4(), title=exam.title,
+                    section="listening", mode="timed", status=status, started_at=timezone.now(),
+                    submitted_at=timezone.now() if status == "submitted" else None,
+                    score=2 if status == "submitted" else None, answered_count=1)
+                AttemptItem.objects.create(attempt=attempt, position=1, source_item_id=uuid.uuid4(),
+                    snapshot={"prompt": "Original"}, correct_answer=2, selected_option=2)
+            rows = list(Attempt.objects.order_by("pk").values())
+            items = list(AttemptItem.objects.order_by("pk").values())
+        finally:
+            executor = MigrationExecutor(connection)
+            executor.migrate(after)
+        apps = executor.loader.project_state(after).apps
+        current = list(apps.get_model("pbt", "Attempt").objects.order_by("pk").values())
+        for row in current:
+            self.assertEqual(row.pop("timed_session_token_hash"), "")
+        self.assertEqual(current, rows)
+        self.assertEqual(list(apps.get_model("pbt", "AttemptItem").objects.order_by("pk").values()), items)
+
+
 class AnsweredCountMigrationTests(TransactionTestCase):
     def test_backfill_batches_preserve_attempts_and_answers(self):
         old_target = [("pbt", "0006_attemptitem_selected_order")]

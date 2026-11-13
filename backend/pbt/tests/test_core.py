@@ -17,6 +17,18 @@ from ..models import Attempt, AttemptItem, Exam
 
 
 class BankFixtures:
+    def enter_timed(self, data, client):
+        if data["mode"] != "timed" or data["status"] != "in_progress":
+            return
+        token = client.defaults.setdefault("HTTP_X_EXAM_SESSION", str(uuid.uuid4()))
+        response = client.post(f"/api/{data['examFormat']}/attempts/{data['id']}/enter/",
+                              {"sessionToken": token}, content_type="application/json")
+        self.assertEqual(response.status_code, 200)
+
+    def store_legacy_items(self, attempt):
+        AttemptItem.objects.bulk_create([AttemptItem(attempt=attempt, **question) for question in
+            load_set(attempt.exam.source_set_id, attempt.section, attempt.exam_format)])
+
     def setUp(self):
         self.bank_models = (QuestionSet, Item, AudioAsset, ItemAudioBinding, VisualAsset)
         with connection.cursor() as cursor:
@@ -81,6 +93,7 @@ class PbtTests(BankFixtures, TransactionTestCase):
         client = client or self.client
         result = client.post("/api/pbt/attempts/", {"examId": str((exam or self.exam).pk), "mode": mode}, content_type="application/json")
         self.assertIn(result.status_code, (200, 201), result.content)
+        self.enter_timed(result.json(), client)
         return result.json()
 
     def test_answered_count_tracks_changes_clears_resume_and_submission(self):
@@ -102,7 +115,8 @@ class PbtTests(BankFixtures, TransactionTestCase):
                         self.assertEqual(response.status_code, 200)
                         self.assertEqual(Attempt.objects.get(pk=data["id"]).answered_count, expected)
                         self.assertEqual(client.get(path).json()["answeredCount"], expected)
-                    self.assertIsNotNone(AttemptItem.objects.get(attempt_id=data["id"], position=1).answered_at)
+                    self.assertFalse(AttemptItem.objects.filter(attempt_id=data["id"], position=1).exists())
+                    self.assertIsNotNone(AttemptItem.objects.get(attempt_id=data["id"], position=50).answered_at)
                     self.assertEqual(self.start(mode=mode, client=client)["answeredCount"], 1)
                     history = client.get("/api/pbt/attempts/").json()["attempts"]
                     self.assertEqual(next(row for row in history if row["id"] == data["id"])["answeredCount"], 1)
@@ -127,9 +141,7 @@ class PbtTests(BankFixtures, TransactionTestCase):
         self.assertEqual(response.status_code, 503)
         attempt = Attempt.objects.get(pk=data["id"])
         self.assertEqual(attempt.answered_count, 0)
-        item = attempt.items.get(position=1)
-        self.assertIsNone(item.selected_option)
-        self.assertIsNone(item.answered_at)
+        self.assertFalse(attempt.items.exists())
 
     def test_concurrent_answers_and_submission_keep_count_consistent(self):
         data = self.start()
@@ -186,7 +198,7 @@ class PbtTests(BankFixtures, TransactionTestCase):
     def test_practice_unlimited_and_timed_deadlines(self):
         practice = self.start()
         self.assertIsNone(practice["expiresAt"])
-        self.assertEqual(AttemptItem.objects.filter(attempt_id=practice["id"]).count(), 50)
+        self.assertEqual(AttemptItem.objects.filter(attempt_id=practice["id"]).count(), 0)
         for exam, seconds in ((self.exam, 4200), (self.listen_exam, None)):
             data = self.start(exam, "timed")
             attempt = Attempt.objects.get(pk=data["id"])
@@ -368,8 +380,9 @@ class PbtTests(BankFixtures, TransactionTestCase):
                 with self.subTest(member=member, mode=mode):
                     data = self.start(mode=mode, client=client)
                     old = Attempt.objects.get(pk=data["id"])
-                    old.items.filter(position=1).update(selected_option=2)
-                    old.items.filter(position=2).update(selected_option=1)
+                    for position, option in ((1, 2), (2, 1)):
+                        self.assertEqual(client.put(f"/api/pbt/attempts/{old.pk}/answers/{position}/",
+                            {"selectedOption": option}, content_type="application/json").status_code, 200)
                     old.started_at -= timedelta(minutes=5)
                     if old.expires_at:
                         old.expires_at -= timedelta(minutes=5)
@@ -387,10 +400,10 @@ class PbtTests(BankFixtures, TransactionTestCase):
                     self.assertIsNotNone(old.submitted_at)
                     self.assertEqual(old.items.get(position=1).selected_option, 2)
                     self.assertTrue(old.items.get(position=1).is_correct)
-                    self.assertFalse(old.items.get(position=3).is_correct)
+                    self.assertFalse(old.items.filter(position=3).exists())
                     self.assertEqual((new.status, new.score, new.user_id, new.guest_id),
                                      ("in_progress", None, old.user_id, old.guest_id))
-                    self.assertEqual(new.items.count(), 50)
+                    self.assertEqual(new.items.count(), 0)
                     self.assertFalse(new.items.filter(selected_option__isnull=False).exists())
                     if mode == "timed":
                         self.assertEqual((new.expires_at - new.started_at).total_seconds(), 4200)
@@ -455,12 +468,13 @@ class PbtTests(BankFixtures, TransactionTestCase):
     def test_restart_failures_preserve_existing_attempt_and_answers(self):
         original = self.start()
         old = Attempt.objects.get(pk=original["id"])
-        old.items.filter(position=1).update(selected_option=2)
+        self.assertEqual(self.client.put(f"/api/pbt/attempts/{old.pk}/answers/1/",
+            {"selectedOption": 2}, content_type="application/json").status_code, 200)
         payload = {"examId": str(self.exam.pk), "mode": "practice", "restartAttemptId": original["id"]}
         failures = (
             ("pbt.views.record_attempt", {"return_value": 60}, 429),
             ("pbt.views.load_set", {"side_effect": BankNotReady("synthetic")}, 409),
-            ("pbt.views.AttemptItem.objects.bulk_create", {"side_effect": DatabaseError("synthetic")}, 503),
+            ("pbt.views.Attempt.objects.create", {"side_effect": DatabaseError("synthetic")}, 503),
         )
         for target, options, status in failures:
             with self.subTest(target=target), patch(target, **options):
@@ -471,7 +485,7 @@ class PbtTests(BankFixtures, TransactionTestCase):
             self.assertEqual(old.items.get(position=1).selected_option, 2)
             self.assertIsNone(old.items.get(position=1).is_correct)
             self.assertEqual(Attempt.objects.count(), 1)
-            self.assertEqual(AttemptItem.objects.count(), 50)
+            self.assertEqual(AttemptItem.objects.count(), 1)
 
     def test_restart_validates_id_owner_set_mode_and_csrf(self):
         original = self.start()
