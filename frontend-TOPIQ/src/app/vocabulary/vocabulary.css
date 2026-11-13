@@ -93,9 +93,7 @@
 .vocabulary-dictionary-entry h4 span { margin-left: 6px; font-size: 12px; font-weight: 400; color: #64748b; }
 .vocabulary-dictionary-entry ol { padding-left: 20px; margin: 12px 0; list-style: decimal; }
 .vocabulary-dictionary-entry li + li { margin-top: 16px; }
-.vocabulary-dictionary-entry a, .vocabulary-dictionary-popup footer a { color: #214fa7; text-decoration: underline; }
 .vocabulary-dictionary-note { color: #64748b; }
-.vocabulary-dictionary-popup footer { display: grid; gap: 4px; margin-top: 20px; padding-top: 12px; border-top: 1px solid #e6edf6; color: #64748b; font-size: 11px; }
 .vocabulary-card-navigation { display: flex; justify-content: space-between; gap: 16px; margin-top: 20px; }
 .vocabulary-end { margin-top: 24px; color: var(--color-muted); font-size: 13px; text-align: center; line-height: 1.8; }
 .vocabulary-end button { border: 0; background: transparent; color: #2d5ec5; text-decoration: underline; margin-left: 8px; }

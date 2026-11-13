@@ -88,12 +88,8 @@ function MeaningPopup({ wordId, version, selection, meaningLanguage, close, relo
           {sense.translatedDefinition ? <p lang={meaningLanguage}>{sense.translatedDefinition}</p>
             : !sense.translation && <p className="vocabulary-dictionary-note">{t.dictionaryMissingTranslation}</p>}
         </li>)}</ol>
-        <a href={entry.sourceUrl} target="_blank" rel="noopener noreferrer">{t.dictionaryOriginal}</a>
       </section>)}
     </div>}
-    <footer><span>{t.dictionarySource}</span>
-      <a href="https://creativecommons.org/licenses/by-sa/2.0/kr/" target="_blank" rel="noopener noreferrer">{t.dictionaryLicense}</a>
-    </footer>
   </div>, document.body);
 }
 

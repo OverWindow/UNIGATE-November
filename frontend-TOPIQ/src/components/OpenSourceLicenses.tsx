@@ -14,7 +14,7 @@ const content = {
     mecab: "mecab-ko-dic — Eunjeon project, Yongwoon Lee, Yungho Yu 및 기여자. Apache-2.0.",
     nikl: "한국어기초사전 — 국립국어원. 우리말샘 — 국립국어원 및 원문에 표시된 기여자. CC BY-SA 2.0 KR.",
     changes: "Garu의 사전 데이터 선별·정규화와 변경 내역, 출처별 기록은 아래 models/NOTICE.md 및 bulk-provenance.json에 보존되어 있습니다. 해당 CC 데이터의 변경물을 배포할 때에는 동일조건변경허락 조건이 적용됩니다.",
-    dictionary: "예문 단어 뜻은 국립국어원 한국어기초사전의 내려받기 자료를 바탕으로 제공합니다. 자료를 뜻풀이별로 정리하고 표제어의 유니코드와 앞뒤 공백을 정규화했습니다. 사전 결과에도 출처 링크와 CC BY-SA 2.0 KR 이용조건을 표시합니다.",
+    dictionary: "예문 단어 뜻은 국립국어원 한국어기초사전의 내려받기 자료를 바탕으로 제공합니다. 자료를 뜻풀이별로 정리하고 표제어의 유니코드와 앞뒤 공백을 정규화했습니다.",
     terms: "CC BY-SA 2.0 KR 이용조건", libraries: "소프트웨어", more: "포함된 고지 보기",
   },
   en: {
@@ -25,7 +25,7 @@ const content = {
     mecab: "mecab-ko-dic — Eunjeon project, Yongwoon Lee, Yungho Yu and contributors. Apache-2.0.",
     nikl: "Korean Basic Dictionary — National Institute of Korean Language. Urimalsaem — National Institute of Korean Language and contributors credited by the source. CC BY-SA 2.0 KR.",
     changes: "Garu's selection, normalization, modifications and source records are preserved in models/NOTICE.md and bulk-provenance.json below. Distributed adaptations of the CC-licensed data are subject to ShareAlike.",
-    dictionary: "Example-word definitions use downloaded Korean Basic Dictionary data from the National Institute of Korean Language, organized by sense with normalized headword Unicode and trimmed whitespace. Results display attribution, source links and CC BY-SA 2.0 KR terms.",
+    dictionary: "Example-word definitions use downloaded Korean Basic Dictionary data from the National Institute of Korean Language, organized by sense with normalized headword Unicode and trimmed whitespace.",
     terms: "CC BY-SA 2.0 KR terms", libraries: "Software", more: "View bundled notices",
   },
   id: {
@@ -36,7 +36,7 @@ const content = {
     mecab: "mecab-ko-dic — Eunjeon project, Yongwoon Lee, Yungho Yu dan kontributor. Apache-2.0.",
     nikl: "Korean Basic Dictionary — National Institute of Korean Language. Urimalsaem — National Institute of Korean Language dan kontributor yang tercantum pada sumber. CC BY-SA 2.0 KR.",
     changes: "Pemilihan, normalisasi, perubahan, dan catatan sumber data Garu disimpan dalam models/NOTICE.md serta bulk-provenance.json di bawah. Adaptasi data berlisensi CC yang dibagikan wajib mengikuti ketentuan BerbagiSerupa.",
-    dictionary: "Arti kata dalam contoh berasal dari data unduhan Korean Basic Dictionary milik National Institute of Korean Language, disusun per makna dengan normalisasi Unicode kata utama dan penghapusan spasi di awal dan akhir. Hasil menampilkan atribusi, tautan sumber, dan ketentuan CC BY-SA 2.0 KR.",
+    dictionary: "Arti kata dalam contoh berasal dari data unduhan Korean Basic Dictionary milik National Institute of Korean Language, disusun per makna dengan normalisasi Unicode kata utama dan penghapusan spasi di awal dan akhir.",
     terms: "Ketentuan CC BY-SA 2.0 KR", libraries: "Perangkat lunak", more: "Lihat pemberitahuan komponen",
   },
 };
