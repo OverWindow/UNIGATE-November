@@ -357,6 +357,26 @@ class SurveyContractTests(SimpleTestCase):
             self.assertIn(f"/ibt/attempts/{attempt.pk}/result#token=token%2F%26", body["textContent"])
             self.assertIn("&lt;Synthetic&gt;", body["htmlContent"])
             self.assertNotIn("<Synthetic>", body["htmlContent"])
-            details = {"ko": "IBT · 듣기 · 실전", "en": "IBT · Listening · Timed", "id": "IBT · Menyimak · Simulasi"}[language]
+            details = {"ko": "실전", "en": "Timed", "id": "Simulasi"}[language]
             self.assertIn(details, body["textContent"])
             self.assertIn(details, body["htmlContent"])
+
+    def test_korean_result_email_copy_and_exam_labels(self):
+        for section, mode, expected_title, expected_mode in (
+            ("reading", "practice", "TOPIK II PBT 읽기 모의고사 1회", "연습"),
+            ("listening", "timed", "TOPIK II PBT 듣기 모의고사 2회", "실전"),
+        ):
+            with self.subTest(section=section, mode=mode):
+                number = 1 if section == "reading" else 2
+                attempt = Attempt(id=uuid.uuid4(), exam_format="pbt", title=f"TOPIK II PBT {number}",
+                                  section=section, mode=mode)
+                body = build_result_email(attempt, "token", "ko")
+                for content in (body["textContent"], body["htmlContent"]):
+                    self.assertIn(expected_title, content)
+                    self.assertIn(expected_mode, content)
+                    self.assertIn("점수와 문항별 정답·해설을 확인하고 다음 학습을 이어가 보세요.", content)
+                    self.assertNotIn("오늘의 학습을 돌아볼 시간이에요.", content)
+                    self.assertNotIn("모의고사 결과 안내", content)
+                    self.assertNotIn("한국어 학습의 다음 단계", content)
+                    self.assertNotIn("PBT ·", content)
+                self.assertNotIn('height="6"', body["htmlContent"])

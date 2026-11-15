@@ -216,13 +216,13 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
       </div>}
       {attempt && <>
         {review ? <section className="pbt-result-summary">
-          <div><p className="eyebrow">{attempt.title} · {t[attempt.section]} · {t[attempt.mode]}</p><h1>{t.complete}</h1>{attempt.timedOut && <p>{t.timedOut}</p>}</div>
+          <div><h1>{language === "ko" ? attempt.title.replace(/ (\d+)$/, ` ${t[attempt.section]} 모의고사 $1회`) : attempt.title}</h1>{attempt.timedOut && <p>{t.timedOut}</p>}</div>
           <div className="pbt-score"><span>{t.score}</span><strong>{attempt.score}<small> / {attempt.maxScore}</small></strong><span>{t.correct} {attempt.items.length - wrong.length} / {attempt.items.length}</span></div>
         </section> : <>
           <div className="pbt-exam-toolbar"><div className="pbt-exam-width pbt-exam-toolbar-inner">
             <Link className="pbt-exam-back" href={basePath} onClick={event => { if (busy || submitting) event.preventDefault(); }}><ArrowLeft size={14} aria-hidden="true" /> {t.back}</Link>
             <h1>{language === "ko" ? attempt.title.replace(/ (\d+)$/, " 모의고사 $1회") : attempt.title}</h1>
-            {isListening ? <span className="ibt-timing-label">{timedListening ? listeningCopy[language].estimatedDuration[examFormat] : t.unlimited}</span> : <div className={`pbt-timer ${remaining !== null && remaining < 300 ? "is-urgent" : ""}`} role="timer" aria-label={remaining === null ? t.unlimited : `${t.remainingTime} ${clockText(remaining)}`} title={attempt.mode === "timed" ? t.timeHint : t.practiceHint}>
+            {isListening ? <span className="ibt-timing-label">{timedListening ? listeningCopy[language].estimatedDuration[examFormat] : t.unlimited}</span> : <div className={`pbt-timer ${remaining !== null && remaining < 300 ? "is-urgent" : ""}`} role="timer" aria-label={remaining === null ? t.unlimited : `${t.remainingTime} ${clockText(remaining)}`} title={attempt.mode === "timed" ? undefined : t.practiceHint}>
               {remaining !== null && <small>{t.remainingTime}</small>}<span>{remaining === null ? t.unlimited : clockText(remaining)}</span>
             </div>}
           </div></div>
@@ -280,7 +280,7 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
           {attempt?.items.map(item => <button key={item.position} className={isAnswered(item) ? "is-answered" : ""} aria-current={group.some(q => q.position === item.position) ? "step" : undefined} aria-label={`${item.position}: ${isAnswered(item) ? `${t.yourAnswer} ${answerText(item)}` : t.noAnswer}`} disabled={busy || submitting || audioPlaying} onClick={() => go(item.position)}>{item.position}</button>)}
         </div>
         <div className="pbt-navigator-legend"><span><i className="is-current" />{t.currentQuestion}</span><span><i className="is-answered" />{t.answered}</span><span><i />{t.noAnswer}</span></div>
-        <p className="pbt-muted">{attempt?.mode === "timed" ? t.timeHint : t.saveHint}</p>
+        {attempt?.mode !== "timed" && <p className="pbt-muted">{t.saveHint}</p>}
         <div className="pbt-dialog-actions"><button className="button button-primary" disabled={disabled} onClick={() => setDialog("submit")}>{t.submit}</button></div>
       </> : dialog === "exit" ? <>
         <p>{t.exitWarning}</p>

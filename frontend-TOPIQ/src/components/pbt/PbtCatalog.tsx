@@ -81,7 +81,6 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
           <span className="pbt-radio" /><span><strong>{t[value]}</strong><small>{value === "practice" ? t.practiceHint : timedHint}</small></span>
         </button>)}
       </div>
-      {mode === "timed" && <p className="pbt-muted">{t.timeHint}</p>}
       {(error || status === "error") ? <div role="alert" className="pbt-alert">{pbtErrorMessage(error, t)} <button onClick={retry}>{t.retry}</button></div> : null}
       {loading || status === "loading" ? <p role="status">{t.loading}</p> : <div className="pbt-exam-grid">
         {exams.filter(exam => exam.section === section).map(exam => {
