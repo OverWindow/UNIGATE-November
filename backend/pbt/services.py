@@ -1,7 +1,8 @@
+from django.db import DatabaseError, transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from .bank import load_set
+from .bank import BankNotReady, load_set
 from .formats import EXAM_FORMATS
 from .models import AttemptItem
 from .result_delivery import feedback_state, has_result_access
@@ -25,14 +26,36 @@ def is_answered(item):
 def display_items(attempt):
     items = list(attempt.items.all())
     count = EXAM_FORMATS[attempt.exam_format]["question_count"]
-    # Legacy attempts keep their complete, unmarked snapshots.
+    refresh_banners = attempt.exam_format == "ibt" and attempt.section == "reading"
     if len(items) == count or any(not item.snapshot.get("_answerOnly") for item in items):
-        return items
-    saved = {item.position: item for item in items}
-    questions = load_set(attempt.exam.source_set_id, attempt.section, attempt.exam_format)
-    return [saved[q["position"]] if q["position"] in saved else AttemptItem(
-        attempt=attempt, is_correct=False if attempt.status == "submitted" else None, **q,
-    ) for q in questions]
+        if not refresh_banners:
+            return items
+        # Image refresh is optional for attempts with complete stored content.
+        try:
+            with transaction.atomic():
+                questions = load_set(attempt.exam.source_set_id, attempt.section, attempt.exam_format)
+        except (BankNotReady, DatabaseError):
+            return items
+    else:
+        saved = {item.position: item for item in items}
+        questions = load_set(attempt.exam.source_set_id, attempt.section, attempt.exam_format)
+        items = [saved[q["position"]] if q["position"] in saved else AttemptItem(
+            attempt=attempt, is_correct=False if attempt.status == "submitted" else None, **q,
+        ) for q in questions]
+    if refresh_banners:
+        current = {q["position"]: q for q in questions}
+        for item in items:
+            if item.pk is None or item.position not in (4, 5, 6, 7):
+                continue
+            question = current[item.position]
+            ignored = {"materialUrl", "_answerOnly"}
+            if (item.source_item_id == question["source_item_id"]
+                    and item.correct_answer == question["correct_answer"]
+                    and {k: v for k, v in item.snapshot.items() if k not in ignored}
+                    == {k: v for k, v in question["snapshot"].items() if k not in ignored}):
+                # Only the response uses the new image; never save over the snapshot.
+                item.snapshot = {**item.snapshot, "materialUrl": question["snapshot"]["materialUrl"]}
+    return items
 
 
 def finalize(attempt, force=False):
