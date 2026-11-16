@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, CreditCard, Globe, LogOut, Menu, UserRound, X } from "lucide-react";
 import { useApp } from "@/app/providers";
 import { authContent } from "@/lib/auth-content";
+import { creditsContent } from "@/lib/credits-content";
 import { landingContent, type Language } from "@/lib/landing-content";
 
 const languages: { code: Language; name: string }[] = [
@@ -20,7 +21,7 @@ export function Logo({ className = "" }: { className?: string }) {
 }
 
 export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: string; onBeforeLogout?: (logout: () => void) => void }) {
-  const { language, setLanguage, user, status, refreshSession, logout } = useApp();
+  const { language, setLanguage, user, status, refreshSession, creditBalance, refreshCredits, logout } = useApp();
   const pathname = usePathname();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -38,6 +39,15 @@ export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: st
   const isAuthPage = ["/login", "/signup", "/verify-email"].includes(pathname);
   const loginHref = authHref || (isAuthPage
     ? "/login" : `/login?next=${encodeURIComponent(pathname)}`);
+
+  useEffect(() => {
+    if (status !== "authenticated" || !user) return;
+    const controller = new AbortController();
+    const refresh = () => { void refreshCredits(controller.signal).catch(() => {}); };
+    refresh();
+    window.addEventListener("focus", refresh);
+    return () => { controller.abort(); window.removeEventListener("focus", refresh); };
+  }, [status, user?.id, pathname, refreshCredits]);
 
   useEffect(() => {
     if (!languageOpen && !accountOpen) return;
@@ -123,6 +133,9 @@ export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: st
                   <span>{user.nickname}</span>
                   <ChevronDown className="account-chevron" size={16} strokeWidth={1.7} aria-hidden="true" />
                 </button>
+                <p className="account-credit" title={creditsContent[language].available} aria-live="polite">
+                  {creditBalance?.available.toLocaleString(language) ?? "—"} {a.credits}
+                </p>
                 <div className="account-menu" id="account-menu" role="group" aria-labelledby="account-trigger" hidden={!accountOpen}>
                   <div className="account-profile">
                     <span className="account-avatar" aria-hidden="true"><UserRound size={21} strokeWidth={1.6} /></span>

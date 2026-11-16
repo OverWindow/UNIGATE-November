@@ -43,9 +43,9 @@ export default function WritingStudy({ id }: { id: string }) {
     }
   }, [index]);
 
-  function move(next: number) {
+  function move(next: number, focusQuestion = false) {
     if (next === index || !data || next < 0 || next >= data.questions.length) return;
-    pendingFocus.current = true;
+    pendingFocus.current = focusQuestion;
     setIndex(next);
   }
 
@@ -56,7 +56,7 @@ export default function WritingStudy({ id }: { id: string }) {
       <button className="button writing-secondary" onClick={() => setRevision(value => value + 1)}>{t.retry}</button>
     </div> : !data || !question ? <p className="writing-status" role="status">{t.loading}</p> : <>
       <div className="writing-study-heading"><h1>{t.set} {data.number}</h1><p>{t.questions}</p></div>
-      <nav className="writing-question-nav" aria-label={t.navigation}>
+      <nav className="writing-question-nav" aria-label={t.navigation} data-question={question.number}>
         {data.questions.map((entry, position) => <button type="button" key={entry.number}
           aria-current={position === index ? "step" : undefined} onClick={() => move(position)}>
           <strong>{entry.number}</strong><span>{t.types[entry.number]}</span>
@@ -71,7 +71,9 @@ export default function WritingStudy({ id }: { id: string }) {
             {question.contextTitle && <h3>{question.contextTitle}</h3>}
             <p>{question.passage}</p>
           </div>}
-          {question.materials.length > 0 && <div className="writing-materials">{question.materials.map((material, position) =>
+          {question.number === 53 && question.imageUrl
+            ? <img className="writing-material-image" src={question.imageUrl} alt={`${question.topic} 자료`} />
+            : question.materials.length > 0 && <div className="writing-materials">{question.materials.map((material, position) =>
             <WritingMaterial key={`${question.number}-${position}`} material={material} language={language} />)}</div>}
           {question.materialNotes.length > 0 && <ul className="writing-notes">{question.materialNotes.map((note, position) => <li key={position}>{note}</li>)}</ul>}
           {question.dataSource && <p className="writing-source"><span lang={language}>{t.source}: </span>{question.dataSource}</p>}
@@ -81,8 +83,8 @@ export default function WritingStudy({ id }: { id: string }) {
       <WritingAnswer key={question.number} setId={id} slot={question.number} draft={drafts[question.number] ?? {}}
         onChange={answer => setDrafts(previous => ({ ...previous, [question.number]: answer }))} />
       <div className="writing-pager">
-        <button className="button writing-secondary" disabled={index === 0} onClick={() => move(index - 1)}><ArrowLeft size={16} aria-hidden="true" />{t.previous}</button>
-        {index < data.questions.length - 1 && <button className="button button-primary" onClick={() => move(index + 1)}>{t.next}<ArrowRight size={16} aria-hidden="true" /></button>}
+        <button className="button writing-secondary" disabled={index === 0} onClick={() => move(index - 1, true)}><ArrowLeft size={16} aria-hidden="true" />{t.previous}</button>
+        {index < data.questions.length - 1 && <button className="button button-primary" onClick={() => move(index + 1, true)}>{t.next}<ArrowRight size={16} aria-hidden="true" /></button>}
       </div>
       <p className="writing-notice">{t.notice}</p>
     </>}

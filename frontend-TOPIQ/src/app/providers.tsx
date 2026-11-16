@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { getSession, signIn, signOut, signUp, type AuthUser, type SignupInput } from "@/lib/auth-api";
+import { creditsRequest, type CreditBalance } from "@/lib/writing-api";
 import type { Language } from "@/lib/landing-content";
 
 interface AppContextValue {
@@ -10,6 +11,8 @@ interface AppContextValue {
   user: AuthUser | null;
   status: "loading" | "anonymous" | "authenticated" | "error";
   refreshSession: () => Promise<void>;
+  creditBalance: CreditBalance | null;
+  refreshCredits: (signal: AbortSignal) => Promise<CreditBalance>;
   login: (email: string, password: string) => Promise<void>;
   signup: (input: SignupInput) => Promise<void>;
   logout: () => Promise<void>;
@@ -21,12 +24,24 @@ export default function Providers({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<Language>("ko");
   const [user, setUser] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState<AppContextValue["status"]>("loading");
+  const [creditBalance, setCreditBalance] = useState<CreditBalance | null>(null);
   const generation = useRef(0);
+  const creditRequest = useRef(0);
 
   useEffect(() => { document.documentElement.lang = language; }, [language]);
 
+  const refreshCredits = useCallback(async (signal: AbortSignal) => {
+    const session = generation.current;
+    const request = ++creditRequest.current;
+    const balance = await creditsRequest<CreditBalance>("", signal);
+    // Ignore responses from an older session or an earlier balance request.
+    if (!signal.aborted && session === generation.current && request === creditRequest.current) setCreditBalance(balance);
+    return balance;
+  }, []);
+
   const refreshSession = useCallback(async () => {
     const current = ++generation.current;
+    setCreditBalance(null);
     setStatus("loading");
     try {
       const next = await getSession();
@@ -46,24 +61,25 @@ export default function Providers({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const current = ++generation.current;
     const next = await signIn(email, password);
-    if (current === generation.current) { setUser(next); setStatus("authenticated"); }
+    if (current === generation.current) { setCreditBalance(null); setUser(next); setStatus("authenticated"); }
   }, []);
 
   const signup = useCallback(async (input: SignupInput) => {
     const current = ++generation.current;
     const next = await signUp(input);
-    if (current === generation.current) { setUser(next); setStatus("authenticated"); }
+    if (current === generation.current) { setCreditBalance(null); setUser(next); setStatus("authenticated"); }
   }, []);
 
   const logout = useCallback(async () => {
     ++generation.current;
     await signOut();
+    setCreditBalance(null);
     setUser(null);
     setStatus("anonymous");
   }, []);
 
-  const value = useMemo(() => ({ language, setLanguage, user, status, refreshSession, login, signup, logout }),
-    [language, user, status, refreshSession, login, signup, logout]);
+  const value = useMemo(() => ({ language, setLanguage, user, status, refreshSession, creditBalance, refreshCredits, login, signup, logout }),
+    [language, user, status, refreshSession, creditBalance, refreshCredits, login, signup, logout]);
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 

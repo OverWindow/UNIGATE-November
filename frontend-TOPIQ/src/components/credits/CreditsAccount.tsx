@@ -28,7 +28,7 @@ interface WalletData {
 }
 
 function CreditWallet() {
-  const { language, refreshSession } = useApp();
+  const { language, refreshSession, refreshCredits } = useApp();
   const t = creditsContent[language];
   const [page, setPage] = useState(1);
   const [revision, setRevision] = useState(0);
@@ -41,7 +41,7 @@ function CreditWallet() {
     async function load() {
       try {
         // Read the ledger after the balance endpoint has released expired reservations.
-        const balance = await creditsRequest<CreditBalance>("", controller.signal);
+        const balance = await refreshCredits(controller.signal);
         const history = await creditsRequest<{ transactions: CreditEntry[]; nextPage: number | null }>(`transactions/?page=${page}`, controller.signal);
         if (!controller.signal.aborted) setData({ page, balance, ...history });
       } catch (cause) {
@@ -52,7 +52,7 @@ function CreditWallet() {
     }
     void load();
     return () => controller.abort();
-  }, [page, revision, refreshSession]);
+  }, [page, revision, refreshSession, refreshCredits]);
 
   const current = data?.page === page ? data : null;
   const number = (value: number) => value.toLocaleString(language);

@@ -30,12 +30,28 @@ class WritingPromptTests(SimpleTestCase):
         source.update(answer="hidden", provider="hidden", explanation="hidden")
         source["materials"][0]["answer"] = "hidden"
         source["materials"][0]["series"][0]["secret"] = "hidden"
+        source["image"] = {"storage_url": "https://example.invalid/writing/53.png", "storage_bucket": "hidden"}
         original = copy.deepcopy(source)
         result = question(WritingQuestion(type_slot=53, content_json=source))
         self.assertEqual(source, original)
         self.assertEqual(result["materials"][0]["series"], [{"label": "비율", "values": [20, 40]}])
         self.assertNotIn("hidden", str(result))
         self.assertNotIn("source_generated_id", result)
+        self.assertEqual(result["imageUrl"], source["image"]["storage_url"])
+
+    def test_missing_or_invalid_image_keeps_structured_materials(self):
+        for image in (None, "invalid", {}, {"storage_url": None}, {"storage_url": "javascript:alert(1)"},
+                      {"storage_url": "https://user:password@example.invalid/53.png"}):
+            with self.subTest(image=image):
+                result = question(WritingQuestion(type_slot=53, content_json=prompt(53) | {"image": image}))
+                self.assertEqual(result["imageUrl"], "")
+                self.assertTrue(result["materials"])
+
+    def test_images_are_only_exposed_for_question_53(self):
+        for slot in (51, 52, 54):
+            with self.subTest(slot=slot):
+                source = prompt(slot) | {"image": {"storage_url": "https://example.invalid/writing/53.png"}}
+                self.assertEqual(question(WritingQuestion(type_slot=slot, content_json=source))["imageUrl"], "")
 
     def test_missing_or_mismatched_prompt_is_unavailable(self):
         for slot, changes in [(51, {"instruction": ""}), (52, {"passage": ""}),

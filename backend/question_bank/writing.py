@@ -8,6 +8,8 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 from django.utils.cache import patch_vary_headers
 
+from pbt.bank import media_url
+
 from .models import WritingQuestion, WritingSet
 
 
@@ -98,6 +100,7 @@ def question(item):
     materials = source.get("materials", [])
     if not isinstance(materials, list):
         raise WritingUnavailable
+    image = source.get("image")
     # Expose only prompt fields, even if answers or generation metadata are added upstream.
     result = {
         "number": item.type_slot, "instruction": text(source.get("instruction")),
@@ -107,6 +110,7 @@ def question(item):
         "materials": [material(value) for value in materials],
         "materialNotes": text_list(source.get("material_notes", [])),
         "dataSource": text(source.get("data_source", "")),
+        "imageUrl": media_url(image.get("storage_url")) if item.type_slot == 53 and isinstance(image, dict) else "",
     }
     if (not result["instruction"].strip()
             or (item.type_slot in (51, 52, 54) and not result["passage"].strip())

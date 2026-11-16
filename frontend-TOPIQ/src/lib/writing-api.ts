@@ -6,6 +6,7 @@ export interface WritingMaterial {
 export interface WritingQuestion {
   number: number; instruction: string; topic: string; passage: string; contextTitle: string;
   requirements: string[]; materials: WritingMaterial[]; materialNotes: string[]; dataSource: string;
+  imageUrl: string;
 }
 export interface WritingDetail extends WritingSet { questions: WritingQuestion[] }
 
@@ -47,7 +48,7 @@ export interface Evaluation {
   totalScore: number | null; maxScore: number; creditCost: number; chargedCredits: number;
   createdAt: string; completedAt: string | null; error: string;
   answer?: LearnerAnswer;
-  question?: { instruction: string; passage: string; topic: string; context_title: string; materials: WritingMaterial[]; material_notes: string[]; requirements: string[]; data_source: string };
+  question?: { instruction: string; passage: string; topic: string; context_title: string; materials: WritingMaterial[]; material_notes: string[]; requirements: string[]; data_source: string; image_url?: string };
   result?: {
     scores: Record<string, { score: number; rationale: string; quotes: string[] }>;
     task_checks: { requirement_id: string; status: string; reason: string; quotes: string[] }[];

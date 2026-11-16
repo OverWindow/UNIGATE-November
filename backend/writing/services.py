@@ -68,6 +68,9 @@ def submit(*, user_id, evaluation_id, set_id, slot, answer, price_version):
     except ValueError:
         raise EvaluationError("question_unavailable", 503) from None
     local = empty_response(request)
+    snapshot = source.copy()
+    if display["imageUrl"]:
+        snapshot["image_url"] = display["imageUrl"]
     config = config_data()
     cost = config["prices"][str(slot)]
     if not config["enabled"] or cost is None:
@@ -89,7 +92,7 @@ def submit(*, user_id, evaluation_id, set_id, slot, answer, price_version):
             raise EvaluationError("insufficient_credits", 409)
         entry = Evaluation.objects.create(
             id=evaluation_id, user_id=user_id, set_id=set_id, type_slot=slot, submission_hash=submission_hash,
-            question_snapshot=source, answer=answer, request_hash=request.request_id,
+            question_snapshot=snapshot, answer=answer, request_hash=request.request_id,
             prompt_version=digest({"system": request.system, "rubric": request.payload["rubric"],
                                    "notes": "", "schema": request.payload["output_schema"]}),
             requested_model=settings.WRITING_EVALUATION_MODEL, model_options=options,

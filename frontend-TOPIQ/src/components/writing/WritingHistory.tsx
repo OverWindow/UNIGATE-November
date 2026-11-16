@@ -9,7 +9,7 @@ import { writingContent } from "@/lib/writing-content";
 import WritingResult from "./WritingResult";
 
 export default function WritingHistory({ id }: { id?: string }) {
-  const { language, refreshSession } = useApp();
+  const { language, refreshSession, refreshCredits } = useApp();
   const t = evaluationContent[language];
   const [page, setPage] = useState(1);
   const [creditPage, setCreditPage] = useState(1);
@@ -26,7 +26,7 @@ export default function WritingHistory({ id }: { id?: string }) {
     setError(""); setDetail(null); setEntries(null); setTransactions(null);
     async function load() {
       try {
-        const wallet = await creditsRequest<CreditBalance>("", controller.signal);
+        const wallet = await refreshCredits(controller.signal);
         if (controller.signal.aborted) return;
         setBalance(wallet);
         if (id) {
@@ -52,7 +52,7 @@ export default function WritingHistory({ id }: { id?: string }) {
     }
     void load();
     return () => { controller.abort(); clearTimeout(timer); };
-  }, [id, page, creditPage, revision, refreshSession]);
+  }, [id, page, creditPage, revision, refreshSession, refreshCredits]);
 
   const date = (value: string) => new Date(value).toLocaleString(language);
   return <div className="page-container writing-study writing-history">

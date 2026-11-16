@@ -142,6 +142,23 @@ class EvaluationTests(TransactionTestCase):
         self.assertEqual((wallet.balance, wallet.reserved), (10, 0))
         self.assertEqual(CreditTransaction.objects.filter(kind="release").count(), 2)
 
+    def test_question_image_is_saved_without_changing_grading_input(self):
+        inputs = fixture(53, "input")
+        image_url = "https://example.invalid/writing/53.png"
+        source = inputs["question"] | {"image": {"storage_url": image_url, "storage_bucket": "hidden"}}
+        self.questions.return_value.first.return_value = SimpleNamespace(type_slot=53, content_json=source)
+        response = self.post(self.payload(typeSlot=53, answer=inputs["answer"]))
+        self.assertEqual(response.status_code, 201, response.content)
+        entry = Evaluation.objects.get()
+        self.assertEqual(entry.status, "succeeded")
+        self.assertEqual(entry.question_snapshot["image_url"], image_url)
+        self.assertEqual(response.json()["question"]["image_url"], image_url)
+        self.assertEqual(self.client.get(f"/api/writing/evaluations/{entry.pk}/").json()["question"]["image_url"], image_url)
+        self.assertNotIn("image", entry.question_snapshot)
+        request = self.provider.call_args.args[0]
+        expected = build_request(f"writing:{self.set_id}:53", inputs["question"], inputs["answer"])
+        self.assertEqual(request, expected)
+
     def test_empty_answer_is_free_and_does_not_call_provider(self):
         response = self.post(self.payload(answer={"a": " \r\n", "b": "\t"}))
         self.assertEqual(response.status_code, 201, response.content)
