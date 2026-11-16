@@ -15,7 +15,7 @@ AI 평가는 학습용 참고 결과이며 공식 TOPIK 성적이 아닙니다.
 Hub 소유의 `topik_bank.writing_sets`, `topik_bank.writing_questions`는 읽기 전용으로 재사용합니다.
 PBT 51~54번이 모두 있는 세트만 표시하며, 막대·선 그래프와 표 자료를 지원합니다.
 평가 입력은 서버가 조회한 문제 표시 필드만 사용하고 참고답안·생성 메타데이터는 전송하지 않습니다.
-문항 형식은 `writing-evaluation-v2`의 표준 발문·빈칸·자료·요구 사항 규칙으로 검증합니다.
+문항 형식은 `backend/writing/`에 편입한 v2 평가 계약의 표준 발문·빈칸·자료·요구 사항 규칙으로 검증합니다.
 호환되지 않는 문항은 `question_unavailable`로 거절하고 크레딧을 예약하지 않습니다.
 
 ### 평가와 크레딧
@@ -128,8 +128,10 @@ Django가 테스트 DB를 생성·마이그레이션·삭제하며 서비스 DB�
 채점 계약·빈칸 치환·응답 검증, 로그인/CSRF/소유권, 중복 접수·예약 중 잔액 검사·전역 동시 한도,
 결과 저장 실패 시 차감 롤백·만료 복구·늦은 응답 거부·관리자 지급 중복 방지를 확인합니다.
 `frontend-TOPIQ/`에서 `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`로 UI/API와 빌드를 검사합니다.
-원본 전달본 검사는 저장소 루트에서 `backend\.venv\Scripts\python.exe -B backend/writing-evaluation-v2/verify.py`로 실행합니다.
-이 명령은 파일·예시만 검사하며 DB/네트워크를 사용하지 않습니다. 전달본은 유지하고 운영 코드는 `backend/writing/`에 편입했습니다.
+평가 예제는 `backend/writing/tests/fixtures/`의 51·52·53·54·empty-51·empty-53 폴더에 보관합니다.
+각 폴더의 `input.json`, `request.json`, `response.json`을 위 테스트가 읽어 요청 구성·원문 보존·응답 검증을 확인합니다.
+답안과 응답 점수는 연동 검증용 합성 데이터이며 실제 모델의 채점 정확도를 나타내지 않습니다.
+운영 코드·프롬프트·채점 기준은 `backend/writing/`에서 관리하며 별도 원본 전달본 폴더나 검증 스크립트는 필요하지 않습니다.
 
 ## TOPIQ 급수별 단어장
 

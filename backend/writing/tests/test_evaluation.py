@@ -21,11 +21,11 @@ from writing.models import Evaluation
 from writing.provider import ProviderError, evaluate
 
 
-ROOT = Path(__file__).resolve().parents[2] / "writing-evaluation-v2"
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
 
 def fixture(name, file):
-    return json.loads((ROOT / "examples" / str(name) / f"{file}.json").read_text(encoding="utf-8"))
+    return json.loads((FIXTURES / str(name) / f"{file}.json").read_text(encoding="utf-8"))
 
 
 def model_result(request, **kwargs):
