@@ -3,17 +3,19 @@
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
-import { WritingError, writingRequest, type WritingDetail } from "@/lib/writing-api";
+import { WritingError, writingRequest, type WritingDetail, type LearnerAnswer } from "@/lib/writing-api";
 import { writingContent } from "@/lib/writing-content";
 import WritingMaterial from "./WritingMaterial";
+import WritingAnswer from "./WritingAnswer";
 
 export default function WritingStudy({ id }: { id: string }) {
-  const { language } = useApp();
+  const { language, refreshSession } = useApp();
   const t = writingContent[language];
   const [data, setData] = useState<WritingDetail | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [revision, setRevision] = useState(0);
   const [index, setIndex] = useState(0);
+  const [drafts, setDrafts] = useState<Record<number, LearnerAnswer>>({});
   const heading = useRef<HTMLHeadingElement>(null);
   const pendingFocus = useRef(false);
 
@@ -26,9 +28,12 @@ export default function WritingStudy({ id }: { id: string }) {
     const controller = new AbortController();
     void writingRequest<WritingDetail>(`sets/${id}/`, controller.signal).then(result => {
       if (!controller.signal.aborted) setData(result);
-    }).catch(cause => { if (!controller.signal.aborted) setError(cause); });
+    }).catch(cause => { if (!controller.signal.aborted) {
+      setError(cause);
+      if (cause instanceof WritingError && cause.status === 401) void refreshSession();
+    } });
     return () => controller.abort();
-  }, [id, revision]);
+  }, [id, revision, refreshSession]);
 
   useEffect(() => {
     if (pendingFocus.current) {
@@ -73,6 +78,8 @@ export default function WritingStudy({ id }: { id: string }) {
           {question.requirements.length > 0 && <ul className="writing-requirements">{question.requirements.map((requirement, position) => <li key={position}>{requirement}</li>)}</ul>}
         </div>
       </article>
+      <WritingAnswer key={question.number} setId={id} slot={question.number} draft={drafts[question.number] ?? {}}
+        onChange={answer => setDrafts(previous => ({ ...previous, [question.number]: answer }))} />
       <div className="writing-pager">
         <button className="button writing-secondary" disabled={index === 0} onClick={() => move(index - 1)}><ArrowLeft size={16} aria-hidden="true" />{t.previous}</button>
         {index < data.questions.length - 1 && <button className="button button-primary" onClick={() => move(index + 1)}>{t.next}<ArrowRight size={16} aria-hidden="true" /></button>}

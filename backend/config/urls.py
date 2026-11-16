@@ -4,6 +4,7 @@ from django.urls import include, path
 from surveys import views
 from config.health import health
 from question_bank import writing
+from writing import views as evaluation_views
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -14,6 +15,9 @@ urlpatterns = [
     path("api/vocabulary/", include("vocabulary.urls")),
     path("api/writing/sets/", writing.sets),
     path("api/writing/sets/<uuid:set_id>/", writing.detail),
+    path("api/writing/", include("writing.urls")),
+    path("api/credits/", evaluation_views.credits),
+    path("api/credits/transactions/", evaluation_views.transactions),
     path("api/ibt/", include("pbt.urls"), {"exam_format": "ibt"}),
     path("api/survey-responses/", views.create_response, name="survey-create"),
 ]

@@ -1,6 +1,8 @@
 import copy
 import importlib
 import uuid
+from types import SimpleNamespace
+from django.contrib.auth.models import AnonymousUser
 from unittest.mock import MagicMock, patch
 
 from django.db import DatabaseError, connection
@@ -64,20 +66,26 @@ class WritingPromptTests(SimpleTestCase):
 
 class WritingAPITests(SimpleTestCase):
     def setUp(self):
+        self.auth = patch("django.contrib.auth.middleware.get_user", return_value=SimpleNamespace(is_authenticated=True))
+        self.auth.start()
+        self.addCleanup(self.auth.stop)
         self.set_id = uuid.uuid4()
         self.group = WritingSet(set_id=self.set_id, created_at=timezone.now())
         self.path = f"/api/writing/sets/{self.set_id}/"
 
     @patch("question_bank.writing.complete_sets")
-    def test_catalog_is_anonymous_and_does_not_create_a_session(self, complete):
+    def test_catalog_requires_login_and_does_not_create_a_session(self, complete):
         complete.return_value.only.return_value = [self.group]
         result = self.client.get("/api/writing/sets/")
         self.assertEqual(result.status_code, 200)
         self.assertEqual(result.json(), {"sets": [{"id": str(self.set_id), "number": 1, "questionCount": 4}]})
-        self.assertEqual(result["Cache-Control"], "no-store")
+        self.assertEqual(result["Cache-Control"], "private, no-store")
         self.assertNotIn("sessionid", result.cookies)
         complete.return_value.only.return_value = []
         self.assertEqual(self.client.get("/api/writing/sets/").json(), {"sets": []})
+        with patch("django.contrib.auth.middleware.get_user", return_value=AnonymousUser()):
+            self.assertEqual(self.client.get("/api/writing/sets/").status_code, 401)
+            self.assertEqual(self.client.get(self.path).status_code, 401)
 
     @patch("question_bank.writing.WritingQuestion.objects")
     @patch("question_bank.writing.complete_sets")

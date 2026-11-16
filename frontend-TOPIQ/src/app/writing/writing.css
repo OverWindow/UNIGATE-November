@@ -1,4 +1,34 @@
 .writing-main { min-height: 70vh; padding-bottom: 72px; background: #f7f9fc; }
+.writing-answer, .writing-evaluation-result { margin-top: 24px; padding: 28px; border: 1px solid #dfe6f1; border-radius: 14px; background: #fff; line-height: 1.8; overflow-wrap: anywhere; }
+.writing-history > h1 { margin: 0 0 20px; font-size: clamp(25px, 4vw, 32px); font-weight: 650; letter-spacing: -.03em; }
+.writing-answer h2, .writing-evaluation-result h2, .writing-history > section > h2 { margin: 0 0 16px; font-size: 21px; font-weight: 650; }
+.writing-evaluation-result h3 { margin: 18px 0 8px; font-weight: 600; }
+.writing-history > .writing-wallet { margin-bottom: 20px; }
+.writing-history > section { margin-top: 32px; }
+.writing-answer-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.writing-answer-heading h2 { margin: 0; }
+.writing-answer-field { display: grid; gap: 8px; margin: 20px 0; font-weight: 600; }
+.writing-answer-field textarea { box-sizing: border-box; width: 100%; min-height: 100px; padding: 14px; border: 1px solid #b7c5db; border-radius: 8px; background: #fff; color: #233651; resize: vertical; font: inherit; font-weight: 400; line-height: 1.9; }
+.writing-answer-field textarea:focus-visible { outline: 3px solid #3866bf; outline-offset: 2px; }
+.writing-answer-field textarea:disabled { background: #f4f6fa; }
+.writing-count { font-size: 12px; color: #596a81; font-weight: 400; }
+.writing-answer button:disabled { opacity: .5; cursor: not-allowed; }
+.writing-original { white-space: pre-wrap; padding: 16px; background: #f4f7fc; border-radius: 8px; min-height: 40px; }
+.writing-scores { display: grid; gap: 14px; margin: 20px 0; }
+.writing-scores section { padding: 16px; border: 1px solid #e0e6ef; border-radius: 8px; }
+.writing-scores h3 { margin: 0 0 8px; }
+.writing-evaluation-result blockquote { margin: 10px 0; padding: 8px 14px; border-left: 3px solid #8ba8da; background: #f5f7fc; white-space: pre-wrap; }
+.writing-evaluation-result ul { padding-left: 22px; list-style: disc; }
+.writing-evaluation-result li + li { margin-top: 12px; }
+.writing-evaluation-result summary { cursor: pointer; padding: 10px 0; }
+.writing-evaluation-result ins { text-decoration: none; background: #e8f4eb; }
+.writing-wallet { padding: 18px; background: #eaf0fc; border-radius: 10px; }
+.writing-history-list, .writing-credit-list { list-style: none; padding: 0; display: grid; gap: 12px; }
+.writing-history-list a { display: grid; gap: 8px; padding: 20px; border: 1px solid #dfe6f1; border-radius: 10px; background: #fff; }
+.writing-history-list a:hover { border-color: #547dc5; }
+.writing-history-list span { font-size: 14px; color: #596a81; }
+.writing-credit-list li { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 16px; background: #fff; border-bottom: 1px solid #e0e6ef; }
+@media (max-width: 640px) { .writing-answer, .writing-evaluation-result { padding: 18px; } }
 .writing-main button, .writing-main a, .writing-main summary { -webkit-tap-highlight-color: transparent; }
 .writing-main :is(button, a, summary, [tabindex]):focus-visible { outline: 3px solid #3866bf; outline-offset: 4px; }
 .writing-hero { padding: 48px 0 42px; border-bottom: 1px solid #e3e9f2; background: #eef3fc; }

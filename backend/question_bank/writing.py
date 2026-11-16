@@ -1,4 +1,4 @@
-"""Read PBT writing prompts from the Hub; no attempts or answers are stored."""
+"""Read authenticated PBT writing prompts from the Hub."""
 import math
 from functools import wraps
 
@@ -6,6 +6,7 @@ from django.db import DatabaseError
 from django.db.models import Count, Q
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
+from django.utils.cache import patch_vary_headers
 
 from .models import WritingQuestion, WritingSet
 
@@ -19,13 +20,16 @@ class WritingUnavailable(Exception):
 
 def response(data, status=200):
     result = JsonResponse(data, status=status)
-    result["Cache-Control"] = "no-store"
+    result["Cache-Control"] = "private, no-store"
+    patch_vary_headers(result, ("Cookie",))
     return result
 
 
 def available(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
+        if not args[0].user.is_authenticated:
+            return response({"error": "authentication_required"}, 401)
         try:
             return view(*args, **kwargs)
         except (DatabaseError, WritingUnavailable):
@@ -57,8 +61,18 @@ def text_list(value):
 
 
 def material(source):
-    if not isinstance(source, dict) or source.get("kind") not in ("bar", "line"):
+    if not isinstance(source, dict) or source.get("kind") not in ("bar", "line", "table"):
         raise WritingUnavailable
+    if source["kind"] == "table":
+        columns = text_list(source.get("columns"))
+        rows = source.get("rows")
+        if not columns or not isinstance(rows, list) or not rows:
+            raise WritingUnavailable
+        checked = [text_list(row) for row in rows]
+        if any(len(row) != len(columns) or any(not cell.strip() for cell in row) for row in checked):
+            raise WritingUnavailable
+        return {"kind": "table", "title": text(source.get("title")), "unit": text(source.get("unit", "")),
+                "columns": columns, "rows": checked}
     categories = text_list(source.get("categories"))
     series = source.get("series")
     if not categories or not isinstance(series, list) or not series:

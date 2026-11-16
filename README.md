@@ -6,42 +6,130 @@ PDF 파일은 운영자가 나중에 수동으로 보냅니다. 이 랜딩페이
 
 ## TOPIQ AI 쓰기 튜터 (PBT)
 
-헤더의 **AI 쓰기 튜터**는 `/writing`의 PBT 세트 목록으로 연결됩니다.
-`/writing/sets/[id]`에서 51·52번 지문과 빈칸, 53번 막대·선 그래프와 자료 설명,
-54번 지문과 작성 조건을 확인하고 문항 사이를 이동합니다. 그래프의 정확한 수치는 펼침 표로도 제공합니다.
-화면 UI는 한국어·영어·인도네시아어이며 문제 원문은 한국어를 유지합니다.
-비회원도 이용할 수 있으며 답안 입력·저장·제출·채점, 응시 기록, IBT 쓰기, 실시간 AI 생성은 제공하지 않습니다.
+로그인한 사용자가 `/writing`에서 세트를 선택하고 `/writing/sets/[id]`에서 문항별 답안을 제출합니다.
+51·52번은 두 빈칸, 53·54번은 본문 답안을 입력합니다. 문제·평가 설명은 한국어이며 UI는 한국어·영어·인도네시아어입니다.
+`/writing/history`에서 본인의 평가와 크레딧 거래를 조회하고 `/writing/history/[id]`에서 제출 당시 문제·원본 답안·평가를 확인합니다.
+입력 중인 답안은 현재 페이지에서만 유지되며 **제출이 접수된 답안부터 DB에 저장**됩니다.
+AI 평가는 학습용 참고 결과이며 공식 TOPIK 성적이 아닙니다.
 
-기존 `topik_bank.writing_sets`와 `topik_bank.writing_questions`를 읽기 전용으로 사용합니다.
-`exam_format=pbt`이고 51~54번을 모두 가진 세트만 목록에 표시하며 생성 시각·세트 ID 순으로 번호를 부여합니다.
-별도 세트 등록 명령은 필요하지 않습니다. Hub에서 전송한 세트가 다음 조회부터 반영됩니다.
-문제 본문·그래프 형식이 잘못되면 상세 조회를 503으로 처리하고 다시 시도를 안내합니다.
-조회 응답에는 문제 표시용 필드만 포함하며 생성 모델·공급자·원본 생성 ID를 노출하지 않습니다.
+Hub 소유의 `topik_bank.writing_sets`, `topik_bank.writing_questions`는 읽기 전용으로 재사용합니다.
+PBT 51~54번이 모두 있는 세트만 표시하며, 막대·선 그래프와 표 자료를 지원합니다.
+평가 입력은 서버가 조회한 문제 표시 필드만 사용하고 참고답안·생성 메타데이터는 전송하지 않습니다.
+문항 형식은 `writing-evaluation-v2`의 표준 발문·빈칸·자료·요구 사항 규칙으로 검증합니다.
+호환되지 않는 문항은 `question_unavailable`로 거절하고 크레딧을 예약하지 않습니다.
+
+### 평가와 크레딧
+
+별도 워커·대기열 없이 HTTP 요청 안에서 BizRouter Chat Completions를 호출합니다.
+먼저 평가 ID·원본 답안·문제 스냅샷을 저장하고 크레딧을 예약합니다. 모델 호출 동안 DB 잠금은 유지하지 않습니다.
+응답 구조·점수 범위·원문 인용·과제 누락을 검증한 뒤 **결과 저장과 차감 확정을 같은 트랜잭션**에서 처리합니다.
+53·54번 언어 점수는 이미 2배 적용된 짝수이며 서버에서 재차 곱하지 않습니다.
+전체 미응답은 모델 호출 없이 0점, 차감량 0으로 저장합니다. 가격·모델이 미설정인 문항은 미응답도 평가 접수를 비활성화합니다.
+
+사용 가능 잔액은 `balance - reserved`입니다. 가격 미설정은 무료가 아니며 명시적인 `0`만 무료입니다.
+잔액 부족·평가 동시 실행 한도 초과·가격 변경은 접수 전에 거절합니다. 가격 변경 후에는 사용자가 새 가격을 확인하고 다시 제출합니다.
+모델 오류·검증 실패는 실패 이력을 저장하고 예약을 해제합니다. 예기치 않은 서버/DB 중단은 처리 기한(호출 제한 시간 + 60초) 후
+다음 평가/잔액/이력 조회·평가 접수 시 실패 처리하고 예약을 해제합니다. 조회가 없으면 예약은 그때까지 DB에 남습니다.
+이미 실패한 평가에 늦게 도착한 결과는 점수나 차감을 확정하지 않습니다. 중단된 작업을 자동 재실행하지 않습니다.
+
+`POST`의 UUID `id`는 실행 식별자이자 중복 요청 방지 키입니다. 같은 사용자·ID·답안은 기존 기록을 반환하고 다시 호출/차감하지 않습니다.
+같은 ID로 다른 문항·답안을 보내면 409입니다. 패키지 `request_id` 내용 해시와 실행 UUID는 별개입니다.
+브라우저는 사용자·문항별 진행 ID만 sessionStorage에 저장하고 원본 답안은 브라우저 저장소에 기록하지 않습니다.
+통신 실패 시 기존 ID로 상태를 확인합니다. 새로고침 후 입력 내용이 사라졌다면 먼저 이력의 접수 여부를 확인하세요.
+의도적인 재평가는 새 UUID를 사용하며 이전 기록을 보존합니다. 외부 호출은 자동 재시도하지 않습니다.
+
+### API
+
+모든 경로는 세션 로그인이 필요하며 POST에는 CSRF 토큰이 필요합니다. 응답은 `private, no-store`입니다.
 
 | 메서드 | API | 목적 |
 | --- | --- | --- |
-| GET | `/api/writing/sets/` | 완성된 PBT 쓰기 세트 목록 |
-| GET | `/api/writing/sets/<uuid:set_id>/` | 51~54번 문제·자료·작성 조건 |
+| GET | `/api/writing/sets/` | 기존 API: 로그인 전용 세트 목록 |
+| GET | `/api/writing/sets/<uuid:set_id>/` | 기존 API: 로그인 전용 문제 상세 |
+| GET | `/api/writing/evaluation-config/` | 문항별 가격·평가 가능 여부·가격 버전·호출 제한 시간 |
+| POST | `/api/writing/evaluations/` | 답안 저장·예약·동기 평가·결과 저장 |
+| GET | `/api/writing/evaluations/?page=1` | 본인 평가 이력, 페이지당 20건 |
+| GET | `/api/writing/evaluations/<uuid:id>/` | 본인 평가 상태·답안·결과·문제 스냅샷 |
+| GET | `/api/credits/` | 잔액·예약액·사용 가능액 |
+| GET | `/api/credits/transactions/?page=1` | 본인 지급·예약·차감·해제 내역, 페이지당 20건 |
 
-새 테이블·컬럼이나 기존 테이블·컬럼 변경은 없습니다. `migration/question_bank/0009_writing_models.py`는
-`managed=False` 모델과 `(set_id, type_slot)` 복합 기본키의 Django 상태만 등록하며 테이블 생성·변경 SQL을 실행하지 않습니다.
-기존 Hub 쓰기 테이블이 DB에 있어야 합니다. 추가 의존성·환경 변수·백그라운드 작업은 없습니다.
+POST 필드는 `id`, `setId`, `typeSlot`, `answer`, `priceVersion`입니다.
+`answer`는 51·52번 `{ "a": "...", "b": "..." }`, 53·54번 `{ "text": "..." }`이며 원본 공백을 보존합니다.
+빈칸은 각각 2,000, 본문은 20,000 Unicode 코드 포인트까지 받습니다. 표시 글자 수는 줄바꿈을 제외하며 원고지 칸 수와 다릅니다.
+신규 완료/실패 기록은 HTTP 201, 기존 기록은 200, 기존 처리 중 기록은 202로 반환합니다. **실제 성공 여부는 `status`를 확인**합니다.
+`evaluation_busy`/`rate_limited`는 429, `insufficient_credits`/`price_changed`/`request_conflict`는 409입니다.
+사용자는 모델·문제 내용·차감량을 지정할 수 없으며 타인의 평가 조회는 404입니다.
 
-로컬에서는 코드 업데이트 후 **backend 폴더에서 사용자가 아래 명령을 수동 실행**해 모델 매핑 이력을 등록합니다.
-기존 `0008_vocabulary_questions`까지 적용된 DB를 전제로 하며, 쓰기 데이터나 DB 구조는 바꾸지 않고 Django migration 이력만 기록합니다.
-에이전트는 이 명령을 실행하지 않습니다. 운영은 기존 `deploy/start.sh`의 migrate 후 Gunicorn 시작 절차가 자동 적용합니다.
+### DB 변경
+
+신규 테이블은 3개이며 기존 사용자·문제은행·읽기·듣기 테이블의 컬럼 추가/변경은 없습니다.
+
+| 테이블 | 신규 컬럼 | 목적 |
+| --- | --- | --- |
+| `writing_evaluations` | `id`, `user_id`, `set_id`, `type_slot`, `submission_hash`, `question_snapshot`, `answer` | 실행 식별·소유권·제출 당시 문제와 원문 |
+| 위 테이블 | `request_hash`, `package_version`, `prompt_version`, `requested_model`, `resolved_model`, `model_options`, `price_version`, `credit_cost` | 평가 계약·모델·접수 시 가격 기록 |
+| 위 테이블 | `status`, `result`, `total_score`, `usage`, `error_code`, `created_at`, `expires_at`, `completed_at` | 처리 상태·검증 결과·토큰 사용량·복구 기한 |
+| `credit_accounts` | `user_id`, `balance`, `reserved`, `updated_at` | 사용자별 잔액·예약액 |
+| `credit_transactions` | `id`, `account_id`, `evaluation_id`, `kind`, `amount`, `balance_after`, `reserved_after`, `actor_id`, `reason`, `created_at` | 지급·예약·차감·해제 감사 내역 |
+
+Django migration `migration/writing/0001_initial.py`, `migration/accounts/0003_creditaccount_credittransaction.py`로 관리합니다.
+잔액/예약액 제약과 평가별 거래 중복 방지 제약을 사용합니다. 짧은 PostgreSQL advisory transaction lock으로 프로세스 간 접수를 직렬화합니다.
+회원가입 시 자동 지급하지 않으며 계정은 최초 조회/평가/관리자 지급 시 잔액 0으로 생성됩니다.
+거래·평가 이력이 있는 사용자 삭제는 보호됩니다. 데이터 삭제·크레딧 결제 충전·만료 정책은 이 기능에 포함하지 않습니다.
+
+### 환경변수와 운영
+
+백엔드의 `.env.development`/`.env.production` 또는 배포 환경변수에 설정합니다. 키는 프론트에 넣지 않습니다.
+
+| 변수 | 기본값 / 설명 |
+| --- | --- |
+| `BIZROUTER_API_KEY` | 미설정 시 평가 비활성화. 서버용 키 |
+| `WRITING_EVALUATION_MODEL` | 미설정 시 평가 비활성화. BizRouter에서 허용된 모델 ID |
+| `WRITING_EVALUATION_CREDITS_51` ~ `_54` | 기본 미설정. 각 문항별 0~1,000,000 정수. 값이 없는 문항만 비활성화 |
+| `WRITING_EVALUATION_TIMEOUT_SECONDS` | 기본 45, 범위 5~120초. 외부 호출 제한 |
+| `WRITING_EVALUATION_MAX_CONCURRENT` | 기본 1, 범위 1~32. DB를 공유하는 서버 전체의 동시 평가 제한 |
+| `GUNICORN_WORKERS` | 기본 1. 양의 정수 |
+| `GUNICORN_THREADS` | 기본 4. 양의 정수 |
+
+요청은 `https://api.bizrouter.ai/v1/chat/completions`에 `max_tokens=4096`, `stream=false`로 전송합니다.
+모델·호출 옵션·가격은 평가별로 기록하며 이후 설정 변경으로 과거 차감량을 바꾸지 않습니다.
+Gunicorn 변수는 프로세스 환경변수로 설정하세요. Gunicorn 설정은 Django 환경 파일을 직접 로드하지 않습니다.
+변경 후 백엔드를 재시작/재배포합니다. 동시 평가 한도는 일반 API 요청을 처리할 스레드가 남도록 설정합니다.
+Next.js rewrite 제한은 180초, 평가 브라우저 요청 제한은 모델 호출 제한 + 20초입니다.
+Gunicorn의 gthread `timeout=30`은 개별 요청 30초 제한이 아닙니다. 배포 플랫폼의 ingress 요청 제한은 따로 확인해야 합니다.
+선택 모델의 실제 응답 시간·비용·채점 품질은 합성 fixture 검사와 별도로 배포 전 검증합니다.
+
+**로컬 적용은 사용자가 `backend/`에서 다음 명령을 수동 실행합니다.**
 
 ```powershell
-.\.venv\Scripts\python.exe manage.py migrate question_bank 0009_writing_models
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe manage.py migrate
+.\.venv\Scripts\python.exe manage.py runserver
 ```
 
-프론트 API rewrite를 반영하려면 **frontend-TOPIQ 폴더에서** 개발 서버를 재시작(`npm run dev`)하거나,
-운영 배포 전 `npm run build`로 다시 빌드합니다. 이 명령들은 수동 실행하며 DB를 변경하지 않습니다.
-로컬 백엔드도 새 코드를 반영하도록 기존 실행 절차로 재시작합니다.
+첫 명령은 Pydantic 2.11.7 등 의존성을 설치하며 DB를 변경하지 않습니다. 두 번째 명령은 미적용 migration을 적용해 위 세 테이블과 제약을 생성합니다.
+세 번째는 개발 서버 실행이며 migration을 자동 실행하지 않습니다. 기존 개발 서버는 먼저 종료 후 재시작합니다.
+운영은 기존 `deploy/start.sh`가 **migrate → collectstatic → Gunicorn**을 자동 실행합니다. 별도 워커/스케줄/관리 명령은 없습니다.
+**frontend-TOPIQ/**에서 `npm run dev`로 개발 서버를 수동 재시작하거나 `npm run build` 후 운영 재배포합니다. 프론트 명령은 DB를 변경하지 않습니다.
 
-문제 조회·오류 처리·쓰기 메서드 차단·migration SQL 미발생 검사는 **backend 폴더에서**
-`.\.venv\Scripts\python.exe manage.py test question_bank.tests.test_writing`으로 수동 실행합니다.
-이 테스트는 DB를 생성·수정하지 않습니다. 프론트 검사는 **frontend-TOPIQ 폴더에서** `npm test`, `npm run typecheck`, `npm run lint`로 실행합니다.
+초기 크레딧 지급은 migration 적용 후 관리자가 `/admin/accounts/creditaccount/`의 **크레딧 지급** 링크에서 수행합니다.
+사용자 ID·수량·사유를 입력하면 잔액과 지급 원장이 함께 저장됩니다. 권한은 `accounts.add_credittransaction`이며 같은 지급 요청 재전송은 중복 지급하지 않습니다.
+계정·거래 원장은 일반 관리자 편집/삭제로 수정할 수 없습니다. 활성 사용자의 ID는 Django 사용자 관리자에서 확인합니다.
+
+### 검증
+
+서비스와 분리된 일회용 PostgreSQL 연결 환경에서 `backend/`의 아래 명령을 수동 실행합니다.
+Django가 테스트 DB를 생성·마이그레이션·삭제하며 서비스 DB에 migrate를 실행하지 않습니다.
+
+```powershell
+.\.venv\Scripts\python.exe manage.py test writing accounts question_bank.tests.test_writing config.tests --noinput
+```
+
+채점 계약·빈칸 치환·응답 검증, 로그인/CSRF/소유권, 중복 접수·예약 중 잔액 검사·전역 동시 한도,
+결과 저장 실패 시 차감 롤백·만료 복구·늦은 응답 거부·관리자 지급 중복 방지를 확인합니다.
+`frontend-TOPIQ/`에서 `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`로 UI/API와 빌드를 검사합니다.
+원본 전달본 검사는 저장소 루트에서 `backend\.venv\Scripts\python.exe -B backend/writing-evaluation-v2/verify.py`로 실행합니다.
+이 명령은 파일·예시만 검사하며 DB/네트워크를 사용하지 않습니다. 전달본은 유지하고 운영 코드는 `backend/writing/`에 편입했습니다.
 
 ## TOPIQ 급수별 단어장
 

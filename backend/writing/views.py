@@ -1,0 +1,132 @@
+import json
+from functools import wraps
+from uuid import UUID
+
+from django.core.exceptions import RequestDataTooBig
+from django.db import DatabaseError
+from django.views.decorators.debug import sensitive_variables
+from django.views.decorators.http import require_GET, require_http_methods
+
+from accounts.credits import balance_data, evaluation_lock, locked_account
+from accounts.models import CreditTransaction
+from accounts.rate_limits import RateLimitUnavailable, record_attempt
+from accounts.views import api_response
+from question_bank.writing import WritingUnavailable
+
+from .models import Evaluation
+from .services import EvaluationError, config_data, expire_locked, serialize, submit
+
+
+def authenticated(view):
+    @wraps(view)
+    def wrapped(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return api_response({"error": "authentication_required"}, 401)
+        try:
+            return view(request, *args, **kwargs)
+        except EvaluationError as exc:
+            return api_response({"error": exc.code}, exc.status)
+        except (DatabaseError, RateLimitUnavailable, WritingUnavailable):
+            return api_response({"error": "writing_unavailable"}, 503)
+    return wrapped
+
+
+def page_number(request):
+    try:
+        page = int(request.GET.get("page", "1"))
+    except ValueError:
+        raise EvaluationError("invalid_page") from None
+    if not 1 <= page <= 10000:
+        raise EvaluationError("invalid_page")
+    return page
+
+
+def page_rows(query, page):
+    rows = list(query[(page - 1) * 20:page * 20 + 1])
+    return rows[:20], page + 1 if len(rows) > 20 else None
+
+
+@require_GET
+@authenticated
+def configuration(request):
+    return api_response(config_data())
+
+
+@require_http_methods(["GET", "POST"])
+@authenticated
+@sensitive_variables()
+def evaluations(request):
+    if request.method == "GET":
+        page = page_number(request)
+        with evaluation_lock():
+            expire_locked()
+        query = Evaluation.objects.filter(user=request.user).defer("question_snapshot", "answer", "result").order_by("-created_at", "-id")
+        rows, next_page = page_rows(query, page)
+        return api_response({"evaluations": [serialize(entry) for entry in rows], "nextPage": next_page})
+    if request.content_type != "application/json":
+        return api_response({"error": "unsupported_media_type"}, 415)
+    try:
+        # Enough for 20,000 Unicode code points, including JSON escaping.
+        if len(request.body) > 262144:
+            return api_response({"error": "payload_too_large"}, 413)
+        data = json.loads(request.body)
+        if not isinstance(data, dict) or set(data) != {"id", "setId", "typeSlot", "answer", "priceVersion"}:
+            raise ValueError
+        if type(data["typeSlot"]) is not int or data["typeSlot"] not in (51, 52, 53, 54):
+            raise ValueError
+        if not isinstance(data["priceVersion"], str) or len(data["priceVersion"]) != 64:
+            raise ValueError
+        evaluation_id, set_id = UUID(data["id"]), UUID(data["setId"])
+        if not isinstance(data["answer"], dict):
+            raise ValueError
+    except RequestDataTooBig:
+        return api_response({"error": "payload_too_large"}, 413)
+    except (ValueError, TypeError, AttributeError):
+        return api_response({"error": "invalid_submission"}, 400)
+    wait = record_attempt("writing-submit", str(request.user.pk), limit=60, window=3600)
+    if wait:
+        result = api_response({"error": "rate_limited"}, 429)
+        result["Retry-After"] = str(wait)
+        return result
+    try:
+        entry, created = submit(user_id=request.user.pk, evaluation_id=evaluation_id, set_id=set_id,
+                                slot=data["typeSlot"], answer=data["answer"], price_version=data["priceVersion"])
+    except ValueError:
+        return api_response({"error": "invalid_submission"}, 400)
+    return api_response(serialize(entry, detail=True), 202 if entry.status == "processing" else 201 if created else 200)
+
+
+@require_GET
+@authenticated
+def evaluation_detail(request, evaluation_id):
+    with evaluation_lock():
+        expire_locked()
+    entry = Evaluation.objects.filter(pk=evaluation_id, user=request.user).first()
+    if entry is None:
+        return api_response({"error": "not_found"}, 404)
+    return api_response(serialize(entry, detail=True))
+
+
+@require_GET
+@authenticated
+def credits(request):
+    with evaluation_lock():
+        expire_locked()
+        data = balance_data(locked_account(request.user.pk))
+    return api_response(data)
+
+
+@require_GET
+@authenticated
+def transactions(request):
+    page = page_number(request)
+    with evaluation_lock():
+        expire_locked()
+    query = CreditTransaction.objects.filter(account_id=request.user.pk).order_by("-created_at", "-id")
+    rows, next_page = page_rows(query, page)
+    return api_response({"transactions": [
+        {"id": str(entry.pk), "kind": entry.kind, "amount": entry.amount,
+         "evaluationId": str(entry.evaluation_id) if entry.evaluation_id else None,
+         "balanceAfter": entry.balance_after, "reservedAfter": entry.reserved_after,
+         "createdAt": entry.created_at.isoformat()} for entry in rows
+    ], "nextPage": next_page})

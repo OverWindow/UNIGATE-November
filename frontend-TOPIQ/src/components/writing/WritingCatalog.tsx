@@ -4,11 +4,12 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useApp } from "@/app/providers";
-import { writingRequest, type WritingSet } from "@/lib/writing-api";
+import { writingRequest, WritingError, type WritingSet } from "@/lib/writing-api";
+import { evaluationContent } from "@/lib/writing-evaluation-content";
 import { writingContent } from "@/lib/writing-content";
 
 export default function WritingCatalog() {
-  const { language } = useApp();
+  const { language, refreshSession } = useApp();
   const t = writingContent[language];
   const [sets, setSets] = useState<WritingSet[] | null>(null);
   const [error, setError] = useState(false);
@@ -19,9 +20,12 @@ export default function WritingCatalog() {
     setSets(null); setError(false);
     void writingRequest<{ sets: WritingSet[] }>("sets/", controller.signal).then(result => {
       if (!controller.signal.aborted) setSets(result.sets);
-    }).catch(() => { if (!controller.signal.aborted) setError(true); });
+    }).catch(cause => { if (!controller.signal.aborted) {
+      setError(true);
+      if (cause instanceof WritingError && cause.status === 401) void refreshSession();
+    } });
     return () => controller.abort();
-  }, [revision]);
+  }, [revision, refreshSession]);
 
   return <>
     <section className="writing-hero"><div className="page-container">
@@ -29,6 +33,7 @@ export default function WritingCatalog() {
     </div></section>
     <div className="page-container writing-catalog">
       <p className="writing-notice">{t.notice}</p>
+      <p><Link className="button writing-secondary" href="/writing/history">{evaluationContent[language].history}</Link></p>
       {error ? <div className="writing-status" role="alert"><p>{t.error}</p>
         <button className="button writing-secondary" onClick={() => setRevision(value => value + 1)}>{t.retry}</button>
       </div> : sets === null ? <p className="writing-status" role="status">{t.loading}</p>

@@ -1,7 +1,7 @@
 import type { Language } from "./landing-content";
 
 interface AuthContent {
-  login: string; signup: string; logout: string; retry: string;
+  login: string; signup: string; logout: string; retry: string; credits: string;
   email: string; nickname: string; password: string; confirm: string; passwordHint: string;
   emailPlaceholder: string; nicknamePlaceholder: string;
   show: string; hide: string; submitting: string; loading: string;
@@ -11,7 +11,7 @@ interface AuthContent {
 
 export const authContent: Record<Language, AuthContent> = {
   ko: {
-    login: "로그인", signup: "회원가입", logout: "로그아웃", retry: "다시 연결",
+    login: "로그인", signup: "회원가입", logout: "로그아웃", retry: "다시 연결", credits: "크레딧",
     email: "이메일", nickname: "닉네임", password: "비밀번호", confirm: "비밀번호 확인",
     passwordHint: "8자 이상으로, 흔한 비밀번호나 숫자만으로 된 비밀번호는 사용할 수 없어요.",
     emailPlaceholder: "you@example.com", nicknamePlaceholder: "어떻게 불러 드릴까요?",
@@ -39,7 +39,7 @@ export const authContent: Record<Language, AuthContent> = {
     },
   },
   en: {
-    login: "Log in", signup: "Sign up", logout: "Log out", retry: "Reconnect",
+    login: "Log in", signup: "Sign up", logout: "Log out", retry: "Reconnect", credits: "Credits",
     email: "Email", nickname: "Nickname", password: "Password", confirm: "Confirm password",
     passwordHint: "Use at least 8 characters. Avoid common passwords and passwords made up of only numbers.",
     emailPlaceholder: "you@example.com", nicknamePlaceholder: "What should we call you?",
@@ -67,7 +67,7 @@ export const authContent: Record<Language, AuthContent> = {
     },
   },
   id: {
-    login: "Masuk", signup: "Daftar", logout: "Keluar", retry: "Hubungkan lagi",
+    login: "Masuk", signup: "Daftar", logout: "Keluar", retry: "Hubungkan lagi", credits: "Kredit",
     email: "Email", nickname: "Nama panggilan", password: "Kata sandi", confirm: "Konfirmasi kata sandi",
     passwordHint: "Gunakan minimal 8 karakter. Hindari kata sandi umum atau yang hanya berisi angka.",
     emailPlaceholder: "you@example.com", nicknamePlaceholder: "Kami harus memanggilmu apa?",

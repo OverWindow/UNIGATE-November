@@ -1,0 +1,55 @@
+.credits-main { min-height: 70vh; padding-block: 44px 72px; background: #f7f9fc; }
+.credits-page { max-width: 960px; }
+.credits-heading h1 { margin: 0 0 12px; font-size: clamp(28px, 4vw, 36px); font-weight: 650; letter-spacing: -.04em; }
+.credits-heading p { color: #596a81; line-height: 1.8; }
+.credits-actions { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-block: 28px 20px; }
+.credits-actions a, .credits-transaction-details a { color: #315eb7; font-size: 14px; font-weight: 600; text-underline-offset: 4px; }
+.credits-actions a:hover, .credits-transaction-details a:hover { text-decoration: underline; }
+.credits-secondary { border-color: #dbe2ed; background: #fff; color: #405674; }
+.credits-secondary:hover:not(:disabled) { background: #eef3fc; border-color: #94afe1; }
+.credits-secondary:disabled { opacity: .45; }
+.credits-status { padding: 56px 16px; text-align: center; color: #596a81; line-height: 1.8; }
+.credits-status p { margin-bottom: 20px; }
+.credits-balances { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 16px; }
+.credits-balances > div { padding: 26px; border: 1px solid #dfe6f1; border-radius: 16px; background: #fff; }
+.credits-balances dt { margin-bottom: 12px; color: #596a81; font-size: 14px; }
+.credits-balances dd { font-size: clamp(24px, 3vw, 32px); font-weight: 650; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.credits-balances dd span { font-size: 13px; font-weight: 500; white-space: nowrap; }
+.credits-balances .credits-available { border-color: #a9bde7; background: #eaf0fc; color: #244e9e; }
+.credits-available dt { color: #315eb7; }
+.credits-note { margin-top: 16px; color: #65728a; font-size: 13px; line-height: 1.8; word-break: keep-all; overflow-wrap: anywhere; }
+.credits-history { margin-top: 40px; }
+.credits-history h2 { font-size: 22px; font-weight: 650; letter-spacing: -.02em; }
+.credits-history > .credits-note { margin-block: 10px 22px; }
+.credits-transactions { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.credits-transactions li { padding: 22px 24px; border: 1px solid #dfe6f1; border-radius: 12px; background: #fff; }
+.credits-transaction-heading { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.credits-kind { padding: 5px 10px; border-radius: 6px; background: #eef2f8; color: #52647e; font-size: 13px; font-weight: 600; }
+.credits-kind-grant { background: #eaf5ef; color: #286143; }
+.credits-kind-capture { background: #edf2fc; color: #315eb7; }
+.credits-transaction-heading time { color: #65728a; font-size: 13px; }
+.credits-amount { margin-left: auto; font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.credits-amount span { font-size: 12px; font-weight: 500; }
+.credits-amount-grant { color: #286143; }
+.credits-amount-capture { color: #315eb7; }
+.credits-transaction-details { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 18px; padding-top: 16px; border-top: 1px solid #edf0f6; flex-wrap: wrap; }
+.credits-transaction-details dl { display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: 13px; color: #596a81; }
+.credits-transaction-details dl > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.credits-transaction-details dd { font-weight: 600; color: #334760; font-variant-numeric: tabular-nums; }
+.credits-empty { padding: 44px 20px; border: 1px dashed #ccd6e7; border-radius: 12px; text-align: center; color: #65728a; line-height: 1.8; }
+.credits-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 24px; }
+.credits-pagination > span { font-size: 13px; color: #596a81; }
+@media (max-width: 640px) {
+  .credits-main { padding-block: 30px 48px; }
+  .credits-balances { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .credits-balances > div { padding: 20px; }
+  .credits-balances .credits-available { grid-column: 1 / -1; }
+  .credits-transactions li { padding: 18px; }
+  .credits-transaction-heading { display: grid; grid-template-columns: 1fr auto; gap: 12px; }
+  .credits-kind { justify-self: start; }
+  .credits-transaction-heading time { grid-row: 2; grid-column: 1 / -1; }
+  .credits-amount { grid-row: 1; grid-column: 2; font-size: 18px; }
+  .credits-transaction-details { align-items: start; }
+  .credits-transaction-details dl { flex-direction: column; }
+  .credits-pagination .button { min-height: 44px; padding: 10px 16px; }
+}

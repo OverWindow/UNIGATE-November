@@ -114,7 +114,7 @@ export default function VocabularyQuiz({ id }: { id: string }) {
               return <label key={`${question.id}:${option}`} className={`vocabulary-quiz-choice${correct ? " is-correct" : incorrect ? " is-incorrect" : ""}`}>
                 <input type="radio" name="quiz-choice" value={option} checked={selected === option} onChange={() => setSelected(option)} />
                 <span className="vocabulary-quiz-option-number" aria-hidden="true">{option}</span><span lang="ko">{choice}</span>
-                {(correct || incorrect) && <span className="vocabulary-quiz-choice-status">{correct ? t.correctAnswer : t.yourAnswer}</span>}
+                {(correct || incorrect) && <span className="sr-only">{correct ? t.correctAnswer : t.yourAnswer}</span>}
               </label>;
             })}
           </fieldset>

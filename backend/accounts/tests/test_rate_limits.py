@@ -253,6 +253,10 @@ class RateLimitPersistenceTests(TransactionTestCase):
             self.assertGreater(pool.submit(read_from_other_connection).result(), 0)
 
     def test_migration_adds_only_rate_limit_table_and_keeps_user_and_session_data(self):
+        executor = MigrationExecutor(connection)
+        latest = executor.loader.graph.leaf_nodes()
+        self.addCleanup(lambda: MigrationExecutor(connection).migrate(latest))
+        executor.migrate([("accounts", "0002_rate_limit")])
         user = get_user_model().objects.create_user(username="preserved", email="preserved@example.invalid")
         session = SessionStore()
         session["synthetic"] = True

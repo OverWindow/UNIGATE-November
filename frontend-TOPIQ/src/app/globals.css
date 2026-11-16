@@ -53,10 +53,10 @@ main:focus { outline: none; }
 .language-options { opacity: 1; transform: translateY(0); transition: opacity .18s ease, transform .18s ease, display .18s allow-discrete; }
 .language-options[hidden] { opacity: 0; transform: translateY(-6px); }
 @starting-style { .language-options:not([hidden]) { opacity: 0; transform: translateY(-6px); } }
-.language-options button, .account-menu button { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-height: 42px; padding: 10px 12px; border-radius: 7px; color: #42516b; font-size: 13px; line-height: 1.5; text-align: left; white-space: nowrap; }
+.language-options button, .account-menu button, .account-menu a { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-height: 42px; padding: 10px 12px; border-radius: 7px; color: #42516b; font-size: 13px; line-height: 1.5; text-align: left; white-space: nowrap; }
 .language-options button:hover { color: var(--color-primary); }
 .language-options button[aria-pressed="true"] { background: #edf2ff; color: var(--color-primary); }
-.account-menu button:hover:not(:disabled) { background: #edf2ff; color: var(--color-primary); }
+.account-menu button:hover:not(:disabled), .account-menu a:hover, .account-menu a[aria-current="page"] { background: #edf2ff; color: var(--color-primary); }
 .language-check { min-width: 14px; font-weight: 600; }
 .header-login { flex-shrink: 0; min-height: 40px; padding: 8px; border: 0; background: transparent; color: #42516b; font-size: 12px; font-weight: 550; white-space: nowrap; }
 .header-login { display: inline-flex; align-items: center; justify-content: center; }

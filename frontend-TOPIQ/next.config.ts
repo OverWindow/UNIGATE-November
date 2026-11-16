@@ -11,6 +11,7 @@ if (!["http:", "https:"].includes(backendOrigin.protocol) || backendOrigin.usern
 const nextConfig: NextConfig = {
   output: "standalone",
   reactStrictMode: true,
+  experimental: { proxyTimeout: 180000 },
   async headers() {
     return [{ source: "/garu-0.13.0/:path*", headers: [
       { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
@@ -28,6 +29,7 @@ const nextConfig: NextConfig = {
       { source: "/api/ibt/:path*", destination: `${backendOrigin.origin}/api/ibt/:path*/` },
       { source: "/api/vocabulary/:path*", destination: `${backendOrigin.origin}/api/vocabulary/:path*/` },
       { source: "/api/writing/:path*", destination: `${backendOrigin.origin}/api/writing/:path*/` },
+      { source: "/api/credits/:path*", destination: `${backendOrigin.origin}/api/credits/:path*/` },
       { source: "/api/csrf/", destination: `${backendOrigin.origin}/api/csrf/` },
     ];
   },

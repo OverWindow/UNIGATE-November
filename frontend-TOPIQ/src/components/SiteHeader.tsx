@@ -121,6 +121,7 @@ export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: st
                     setAccountOpen(!accountOpen); setLanguageOpen(false); setMenuOpen(false);
                   }}>{user.nickname}</button>
                 <div className="account-menu" id="account-menu" role="group" aria-labelledby="account-trigger" hidden={!accountOpen}>
+                  <Link href="/credits" aria-current={pathname === "/credits" ? "page" : undefined} onClick={() => setAccountOpen(false)}>{a.credits}</Link>
                   <button type="button" disabled={loggingOut} aria-busy={loggingOut} onClick={() => onBeforeLogout ? onBeforeLogout(() => void handleLogout()) : void handleLogout()}>{loggingOut ? a.submitting : a.logout}</button>
                   {logoutError && <p className="account-menu-error" role="alert">{a.network}</p>}
                 </div>

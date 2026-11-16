@@ -260,8 +260,10 @@ class EmailIndexMigrationTests(TransactionTestCase):
         with connection.cursor() as cursor:
             before_columns = [column.name for column in connection.introspection.get_table_description(cursor, "auth_user")]
         executor = MigrationExecutor(connection)
+        latest = executor.loader.graph.leaf_nodes()
         executor.migrate([("accounts", None)])
-        user_model = get_user_model()
+        # Use the historical User without relations to the rolled-back credit tables.
+        user_model = executor.loader.project_state([("auth", "0012_alter_user_first_name_max_length")]).apps.get_model("auth", "User")
         try:
             user_model.objects.create(username="one", email=" Dup@example.invalid ")
             user_model.objects.create(username="two", email="dup@EXAMPLE.INVALID")
@@ -271,7 +273,7 @@ class EmailIndexMigrationTests(TransactionTestCase):
                     migration.check_email_conflicts(None, editor)
         finally:
             user_model.objects.all().delete()
-            MigrationExecutor(connection).migrate([("accounts", "0002_rate_limit")])
+            MigrationExecutor(connection).migrate(latest)
         self.assertEqual(set(connection.introspection.table_names()), before_tables)
         with connection.cursor() as cursor:
             self.assertEqual([column.name for column in connection.introspection.get_table_description(cursor, "auth_user")], before_columns)

@@ -13,6 +13,27 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 
 
 class EnvironmentSettingsTests(unittest.TestCase):
+    def test_writing_prices_distinguish_unset_and_explicit_zero(self):
+        settings, _ = self.read_settings({"DJANGO_SECRET_KEY": "test", "WRITING_EVALUATION_CREDITS_51": "0", "WRITING_EVALUATION_MODEL": " fixture/model "})
+        self.assertEqual(settings["WRITING_EVALUATION_CREDITS"][51], 0)
+        self.assertIsNone(settings["WRITING_EVALUATION_CREDITS"][52])
+        self.assertEqual(settings["WRITING_EVALUATION_MODEL"], "fixture/model")
+        self.assertEqual(settings["WRITING_EVALUATION_MAX_CONCURRENT"], 1)
+        for value in ("-1", "1.5", "true", "1000001"):
+            with self.subTest(value=value), self.assertRaises(ImproperlyConfigured):
+                self.read_settings({"DJANGO_SECRET_KEY": "test", "WRITING_EVALUATION_CREDITS_51": value})
+
+    def test_gunicorn_defaults_and_environment(self):
+        path = BASE_DIR / "deploy" / "gunicorn.conf.py"
+        with patch.dict(os.environ, {}, clear=True):
+            config = runpy.run_path(str(path))
+        self.assertEqual((config["workers"], config["threads"]), (1, 4))
+        with patch.dict(os.environ, {"GUNICORN_WORKERS": "2", "GUNICORN_THREADS": "6"}, clear=True):
+            config = runpy.run_path(str(path))
+        self.assertEqual((config["workers"], config["threads"]), (2, 6))
+        with patch.dict(os.environ, {"GUNICORN_THREADS": "0"}, clear=True), self.assertRaises(ValueError):
+            runpy.run_path(str(path))
+
     def test_request_limits_need_no_proxy_cidrs_and_preserve_https_trust(self):
         for legacy_value in (None, "", "obsolete-value"):
             environment = {"DJANGO_SECRET_KEY": "test", "DJANGO_TRUST_PROXY": "1"}

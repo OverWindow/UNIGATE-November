@@ -1,0 +1,5 @@
+{% extends "admin/change_list.html" %}
+{% block object-tools-items %}
+{% if perms.accounts.add_credittransaction %}<li><a href="{% url 'admin:accounts_creditaccount_grant' %}">크레딧 지급</a></li>{% endif %}
+{{ block.super }}
+{% endblock %}
