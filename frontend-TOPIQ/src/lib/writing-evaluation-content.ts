@@ -5,7 +5,7 @@ interface Copy {
   cost: string; unavailable: string; loading: string; processing: string; succeeded: string; failed: string;
   check: string; uncertain: string; retrySame: string; empty: string; result: string; original: string;
   tasks: string; corrections: string; review: string; charged: string; transactions: string; next: string;
-  previous: string; blankFree: string; count: string; savedQuestion: string; back: string;
+  previous: string; count: string; savedQuestion: string; back: string;
   errors: Record<string, string>; kinds: Record<string, string>;
 }
 
@@ -17,7 +17,7 @@ export const evaluationContent: Record<Language, Copy> = {
     check: "처리 상태 확인", uncertain: "접수 또는 완료 여부를 확인하지 못했습니다. 상태를 확인하거나 같은 요청으로 다시 시도하세요.",
     retrySame: "같은 요청 다시 확인", empty: "아직 내역이 없습니다.", result: "평가 결과", original: "제출한 원본 답안",
     tasks: "과제 수행", corrections: "수정 제안", review: "검토 사항", charged: "사용 크레딧", transactions: "크레딧 거래 내역",
-    next: "다음", previous: "이전", blankFree: "완전 미응답은 모델 호출 없이 0점으로 기록되며 크레딧이 차감되지 않습니다.",
+    next: "다음", previous: "이전",
     count: "공백 포함 · 줄바꿈 제외", savedQuestion: "제출 당시 문제", back: "쓰기 세트",
     errors: {
       insufficient_credits: "사용 가능한 크레딧이 부족합니다.", price_changed: "평가 조건이 변경됐습니다. 새 차감량을 확인한 뒤 다시 요청하세요.",
@@ -34,7 +34,7 @@ export const evaluationContent: Record<Language, Copy> = {
     check: "Check status", uncertain: "Receipt or completion could not be confirmed. Check the status or retry the same request.",
     retrySame: "Retry the same request", empty: "No records yet.", result: "Evaluation result", original: "Submitted answer",
     tasks: "Task completion", corrections: "Suggested corrections", review: "Review notes", charged: "Credits charged", transactions: "Credit transactions",
-    next: "Next", previous: "Previous", blankFree: "An entirely blank answer is recorded as zero without a model call or credit charge.",
+    next: "Next", previous: "Previous",
     count: "Including spaces, excluding line breaks", savedQuestion: "Question at submission", back: "Writing sets",
     errors: {
       insufficient_credits: "You do not have enough available credits.", price_changed: "Evaluation terms changed. Review the updated price before submitting again.",
@@ -51,7 +51,7 @@ export const evaluationContent: Record<Language, Copy> = {
     check: "Periksa status", uncertain: "Penerimaan atau penyelesaian belum dapat dipastikan. Periksa status atau ulangi permintaan yang sama.",
     retrySame: "Ulangi permintaan yang sama", empty: "Belum ada riwayat.", result: "Hasil penilaian", original: "Jawaban yang dikirim",
     tasks: "Pemenuhan tugas", corrections: "Saran perbaikan", review: "Catatan tinjauan", charged: "Kredit terpakai", transactions: "Riwayat transaksi kredit",
-    next: "Berikutnya", previous: "Sebelumnya", blankFree: "Jawaban kosong dicatat dengan nilai nol tanpa panggilan model atau pemotongan kredit.",
+    next: "Berikutnya", previous: "Sebelumnya",
     count: "Termasuk spasi, tanpa baris baru", savedQuestion: "Soal saat dikirim", back: "Paket menulis",
     errors: {
       insufficient_credits: "Kredit yang tersedia tidak cukup.", price_changed: "Ketentuan penilaian berubah. Periksa biaya terbaru sebelum mengirim ulang.",

@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Check, Globe, Menu, X } from "lucide-react";
+import { Check, ChevronDown, CreditCard, Globe, LogOut, Menu, UserRound, X } from "lucide-react";
 import { useApp } from "@/app/providers";
 import { authContent } from "@/lib/auth-content";
 import { landingContent, type Language } from "@/lib/landing-content";
@@ -119,11 +119,31 @@ export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: st
                 <button className="account-name" type="button" ref={accountButton} id="account-trigger" title={user.nickname}
                   aria-expanded={accountOpen} aria-controls="account-menu" onClick={() => {
                     setAccountOpen(!accountOpen); setLanguageOpen(false); setMenuOpen(false);
-                  }}>{user.nickname}</button>
+                  }}>
+                  <span>{user.nickname}</span>
+                  <ChevronDown className="account-chevron" size={16} strokeWidth={1.7} aria-hidden="true" />
+                </button>
                 <div className="account-menu" id="account-menu" role="group" aria-labelledby="account-trigger" hidden={!accountOpen}>
-                  <Link href="/credits" aria-current={pathname === "/credits" ? "page" : undefined} onClick={() => setAccountOpen(false)}>{a.credits}</Link>
-                  <button type="button" disabled={loggingOut} aria-busy={loggingOut} onClick={() => onBeforeLogout ? onBeforeLogout(() => void handleLogout()) : void handleLogout()}>{loggingOut ? a.submitting : a.logout}</button>
-                  {logoutError && <p className="account-menu-error" role="alert">{a.network}</p>}
+                  <div className="account-profile">
+                    <span className="account-avatar" aria-hidden="true"><UserRound size={21} strokeWidth={1.6} /></span>
+                    <div className="account-profile-details">
+                      <p className="account-profile-name">{user.nickname}</p>
+                      <p className="account-profile-email">{user.email}</p>
+                    </div>
+                  </div>
+                  <div className="account-menu-section">
+                    <Link href="/credits" aria-current={pathname === "/credits" ? "page" : undefined} onClick={() => setAccountOpen(false)}>
+                      <CreditCard size={19} strokeWidth={1.7} aria-hidden="true" />
+                      <span>{a.credits}</span>
+                    </Link>
+                  </div>
+                  <div className="account-menu-section">
+                    <button type="button" disabled={loggingOut} aria-busy={loggingOut} onClick={() => onBeforeLogout ? onBeforeLogout(() => void handleLogout()) : void handleLogout()}>
+                      <LogOut size={19} strokeWidth={1.7} aria-hidden="true" />
+                      <span>{loggingOut ? a.submitting : a.logout}</span>
+                    </button>
+                    {logoutError && <p className="account-menu-error" role="alert">{a.network}</p>}
+                  </div>
                 </div>
               </div>
             ) : status === "error" ? (

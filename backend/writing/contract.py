@@ -29,9 +29,9 @@ class EvaluationModel(BaseModel):
 
 class LearnerAnswer(EvaluationModel):
     # Preserve whitespace and wording in the submitted answer and evidence quotes.
-    a: str = Field(default="", max_length=2000)
-    b: str = Field(default="", max_length=2000)
-    text: str = Field(default="", max_length=20000)
+    a: str = Field(default="", max_length=200)
+    b: str = Field(default="", max_length=200)
+    text: str = Field(default="", max_length=1000)
 
     def for_slot(self, slot: int) -> dict[str, str]:
         if slot not in SCORE_LIMITS:

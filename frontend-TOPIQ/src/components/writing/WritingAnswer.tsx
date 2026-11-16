@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useApp } from "@/app/providers";
 import { creditsRequest, submitWriting, writingRequest, WritingError, type CreditBalance, type Evaluation, type EvaluationConfig, type LearnerAnswer, type Submission } from "@/lib/writing-api";
@@ -85,7 +84,7 @@ export default function WritingAnswer({ setId, slot, draft, onChange }: { setId:
 
   async function send(event: FormEvent) {
     event.preventDefault();
-    if (!config || busy) return;
+    if (!config || busy || isEmpty) return;
     const answer = slot < 53 ? { a: draft.a ?? "", b: draft.b ?? "" } : { text: draft.text ?? "" };
     const submission = pending.current ?? { id: trackedId.current ?? crypto.randomUUID(), setId, typeSlot: slot, answer, priceVersion: config.priceVersion };
     pending.current = submission;
@@ -114,28 +113,30 @@ export default function WritingAnswer({ setId, slot, draft, onChange }: { setId:
   }
 
   const keys: (keyof LearnerAnswer)[] = slot < 53 ? ["a", "b"] : ["text"];
-  const limit = slot < 53 ? 2000 : 20000;
+  const limit = slot < 53 ? 200 : 1000;
   const cost = config?.prices[slot];
   const enabled = config?.enabled && cost !== null && cost !== undefined;
   const isEmpty = keys.every(key => !(draft[key] ?? "").trim());
   const tooLong = keys.some(key => Array.from(draft[key] ?? "").length > limit);
   const processing = entry?.status === "processing";
   return <section className="writing-answer" aria-label={t.answer}>
-    <div className="writing-answer-heading"><h2>{t.answer}</h2><Link href="/writing/history">{t.history}</Link></div>
-    <p>{balance ? `${t.available}: ${balance.available} · ${t.reserved}: ${balance.reserved} ${t.credits}` : t.loading}</p>
+    <h2>{t.answer}</h2>
     <form onSubmit={event => void send(event)}>
-      {keys.map(key => <label className="writing-answer-field" key={key}>
+      {keys.map(key => <label className={`writing-answer-field${slot < 53 ? " writing-answer-field-inline" : ""}`} key={key}>
         <span>{key === "a" ? "㉠" : key === "b" ? "㉡" : t.answer}</span>
-        <textarea lang="ko" value={draft[key] ?? ""} rows={slot < 53 ? 3 : 12} disabled={busy || processing || (uncertain && pending.current !== null)}
+        <textarea lang="ko" value={draft[key] ?? ""} rows={slot < 53 ? 1 : 12} maxLength={limit} disabled={busy || processing || (uncertain && pending.current !== null)}
           onChange={event => onChange({ ...draft, [key]: event.target.value })} aria-describedby={`writing-count-${slot}-${key}`} />
         <span id={`writing-count-${slot}-${key}`} className="writing-count">{answerLength(draft[key] ?? "")} · {t.count} ({Array.from(draft[key] ?? "").length}/{limit})</span>
       </label>)}
       {tooLong && <p role="alert">{t.errors.invalid_submission}</p>}
-      <p>{enabled ? `${t.cost}: ${isEmpty ? 0 : cost} ${t.credits}` : t.unavailable}</p>
-      <p className="writing-notice">{t.blankFree}</p>
-      <button className="button button-primary" type="submit" disabled={!enabled || !balance || busy || processing || tooLong || (!isEmpty && balance.available < (cost ?? 0) && !uncertain)}>
-        {busy ? t.processing : uncertain ? t.retrySame : t.evaluate}
-      </button>
+      {!enabled && <p>{t.unavailable}</p>}
+      <div className="writing-answer-actions">
+        <button className="button button-primary" type="submit" aria-describedby={enabled ? `writing-cost-${slot}` : undefined}
+          disabled={!enabled || !balance || busy || processing || isEmpty || tooLong || (balance.available < (cost ?? 0) && !uncertain)}>
+          {busy ? t.processing : uncertain ? t.retrySame : t.evaluate}
+        </button>
+        {enabled && <span id={`writing-cost-${slot}`} className="writing-evaluation-cost">{cost} {t.credits}</span>}
+      </div>
     </form>
     {error && <p role="alert">{t.errors[error] ?? t.errors.default}</p>}
     {uncertain && <div role="status"><p>{t.uncertain}</p><button type="button" className="button writing-secondary" disabled={busy} onClick={() => {

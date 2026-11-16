@@ -5,13 +5,17 @@
 .writing-evaluation-result h3 { margin: 18px 0 8px; font-weight: 600; }
 .writing-history > .writing-wallet { margin-bottom: 20px; }
 .writing-history > section { margin-top: 32px; }
-.writing-answer-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-.writing-answer-heading h2 { margin: 0; }
 .writing-answer-field { display: grid; gap: 8px; margin: 20px 0; font-weight: 600; }
+.writing-answer-field-inline { grid-template-columns: auto minmax(0, 1fr); align-items: start; column-gap: 12px; }
+.writing-answer-field-inline > span:first-child { padding-top: 9px; }
+.writing-answer-field-inline .writing-count { grid-column: 2; }
 .writing-answer-field textarea { box-sizing: border-box; width: 100%; min-height: 100px; padding: 14px; border: 1px solid #b7c5db; border-radius: 8px; background: #fff; color: #233651; resize: vertical; font: inherit; font-weight: 400; line-height: 1.9; }
+.writing-answer-field textarea[rows="1"] { min-height: 0; padding: 8px 14px; }
 .writing-answer-field textarea:focus-visible { outline: 3px solid #3866bf; outline-offset: 2px; }
 .writing-answer-field textarea:disabled { background: #f4f6fa; }
 .writing-count { font-size: 12px; color: #596a81; font-weight: 400; }
+.writing-answer-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.writing-evaluation-cost { color: #596a81; font-size: 14px; }
 .writing-answer button:disabled { opacity: .5; cursor: not-allowed; }
 .writing-original { white-space: pre-wrap; padding: 16px; background: #f4f7fc; border-radius: 8px; min-height: 40px; }
 .writing-scores { display: grid; gap: 14px; margin: 20px 0; }

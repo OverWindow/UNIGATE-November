@@ -5,7 +5,6 @@ import { ArrowRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useApp } from "@/app/providers";
 import { writingRequest, WritingError, type WritingSet } from "@/lib/writing-api";
-import { evaluationContent } from "@/lib/writing-evaluation-content";
 import { writingContent } from "@/lib/writing-content";
 
 export default function WritingCatalog() {
@@ -33,7 +32,6 @@ export default function WritingCatalog() {
     </div></section>
     <div className="page-container writing-catalog">
       <p className="writing-notice">{t.notice}</p>
-      <p><Link className="button writing-secondary" href="/writing/history">{evaluationContent[language].history}</Link></p>
       {error ? <div className="writing-status" role="alert"><p>{t.error}</p>
         <button className="button writing-secondary" onClick={() => setRevision(value => value + 1)}>{t.retry}</button>
       </div> : sets === null ? <p className="writing-status" role="status">{t.loading}</p>

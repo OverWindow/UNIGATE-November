@@ -35,6 +35,20 @@ def model_result(request, **kwargs):
 
 
 class ContractTests(SimpleTestCase):
+    def test_answer_length_limits_for_each_question(self):
+        for slot in (51, 52, 53, 54):
+            limit = 200 if slot < 53 else 1000
+            fields = ("a", "b") if slot < 53 else ("text",)
+            inputs = fixture(slot, "input")
+            answer = {field: "가" * limit for field in fields}
+            with self.subTest(slot=slot, length=limit):
+                request = build_request(**(inputs | {"answer": answer}))
+                self.assertEqual(request.payload["answer"], answer)
+            for field in fields:
+                with self.subTest(slot=slot, field=field, length=limit + 1):
+                    with self.assertRaises(ValueError):
+                        build_request(**(inputs | {"answer": answer | {field: "가" * (limit + 1)}}))
+
     def test_handoff_examples_and_raw_answers_are_preserved(self):
         for name in ("51", "52", "53", "54", "empty-51", "empty-53"):
             inputs = fixture(name, "input")
@@ -174,7 +188,8 @@ class EvaluationTests(TransactionTestCase):
         self.provider.assert_not_called()
 
     def test_raw_answer_bounds_and_no_client_problem_or_price(self):
-        for fields in ({"answer": {"a": "x" * 2001}}, {"answer": {"a": True}}, {"typeSlot": True},
+        for fields in ({"answer": {"a": "x" * 201}}, {"answer": {"b": "x" * 201}},
+                       {"answer": {"a": True}}, {"typeSlot": True},
                        {"question": {}}, {"creditCost": 0}):
             self.assertEqual(self.post(self.payload(**fields)).status_code, 400)
         self.provider.assert_not_called()
