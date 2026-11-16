@@ -26,6 +26,20 @@ IBT는 기존 안내·준비 중 화면을 유지합니다. 쓰기는 이번 PBT
 
 문제 등록과 API·테이블 설명은 [프로젝트 README의 PBT 항목](../README.md#pbt-모의고사)을 참고하세요.
 
+## AI 쓰기 튜터 (PBT)
+
+헤더의 AI 쓰기 튜터는 `/writing`으로 연결되며, `/writing/sets/[id]`에서 PBT 51~54번 문제를 봅니다.
+51·52번 지문과 빈칸, 53번 막대·선 그래프와 자료 수치 표, 54번 지문과 작성 조건을 표시합니다.
+한국어·영어·인도네시아어 UI와 모바일 문항 이동을 지원하며 문제 원문은 한국어입니다.
+현재는 문제 조회만 제공하며 답안 입력·저장·제출·채점·IBT 쓰기는 없습니다. 비회원도 이용할 수 있습니다.
+
+`src/app/writing/`, `src/components/writing/`, `src/lib/writing-api.ts`, `src/lib/writing-content.ts`가 관련 코드입니다.
+`GET /api/writing/sets/`, `GET /api/writing/sets/<uuid>/`는 기존 Django origin으로 rewrite됩니다.
+추가 의존성·환경 변수·DB 테이블·컬럼은 없으며 기존 쓰기 테이블을 읽습니다.
+코드 적용 후 **이 폴더에서** 개발 서버를 `npm run dev`로 재시작하거나 운영용 `npm run build` 후 재배포합니다.
+이 명령들은 수동 실행이며 DB를 변경하지 않습니다. 백엔드 모델 매핑 migration의 목적·수동 명령·실행 시점은
+[루트 README의 AI 쓰기 튜터](../README.md#topiq-ai-쓰기-튜터-pbt)를 따릅니다.
+
 ## 급수별 단어장
 
 헤더의 단어장은 `/vocabulary`로 연결됩니다. 3~6급 세트를 24개씩 표시하며 급수·페이지는 URL에 유지합니다.

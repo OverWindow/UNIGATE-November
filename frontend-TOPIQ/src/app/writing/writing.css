@@ -1,0 +1,85 @@
+.writing-main { min-height: 70vh; padding-bottom: 72px; background: #f7f9fc; }
+.writing-main button, .writing-main a, .writing-main summary { -webkit-tap-highlight-color: transparent; }
+.writing-main :is(button, a, summary, [tabindex]):focus-visible { outline: 3px solid #3866bf; outline-offset: 4px; }
+.writing-hero { padding: 48px 0 42px; border-bottom: 1px solid #e3e9f2; background: #eef3fc; }
+.writing-hero h1 { margin: 0 0 14px; font-size: clamp(28px, 4vw, 38px); font-weight: 650; letter-spacing: -.04em; }
+.writing-hero p { max-width: 680px; margin: 0; color: #586981; line-height: 1.9; word-break: keep-all; overflow-wrap: anywhere; }
+.writing-catalog { padding-top: 28px; }
+.writing-notice { margin: 0 0 24px; color: #65728a; font-size: 13px; line-height: 1.8; }
+.writing-set-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; }
+.writing-set-card { padding: 26px; border: 1px solid #dfe6f1; border-radius: 16px; background: #fff; transition: border-color .15s, box-shadow .15s; }
+.writing-set-card:hover { border-color: #89a6d9; box-shadow: 0 8px 24px #24487b0a; }
+.writing-card-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.writing-set-number { font-size: 32px; font-weight: 500; letter-spacing: -.05em; color: #8e9fbc; }
+.writing-badge { display: inline-flex; padding: 5px 10px; border-radius: 6px; background: #edf2fc; color: #3e619f; font-size: 12px; font-weight: 600; }
+.writing-set-card h2 { margin: 28px 0 10px; font-size: 21px; font-weight: 650; }
+.writing-set-card p { margin: 0 0 28px; color: #66758e; font-size: 14px; }
+.writing-set-action { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 18px; border-top: 1px solid #edf0f6; color: #315eb7; font-size: 14px; font-weight: 600; }
+.writing-status { padding: 60px 12px; text-align: center; color: #65728a; line-height: 1.8; }
+.writing-status p { margin: 0 0 20px; }
+.writing-secondary { border: 1px solid #dbe2ed; background: #fff; color: #405674; }
+.writing-secondary:hover:not(:disabled) { background: #eef3fc; border-color: #94afe1; }
+.writing-secondary:disabled { opacity: .45; cursor: default; }
+.writing-study { max-width: 960px; padding-top: 28px; }
+.writing-study-heading { display: flex; justify-content: space-between; align-items: end; gap: 16px; margin: 0 0 26px; }
+.writing-study-heading h1 { margin: 0; font-size: clamp(25px, 4vw, 32px); font-weight: 650; letter-spacing: -.03em; }
+.writing-study-heading p { margin: 0 0 3px; color: #65728a; font-size: 13px; }
+.writing-question-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 24px; }
+.writing-question-nav button { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 15px 10px; border: 1px solid #dfe6f1; border-radius: 10px; background: #fff; color: #61718a; }
+.writing-question-nav button strong { font-size: 20px; font-weight: 600; }
+.writing-question-nav button span { font-size: 13px; }
+.writing-question-nav button[aria-current] { border-color: #547dc5; background: #eaf0fc; color: #2d57a4; }
+.writing-question-nav button:hover { border-color: #96aed7; }
+.writing-question { padding: 32px 40px 40px; border: 1px solid #dfe6f1; border-radius: 18px; background: #fff; overflow-wrap: anywhere; }
+.writing-question-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; font-size: 13px; color: #718099; }
+.writing-question h2 { margin: 22px 0 12px; font-size: 23px; font-weight: 650; scroll-margin-top: 100px; }
+.writing-instruction { margin: 0 0 26px; font-size: 17px; font-weight: 550; line-height: 1.9; white-space: pre-wrap; word-break: keep-all; }
+.writing-passage { padding: 26px 28px; border: 1px solid #dce3ed; background: #fcfdff; border-radius: 4px; }
+.writing-passage h3 { margin: 0 0 18px; text-align: center; font-size: 19px; font-weight: 600; }
+.writing-passage p { margin: 0; white-space: pre-wrap; line-height: 2.2; font-size: 17px; word-break: keep-all; }
+.writing-requirements { display: grid; gap: 12px; padding: 22px 26px 22px 44px; margin: 22px 0 0; border-left: 3px solid #9ab2dc; background: #f4f7fc; line-height: 1.9; list-style: disc; }
+.writing-materials { display: grid; gap: 24px; }
+.writing-material { min-width: 0; margin: 0; padding: 22px; border: 1px solid #e0e6ef; border-radius: 8px; }
+.writing-material figcaption { text-align: center; font-size: 17px; font-weight: 650; line-height: 1.7; }
+.writing-unit { margin: 12px 0 0; text-align: right; color: #63728a; font-size: 12px; }
+.writing-chart-scroll, .writing-table-scroll { max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+.writing-chart { display: block; width: 100%; }
+.writing-axis-label { font-family: inherit; font-size: 13px; fill: #576983; }
+.writing-value-label { font-family: inherit; font-size: 14px; font-weight: 600; fill: #334760; }
+.writing-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 24px; list-style: none; margin: 4px 0 0; padding: 0; color: #52647e; font-size: 13px; }
+.writing-legend li { display: flex; align-items: center; gap: 7px; }
+.writing-legend li span { width: 12px; height: 12px; border-radius: 2px; }
+.writing-data { margin-top: 20px; padding-top: 16px; border-top: 1px solid #edf0f5; color: #52647e; font-size: 13px; }
+.writing-data summary { cursor: pointer; width: fit-content; }
+.writing-data table { width: 100%; margin-top: 16px; border-collapse: collapse; text-align: center; font-size: 13px; }
+.writing-data caption { padding: 8px; font-weight: 600; }
+.writing-data th, .writing-data td { padding: 10px; border: 1px solid #e1e7f0; }
+.writing-data th { background: #f5f7fb; font-weight: 550; }
+.writing-notes { margin: 22px 0 0; padding-left: 22px; list-style: disc; line-height: 1.9; color: #465973; }
+.writing-notes li + li { margin-top: 8px; }
+.writing-source { margin: 18px 0 0; color: #65728a; font-size: 13px; line-height: 1.8; }
+.writing-pager { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin: 24px 0; }
+@media (max-width: 900px) {
+  .writing-set-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .writing-question-nav button { flex-direction: column; gap: 5px; }
+}
+@media (max-width: 600px) {
+  .writing-main { padding-bottom: 48px; }
+  .writing-hero { padding: 32px 0; }
+  .writing-set-grid { grid-template-columns: minmax(0, 1fr); }
+  .writing-study-heading { align-items: start; flex-direction: column; gap: 12px; }
+  .writing-question-nav { gap: 6px; }
+  .writing-question-nav button { padding: 12px 4px; }
+  .writing-question-nav button span { font-size: 11px; line-height: 1.5; }
+  .writing-question { padding: 22px 18px 26px; border-radius: 12px; }
+  .writing-instruction, .writing-passage p { font-size: 16px; }
+  .writing-passage { padding: 20px 18px; }
+  .writing-material { padding: 18px 12px; }
+  .writing-material figcaption { font-size: 16px; }
+  .writing-axis-label, .writing-value-label { font-size: 22px; }
+  .writing-requirements { padding: 18px 18px 18px 32px; }
+  .writing-pager .button { padding-inline: 14px; font-size: 13px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .writing-set-card { transition: none; }
+}

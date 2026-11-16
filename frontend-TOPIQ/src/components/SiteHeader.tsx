@@ -59,9 +59,9 @@ export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: st
   }
 
   const navigation = t.navigation.map((label, index) => {
-    const href = index === 0 ? "/" : index === 1 ? "/pbt" : index === 2 ? "/ibt" : index === 3 ? "/vocabulary" : undefined;
+    const href = index === 0 ? "/" : index === 1 ? "/pbt" : index === 2 ? "/ibt" : index === 3 ? "/vocabulary" : index === 4 ? "/writing" : undefined;
     return href ? (
-      <Link key={href} href={href} aria-current={pathname === href || (href === "/vocabulary" && pathname.startsWith("/vocabulary/")) ? "page" : undefined} onClick={() => setMenuOpen(false)}>{label}</Link>
+      <Link key={href} href={href} aria-current={pathname === href || ((href === "/vocabulary" || href === "/writing") && pathname.startsWith(`${href}/`)) ? "page" : undefined} onClick={() => setMenuOpen(false)}>{label}</Link>
     ) : (
       <button className="pending-nav-button" type="button" key={label} disabled>{label}</button>
     );

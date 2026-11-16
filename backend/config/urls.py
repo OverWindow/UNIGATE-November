@@ -3,6 +3,7 @@ from django.urls import include, path
 
 from surveys import views
 from config.health import health
+from question_bank import writing
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -11,6 +12,8 @@ urlpatterns = [
     path("api/auth/", include("accounts.urls")),
     path("api/pbt/", include("pbt.urls")),
     path("api/vocabulary/", include("vocabulary.urls")),
+    path("api/writing/sets/", writing.sets),
+    path("api/writing/sets/<uuid:set_id>/", writing.detail),
     path("api/ibt/", include("pbt.urls"), {"exam_format": "ibt"}),
     path("api/survey-responses/", views.create_response, name="survey-create"),
 ]

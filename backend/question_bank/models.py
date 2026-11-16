@@ -2,6 +2,32 @@
 from django.db import models
 
 
+class WritingSet(models.Model):
+    set_id = models.UUIDField(primary_key=True)
+    source_key = models.TextField()
+    exam_format = models.TextField()
+    provider = models.TextField()
+    model = models.TextField()
+    created_at = models.DateTimeField()
+    updated_at = models.DateTimeField()
+
+    class Meta:
+        managed = False
+        db_table = '"topik_bank"."writing_sets"'
+
+
+class WritingQuestion(models.Model):
+    pk = models.CompositePrimaryKey("set_id", "type_slot")
+    set_id = models.UUIDField()
+    type_slot = models.SmallIntegerField()
+    source_generated_id = models.BigIntegerField()
+    content_json = models.JSONField()
+
+    class Meta:
+        managed = False
+        db_table = '"topik_bank"."writing_questions"'
+
+
 class Vocabulary(models.Model):
     vocabulary_id = models.BigIntegerField(primary_key=True)
     korean = models.TextField()

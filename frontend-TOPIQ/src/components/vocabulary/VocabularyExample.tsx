@@ -1,5 +1,6 @@
 "use client";
 
+import { Info } from "lucide-react";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useApp } from "@/app/providers";
@@ -8,6 +9,66 @@ import { VocabularyError, vocabularyRequest, type ExampleMeaning, type MeaningLa
 import type { ExampleAnalysis, ExampleAnalyzer, ExampleSegment } from "@/lib/vocabulary-analysis";
 
 type Selection = ExampleSegment & { trigger: HTMLButtonElement };
+
+function ExampleHint({ label, message }: { label: string; message: string }) {
+  const id = useId();
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const tooltip = useRef<HTMLDivElement>(null);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function show() {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    setOpen(true);
+  }
+
+  function hideSoon() {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    hideTimer.current = setTimeout(() => {
+      if (document.activeElement !== trigger.current) setOpen(false);
+    }, 150);
+  }
+
+  useEffect(() => () => { if (hideTimer.current) clearTimeout(hideTimer.current); }, []);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    function position() {
+      if (!trigger.current || !tooltip.current) return;
+      const anchor = trigger.current.getBoundingClientRect();
+      const panel = tooltip.current;
+      panel.style.left = `${Math.max(12, Math.min(anchor.right - panel.offsetWidth, window.innerWidth - panel.offsetWidth - 12))}px`;
+      const top = anchor.top - panel.offsetHeight - 8;
+      panel.style.top = `${Math.max(12, Math.min(top >= 12 ? top : anchor.bottom + 8, window.innerHeight - panel.offsetHeight - 12))}px`;
+    }
+    function outside(event: PointerEvent) {
+      if (event.target instanceof Node && !trigger.current?.contains(event.target) && !tooltip.current?.contains(event.target)) setOpen(false);
+    }
+    function escape(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    position();
+    window.addEventListener("resize", position);
+    window.addEventListener("scroll", position, true);
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("keydown", escape);
+    return () => {
+      window.removeEventListener("resize", position);
+      window.removeEventListener("scroll", position, true);
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [open, message]);
+
+  return <span className="vocabulary-dictionary-hint" onMouseEnter={show} onMouseLeave={hideSoon}>
+    <button ref={trigger} type="button" className="vocabulary-hint-trigger" aria-label={label}
+      aria-describedby={open ? id : undefined} onFocus={show} onBlur={() => setOpen(false)} onClick={show}>
+      <Info size={16} aria-hidden="true" />
+    </button>
+    {open && createPortal(<div ref={tooltip} id={id} className="vocabulary-hint-tooltip" role="tooltip"
+      onMouseEnter={show} onMouseLeave={hideSoon}>{message}</div>, document.body)}
+  </span>;
+}
 
 function MeaningPopup({ wordId, version, selection, meaningLanguage, close, reload }: {
   wordId: string; version: string; selection: Selection; meaningLanguage: MeaningLanguage;
@@ -117,17 +178,19 @@ export default function VocabularyExample({ wordId, text, analyzer, meaningLangu
 
   const changed = error instanceof VocabularyError && error.code === "example_changed";
   return <>
-    <p lang="ko" className="vocabulary-example-text">{data ? data.segments.map((segment, index) => !segment.candidates.length ? segment.text
+    <div className="vocabulary-example-line"><p lang="ko" className="vocabulary-example-text">{data ? data.segments.map((segment, index) => !segment.candidates.length ? segment.text
       : <button key={index} type="button" className="vocabulary-example-word" aria-label={`${segment.text}: ${t.dictionaryLookup}`}
           aria-haspopup="dialog" aria-expanded={selection?.start === segment.start}
           onClick={event => setSelection({ ...segment, trigger: event.currentTarget })}>
           {segment.text}
         </button>) : text}</p>
+      {!error && data?.segments.some(segment => segment.candidates.length) &&
+        <ExampleHint label={`${t.example}: ${t.dictionaryLookup}`} message={t.dictionaryHint} />}
+    </div>
     {error ? <div className="vocabulary-dictionary-status" role="status">
       {changed ? t.dictionaryChanged : t.dictionaryError}{" "}
       <button type="button" className="vocabulary-dictionary-link" onClick={changed ? reload : () => setRevision(value => value + 1)}>{changed ? t.dictionaryReload : t.retry}</button>
-    </div> : !data ? <div className="vocabulary-dictionary-status" role="status">{t.analysisLoading}</div>
-      : data.segments.some(segment => segment.candidates.length) && <div className="vocabulary-dictionary-status">{t.dictionaryHint}</div>}
+    </div> : !data && <div className="vocabulary-dictionary-status" role="status">{t.analysisLoading}</div>}
     {data && selection && <MeaningPopup key={`${data.version}:${selection.start}:${meaningLanguage}`} wordId={wordId}
       version={data.version} selection={selection} meaningLanguage={meaningLanguage} close={close} reload={reload} />}
   </>;

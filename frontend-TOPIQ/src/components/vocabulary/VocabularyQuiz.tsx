@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, RotateCcw } from "lucide-react";
+import { ArrowRight, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
 import { VocabularyError, vocabularyRequest, type MeaningLanguage, type VocabularyAnswer,
@@ -48,7 +48,6 @@ export default function VocabularyQuiz({ id }: { id: string }) {
   const question = questions[index];
   const finished = questions.length > 0 && index === questions.length;
   const changed = checkError instanceof VocabularyError && [404, 409].includes(checkError.status);
-  const backHref = data ? `/vocabulary?level=${data.level}&page=${data.catalogPage}` : "/vocabulary";
 
   async function check() {
     if (selected === null || !question || answer || submission.current || changed) return;
@@ -78,9 +77,6 @@ export default function VocabularyQuiz({ id }: { id: string }) {
   }
 
   return <div className="page-container vocabulary-quiz">
-    <div className="vocabulary-study-top">
-      <Link className="vocabulary-back" href={backHref}><ArrowLeft size={14} aria-hidden="true" /> {t.back}</Link>
-    </div>
     <header className="vocabulary-quiz-header">
       <h1>{t.quizTitle}</h1>
     </header>

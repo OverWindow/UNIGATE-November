@@ -4,6 +4,45 @@
 단일 페이지에서 안내 콘텐츠, 비용 비교, 대학 갤러리와 통계 팝업을 제공하고, PDF 신청 정보를 PostgreSQL에 저장합니다.
 PDF 파일은 운영자가 나중에 수동으로 보냅니다. 이 랜딩페이지에는 자동 다운로드·메일 발송·회원가입·이용자 로그인·결제·백그라운드 작업이 없습니다. 별도 TOPIQ의 인증 기능은 공유 백엔드에 유지합니다.
 
+## TOPIQ AI 쓰기 튜터 (PBT)
+
+헤더의 **AI 쓰기 튜터**는 `/writing`의 PBT 세트 목록으로 연결됩니다.
+`/writing/sets/[id]`에서 51·52번 지문과 빈칸, 53번 막대·선 그래프와 자료 설명,
+54번 지문과 작성 조건을 확인하고 문항 사이를 이동합니다. 그래프의 정확한 수치는 펼침 표로도 제공합니다.
+화면 UI는 한국어·영어·인도네시아어이며 문제 원문은 한국어를 유지합니다.
+비회원도 이용할 수 있으며 답안 입력·저장·제출·채점, 응시 기록, IBT 쓰기, 실시간 AI 생성은 제공하지 않습니다.
+
+기존 `topik_bank.writing_sets`와 `topik_bank.writing_questions`를 읽기 전용으로 사용합니다.
+`exam_format=pbt`이고 51~54번을 모두 가진 세트만 목록에 표시하며 생성 시각·세트 ID 순으로 번호를 부여합니다.
+별도 세트 등록 명령은 필요하지 않습니다. Hub에서 전송한 세트가 다음 조회부터 반영됩니다.
+문제 본문·그래프 형식이 잘못되면 상세 조회를 503으로 처리하고 다시 시도를 안내합니다.
+조회 응답에는 문제 표시용 필드만 포함하며 생성 모델·공급자·원본 생성 ID를 노출하지 않습니다.
+
+| 메서드 | API | 목적 |
+| --- | --- | --- |
+| GET | `/api/writing/sets/` | 완성된 PBT 쓰기 세트 목록 |
+| GET | `/api/writing/sets/<uuid:set_id>/` | 51~54번 문제·자료·작성 조건 |
+
+새 테이블·컬럼이나 기존 테이블·컬럼 변경은 없습니다. `migration/question_bank/0009_writing_models.py`는
+`managed=False` 모델과 `(set_id, type_slot)` 복합 기본키의 Django 상태만 등록하며 테이블 생성·변경 SQL을 실행하지 않습니다.
+기존 Hub 쓰기 테이블이 DB에 있어야 합니다. 추가 의존성·환경 변수·백그라운드 작업은 없습니다.
+
+로컬에서는 코드 업데이트 후 **backend 폴더에서 사용자가 아래 명령을 수동 실행**해 모델 매핑 이력을 등록합니다.
+기존 `0008_vocabulary_questions`까지 적용된 DB를 전제로 하며, 쓰기 데이터나 DB 구조는 바꾸지 않고 Django migration 이력만 기록합니다.
+에이전트는 이 명령을 실행하지 않습니다. 운영은 기존 `deploy/start.sh`의 migrate 후 Gunicorn 시작 절차가 자동 적용합니다.
+
+```powershell
+.\.venv\Scripts\python.exe manage.py migrate question_bank 0009_writing_models
+```
+
+프론트 API rewrite를 반영하려면 **frontend-TOPIQ 폴더에서** 개발 서버를 재시작(`npm run dev`)하거나,
+운영 배포 전 `npm run build`로 다시 빌드합니다. 이 명령들은 수동 실행하며 DB를 변경하지 않습니다.
+로컬 백엔드도 새 코드를 반영하도록 기존 실행 절차로 재시작합니다.
+
+문제 조회·오류 처리·쓰기 메서드 차단·migration SQL 미발생 검사는 **backend 폴더에서**
+`.\.venv\Scripts\python.exe manage.py test question_bank.tests.test_writing`으로 수동 실행합니다.
+이 테스트는 DB를 생성·수정하지 않습니다. 프론트 검사는 **frontend-TOPIQ 폴더에서** `npm test`, `npm run typecheck`, `npm run lint`로 실행합니다.
+
 ## TOPIQ 급수별 단어장
 
 `/vocabulary`에서 3~6급 세트를 선택하고 `/vocabulary/sets/[id]`에서 단어·품사·뜻·예문을 봅니다.
