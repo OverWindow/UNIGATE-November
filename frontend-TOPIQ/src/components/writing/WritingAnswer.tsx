@@ -7,6 +7,7 @@ import { useApp } from "@/app/providers";
 import { submitWriting, writingRequest, WritingError, type Evaluation, type EvaluationConfig, type LearnerAnswer, type Submission } from "@/lib/writing-api";
 import { answerLength, evaluationContent } from "@/lib/writing-evaluation-content";
 import WritingResultModal from "./WritingResultModal";
+import ManuscriptEditor from "./ManuscriptEditor";
 
 const rejected = new Set(["insufficient_credits", "price_changed", "evaluation_busy", "rate_limited", "invalid_submission", "evaluation_unavailable", "question_unavailable", "not_found", "authentication_required", "csrf_failed"]);
 
@@ -26,6 +27,8 @@ export default function WritingAnswer({ setId, setNumber, slot, draft, onChange,
   const [uncertain, setUncertain] = useState(false);
   const [creditNotice, setCreditNotice] = useState(0);
   const [loginNotice, setLoginNotice] = useState(false);
+  const [manuscript, setManuscript] = useState(false);
+  const [composing, setComposing] = useState(false);
   const pending = useRef<Submission | null>(null);
   const trackedId = useRef<string | null>(null);
   const operation = useRef<AbortController | null>(null);
@@ -158,14 +161,27 @@ export default function WritingAnswer({ setId, setNumber, slot, draft, onChange,
   const tooLong = keys.some(key => Array.from(draft[key] ?? "").length > limit);
   const processing = entry?.status === "processing";
   return <section className="writing-answer" aria-label={t.answer}>
-    <h2>{t.answer}</h2>
+    <div className="writing-answer-heading">
+      <h2>{t.answer}</h2>
+      {slot >= 53 && <div className="writing-answer-format" role="group" aria-label={t.answerFormat}>
+        <button type="button" aria-pressed={!manuscript} disabled={composing} onClick={() => setManuscript(false)}>{t.plainFormat}</button>
+        <button type="button" aria-pressed={manuscript} disabled={composing} onClick={() => setManuscript(true)}>{t.manuscriptFormat}</button>
+      </div>}
+    </div>
     <form onSubmit={event => void send(event)}>
-      {keys.map(key => <label className={`writing-answer-field${slot < 53 ? " writing-answer-field-inline" : ""}`} key={key}>
-        <span>{key === "a" ? "㉠" : key === "b" ? "㉡" : t.answer}</span>
-        <textarea lang="ko" value={draft[key] ?? ""} rows={slot < 53 ? 1 : 12} maxLength={limit} disabled={busy || processing || (uncertain && pending.current !== null)}
-          onChange={event => onChange({ ...draft, [key]: event.target.value })} aria-describedby={slot < 53 ? undefined : `writing-count-${slot}-${key}`} />
+      {keys.map(key => <div className={`writing-answer-field${slot < 53 ? " writing-answer-field-inline" : ""}`} key={key}>
+        {slot < 53 ? <>
+          <label htmlFor={`writing-input-${slot}-${key}`}>{key === "a" ? "㉠" : "㉡"}</label>
+          <textarea id={`writing-input-${slot}-${key}`} lang="ko" value={draft[key] ?? ""} rows={1} maxLength={limit}
+            disabled={busy || processing || (uncertain && pending.current !== null)}
+            onChange={event => onChange({ ...draft, [key]: event.target.value })} />
+        </> : <ManuscriptEditor id={`writing-input-${slot}-${key}`} value={draft[key] ?? ""}
+          onChange={value => onChange({ ...draft, [key]: value })} manuscript={manuscript}
+          minimumCells={slot === 53 ? 300 : 700} maxLength={limit} label={t.answer}
+          disabled={busy || processing || (uncertain && pending.current !== null)}
+          describedBy={`writing-count-${slot}-${key}`} onComposingChange={setComposing} />}
         {slot >= 53 && <span id={`writing-count-${slot}-${key}`} className="writing-count">{answerLength(draft[key] ?? "")} · {t.count} ({Array.from(draft[key] ?? "").length}/{limit})</span>}
-      </label>)}
+      </div>)}
       {tooLong && <p role="alert">{t.errors.invalid_submission}</p>}
       {user && !enabled && <p>{t.unavailable}</p>}
       <div className="writing-answer-actions">

@@ -9,11 +9,13 @@ interface Copy {
   processingShort: string; close: string; totalScore: string; points: string; details: string;
   before: string; after: string; viewResult: string; applyCorrection: string; undoCorrection: string; correctedAnswer: string;
   login: string; loginNotice: string;
+  answerFormat: string; plainFormat: string; manuscriptFormat: string;
   errors: Record<string, string>; kinds: Record<string, string>;
 }
 
 export const evaluationContent: Record<Language, Copy> = {
   ko: {
+    answerFormat: "답안 입력 형식", plainFormat: "일반", manuscriptFormat: "원고지",
     answer: "내 답안", evaluate: "평가 요청", history: "내 평가 이력", credits: "크레딧", available: "사용 가능", reserved: "예약 중",
     cost: "이번 평가", unavailable: "이 문항은 아직 평가를 이용할 수 없습니다.", loading: "불러오는 중입니다.",
     processing: "평가 중입니다. 결과는 평가 이력에서도 확인할 수 있습니다.", succeeded: "평가 완료", failed: "평가 실패 · 크레딧 미차감",
@@ -35,6 +37,7 @@ export const evaluationContent: Record<Language, Copy> = {
     }, kinds: { grant: "지급", reserve: "예약", capture: "차감", release: "예약 해제" },
   },
   en: {
+    answerFormat: "Answer format", plainFormat: "Plain", manuscriptFormat: "Manuscript",
     answer: "Your answer", evaluate: "Request evaluation", history: "My evaluations", credits: "Credits", available: "Available", reserved: "Reserved",
     cost: "This evaluation", unavailable: "Evaluation is not yet available for this question.", loading: "Loading…",
     processing: "Evaluation in progress. You can also check your history.", succeeded: "Completed", failed: "Evaluation failed · No credits charged",
@@ -56,6 +59,7 @@ export const evaluationContent: Record<Language, Copy> = {
     }, kinds: { grant: "Granted", reserve: "Reserved", capture: "Charged", release: "Released" },
   },
   id: {
+    answerFormat: "Format jawaban", plainFormat: "Biasa", manuscriptFormat: "Kertas kotak",
     answer: "Jawaban Anda", evaluate: "Minta penilaian", history: "Riwayat penilaian", credits: "Kredit", available: "Tersedia", reserved: "Dicadangkan",
     cost: "Penilaian ini", unavailable: "Penilaian belum tersedia untuk soal ini.", loading: "Memuat…",
     processing: "Penilaian berlangsung. Hasil juga tersedia di riwayat.", succeeded: "Selesai", failed: "Penilaian gagal · Kredit tidak dipotong",

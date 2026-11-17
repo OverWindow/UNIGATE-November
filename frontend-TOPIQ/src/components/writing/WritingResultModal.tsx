@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type RefObject } from "react";
-import { X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { useApp } from "@/app/providers";
 import type { Evaluation } from "@/lib/writing-api";
 import { evaluationContent } from "@/lib/writing-evaluation-content";
@@ -24,14 +24,18 @@ export default function WritingResultModal({ entry, setNumber, error, onRetry, o
   const dialog = useRef<HTMLDialogElement>(null);
   const title = useRef<HTMLHeadingElement>(null);
   const referenceScroll = useRef<HTMLDivElement>(null);
+  const correctionFocusRequest = useRef(0);
   const [compact, setCompact] = useState(false);
   const [tab, setTab] = useState<Tab>("evaluation");
   const [activeCorrection, setActiveCorrection] = useState<number | null>(null);
+  const [correctionsOpen, setCorrectionsOpen] = useState(false);
+  const [questionOpen, setQuestionOpen] = useState(false);
   const [appliedCorrections, setAppliedCorrections] = useState<Record<string, CorrectionMatch[]>>({});
   const question = entry?.question;
   const corrections = entry?.result?.corrections ?? [];
   const tabLabels = { question: w.question, answer: t.answer, evaluation: t.result };
   const hasEdits = Object.values(appliedCorrections).some(matches => matches.length > 0);
+  const waiting = !entry || entry.status === "processing" || Boolean(error);
 
   useEffect(() => {
     const element = dialog.current;
@@ -52,6 +56,8 @@ export default function WritingResultModal({ entry, setNumber, error, onRetry, o
     };
   }, [returnFocusRef]);
 
+  useEffect(() => { title.current?.focus({ preventScroll: true }); }, [waiting, error]);
+
   useEffect(() => {
     const media = window.matchMedia("(max-width: 900px)");
     const update = () => setCompact(media.matches);
@@ -65,10 +71,16 @@ export default function WritingResultModal({ entry, setNumber, error, onRetry, o
   }, [tab, compact]);
 
   function selectCorrection(index: number) {
+    const request = ++correctionFocusRequest.current;
     setTab("evaluation");
     setActiveCorrection(index);
-    // Wait until the mobile evaluation panel is visible before moving focus.
-    requestAnimationFrame(() => {
+    setCorrectionsOpen(true);
+    // Finish the expansion before locating the selected correction in the scroll panel.
+    requestAnimationFrame(async () => {
+      const panel = document.getElementById(`${prefix}-correction-panel`);
+      if (!panel) return;
+      await Promise.allSettled(panel.getAnimations().map(animation => animation.finished));
+      if (request !== correctionFocusRequest.current || !panel.isConnected || panel.getAttribute("aria-hidden") === "true") return;
       const target = document.getElementById(`${prefix}-correction-${index}`);
       target?.focus({ preventScroll: true });
       target?.scrollIntoView({ block: "center", behavior: "instant" });
@@ -89,7 +101,7 @@ export default function WritingResultModal({ entry, setNumber, error, onRetry, o
   function containTabFocus(event: KeyboardEvent<HTMLDialogElement>) {
     if (event.key !== "Tab") return;
     const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>("button, a[href], summary, [tabindex]"))
-      .filter(element => element.tabIndex >= 0 && !element.matches(":disabled") && element.getClientRects().length > 0);
+      .filter(element => element.tabIndex >= 0 && !element.matches(":disabled") && !element.closest("[inert]") && element.getClientRects().length > 0);
     const first = controls[0];
     const last = controls[controls.length - 1];
     const active = document.activeElement;
@@ -112,8 +124,16 @@ export default function WritingResultModal({ entry, setNumber, error, onRetry, o
     };
   }
 
-  return <dialog ref={dialog} className="writing-result-modal" aria-labelledby={`${prefix}-title`}
+  return <dialog ref={dialog} className={waiting ? "writing-result-pending" : "writing-result-modal"} aria-labelledby={`${prefix}-title`}
     onCancel={event => { event.preventDefault(); onClose(); }} onKeyDown={containTabFocus}>
+    {waiting ? <>
+      <button type="button" className="writing-result-close" onClick={onClose} aria-label={t.close}><X size={20} aria-hidden="true" /></button>
+      <div className="writing-result-waiting-content" role={error ? "alert" : "status"}>
+        {!error && <span className="writing-result-loader" aria-hidden="true" />}
+        <h2 ref={title} id={`${prefix}-title`} tabIndex={-1}>{error ? t.result : evaluating || entry?.status === "processing" ? t.processingShort : t.loading}</h2>
+        {error && <><p>{error}</p>{onRetry && <button type="button" className="button writing-secondary" onClick={onRetry}>{t.check}</button>}</>}
+      </div>
+    </> : entry && <>
     <header className="writing-result-modal-header">
       <div><h2 ref={title} id={`${prefix}-title`} tabIndex={-1}>{t.result}</h2>
         {entry && <p>{setNumber !== undefined && <>{w.set} {setNumber} · </>}{w.question} {entry.typeSlot}
@@ -126,11 +146,6 @@ export default function WritingResultModal({ entry, setNumber, error, onRetry, o
         <button type="button" className="writing-result-close" onClick={onClose} aria-label={t.close}><X size={20} aria-hidden="true" /></button>
       </div>
     </header>
-    {error ? <div className="writing-result-modal-state" role="alert"><p>{error}</p>
-      {onRetry && <button type="button" className="button writing-secondary" onClick={onRetry}>{t.check}</button>}
-    </div> : !entry || entry.status === "processing" ? <div className="writing-result-modal-state" role="status">
-      <span className="writing-result-loader" aria-hidden="true" /><p>{evaluating || entry?.status === "processing" ? t.processingShort : t.loading}</p>
-    </div> : <>
       <div className="writing-result-tabs" role="tablist" aria-label={t.result}>
         {tabs.map(name => <button type="button" key={name} id={`${prefix}-tab-${name}`} role="tab"
           aria-selected={tab === name} aria-controls={`${prefix}-panel-${name}`} tabIndex={tab === name ? 0 : -1}
@@ -140,8 +155,14 @@ export default function WritingResultModal({ entry, setNumber, error, onRetry, o
         <div className="writing-result-reference writing-result-pane" hidden={compact && tab === "evaluation"}>
           <div ref={referenceScroll} className="writing-result-scroll" tabIndex={0}>
           <section {...panelProps("question")} className="writing-result-question">
-            <h3 className="writing-result-pane-heading" id={`${prefix}-heading-question`}>{w.question}<span>{t.savedQuestion}</span></h3>
-            <div className="writing-result-section-body">
+            <h3 className="writing-result-pane-heading" id={`${prefix}-heading-question`}>
+              <button type="button" className="writing-question-toggle" aria-expanded={questionOpen} aria-controls={`${prefix}-question-body`}
+                onClick={() => setQuestionOpen(open => !open)}>
+                <span>{w.question}</span><span>{t.savedQuestion}</span><ChevronDown size={15} aria-hidden="true" />
+              </button>
+            </h3>
+            <div id={`${prefix}-question-body`} className="writing-reveal" data-open={questionOpen} aria-hidden={!questionOpen} inert={!questionOpen}>
+            <div><div className="writing-result-section-body">
               {question ? <div lang="ko">
                 <p className="writing-instruction">{question.instruction}</p>
                 {(question.context_title || question.passage) && <div className="writing-passage">
@@ -155,6 +176,7 @@ export default function WritingResultModal({ entry, setNumber, error, onRetry, o
                 {question.data_source && <p className="writing-source"><span lang={language}>{w.source}: </span>{question.data_source}</p>}
                 {question.requirements.length > 0 && <ul className="writing-requirements">{question.requirements.map((requirement, index) => <li key={index}>{requirement}</li>)}</ul>}
               </div> : <p>{t.errors.not_found}</p>}
+            </div></div>
             </div>
           </section>
           <section {...panelProps("answer")} className="writing-result-answer">
@@ -186,7 +208,8 @@ export default function WritingResultModal({ entry, setNumber, error, onRetry, o
         <section {...panelProps("evaluation")} className="writing-result-pane writing-result-evaluation">
           <h3 className="writing-result-pane-heading" id={`${prefix}-heading-evaluation`}>{t.result}</h3>
           <div className="writing-result-scroll" tabIndex={0}>
-            <WritingResult entry={entry} correctionId={`${prefix}-correction`} activeCorrection={activeCorrection} />
+            <WritingResult entry={entry} correctionId={`${prefix}-correction`} activeCorrection={activeCorrection}
+              correctionsOpen={correctionsOpen} onToggleCorrections={() => setCorrectionsOpen(open => !open)} />
           </div>
         </section>
       </div>
