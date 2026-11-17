@@ -91,7 +91,7 @@ export default function WritingHistory({ id }: { id?: string }) {
   const date = (value: string) => new Date(value).toLocaleString(language);
   const questionLabel = (entry: Evaluation) => `${w.set} ${setNumbers[entry.setId] ?? "—"} · ${w.question} ${entry.typeSlot}`;
   return <div className="page-container writing-study writing-history">
-    <nav className="writing-pager"><Link href="/writing">{t.back}</Link>{id && <Link href="/writing/history">{t.history}</Link>}</nav>
+    {id && <nav className="writing-pager"><Link href="/writing/history">{t.history}</Link></nav>}
     <h1>{t.history}</h1>
     {balance && <p className="writing-wallet">{t.available}: <strong>{balance.available}</strong> · {t.reserved}: {balance.reserved} {t.credits}</p>}
     {error && <div role="alert"><p>{t.errors[error] ?? t.errors.default}</p><button className="button writing-secondary" onClick={() => setRevision(value => value + 1)}>{t.check}</button></div>}

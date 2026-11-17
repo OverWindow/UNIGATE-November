@@ -13,7 +13,7 @@ export default function CreditsAccount() {
   const t = creditsContent[language];
   const a = authContent[language];
   return <div className="page-container credits-page">
-    <div className="credits-heading"><h1>{t.title}</h1></div>
+    {(status !== "authenticated" || !user) && <div className="credits-heading"><h1>{t.title}</h1></div>}
     {status === "loading" ? <p className="credits-status" role="status">{a.loading}</p>
       : status === "error" ? <div className="credits-status" role="alert"><p>{a.network}</p><button className="button credits-secondary" onClick={() => void refreshSession()}>{a.retry}</button></div>
       : status !== "authenticated" || !user ? <div className="credits-status"><p>{t.loginRequired}</p><Link className="button button-primary" href="/login?next=%2Fcredits">{a.login}</Link></div>
@@ -66,8 +66,8 @@ function CreditWallet() {
   }
 
   return <>
-    <div className="credits-actions">
-      <Link href="/writing/history">{t.history}</Link>
+    <div className="credits-heading">
+      <h1>{t.title}</h1>
       <button className="button credits-secondary credits-refresh" type="button" aria-label={t.refresh} title={t.refresh}
         disabled={loading} aria-busy={loading} onClick={() => refresh()}>
         <RefreshCw size={20} strokeWidth={1.8} aria-hidden="true" />

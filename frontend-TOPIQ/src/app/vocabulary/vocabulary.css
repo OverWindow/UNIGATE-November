@@ -1,7 +1,7 @@
 .vocabulary-main { min-height: 70vh; background: #f8f9fc; padding-bottom: 72px; }
 .vocabulary-main:has(.vocabulary-study) { height: calc(100dvh - var(--header-height)); min-height: 0; padding: 0; overflow: hidden; }
 .vocabulary-main:has(.vocabulary-study) + .site-footer { display: none; }
-.vocabulary-hero { padding: 56px 0 40px; background: #fff; border-bottom: 1px solid #e6eaf1; }
+.vocabulary-hero { padding: 56px 0 40px; background: radial-gradient(ellipse at 90% 20%, #e7efff, transparent 60%), #fbfcff; border-bottom: 1px solid #e3e9f3; }
 .vocabulary-hero h1 { margin: 0; font-size: clamp(28px, 3.5vw, 42px); font-weight: 650; letter-spacing: -.045em; line-height: 1.35; word-break: keep-all; }
 .vocabulary-hero p:last-child { margin: 16px 0 0; color: var(--color-muted); line-height: 1.8; }
 .vocabulary-catalog { padding-top: 32px; }

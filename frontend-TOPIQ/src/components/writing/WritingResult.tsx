@@ -4,7 +4,7 @@ import { ChevronDown } from "lucide-react";
 import { useApp } from "@/app/providers";
 import type { Evaluation } from "@/lib/writing-api";
 import { evaluationContent } from "@/lib/writing-evaluation-content";
-import { visibleReviewReasons, writingScoreLimits } from "@/lib/writing-result";
+import { visibleReviewReasons, writingScoreLimits, writingTaskLabel } from "@/lib/writing-result";
 
 export default function WritingResult({ entry, correctionId, activeCorrection }: {
   entry: Evaluation; correctionId: string; activeCorrection: number | null;
@@ -15,29 +15,29 @@ export default function WritingResult({ entry, correctionId, activeCorrection }:
   const reviewReasons = visibleReviewReasons(result?.review_reasons ?? []);
   const scoreLimits = writingScoreLimits[entry.typeSlot];
   const labels: Record<string, string> = { a: "㉠", b: "㉡", content: "내용 및 수행 과제", organization: "글의 전개 구조", language: "언어 사용" };
+  const shortLabels: Record<string, string> = { a: "㉠", b: "㉡", content: "내용·과제", organization: "구성", language: "언어" };
   return <section className="writing-evaluation-result" aria-label={t.result}>
-    {entry.totalScore !== null ? <div className="writing-score-summary" role="status">
-      <div><p className="writing-score-status">{t.succeeded}</p><span>{t.totalScore}</span></div>
-      <p className="writing-total-score"><strong>{entry.totalScore}</strong><span>/ {entry.maxScore} {t.points}</span></p>
-    </div> : <p className="writing-result-status" role="status">
-      {entry.status === "processing" && <span className="writing-spinner" aria-hidden="true" />}{t[entry.status]}
-    </p>}
-    <p className="writing-charged">{t.charged}: {entry.chargedCredits} {t.credits}</p>
+    {entry.status === "failed" && <p className="writing-result-status" role="status">{t.failed}</p>}
     {result && <div lang="ko">
       <p className="writing-result-summary">{result.summary}</p>
-      <div className="writing-scores">{Object.entries(result.scores).map(([key, score]) => <section key={key}>
-        <div className="writing-criterion-heading"><h3>{labels[key]}</h3>
-          <p><strong>{score.score}</strong><span> / {scoreLimits?.[key] ?? "—"} <span lang={language}>{t.points}</span></span></p>
-        </div>
-        {entry.typeSlot === 53 || entry.typeSlot === 54 ? <>
-          <progress className="writing-score-progress" value={score.score} max={scoreLimits[key]} aria-label={labels[key]} />
-          <details className="writing-score-details"><summary lang={language}>{t.details}<ChevronDown size={16} aria-hidden="true" /></summary>
-            <div><p>{score.rationale}</p>{score.quotes.map((quote, index) => <blockquote key={index}>{quote}</blockquote>)}</div>
-          </details>
-        </> : <><p>{score.rationale}</p>{score.quotes.map((quote, index) => <blockquote key={index}>{quote}</blockquote>)}</>}
-      </section>)}</div>
-      <h3 lang={language}>{t.tasks}</h3><ul>{result.task_checks.map(check => <li key={check.requirement_id}>
-        <strong>{check.status}</strong> · {check.reason}{check.quotes.map((quote, index) => <blockquote key={index}>{quote}</blockquote>)}
+      <details className="writing-score-details">
+        <summary title={t.details}>
+          <span className="writing-scores">{Object.entries(result.scores).map(([key, score]) => <span key={key}>
+            <span title={labels[key]} aria-label={labels[key]}>{shortLabels[key]}</span>
+            <span><strong>{score.score}</strong><span> / {scoreLimits?.[key] ?? "—"}</span></span>
+          </span>)}</span>
+          <ChevronDown size={15} aria-hidden="true" />
+        </summary>
+        <div className="writing-score-rationales">{Object.entries(result.scores).map(([key, score]) => <section key={key}>
+          <h4>{labels[key]}</h4><p>{score.rationale}</p>
+          {score.quotes.map((quote, index) => <blockquote key={index}>{quote}</blockquote>)}
+        </section>)}</div>
+      </details>
+      <h3 lang={language}>{t.tasks}</h3><ul className="writing-task-list">{result.task_checks.map((check, index) => <li key={check.requirement_id}>
+        <div className="writing-task-heading"><span className="writing-task-status" data-status={check.status}>{check.status}</span>
+          <span>{writingTaskLabel(check.requirement_id, entry.question) ?? `${t.tasks} ${index + 1}`}</span></div>
+        {check.status !== "충족" && <div className="writing-task-reason"><p>{check.reason}</p>
+          {check.quotes.map((quote, quoteIndex) => <blockquote key={quoteIndex}>{quote}</blockquote>)}</div>}
       </li>)}</ul>
       {result.corrections.length > 0 && <section className="writing-corrections">
         <h3 lang={language}>{t.corrections}</h3>

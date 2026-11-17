@@ -6,16 +6,16 @@ import { useApp } from "@/app/providers";
 import type { Evaluation } from "@/lib/writing-api";
 import { evaluationContent } from "@/lib/writing-evaluation-content";
 import { writingContent } from "@/lib/writing-content";
-import { correctionSegments } from "@/lib/writing-result";
+import { correctionSegments, toggleCorrection, type CorrectionMatch } from "@/lib/writing-result";
 import WritingMaterial from "./WritingMaterial";
 import WritingResult from "./WritingResult";
 
 const tabs = ["question", "answer", "evaluation"] as const;
 type Tab = typeof tabs[number];
 
-export default function WritingResultModal({ entry, setNumber, error, onRetry, onClose, returnFocusRef }: {
+export default function WritingResultModal({ entry, setNumber, error, onRetry, onClose, returnFocusRef, evaluating = false }: {
   entry: Evaluation | null; setNumber?: number; error?: string; onRetry?: () => void; onClose: () => void;
-  returnFocusRef?: RefObject<HTMLElement | null>;
+  returnFocusRef?: RefObject<HTMLElement | null>; evaluating?: boolean;
 }) {
   const { language } = useApp();
   const t = evaluationContent[language];
@@ -23,12 +23,15 @@ export default function WritingResultModal({ entry, setNumber, error, onRetry, o
   const prefix = useId();
   const dialog = useRef<HTMLDialogElement>(null);
   const title = useRef<HTMLHeadingElement>(null);
+  const referenceScroll = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(false);
   const [tab, setTab] = useState<Tab>("evaluation");
   const [activeCorrection, setActiveCorrection] = useState<number | null>(null);
+  const [appliedCorrections, setAppliedCorrections] = useState<Record<string, CorrectionMatch[]>>({});
   const question = entry?.question;
   const corrections = entry?.result?.corrections ?? [];
   const tabLabels = { question: w.question, answer: t.answer, evaluation: t.result };
+  const hasEdits = Object.values(appliedCorrections).some(matches => matches.length > 0);
 
   useEffect(() => {
     const element = dialog.current;
@@ -56,6 +59,10 @@ export default function WritingResultModal({ entry, setNumber, error, onRetry, o
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
   }, []);
+
+  useEffect(() => {
+    if (compact) referenceScroll.current?.scrollTo({ top: 0, behavior: "instant" });
+  }, [tab, compact]);
 
   function selectCorrection(index: number) {
     setTab("evaluation");
@@ -112,21 +119,29 @@ export default function WritingResultModal({ entry, setNumber, error, onRetry, o
         {entry && <p>{setNumber !== undefined && <>{w.set} {setNumber} · </>}{w.question} {entry.typeSlot}
           <time dateTime={entry.createdAt}>{new Date(entry.createdAt).toLocaleString(language)}</time></p>}
       </div>
-      <button type="button" className="writing-result-close" onClick={onClose} aria-label={t.close}><X size={22} aria-hidden="true" /></button>
+      <div className="writing-result-header-actions">
+        {entry?.totalScore != null && <p className="writing-header-score" role="status">
+          <span>{t.totalScore}</span><strong>{entry.totalScore}</strong><span>/ {entry.maxScore} {t.points}</span>
+        </p>}
+        <button type="button" className="writing-result-close" onClick={onClose} aria-label={t.close}><X size={20} aria-hidden="true" /></button>
+      </div>
     </header>
     {error ? <div className="writing-result-modal-state" role="alert"><p>{error}</p>
       {onRetry && <button type="button" className="button writing-secondary" onClick={onRetry}>{t.check}</button>}
-    </div> : !entry ? <div className="writing-result-modal-state" role="status"><span className="writing-spinner" aria-hidden="true" />{t.loading}</div> : <>
+    </div> : !entry || entry.status === "processing" ? <div className="writing-result-modal-state" role="status">
+      <span className="writing-result-loader" aria-hidden="true" /><p>{evaluating || entry?.status === "processing" ? t.processingShort : t.loading}</p>
+    </div> : <>
       <div className="writing-result-tabs" role="tablist" aria-label={t.result}>
         {tabs.map(name => <button type="button" key={name} id={`${prefix}-tab-${name}`} role="tab"
           aria-selected={tab === name} aria-controls={`${prefix}-panel-${name}`} tabIndex={tab === name ? 0 : -1}
           onClick={() => setTab(name)} onKeyDown={event => navigateTabs(event, name)}>{tabLabels[name]}</button>)}
       </div>
       <div className="writing-result-layout" data-question={entry.typeSlot}>
-        <div className="writing-result-reference">
-          <section {...panelProps("question")} className="writing-result-pane writing-result-question">
+        <div className="writing-result-reference writing-result-pane" hidden={compact && tab === "evaluation"}>
+          <div ref={referenceScroll} className="writing-result-scroll" tabIndex={0}>
+          <section {...panelProps("question")} className="writing-result-question">
             <h3 className="writing-result-pane-heading" id={`${prefix}-heading-question`}>{w.question}<span>{t.savedQuestion}</span></h3>
-            <div className="writing-result-scroll" tabIndex={0}>
+            <div className="writing-result-section-body">
               {question ? <div lang="ko">
                 <p className="writing-instruction">{question.instruction}</p>
                 {(question.context_title || question.passage) && <div className="writing-passage">
@@ -142,19 +157,31 @@ export default function WritingResultModal({ entry, setNumber, error, onRetry, o
               </div> : <p>{t.errors.not_found}</p>}
             </div>
           </section>
-          <section {...panelProps("answer")} className="writing-result-pane writing-result-answer">
-            <h3 className="writing-result-pane-heading" id={`${prefix}-heading-answer`}>{t.answer}<span>{t.original}</span></h3>
-            <div className="writing-result-scroll writing-correction-context" tabIndex={0}>
-              {corrections.length > 0 && <p className="writing-correction-hint">{t.correctionHint}</p>}
+          <section {...panelProps("answer")} className="writing-result-answer">
+            <h3 className="writing-result-pane-heading" id={`${prefix}-heading-answer`}>{t.answer}<span>{hasEdits ? t.correctedAnswer : t.original}</span></h3>
+            <div className="writing-result-section-body writing-correction-context">
               {entry.answer ? Object.entries(entry.answer).map(([key, value]) => <div key={key} lang="ko">
                 {key !== "text" && <h4>{key === "a" ? "㉠" : "㉡"}</h4>}
-                <p className="writing-original">{value ? correctionSegments(value, corrections).map((segment, index) =>
-                  segment.corrections.length ? <mark className="writing-correction-mark" key={index}>{segment.text}<sup>{segment.corrections.map(number =>
-                    <button type="button" key={number} onClick={() => selectCorrection(number)} lang={language}
-                      aria-label={`${t.corrections} ${number + 1}`} aria-controls={`${prefix}-correction-${number}`}>{number + 1}</button>)}</sup></mark> : segment.text) : "—"}</p>
+                <p className="writing-original">{value ? correctionSegments(value, corrections, appliedCorrections[key]).map(segment =>
+                  segment.corrections.length ? <span className="writing-correction-point" key={segment.start}>
+                    <mark className="writing-correction-mark" data-applied={segment.corrections.some(match =>
+                      appliedCorrections[key]?.some(edit => edit.index === match.index && edit.start === match.start)) || undefined}>{segment.text}</mark>
+                    {segment.corrections.map(match => {
+                      const applied = appliedCorrections[key]?.some(edit => edit.index === match.index && edit.start === match.start) ?? false;
+                      return <span className="writing-correction-controls" key={`${match.index}-${match.start}`} lang={language}>
+                        <button type="button" className="writing-correction-link" onClick={() => selectCorrection(match.index)}
+                          aria-label={`${t.corrections} ${match.index + 1}`} aria-controls={`${prefix}-correction-${match.index}`}>{match.index + 1}</button>
+                        <button type="button" className="writing-correction-toggle" aria-pressed={applied}
+                          aria-label={`${applied ? t.undoCorrection : t.applyCorrection} ${match.index + 1}`}
+                          onClick={() => setAppliedCorrections(previous => ({ ...previous, [key]: toggleCorrection(previous[key] ?? [], match) }))}>
+                          {applied ? t.undoCorrection : t.applyCorrection}</button>
+                      </span>;
+                    })}
+                  </span> : segment.text) : "—"}</p>
               </div>) : <p>{t.empty}</p>}
             </div>
           </section>
+          </div>
         </div>
         <section {...panelProps("evaluation")} className="writing-result-pane writing-result-evaluation">
           <h3 className="writing-result-pane-heading" id={`${prefix}-heading-evaluation`}>{t.result}</h3>

@@ -121,7 +121,7 @@ export default function WritingAnswer({ setId, setNumber, slot, draft, onChange,
     remember(submission.id);
     operation.current?.abort();
     const controller = new AbortController(); operation.current = controller;
-    setBusy(true); setError(""); setEntry(null); setResultOpen(false); setCreditNotice(0);
+    setBusy(true); setError(""); setEntry(null); setResultOpen(true); setCreditNotice(0);
     try {
       const result = await submitWriting(submission, controller.signal, config.timeoutSeconds);
       if (!controller.signal.aborted) accept(result);
@@ -129,6 +129,7 @@ export default function WritingAnswer({ setId, setNumber, slot, draft, onChange,
       if (controller.signal.aborted) return;
       if (cause instanceof WritingError && rejected.has(cause.code)) {
         pending.current = null; remember(null); setUncertain(false);
+        setResultOpen(false);
         if (cause.code === "insufficient_credits") setCreditNotice(value => value + 1);
         else setError(cause.code);
         if (cause.status === 401) void refreshSession();
@@ -142,6 +143,11 @@ export default function WritingAnswer({ setId, setNumber, slot, draft, onChange,
         void refresh(controller.signal).catch(() => {});
       }
     }
+  }
+
+  function checkStatus() {
+    const controller = new AbortController(); operation.current = controller;
+    void check(controller.signal).then(() => refresh(controller.signal)).catch(() => {});
   }
 
   const keys: (keyof LearnerAnswer)[] = slot < 53 ? ["a", "b"] : ["text"];
@@ -181,14 +187,13 @@ export default function WritingAnswer({ setId, setNumber, slot, draft, onChange,
       <button type="button" aria-label={t.close} onClick={() => setCreditNotice(0)}><X size={18} aria-hidden="true" /></button>
     </div>}
     {error && <p role="alert">{t.errors[error] ?? t.errors.default}</p>}
-    {uncertain && <div role="status"><p>{t.uncertain}</p><button type="button" className="button writing-secondary" disabled={busy} onClick={() => {
-      const controller = new AbortController(); operation.current = controller;
-      void check(controller.signal).then(() => refresh(controller.signal)).catch(() => {});
-    }}>{t.check}</button></div>}
+    {uncertain && <div role="status"><p>{t.uncertain}</p><button type="button" className="button writing-secondary" disabled={busy} onClick={checkStatus}>{t.check}</button></div>}
     {entry && <div className="writing-result-launcher">
       <p role="status">{t[entry.status]}{entry.totalScore !== null && <strong>{entry.totalScore} / {entry.maxScore} {t.points}</strong>}</p>
       <button ref={resultTrigger} type="button" className="button writing-secondary" onClick={() => setResultOpen(true)}>{t.viewResult}</button>
     </div>}
-    {entry && resultOpen && <WritingResultModal entry={entry} setNumber={setNumber} returnFocusRef={resultTrigger} onClose={() => setResultOpen(false)} />}
+    {resultOpen && <WritingResultModal entry={entry} setNumber={setNumber} evaluating={busy}
+      error={uncertain && !busy ? t.uncertain : undefined} onRetry={checkStatus}
+      returnFocusRef={resultTrigger} onClose={() => setResultOpen(false)} />}
   </section>;
 }

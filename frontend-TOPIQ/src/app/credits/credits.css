@@ -1,10 +1,8 @@
 .credits-main { min-height: 70vh; padding-block: 44px 72px; background: #f7f9fc; }
 .credits-page { max-width: 960px; }
+.credits-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 24px; }
 .credits-heading h1 { margin: 0; font-size: clamp(28px, 4vw, 36px); font-weight: 650; letter-spacing: -.04em; }
-.credits-actions { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-block: 28px 20px; }
-.credits-actions .credits-refresh { flex: 0 0 44px; width: 44px; min-height: 44px; padding: 0; }
-.credits-actions a { color: #315eb7; font-size: 14px; font-weight: 600; text-underline-offset: 4px; }
-.credits-actions a:hover { text-decoration: underline; }
+.credits-heading .credits-refresh { flex: 0 0 44px; width: 44px; min-height: 44px; padding: 0; }
 .credits-secondary { border-color: #dbe2ed; background: #fff; color: #405674; }
 .credits-secondary:hover:not(:disabled) { background: #eef3fc; border-color: #94afe1; }
 .credits-secondary:disabled { opacity: .45; }
