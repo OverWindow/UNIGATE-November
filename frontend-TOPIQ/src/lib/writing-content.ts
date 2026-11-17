@@ -6,6 +6,7 @@ interface WritingCopy {
   question: string; navigation: string; previous: string; next: string; data: string;
   source: string; unit: string; category: string; types: Record<number, string>;
   submissionHistory: string; submitted: string; notSubmitted: string;
+  viewQuestion: string; close: string;
   catalog: {
     history: string;
     steps: [string, string, string]; stepsLabel: string;
@@ -14,6 +15,7 @@ interface WritingCopy {
 
 export const writingContent: Record<Language, WritingCopy> = {
   ko: {
+    viewQuestion: "{number}번 문제 보기", close: "닫기",
     title: "AI 쓰기 튜터",
     intro: "TOPIK II 쓰기를 연습하고, AI 평가와 첨삭으로 글을 다듬어 보세요.",
     set: "쓰기 세트", questions: "4문항 · 51–54번", open: "문제 풀기",
@@ -30,6 +32,7 @@ export const writingContent: Record<Language, WritingCopy> = {
     types: { 51: "실용문 완성", 52: "설명문 완성", 53: "자료 설명", 54: "주제 글쓰기" },
   },
   en: {
+    viewQuestion: "View question {number}", close: "Close",
     title: "AI Writing Tutor",
     intro: "Practice TOPIK II writing and refine your work with AI feedback and corrections.",
     set: "Writing set", questions: "4 questions · 51–54", open: "Practice now",
@@ -46,6 +49,7 @@ export const writingContent: Record<Language, WritingCopy> = {
     types: { 51: "Practical text", 52: "Explanatory text", 53: "Describing data", 54: "Essay writing" },
   },
   id: {
+    viewQuestion: "Lihat soal {number}", close: "Tutup",
     title: "Tutor Menulis AI",
     intro: "Berlatih menulis TOPIK II dan sempurnakan tulisan dengan penilaian serta koreksi AI.",
     set: "Paket menulis", questions: "4 soal · 51–54", open: "Mulai latihan",

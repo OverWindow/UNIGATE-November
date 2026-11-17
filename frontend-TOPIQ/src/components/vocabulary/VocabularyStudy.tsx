@@ -45,9 +45,23 @@ export default function VocabularyStudy({ id }: { id: string }) {
   }, [id, revision]);
 
   useEffect(() => {
-    cardColumn.current?.scrollTo({ top: 0, behavior: "instant" });
-    wordList.current?.querySelector<HTMLButtonElement>('[aria-current="true"]')?.scrollIntoView({ block: "nearest", behavior: "instant" });
+    meaningRegion.current?.scrollTo({ top: 0, behavior: "instant" });
+    const column = cardColumn.current;
+    if (column && (column.getBoundingClientRect().top < 0 || column.getBoundingClientRect().top >= window.innerHeight)) {
+      column.scrollIntoView({ block: "start", behavior: "instant" });
+    }
   }, [index, data]);
+
+  useEffect(() => {
+    const list = wordList.current;
+    const selected = list?.querySelector<HTMLButtonElement>('[aria-current="true"]');
+    if (!list?.clientHeight || !selected) return;
+    const bounds = list.getBoundingClientRect();
+    const item = selected.getBoundingClientRect();
+    const offset = item.top < bounds.top ? item.top - bounds.top - 8
+      : item.bottom > bounds.bottom ? item.bottom - bounds.bottom + 8 : 0;
+    list.scrollBy({ top: offset, behavior: "instant" });
+  }, [index, data, listOpen]);
 
   useEffect(() => {
     if (revealed) meaningRegion.current?.focus({ preventScroll: true });
@@ -85,36 +99,31 @@ export default function VocabularyStudy({ id }: { id: string }) {
           </div>
           <article className="vocabulary-word-card" aria-labelledby="vocabulary-word">
             <div className="vocabulary-word-front">
-              <VocabularyAudio key={`${word.id}:${word.audioUrl ?? ""}`} word={word.korean} url={word.audioUrl} />
-              {word.partOfSpeech && <span className="vocabulary-pos" lang="ko">{word.partOfSpeech}</span>}
+              <VocabularyAudio key={`${word.id}:${word.audioUrl ?? ""}`} word={word.korean} url={word.audioUrl} partOfSpeech={word.partOfSpeech} />
             </div>
-          </article>
-          <div className={`vocabulary-reveal-area${revealed ? " is-revealed" : ""}`}>
-            <button className="button vocabulary-reveal" aria-expanded={revealed} aria-controls="vocabulary-meaning"
-              aria-hidden={revealed} tabIndex={revealed ? -1 : 0} disabled={revealed} onClick={() => setRevealed(true)}>{t.showMeaning}</button>
-            <div ref={meaningRegion} id="vocabulary-meaning" className={`vocabulary-meaning-region${revealed ? " is-open" : ""}`}
-              role="region" aria-label={t.showMeaning} tabIndex={-1} aria-hidden={!revealed} inert={!revealed}>
-              <div className="vocabulary-meaning-inner"><div className="vocabulary-word-meaning">
+            <div className={`vocabulary-reveal-area${revealed ? " is-revealed" : ""}`}>
+              <button className="button vocabulary-reveal" aria-expanded={revealed} aria-controls="vocabulary-meaning"
+                aria-hidden={revealed} tabIndex={revealed ? -1 : 0} disabled={revealed} onClick={() => setRevealed(true)}>{t.showMeaning}</button>
+              <div ref={meaningRegion} id="vocabulary-meaning" className={`vocabulary-meaning-region${revealed ? " is-open" : ""}`}
+                role="region" aria-label={t.showMeaning} tabIndex={-1} aria-hidden={!revealed} inert={!revealed}>
                 <p className="vocabulary-definition"><span className="vocabulary-definition-label">{t.meaning} :</span>
                   <span lang={meaning ? meaningLanguage : language}>{meaning || t.missingMeaning}</span></p>
                 <div className="vocabulary-example">
                   {revealed ? <VocabularyExample key={`${word.id}:${word.exampleKorean}`} wordId={word.id} text={word.exampleKorean}
                     analyzer={analyzer.current!} meaningLanguage={meaningLanguage} reload={() => setRevision(value => value + 1)} /> : <p lang="ko">{word.exampleKorean}</p>}
                   <p className="vocabulary-example-translation" lang="en">{word.exampleEnglish}</p></div>
-              </div></div>
+              </div>
             </div>
-          </div>
+          </article>
+          <nav className="vocabulary-card-navigation" aria-label={t.wordList}>
+            <button className="button vocabulary-secondary" disabled={index === 0} onClick={() => move(index - 1)}><ArrowLeft size={16} aria-hidden="true" /> {t.previous}</button>
+            {index < data.words.length - 1 ? <button className="button button-primary" onClick={() => move(index + 1)}>{t.next} <ArrowRight size={16} aria-hidden="true" /></button>
+              : data.quizQuestionCount ? <Link className="button button-primary" href={`/vocabulary/sets/${id}/quiz`}>{t.quiz} <ArrowRight size={16} aria-hidden="true" /></Link>
+                : <Link className="button button-primary" href={backHref}>{t.back} <ArrowRight size={16} aria-hidden="true" /></Link>}
+          </nav>
           {index === data.words.length - 1 && <p className="vocabulary-end">{t.lastWord} <button onClick={() => move(0)}>{t.firstWord}</button></p>}
           {index === data.words.length - 1 && !data.quizQuestionCount && <p className="vocabulary-end">{data.quizQuestionCount === null ? t.quizUnavailable : t.quizPreparing}</p>}
         </div>
-      </div>
-      <div className="vocabulary-navigation-bar">
-        <nav className="page-container vocabulary-card-navigation" aria-label={t.wordList}>
-          <button className="button vocabulary-secondary" disabled={index === 0} onClick={() => move(index - 1)}><ArrowLeft size={16} aria-hidden="true" /> {t.previous}</button>
-          {index < data.words.length - 1 ? <button className="button button-primary" onClick={() => move(index + 1)}>{t.next} <ArrowRight size={16} aria-hidden="true" /></button>
-            : data.quizQuestionCount ? <Link className="button button-primary" href={`/vocabulary/sets/${id}/quiz`}>{t.quiz} <ArrowRight size={16} aria-hidden="true" /></Link>
-              : <Link className="button button-primary" href={backHref}>{t.back} <ArrowRight size={16} aria-hidden="true" /></Link>}
-        </nav>
       </div>
     </>}
   </div>;

@@ -5,8 +5,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
 import { WritingError, writingRequest, type WritingDetail, type LearnerAnswer } from "@/lib/writing-api";
 import { writingContent } from "@/lib/writing-content";
-import WritingMaterial from "./WritingMaterial";
 import WritingAnswer from "./WritingAnswer";
+import WritingQuestionContent from "./WritingQuestionContent";
+import WritingQuestionPreview from "./WritingQuestionPreview";
 
 export default function WritingStudy({ id }: { id: string }) {
   const { language, refreshSession } = useApp();
@@ -17,6 +18,7 @@ export default function WritingStudy({ id }: { id: string }) {
   const [index, setIndex] = useState(0);
   const [drafts, setDrafts] = useState<Record<number, LearnerAnswer>>({});
   const heading = useRef<HTMLHeadingElement>(null);
+  const prompt = useRef<HTMLDivElement>(null);
   const pendingFocus = useRef(false);
 
   const markSubmitted = useCallback((slot: number) => {
@@ -73,25 +75,16 @@ export default function WritingStudy({ id }: { id: string }) {
         </button>)}
       </nav>
       <article className="writing-question" aria-labelledby="writing-question-heading">
-        <div className="writing-question-top"><span className="writing-badge">{t.types[question.number]}</span><span>{index + 1} / {data.questionCount}</span></div>
-        <h2 id="writing-question-heading" ref={heading} tabIndex={-1}>{t.question} {question.number}</h2>
-        <div lang="ko">
-          <p className="writing-instruction">{question.instruction}</p>
-          {question.passage && <div className="writing-passage">
-            {question.contextTitle && <h3>{question.contextTitle}</h3>}
-            <p>{question.passage}</p>
-          </div>}
-          {question.number === 53 && question.imageUrl
-            ? <img className="writing-material-image" src={question.imageUrl} alt={`${question.topic} 자료`} />
-            : question.materials.length > 0 && <div className="writing-materials">{question.materials.map((material, position) =>
-            <WritingMaterial key={`${question.number}-${position}`} material={material} language={language} />)}</div>}
-          {question.materialNotes.length > 0 && <ul className="writing-notes">{question.materialNotes.map((note, position) => <li key={position}>{note}</li>)}</ul>}
-          {question.dataSource && <p className="writing-source"><span lang={language}>{t.source}: </span>{question.dataSource}</p>}
-          {question.requirements.length > 0 && <ul className="writing-requirements">{question.requirements.map((requirement, position) => <li key={position}>{requirement}</li>)}</ul>}
+        <div ref={prompt} className="writing-question-prompt">
+          <div className="writing-question-top"><span className="writing-badge">{t.types[question.number]}</span><span>{index + 1} / {data.questionCount}</span></div>
+          <h2 id="writing-question-heading" ref={heading} tabIndex={-1}>{t.question} {question.number}</h2>
+          <WritingQuestionContent question={question} language={language} />
         </div>
         <WritingAnswer key={question.number} setId={id} setNumber={data.number} slot={question.number} draft={drafts[question.number] ?? {}}
           onChange={answer => setDrafts(previous => ({ ...previous, [question.number]: answer }))} onSubmitted={markSubmitted} />
       </article>
+      {(question.number === 53 || question.number === 54) && <WritingQuestionPreview key={`${id}-${question.number}`}
+        question={question} language={language} promptRef={prompt} />}
       <div className="writing-pager">
         <button className="button writing-secondary" disabled={index === 0} onClick={() => move(index - 1, true)}><ArrowLeft size={16} aria-hidden="true" />{t.previous}</button>
         {index < data.questions.length - 1 && <button className="button button-primary" onClick={() => move(index + 1, true)}>{t.next}<ArrowRight size={16} aria-hidden="true" /></button>}

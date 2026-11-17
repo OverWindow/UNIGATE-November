@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
 import { vocabularyContent } from "@/lib/vocabulary-content";
 
-export default function VocabularyAudio({ word, url }: { word: string; url: string | null }) {
+export default function VocabularyAudio({ word, url, partOfSpeech }: { word: string; url: string | null; partOfSpeech: string }) {
   const { language } = useApp();
   const t = vocabularyContent[language];
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -53,12 +53,13 @@ export default function VocabularyAudio({ word, url }: { word: string; url: stri
     : phase === "playing" ? t.audioPlaying : phase === "error" ? t.audioError : "";
 
   return <div className="vocabulary-pronunciation">
-    <div className="vocabulary-word-heading">
-      <h2 id="vocabulary-word" lang="ko">{word}</h2>
+    <h2 id="vocabulary-word" lang="ko">{word}</h2>
+    <div className="vocabulary-word-meta">
+      {partOfSpeech && <span className="vocabulary-pos" lang="ko">{partOfSpeech}</span>}
       <button type="button" className={`vocabulary-audio-button${phase === "playing" ? " is-playing" : ""}`}
         disabled={!url || phase === "loading"} aria-label={`${word}: ${label}`} title={label} onClick={() => void play()}>
-        {phase === "loading" ? <LoaderCircle size={22} className="vocabulary-audio-spinner" aria-hidden="true" />
-          : <Volume2 size={22} aria-hidden="true" />}
+        {phase === "loading" ? <LoaderCircle size={16} className="vocabulary-audio-spinner" aria-hidden="true" />
+          : <Volume2 size={16} aria-hidden="true" />}
       </button>
     </div>
     <p className="vocabulary-audio-status" role="status">{status}</p>

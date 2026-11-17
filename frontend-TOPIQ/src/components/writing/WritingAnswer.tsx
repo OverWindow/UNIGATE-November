@@ -163,7 +163,7 @@ export default function WritingAnswer({ setId, setNumber, slot, draft, onChange,
   return <section className="writing-answer" aria-label={t.answer}>
     <div className="writing-answer-heading">
       <h2>{t.answer}</h2>
-      {slot >= 53 && <div className="writing-answer-format" role="group" aria-label={t.answerFormat}>
+      {slot >= 53 && <div className="writing-answer-format" role="group" aria-label={t.answerFormat} data-format={manuscript ? "manuscript" : "plain"}>
         <button type="button" aria-pressed={!manuscript} disabled={composing} onClick={() => setManuscript(false)}>{t.plainFormat}</button>
         <button type="button" aria-pressed={manuscript} disabled={composing} onClick={() => setManuscript(true)}>{t.manuscriptFormat}</button>
       </div>}

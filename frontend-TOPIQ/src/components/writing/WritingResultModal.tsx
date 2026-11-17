@@ -29,9 +29,10 @@ export default function WritingResultModal({ entry, setNumber, error, onRetry, o
   const [tab, setTab] = useState<Tab>("evaluation");
   const [activeCorrection, setActiveCorrection] = useState<number | null>(null);
   const [correctionsOpen, setCorrectionsOpen] = useState(false);
-  const [questionOpen, setQuestionOpen] = useState(false);
+  const [questionExpanded, setQuestionExpanded] = useState<boolean | null>(null);
   const [appliedCorrections, setAppliedCorrections] = useState<Record<string, CorrectionMatch[]>>({});
   const question = entry?.question;
+  const questionOpen = questionExpanded ?? (entry?.typeSlot === 51 || entry?.typeSlot === 52);
   const corrections = entry?.result?.corrections ?? [];
   const tabLabels = { question: w.question, answer: t.answer, evaluation: t.result };
   const hasEdits = Object.values(appliedCorrections).some(matches => matches.length > 0);
@@ -157,7 +158,7 @@ export default function WritingResultModal({ entry, setNumber, error, onRetry, o
           <section {...panelProps("question")} className="writing-result-question">
             <h3 className="writing-result-pane-heading" id={`${prefix}-heading-question`}>
               <button type="button" className="writing-question-toggle" aria-expanded={questionOpen} aria-controls={`${prefix}-question-body`}
-                onClick={() => setQuestionOpen(open => !open)}>
+                onClick={() => setQuestionExpanded(!questionOpen)}>
                 <span>{w.question}</span><span>{t.savedQuestion}</span><ChevronDown size={15} aria-hidden="true" />
               </button>
             </h3>
