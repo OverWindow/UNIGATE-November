@@ -9,6 +9,7 @@ from django.views.decorators.http import require_GET
 from django.utils.cache import patch_vary_headers
 
 from pbt.bank import media_url
+from writing.models import Evaluation
 
 from .models import WritingQuestion, WritingSet
 
@@ -46,8 +47,22 @@ def complete_sets():
     return WritingSet.objects.filter(exam_format="pbt", set_id__in=complete).order_by("created_at", "set_id")
 
 
-def summary(group, number):
-    return {"id": str(group.pk), "number": number, "questionCount": len(SLOTS)}
+def submitted_slots(user_id, set_ids):
+    history = {}
+    if not set_ids:
+        return history
+    # All saved evaluations count, including processing and failed attempts.
+    rows = Evaluation.objects.filter(user_id=user_id, set_id__in=set_ids).order_by(
+        "set_id", "type_slot",
+    ).values_list("set_id", "type_slot").distinct()
+    for set_id, slot in rows:
+        history.setdefault(set_id, []).append(slot)
+    return history
+
+
+def summary(group, number, history):
+    return {"id": str(group.pk), "number": number, "questionCount": len(SLOTS),
+            "submittedSlots": history.get(group.pk, [])}
 
 
 def text(value):
@@ -123,8 +138,9 @@ def question(item):
 @require_GET
 @available
 def sets(request):
-    groups = complete_sets().only("set_id", "created_at")
-    return response({"sets": [summary(group, number) for number, group in enumerate(groups, 1)]})
+    groups = list(complete_sets().only("set_id", "created_at"))
+    history = submitted_slots(request.user.pk, [group.pk for group in groups])
+    return response({"sets": [summary(group, number, history) for number, group in enumerate(groups, 1)]})
 
 
 @require_GET
@@ -140,4 +156,5 @@ def detail(request, set_id):
     number = groups.filter(Q(created_at__lt=group.created_at) | Q(
         created_at=group.created_at, set_id__lt=group.pk,
     )).count() + 1
-    return response({**summary(group, number), "questions": [question(item) for item in items]})
+    history = submitted_slots(request.user.pk, [set_id])
+    return response({**summary(group, number, history), "questions": [question(item) for item in items]})

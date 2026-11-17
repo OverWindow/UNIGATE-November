@@ -1,17 +1,21 @@
 import copy
 import importlib
+import json
 import uuid
+from datetime import timedelta
 from types import SimpleNamespace
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from unittest.mock import MagicMock, patch
 
 from django.db import DatabaseError, connection
 from django.db.migrations.state import ProjectState
-from django.test import SimpleTestCase
+from django.test import RequestFactory, SimpleTestCase, TestCase
 from django.utils import timezone
 
 from ..models import WritingQuestion, WritingSet
-from ..writing import WritingUnavailable, material, question
+from ..writing import WritingUnavailable, detail as set_detail, material, question, sets
+from writing.models import Evaluation
 
 
 def prompt(slot):
@@ -82,9 +86,12 @@ class WritingPromptTests(SimpleTestCase):
 
 class WritingAPITests(SimpleTestCase):
     def setUp(self):
-        self.auth = patch("django.contrib.auth.middleware.get_user", return_value=SimpleNamespace(is_authenticated=True))
+        self.auth = patch("django.contrib.auth.middleware.get_user", return_value=SimpleNamespace(is_authenticated=True, pk=1))
         self.auth.start()
         self.addCleanup(self.auth.stop)
+        evaluations = patch("question_bank.writing.Evaluation.objects")
+        evaluations.start().filter.return_value.order_by.return_value.values_list.return_value.distinct.return_value = []
+        self.addCleanup(evaluations.stop)
         self.set_id = uuid.uuid4()
         self.group = WritingSet(set_id=self.set_id, created_at=timezone.now())
         self.path = f"/api/writing/sets/{self.set_id}/"
@@ -94,7 +101,8 @@ class WritingAPITests(SimpleTestCase):
         complete.return_value.only.return_value = [self.group]
         result = self.client.get("/api/writing/sets/")
         self.assertEqual(result.status_code, 200)
-        self.assertEqual(result.json(), {"sets": [{"id": str(self.set_id), "number": 1, "questionCount": 4}]})
+        self.assertEqual(result.json(), {"sets": [{"id": str(self.set_id), "number": 1, "questionCount": 4,
+                                                  "submittedSlots": []}]})
         self.assertEqual(result["Cache-Control"], "private, no-store")
         self.assertNotIn("sessionid", result.cookies)
         complete.return_value.only.return_value = []
@@ -136,3 +144,72 @@ class WritingAPITests(SimpleTestCase):
             for method in (self.client.post, self.client.put, self.client.patch, self.client.delete):
                 self.assertEqual(method(path).status_code, 405)
         self.assertEqual(self.client.post(self.path + "submit/").status_code, 404)
+
+
+class WritingSubmissionHistoryTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username="submission-fixture")
+        self.other = get_user_model().objects.create_user(username="submission-other")
+        self.group = WritingSet(set_id=uuid.uuid4(), created_at=timezone.now())
+        self.second = WritingSet(set_id=uuid.uuid4(), created_at=timezone.now())
+        self.empty = WritingSet(set_id=uuid.uuid4(), created_at=timezone.now())
+        self.factory = RequestFactory()
+        bank = patch("question_bank.writing.complete_sets")
+        self.groups = bank.start().return_value
+        self.groups.only.return_value = [self.group, self.second, self.empty]
+        self.groups.filter.return_value.first.return_value = self.group
+        self.groups.filter.return_value.count.return_value = 0
+        self.addCleanup(bank.stop)
+        questions = patch("question_bank.writing.WritingQuestion.objects")
+        questions.start().filter.return_value.order_by.return_value = [
+            WritingQuestion(type_slot=slot, content_json=prompt(slot)) for slot in (51, 52, 53, 54)
+        ]
+        self.addCleanup(questions.stop)
+
+    def record(self, slot, *, status="succeeded", user=None, group=None):
+        return Evaluation.objects.create(
+            user=user or self.user, set_id=(group or self.group).pk, type_slot=slot,
+            question_snapshot={}, answer={}, credit_cost=0, status=status,
+            expires_at=timezone.now() - timedelta(days=1),
+            completed_at=None if status == "processing" else timezone.now(),
+            result={} if status == "succeeded" else None,
+            total_score=0 if status == "succeeded" else None,
+        )
+
+    def read(self, *, user=None, detail=False):
+        request = self.factory.get("/api/writing/sets/")
+        request.user = user or self.user
+        with self.assertNumQueries(1):
+            result = set_detail(request, self.group.pk) if detail else sets(request)
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result["Cache-Control"], "private, no-store")
+        self.assertIn("Cookie", result["Vary"])
+        return json.loads(result.content)
+
+    def test_all_saved_statuses_and_old_submissions_count_once(self):
+        self.record(53, status="processing")
+        self.record(52, status="failed")
+        # More than a page of newer attempts must not hide earlier slots.
+        for _ in range(25):
+            self.record(51)
+        self.record(54, user=self.other)
+        self.record(54, group=self.second)
+        self.record(54, group=WritingSet(set_id=uuid.uuid4()))
+        result = self.read()
+        self.assertEqual([entry["submittedSlots"] for entry in result["sets"]], [[51, 52, 53], [54], []])
+        self.assertEqual(self.read(detail=True)["submittedSlots"], [51, 52, 53])
+        self.assertEqual(self.read(user=self.other)["sets"][0]["submittedSlots"], [54])
+        self.assertEqual(self.read(user=self.other, detail=True)["submittedSlots"], [54])
+        self.assertEqual(Evaluation.objects.filter(status="processing").count(), 1)
+
+    def test_no_history_returns_empty_arrays(self):
+        self.record(51, user=self.other)
+        self.assertEqual([entry["submittedSlots"] for entry in self.read()["sets"]], [[], [], []])
+        self.assertEqual(self.read(detail=True)["submittedSlots"], [])
+
+    def test_empty_catalog_does_not_query_history(self):
+        self.groups.only.return_value = []
+        request = self.factory.get("/api/writing/sets/")
+        request.user = self.user
+        with self.assertNumQueries(0):
+            self.assertJSONEqual(sets(request).content, {"sets": []})

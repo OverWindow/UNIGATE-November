@@ -9,7 +9,10 @@ import WritingResult from "./WritingResult";
 
 const rejected = new Set(["insufficient_credits", "price_changed", "evaluation_busy", "rate_limited", "invalid_submission", "evaluation_unavailable", "question_unavailable", "not_found", "authentication_required", "csrf_failed"]);
 
-export default function WritingAnswer({ setId, slot, draft, onChange }: { setId: string; slot: number; draft: LearnerAnswer; onChange: (answer: LearnerAnswer) => void }) {
+export default function WritingAnswer({ setId, slot, draft, onChange, onSubmitted }: {
+  setId: string; slot: number; draft: LearnerAnswer; onChange: (answer: LearnerAnswer) => void;
+  onSubmitted: (slot: number) => void;
+}) {
   const { language, user, refreshSession, creditBalance: balance, refreshCredits } = useApp();
   const t = evaluationContent[language];
   const [config, setConfig] = useState<EvaluationConfig | null>(null);
@@ -37,6 +40,7 @@ export default function WritingAnswer({ setId, slot, draft, onChange }: { setId:
 
   function accept(result: Evaluation) {
     setEntry(result); setUncertain(false); setError("");
+    onSubmitted(result.typeSlot);
     if (result.status !== "processing") { pending.current = null; remember(null); }
   }
 
@@ -127,7 +131,7 @@ export default function WritingAnswer({ setId, slot, draft, onChange }: { setId:
   }
 
   const keys: (keyof LearnerAnswer)[] = slot < 53 ? ["a", "b"] : ["text"];
-  const limit = slot < 53 ? 200 : 1000;
+  const limit = slot < 53 ? 100 : 1000;
   const cost = config?.prices[slot];
   const enabled = config?.enabled && cost !== null && cost !== undefined;
   const isEmpty = keys.every(key => !(draft[key] ?? "").trim());
@@ -139,8 +143,8 @@ export default function WritingAnswer({ setId, slot, draft, onChange }: { setId:
       {keys.map(key => <label className={`writing-answer-field${slot < 53 ? " writing-answer-field-inline" : ""}`} key={key}>
         <span>{key === "a" ? "㉠" : key === "b" ? "㉡" : t.answer}</span>
         <textarea lang="ko" value={draft[key] ?? ""} rows={slot < 53 ? 1 : 12} maxLength={limit} disabled={busy || processing || (uncertain && pending.current !== null)}
-          onChange={event => onChange({ ...draft, [key]: event.target.value })} aria-describedby={`writing-count-${slot}-${key}`} />
-        <span id={`writing-count-${slot}-${key}`} className="writing-count">{answerLength(draft[key] ?? "")} · {t.count} ({Array.from(draft[key] ?? "").length}/{limit})</span>
+          onChange={event => onChange({ ...draft, [key]: event.target.value })} aria-describedby={slot < 53 ? undefined : `writing-count-${slot}-${key}`} />
+        {slot >= 53 && <span id={`writing-count-${slot}-${key}`} className="writing-count">{answerLength(draft[key] ?? "")} · {t.count} ({Array.from(draft[key] ?? "").length}/{limit})</span>}
       </label>)}
       {tooLong && <p role="alert">{t.errors.invalid_submission}</p>}
       {!enabled && <p>{t.unavailable}</p>}

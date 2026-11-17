@@ -1,7 +1,7 @@
 "use client";
 
-import { ArrowLeft, ArrowRight } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
 import { WritingError, writingRequest, type WritingDetail, type LearnerAnswer } from "@/lib/writing-api";
 import { writingContent } from "@/lib/writing-content";
@@ -18,6 +18,12 @@ export default function WritingStudy({ id }: { id: string }) {
   const [drafts, setDrafts] = useState<Record<number, LearnerAnswer>>({});
   const heading = useRef<HTMLHeadingElement>(null);
   const pendingFocus = useRef(false);
+
+  const markSubmitted = useCallback((slot: number) => {
+    setData(previous => !previous || previous.submittedSlots?.includes(slot) ? previous : {
+      ...previous, submittedSlots: [...(previous.submittedSlots ?? []), slot].sort((a, b) => a - b),
+    });
+  }, []);
 
   useEffect(() => {
     setData(null); setError(null); setIndex(0);
@@ -50,6 +56,7 @@ export default function WritingStudy({ id }: { id: string }) {
   }
 
   const question = data?.questions[index];
+  const submittedSlots = data?.submittedSlots ?? [];
   return <div className="page-container writing-study">
     {error ? <div className="writing-status" role="alert">
       <p>{error instanceof WritingError && error.status === 404 ? t.notFound : t.error}</p>
@@ -58,8 +65,11 @@ export default function WritingStudy({ id }: { id: string }) {
       <div className="writing-study-heading"><h1>{t.set} {data.number}</h1><p>{t.questions}</p></div>
       <nav className="writing-question-nav" aria-label={t.navigation} data-question={question.number}>
         {data.questions.map((entry, position) => <button type="button" key={entry.number}
+          aria-label={`${entry.number} · ${t.types[entry.number]}${submittedSlots.includes(entry.number) ? ` · ${t.submitted}` : ""}`}
           aria-current={position === index ? "step" : undefined} onClick={() => move(position)}>
-          <strong>{entry.number}</strong><span>{t.types[entry.number]}</span>
+          <strong>{entry.number}{submittedSlots.includes(entry.number) && <span className="writing-tab-submitted" title={t.submitted}>
+            <Check size={12} aria-hidden="true" />
+          </span>}</strong><span>{t.types[entry.number]}</span>
         </button>)}
       </nav>
       <article className="writing-question" aria-labelledby="writing-question-heading">
@@ -81,7 +91,7 @@ export default function WritingStudy({ id }: { id: string }) {
         </div>
       </article>
       <WritingAnswer key={question.number} setId={id} slot={question.number} draft={drafts[question.number] ?? {}}
-        onChange={answer => setDrafts(previous => ({ ...previous, [question.number]: answer }))} />
+        onChange={answer => setDrafts(previous => ({ ...previous, [question.number]: answer }))} onSubmitted={markSubmitted} />
       <div className="writing-pager">
         <button className="button writing-secondary" disabled={index === 0} onClick={() => move(index - 1, true)}><ArrowLeft size={16} aria-hidden="true" />{t.previous}</button>
         {index < data.questions.length - 1 && <button className="button button-primary" onClick={() => move(index + 1, true)}>{t.next}<ArrowRight size={16} aria-hidden="true" /></button>}

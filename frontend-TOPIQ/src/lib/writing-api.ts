@@ -1,4 +1,4 @@
-export interface WritingSet { id: string; number: number; questionCount: number }
+export interface WritingSet { id: string; number: number; questionCount: number; submittedSlots: number[] }
 export interface WritingMaterial {
   kind: "bar" | "line" | "table"; title: string; unit: string; categories?: string[];
   series?: { label: string; values: number[] }[]; columns?: string[]; rows?: string[][];
