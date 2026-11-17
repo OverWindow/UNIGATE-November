@@ -19,14 +19,28 @@ interface AppContextValue {
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
+const languageStorageKey = "topiq-language";
 
 export default function Providers({ children }: { children: ReactNode }) {
-  const [language, setLanguage] = useState<Language>("ko");
+  const [language, setLanguageState] = useState<Language>("ko");
   const [user, setUser] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState<AppContextValue["status"]>("loading");
   const [creditBalance, setCreditBalance] = useState<CreditBalance | null>(null);
   const generation = useRef(0);
   const creditRequest = useRef(0);
+
+  useEffect(() => {
+    // Restore after hydration so the initial render matches the server.
+    try {
+      const saved = localStorage.getItem(languageStorageKey);
+      if (saved === "ko" || saved === "en" || saved === "id") setLanguageState(saved);
+    } catch { /* Storage may be unavailable. */ }
+  }, []);
+
+  const setLanguage = useCallback((next: Language) => {
+    setLanguageState(next);
+    try { localStorage.setItem(languageStorageKey, next); } catch { /* Keep the in-memory selection. */ }
+  }, []);
 
   useEffect(() => { document.documentElement.lang = language; }, [language]);
 
@@ -79,7 +93,7 @@ export default function Providers({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(() => ({ language, setLanguage, user, status, refreshSession, creditBalance, refreshCredits, login, signup, logout }),
-    [language, user, status, refreshSession, creditBalance, refreshCredits, login, signup, logout]);
+    [language, setLanguage, user, status, refreshSession, creditBalance, refreshCredits, login, signup, logout]);
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 

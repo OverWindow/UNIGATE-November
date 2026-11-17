@@ -97,7 +97,7 @@ class WritingAPITests(SimpleTestCase):
         self.path = f"/api/writing/sets/{self.set_id}/"
 
     @patch("question_bank.writing.complete_sets")
-    def test_catalog_requires_login_and_does_not_create_a_session(self, complete):
+    def test_catalog_does_not_create_a_session(self, complete):
         complete.return_value.only.return_value = [self.group]
         result = self.client.get("/api/writing/sets/")
         self.assertEqual(result.status_code, 200)
@@ -107,9 +107,40 @@ class WritingAPITests(SimpleTestCase):
         self.assertNotIn("sessionid", result.cookies)
         complete.return_value.only.return_value = []
         self.assertEqual(self.client.get("/api/writing/sets/").json(), {"sets": []})
+
+    @patch("question_bank.writing.Evaluation.objects.filter")
+    @patch("question_bank.writing.WritingQuestion.objects")
+    @patch("question_bank.writing.complete_sets")
+    def test_guests_can_read_prompts_without_querying_personal_history(self, complete, questions, history):
+        groups = complete.return_value
+        groups.only.return_value = [self.group]
+        groups.filter.return_value.first.return_value = self.group
+        groups.filter.return_value.count.return_value = 0
+        questions.filter.return_value.order_by.return_value = [
+            WritingQuestion(type_slot=slot, content_json=prompt(slot)) for slot in (51, 52, 53, 54)
+        ]
         with patch("django.contrib.auth.middleware.get_user", return_value=AnonymousUser()):
-            self.assertEqual(self.client.get("/api/writing/sets/").status_code, 401)
-            self.assertEqual(self.client.get(self.path).status_code, 401)
+            catalog = self.client.get("/api/writing/sets/")
+            detail = self.client.get(self.path)
+        for result in (catalog, detail):
+            self.assertEqual(result.status_code, 200)
+            self.assertEqual(result["Cache-Control"], "private, no-store")
+            self.assertIn("Cookie", result["Vary"])
+            self.assertNotIn("sessionid", result.cookies)
+        self.assertEqual(catalog.json()["sets"][0]["submittedSlots"], [])
+        self.assertEqual(detail.json()["submittedSlots"], [])
+        self.assertEqual([entry["number"] for entry in detail.json()["questions"]], [51, 52, 53, 54])
+        history.assert_not_called()
+
+    def test_guests_cannot_evaluate_or_read_private_data(self):
+        with patch("django.contrib.auth.middleware.get_user", return_value=AnonymousUser()):
+            for path in ("/api/writing/evaluation-config/", "/api/writing/evaluations/",
+                         f"/api/writing/evaluations/{uuid.uuid4()}/", "/api/credits/", "/api/credits/transactions/"):
+                with self.subTest(path=path):
+                    result = self.client.get(path)
+                    self.assertEqual(result.status_code, 401)
+                    self.assertEqual(result.json(), {"error": "authentication_required"})
+            self.assertEqual(self.client.post("/api/writing/evaluations/", {}, content_type="application/json").status_code, 401)
 
     @patch("question_bank.writing.WritingQuestion.objects")
     @patch("question_bank.writing.complete_sets")

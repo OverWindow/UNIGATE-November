@@ -1,26 +1,31 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { CircleAlert, X } from "lucide-react";
 import { useApp } from "@/app/providers";
 import { submitWriting, writingRequest, WritingError, type Evaluation, type EvaluationConfig, type LearnerAnswer, type Submission } from "@/lib/writing-api";
 import { answerLength, evaluationContent } from "@/lib/writing-evaluation-content";
-import WritingResult from "./WritingResult";
+import WritingResultModal from "./WritingResultModal";
 
 const rejected = new Set(["insufficient_credits", "price_changed", "evaluation_busy", "rate_limited", "invalid_submission", "evaluation_unavailable", "question_unavailable", "not_found", "authentication_required", "csrf_failed"]);
 
-export default function WritingAnswer({ setId, slot, draft, onChange, onSubmitted }: {
-  setId: string; slot: number; draft: LearnerAnswer; onChange: (answer: LearnerAnswer) => void;
+export default function WritingAnswer({ setId, setNumber, slot, draft, onChange, onSubmitted }: {
+  setId: string; setNumber: number; slot: number; draft: LearnerAnswer; onChange: (answer: LearnerAnswer) => void;
   onSubmitted: (slot: number) => void;
 }) {
   const { language, user, refreshSession, creditBalance: balance, refreshCredits } = useApp();
   const t = evaluationContent[language];
   const [config, setConfig] = useState<EvaluationConfig | null>(null);
   const [entry, setEntry] = useState<Evaluation | null>(null);
+  const [resultOpen, setResultOpen] = useState(false);
+  const resultTrigger = useRef<HTMLButtonElement>(null);
+  const autoOpened = useRef<string | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [uncertain, setUncertain] = useState(false);
   const [creditNotice, setCreditNotice] = useState(0);
+  const [loginNotice, setLoginNotice] = useState(false);
   const pending = useRef<Submission | null>(null);
   const trackedId = useRef<string | null>(null);
   const operation = useRef<AbortController | null>(null);
@@ -42,6 +47,10 @@ export default function WritingAnswer({ setId, slot, draft, onChange, onSubmitte
     setEntry(result); setUncertain(false); setError("");
     onSubmitted(result.typeSlot);
     if (result.status !== "processing") { pending.current = null; remember(null); }
+    if (result.status === "succeeded" && autoOpened.current !== result.id) {
+      autoOpened.current = result.id;
+      setResultOpen(true);
+    }
   }
 
   async function check(signal: AbortSignal) {
@@ -58,6 +67,7 @@ export default function WritingAnswer({ setId, slot, draft, onChange, onSubmitte
   }
 
   useEffect(() => {
+    if (!user) return;
     const controller = new AbortController();
     operation.current = controller;
     try { trackedId.current = sessionStorage.getItem(storageKey); } catch { /* Storage may be unavailable. */ }
@@ -95,6 +105,10 @@ export default function WritingAnswer({ setId, slot, draft, onChange, onSubmitte
 
   async function send(event: FormEvent) {
     event.preventDefault();
+    if (!user) {
+      setLoginNotice(true);
+      return;
+    }
     if (!config || !enabled || !balance || busy || processing || isEmpty || tooLong) return;
     // A retry may refer to an evaluation whose credits are already reserved.
     if (balance.available < (cost ?? 0) && !uncertain) {
@@ -107,7 +121,7 @@ export default function WritingAnswer({ setId, slot, draft, onChange, onSubmitte
     remember(submission.id);
     operation.current?.abort();
     const controller = new AbortController(); operation.current = controller;
-    setBusy(true); setError(""); setEntry(null); setCreditNotice(0);
+    setBusy(true); setError(""); setEntry(null); setResultOpen(false); setCreditNotice(0);
     try {
       const result = await submitWriting(submission, controller.signal, config.timeoutSeconds);
       if (!controller.signal.aborted) accept(result);
@@ -147,16 +161,20 @@ export default function WritingAnswer({ setId, slot, draft, onChange, onSubmitte
         {slot >= 53 && <span id={`writing-count-${slot}-${key}`} className="writing-count">{answerLength(draft[key] ?? "")} · {t.count} ({Array.from(draft[key] ?? "").length}/{limit})</span>}
       </label>)}
       {tooLong && <p role="alert">{t.errors.invalid_submission}</p>}
-      {!enabled && <p>{t.unavailable}</p>}
+      {user && !enabled && <p>{t.unavailable}</p>}
       <div className="writing-answer-actions">
         <button className="button button-primary" type="submit" aria-busy={busy || processing} aria-describedby={enabled ? `writing-cost-${slot}` : undefined}
-          disabled={!enabled || !balance || busy || processing || isEmpty || tooLong}>
+          disabled={!!user && (!enabled || !balance || busy || processing || isEmpty || tooLong)}>
           {(busy || processing) && <span className="writing-spinner" aria-hidden="true" />}
           {busy || processing ? t.processingShort : uncertain ? t.retrySame : t.evaluate}
         </button>
         {enabled && <span id={`writing-cost-${slot}`} className="writing-evaluation-cost">{cost} {t.credits}</span>}
       </div>
     </form>
+    {loginNotice && !user && <div className="writing-login-notice" role="status">
+      <p>{t.loginNotice}</p>
+      <Link className="button button-primary" href={`/login?next=${encodeURIComponent(`/writing/sets/${setId}`)}`}>{t.login}</Link>
+    </div>}
     {busy && !entry && <p className="writing-evaluation-loading" role="status">{t.processing}</p>}
     {creditNotice > 0 && <div className="writing-credit-toast" key={creditNotice} role="alert">
       <CircleAlert size={20} aria-hidden="true" /><span>{t.errors.insufficient_credits}</span>
@@ -167,6 +185,10 @@ export default function WritingAnswer({ setId, slot, draft, onChange, onSubmitte
       const controller = new AbortController(); operation.current = controller;
       void check(controller.signal).then(() => refresh(controller.signal)).catch(() => {});
     }}>{t.check}</button></div>}
-    {entry && <WritingResult entry={entry} />}
+    {entry && <div className="writing-result-launcher">
+      <p role="status">{t[entry.status]}{entry.totalScore !== null && <strong>{entry.totalScore} / {entry.maxScore} {t.points}</strong>}</p>
+      <button ref={resultTrigger} type="button" className="button writing-secondary" onClick={() => setResultOpen(true)}>{t.viewResult}</button>
+    </div>}
+    {entry && resultOpen && <WritingResultModal entry={entry} setNumber={setNumber} returnFocusRef={resultTrigger} onClose={() => setResultOpen(false)} />}
   </section>;
 }

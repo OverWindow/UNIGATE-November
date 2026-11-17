@@ -62,10 +62,9 @@ main:focus { outline: none; }
 .header-login { display: inline-flex; align-items: center; justify-content: center; }
 .header-login:hover:not(:disabled) { color: var(--color-primary); }
 .account-actions { position: relative; display: grid; justify-items: end; }
-.account-name { display: inline-flex; align-items: center; gap: 10px; max-width: 160px; min-height: 32px; padding: 4px 8px; border: 0; border-radius: 8px; background: transparent; color: #253450; font-size: 13px; font-weight: 600; white-space: nowrap; transition: background-color .2s, color .2s; }
+.account-name { display: inline-flex; align-items: center; gap: 10px; max-width: 180px; min-height: 44px; padding: 10px 16px; border: 1px solid #d8e0ed; border-radius: 8px; background: transparent; color: #253450; font-size: 13px; font-weight: 600; white-space: nowrap; transition: background-color .2s, color .2s; }
 .account-name > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .account-name:hover, .account-name[aria-expanded="true"] { background: #f0f4fc; color: var(--color-primary); }
-.account-credit { margin: 0; padding: 0 8px 3px; color: #748198; font-size: 11px; line-height: 1.5; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .account-chevron { flex-shrink: 0; color: #748198; transition: transform .2s ease; }
 .account-name[aria-expanded="true"] .account-chevron { transform: rotate(180deg); }
 .account-menu { width: 300px; min-width: 0; max-width: calc(100vw - 40px); padding: 0; border-radius: 14px; box-shadow: 0 12px 32px #25416c14, 0 2px 6px #25416c08; }
@@ -74,13 +73,13 @@ main:focus { outline: none; }
   from { opacity: 0; transform: translateY(-8px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.account-profile { display: flex; align-items: flex-start; gap: 12px; padding: 18px; }
+.account-profile { display: flex; align-items: flex-start; gap: 12px; padding: 24px; }
 .account-avatar { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 40px; height: 40px; border-radius: 50%; background: #f3f5f9; color: #637087; }
 .account-profile-details { min-width: 0; padding-top: 1px; }
 .account-profile-name { margin: 0; color: #253450; font-size: 14px; font-weight: 650; line-height: 1.5; overflow-wrap: anywhere; }
 .account-profile-email { margin: 3px 0 0; color: #748198; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
-.account-menu-section { padding: 6px; border-top: 1px solid #edf0f5; }
-.account-menu button, .account-menu a { justify-content: flex-start; gap: 11px; min-height: 44px; font-size: 14px; transition: background-color .15s, color .15s; }
+.account-menu-section { padding: 8px; border-top: 1px solid #edf0f5; }
+.account-menu button, .account-menu a { justify-content: flex-start; gap: 11px; min-height: 50px; padding: 14px 16px; font-size: 14px; transition: background-color .15s, color .15s; }
 .account-menu button svg, .account-menu a svg { flex-shrink: 0; }
 .account-menu button:disabled { opacity: .6; }
 .account-menu-error { margin: 6px 0 0; padding: 10px 12px; border-radius: 7px; background: #fff8f5; color: #914332; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
@@ -304,7 +303,7 @@ details[open] .faq-indicator::after { transform: rotate(0); }
 .auth-connection-error .button { width: 100%; margin-top: 15px; }
 
 @media (max-width: 767px) {
-  .account-name { gap: 6px; max-width: 108px; min-height: 36px; padding: 6px 9px; font-size: 12px; }
+  .account-name { gap: 8px; max-width: 128px; min-height: 40px; padding: 9px 12px; font-size: 12px; }
   .account-menu { max-width: calc(100vw - 64px); }
   .auth-main { justify-content: flex-start; padding: 32px 16px; }
   .auth-card { padding: 28px 24px; border-radius: 20px; }

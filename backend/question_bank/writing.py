@@ -1,4 +1,4 @@
-"""Read authenticated PBT writing prompts from the Hub."""
+"""Read public PBT writing prompts with optional personal submission history."""
 import math
 from functools import wraps
 
@@ -31,8 +31,6 @@ def response(data, status=200):
 def available(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
-        if not args[0].user.is_authenticated:
-            return response({"error": "authentication_required"}, 401)
         try:
             return view(*args, **kwargs)
         except (DatabaseError, WritingUnavailable):
@@ -49,7 +47,7 @@ def complete_sets():
 
 def submitted_slots(user_id, set_ids):
     history = {}
-    if not set_ids:
+    if user_id is None or not set_ids:
         return history
     # All saved evaluations count, including processing and failed attempts.
     rows = Evaluation.objects.filter(user_id=user_id, set_id__in=set_ids).order_by(

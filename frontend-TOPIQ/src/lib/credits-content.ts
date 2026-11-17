@@ -2,7 +2,7 @@ import type { Language } from "./landing-content";
 import type { CreditEntry } from "./writing-api";
 
 interface Copy {
-  title: string; description: string; available: string; balance: string; reserved: string; unit: string;
+  title: string; available: string; balance: string; reserved: string; unit: string;
   balanceNote: string; transactions: string; transactionNote: string; balanceAfter: string; reservedAfter: string;
   result: string; history: string; empty: string; loading: string; error: string; retry: string; refresh: string;
   loginRequired: string; previous: string; next: string; page: string;
@@ -11,7 +11,7 @@ interface Copy {
 
 export const creditsContent: Record<Language, Copy> = {
   ko: {
-    title: "크레딧", description: "사용 가능한 크레딧과 거래 내역을 확인하세요.",
+    title: "크레딧",
     available: "사용 가능", balance: "보유 크레딧", reserved: "예약 중", unit: "크레딧",
     balanceNote: "보유 크레딧에는 예약 중인 금액이 포함됩니다. 사용 가능액은 보유액에서 예약액을 뺀 금액입니다.",
     transactions: "거래 내역", transactionNote: "예약은 평가를 위해 크레딧을 잠시 확보하는 단계입니다. 평가가 완료되면 차감하고, 실패하면 예약을 해제합니다.",
@@ -22,7 +22,7 @@ export const creditsContent: Record<Language, Copy> = {
     kinds: { grant: "지급", reserve: "예약", capture: "차감", release: "예약 해제" },
   },
   en: {
-    title: "Credits", description: "Check your available credits and transaction history.",
+    title: "Credits",
     available: "Available", balance: "Total balance", reserved: "Reserved", unit: "credits",
     balanceNote: "Your total balance includes reserved credits. Available credits are your total balance minus reservations.",
     transactions: "Transactions", transactionNote: "A reservation sets credits aside for an evaluation. Credits are charged when it completes, or released if it fails.",
@@ -33,7 +33,7 @@ export const creditsContent: Record<Language, Copy> = {
     kinds: { grant: "Granted", reserve: "Reserved", capture: "Charged", release: "Released" },
   },
   id: {
-    title: "Kredit", description: "Lihat kredit yang tersedia dan riwayat transaksi Anda.",
+    title: "Kredit",
     available: "Tersedia", balance: "Total saldo", reserved: "Dicadangkan", unit: "kredit",
     balanceNote: "Total saldo termasuk kredit yang dicadangkan. Kredit tersedia adalah total saldo dikurangi cadangan.",
     transactions: "Riwayat transaksi", transactionNote: "Cadangan menyisihkan kredit untuk penilaian. Kredit dipotong saat penilaian selesai, atau dilepas jika gagal.",

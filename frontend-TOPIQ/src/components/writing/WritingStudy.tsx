@@ -89,9 +89,9 @@ export default function WritingStudy({ id }: { id: string }) {
           {question.dataSource && <p className="writing-source"><span lang={language}>{t.source}: </span>{question.dataSource}</p>}
           {question.requirements.length > 0 && <ul className="writing-requirements">{question.requirements.map((requirement, position) => <li key={position}>{requirement}</li>)}</ul>}
         </div>
+        <WritingAnswer key={question.number} setId={id} setNumber={data.number} slot={question.number} draft={drafts[question.number] ?? {}}
+          onChange={answer => setDrafts(previous => ({ ...previous, [question.number]: answer }))} onSubmitted={markSubmitted} />
       </article>
-      <WritingAnswer key={question.number} setId={id} slot={question.number} draft={drafts[question.number] ?? {}}
-        onChange={answer => setDrafts(previous => ({ ...previous, [question.number]: answer }))} onSubmitted={markSubmitted} />
       <div className="writing-pager">
         <button className="button writing-secondary" disabled={index === 0} onClick={() => move(index - 1, true)}><ArrowLeft size={16} aria-hidden="true" />{t.previous}</button>
         {index < data.questions.length - 1 && <button className="button button-primary" onClick={() => move(index + 1, true)}>{t.next}<ArrowRight size={16} aria-hidden="true" /></button>}

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Info, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useApp } from "@/app/providers";
 import { authContent } from "@/lib/auth-content";
@@ -12,7 +13,7 @@ export default function CreditsAccount() {
   const t = creditsContent[language];
   const a = authContent[language];
   return <div className="page-container credits-page">
-    <div className="credits-heading"><h1>{t.title}</h1><p>{t.description}</p></div>
+    <div className="credits-heading"><h1>{t.title}</h1></div>
     {status === "loading" ? <p className="credits-status" role="status">{a.loading}</p>
       : status === "error" ? <div className="credits-status" role="alert"><p>{a.network}</p><button className="button credits-secondary" onClick={() => void refreshSession()}>{a.retry}</button></div>
       : status !== "authenticated" || !user ? <div className="credits-status"><p>{t.loginRequired}</p><Link className="button button-primary" href="/login?next=%2Fcredits">{a.login}</Link></div>
@@ -34,10 +35,12 @@ function CreditWallet() {
   const [revision, setRevision] = useState(0);
   const [data, setData] = useState<WalletData | null>(null);
   const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [infoOpen, setInfoOpen] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
-    setData(null); setError(false);
+    setLoading(true); setError(false);
     async function load() {
       try {
         // Read the ledger after the balance endpoint has released expired reservations.
@@ -48,24 +51,31 @@ function CreditWallet() {
         if (controller.signal.aborted) return;
         setError(true);
         if (cause instanceof WritingError && cause.status === 401) void refreshSession();
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
     void load();
     return () => controller.abort();
   }, [page, revision, refreshSession, refreshCredits]);
 
-  const current = data?.page === page ? data : null;
+  const current = data;
   const number = (value: number) => value.toLocaleString(language);
-  const refresh = () => { setData(null); setError(false); setRevision(value => value + 1); };
+  function refresh(nextPage = page) {
+    setLoading(true); setError(false); setPage(nextPage); setRevision(value => value + 1);
+  }
 
   return <>
     <div className="credits-actions">
       <Link href="/writing/history">{t.history}</Link>
-      <button className="button credits-secondary" disabled={!current && !error} onClick={refresh}>{t.refresh}</button>
+      <button className="button credits-secondary credits-refresh" type="button" aria-label={t.refresh} title={t.refresh}
+        disabled={loading} aria-busy={loading} onClick={() => refresh()}>
+        <RefreshCw size={20} strokeWidth={1.8} aria-hidden="true" />
+      </button>
     </div>
-    {error ? <div className="credits-status" role="alert"><p>{t.error}</p><button className="button credits-secondary" onClick={refresh}>{t.retry}</button></div>
-      : !current ? <p className="credits-status" role="status">{t.loading}</p>
-      : <>
+    {error && <div className="credits-status" role="alert"><p>{t.error}</p><button className="button credits-secondary" onClick={() => refresh()}>{t.retry}</button></div>}
+    {!current ? !error && <p className="credits-status credits-loading" role="status"><RefreshCw className="credits-loading-icon" size={20} aria-hidden="true" />{t.loading}</p>
+      : <div className="credits-content" aria-busy={loading}>
         <dl className="credits-balances">
           <div className="credits-available"><dt>{t.available}</dt><dd>{number(current.balance.available)} <span>{t.unit}</span></dd></div>
           <div><dt>{t.balance}</dt><dd>{number(current.balance.balance)} <span>{t.unit}</span></dd></div>
@@ -73,26 +83,34 @@ function CreditWallet() {
         </dl>
         <p className="credits-note">{t.balanceNote}</p>
         <section className="credits-history" aria-labelledby="credit-transactions-heading">
-          <h2 id="credit-transactions-heading">{t.transactions}</h2>
-          <p className="credits-note">{t.transactionNote}</p>
+          <div className="credits-history-heading">
+            <h2 id="credit-transactions-heading">{t.transactions}</h2>
+            <span className="credits-info" onMouseEnter={() => setInfoOpen(true)} onMouseLeave={() => setInfoOpen(false)}
+              onFocus={() => setInfoOpen(true)} onBlur={() => setInfoOpen(false)}
+              onKeyDown={event => { if (event.key === "Escape") setInfoOpen(false); }}>
+              <button className="credits-info-trigger" type="button" aria-label={`${t.transactions} · ${t.reserved}`}
+                aria-describedby={infoOpen ? "credit-reservation-info" : undefined} onClick={() => setInfoOpen(true)}>
+                <Info size={17} aria-hidden="true" />
+              </button>
+              {infoOpen && <span className="credits-info-tooltip" id="credit-reservation-info" role="tooltip"><span>{t.transactionNote}</span></span>}
+            </span>
+          </div>
           {current.transactions.length === 0 ? <p className="credits-empty">{t.empty}</p>
-            : <ul className="credits-transactions">{current.transactions.map(entry => <li key={entry.id}>
+            : <div className="credits-transactions-scroll" role="region" aria-labelledby="credit-transactions-heading" tabIndex={0}>
+              <ul className="credits-transactions">{current.transactions.map(entry => <li key={entry.id}>
               <div className="credits-transaction-heading">
                 <span className={`credits-kind credits-kind-${entry.kind}`}>{t.kinds[entry.kind]}</span>
                 <time dateTime={entry.createdAt}>{new Date(entry.createdAt).toLocaleString(language)}</time>
-                <strong className={`credits-amount credits-amount-${entry.kind}`}>{entry.kind === "grant" ? "+" : entry.kind === "capture" ? "−" : ""}{number(entry.amount)} <span>{t.unit}</span></strong>
               </div>
-              <div className="credits-transaction-details">
-                <dl><div><dt>{t.balanceAfter}</dt><dd>{number(entry.balanceAfter)}</dd></div><div><dt>{t.reservedAfter}</dt><dd>{number(entry.reservedAfter)}</dd></div></dl>
-                {entry.evaluationId && <Link href={`/writing/history/${entry.evaluationId}`}>{t.result}</Link>}
-              </div>
-            </li>)}</ul>}
+              <dl className="credits-transaction-details"><div><dt>{t.balanceAfter}</dt><dd>{number(entry.balanceAfter)}</dd></div><div><dt>{t.reservedAfter}</dt><dd>{number(entry.reservedAfter)}</dd></div></dl>
+              <strong className={`credits-amount credits-amount-${entry.kind}`}>{entry.kind === "grant" ? "+" : entry.kind === "capture" ? "−" : ""}{number(entry.amount)} <span>{t.unit}</span></strong>
+            </li>)}</ul></div>}
           <nav className="credits-pagination" aria-label={t.transactions}>
-            <button className="button credits-secondary" disabled={page === 1} onClick={() => setPage(value => value - 1)}>{t.previous}</button>
-            <span aria-live="polite">{t.page} {number(page)}</span>
-            <button className="button credits-secondary" disabled={current.nextPage === null} onClick={() => current.nextPage !== null && setPage(current.nextPage)}>{t.next}</button>
+            <button className="button credits-secondary" disabled={loading || current.page === 1} onClick={() => refresh(current.page - 1)}>{t.previous}</button>
+            <span aria-live="polite">{t.page} {number(current.page)}</span>
+            <button className="button credits-secondary" disabled={loading || current.nextPage === null} onClick={() => current.nextPage !== null && refresh(current.nextPage)}>{t.next}</button>
           </nav>
         </section>
-      </>}
+      </div>}
   </>;
 }

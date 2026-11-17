@@ -7,7 +7,8 @@ interface Copy {
   tasks: string; corrections: string; review: string; charged: string; transactions: string; next: string;
   previous: string; count: string; savedQuestion: string; back: string;
   processingShort: string; close: string; totalScore: string; points: string; details: string;
-  correctionContext: string; correctionHint: string; before: string; after: string;
+  correctionContext: string; correctionHint: string; before: string; after: string; viewResult: string;
+  login: string; loginNotice: string;
   errors: Record<string, string>; kinds: Record<string, string>;
 }
 
@@ -23,7 +24,8 @@ export const evaluationContent: Record<Language, Copy> = {
     count: "공백 포함 · 줄바꿈 제외", savedQuestion: "제출 당시 문제", back: "쓰기 세트",
     processingShort: "평가 중…", close: "닫기", totalScore: "총점", points: "점", details: "상세히 보기",
     correctionContext: "전체 원문에서 수정 위치", correctionHint: "강조된 부분의 번호를 누르면 수정 전·후 표현과 이유를 확인할 수 있어요.",
-    before: "수정 전", after: "수정 제안",
+    before: "수정 전", after: "수정 제안", viewResult: "평가 결과 보기",
+    login: "로그인", loginNotice: "로그인 후 크레딧을 받아 쓰기 평가를 이용할 수 있어요.",
     errors: {
       insufficient_credits: "크레딧이 부족해요", price_changed: "평가 조건이 변경됐습니다. 새 차감량을 확인한 뒤 다시 요청하세요.",
       evaluation_busy: "다른 평가가 진행 중입니다. 잠시 후 다시 요청하세요.", rate_limited: "요청이 많습니다. 잠시 후 다시 시도하세요.",
@@ -43,7 +45,8 @@ export const evaluationContent: Record<Language, Copy> = {
     count: "Including spaces, excluding line breaks", savedQuestion: "Question at submission", back: "Writing sets",
     processingShort: "Evaluating…", close: "Close", totalScore: "Total score", points: "points", details: "View details",
     correctionContext: "Corrections in your full answer", correctionHint: "Select a number in the highlighted text to see the original wording, suggested change, and reason.",
-    before: "Before", after: "Suggested change",
+    before: "Before", after: "Suggested change", viewResult: "View evaluation result",
+    login: "Sign in", loginNotice: "Sign in to receive credits and use writing evaluations.",
     errors: {
       insufficient_credits: "You do not have enough available credits.", price_changed: "Evaluation terms changed. Review the updated price before submitting again.",
       evaluation_busy: "Another evaluation is in progress. Please try again shortly.", rate_limited: "Too many requests. Please try again later.",
@@ -63,7 +66,8 @@ export const evaluationContent: Record<Language, Copy> = {
     count: "Termasuk spasi, tanpa baris baru", savedQuestion: "Soal saat dikirim", back: "Paket menulis",
     processingShort: "Menilai…", close: "Tutup", totalScore: "Skor total", points: "poin", details: "Lihat detail",
     correctionContext: "Letak perbaikan dalam jawaban lengkap", correctionHint: "Pilih nomor pada teks yang ditandai untuk melihat teks asli, saran perubahan, dan alasannya.",
-    before: "Sebelum", after: "Saran perubahan",
+    before: "Sebelum", after: "Saran perubahan", viewResult: "Lihat hasil penilaian",
+    login: "Masuk", loginNotice: "Masuk untuk menerima kredit dan menggunakan penilaian menulis.",
     errors: {
       insufficient_credits: "Kredit yang tersedia tidak cukup.", price_changed: "Ketentuan penilaian berubah. Periksa biaya terbaru sebelum mengirim ulang.",
       evaluation_busy: "Penilaian lain sedang berlangsung. Coba lagi sebentar.", rate_limited: "Terlalu banyak permintaan. Coba lagi nanti.",
