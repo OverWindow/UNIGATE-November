@@ -16,7 +16,7 @@ from django.utils import timezone
 from accounts.credits import grant
 from accounts.models import CreditAccount, CreditTransaction
 from writing import services
-from writing.contract import build_request, empty_response, validate_response
+from writing.contract import FEEDBACK_LANGUAGES, build_request, digest, empty_response, validate_response
 from writing.models import Evaluation
 from writing.provider import ProviderError, evaluate
 
@@ -35,6 +35,49 @@ def model_result(request, **kwargs):
 
 
 class ContractTests(SimpleTestCase):
+    def test_feedback_languages_preserve_scoring_inputs_and_korean_corrections(self):
+        for slot in (51, 52, 53, 54):
+            inputs = fixture(slot, "input")
+            default = build_request(**inputs)
+            request_ids = set()
+            for language, name in FEEDBACK_LANGUAGES.items():
+                with self.subTest(slot=slot, language=language):
+                    request = build_request(**inputs, feedback_language=language)
+                    request_ids.add(request.request_id)
+                    self.assertEqual(request.payload["feedback_language"], language)
+                    self.assertIn(f"Feedback language: {name} ({language})", request.system)
+                    self.assertIn("Write corrections.suggestion in Korean", request.system)
+                    for field in ("summary", "scores.*.rationale", "task_checks.*.reason", "corrections.*.reason", "review_reasons"):
+                        self.assertIn(field, request.system)
+                    for field in ("question", "answer", "tasks", "rubric", "score_limits", "output_schema"):
+                        self.assertEqual(request.payload[field], default.payload[field])
+                    response = model_result(request)[0]
+                    response["summary"] = {"ko": "요청이 명확합니다.", "en": "The request is clear.",
+                                           "id": "Permintaan sudah jelas."}[language]
+                    response["corrections"] = [{"original": next(text for text in inputs["answer"].values() if text.strip()),
+                                                "suggestion": "수정 문장입니다.", "reason": response["summary"]}]
+                    result = validate_response(response, request)
+                    self.assertEqual(result.corrections[0].suggestion, "수정 문장입니다.")
+                    self.assertEqual(result.corrections[0].original, response["corrections"][0]["original"])
+            self.assertEqual(len(request_ids), 3)
+
+    def test_invalid_feedback_language_is_rejected(self):
+        for language in (None, "", "fr", "en-US", [], {}, True):
+            with self.subTest(language=language), self.assertRaises(ValueError):
+                build_request(**fixture(51, "input"), feedback_language=language)
+
+    def test_empty_feedback_is_localized_for_every_slot(self):
+        for slot in (51, 52, 53, 54):
+            answer = {"a": " \n", "b": "\t"} if slot < 53 else {"text": " \n"}
+            for language, reason in (("ko", "미응답"), ("en", "No answer"), ("id", "Tidak ada jawaban")):
+                with self.subTest(slot=slot, language=language):
+                    request = build_request(**(fixture(slot, "input") | {"answer": answer}), feedback_language=language)
+                    result = validate_response(empty_response(request), request)
+                    self.assertEqual(result.total, 0)
+                    self.assertTrue(all(score.rationale == reason for score in result.scores.values()))
+                    self.assertTrue(all(check.reason == reason and check.status == "미충족" for check in result.task_checks))
+                    self.assertIn({"ko": "작성된 답안", "en": "No answer", "id": "Tidak ada jawaban"}[language], result.summary)
+
     def test_answer_length_limits_for_each_question(self):
         for slot in (51, 52, 53, 54):
             limit = 200 if slot < 53 else 1000
@@ -112,6 +155,64 @@ class EvaluationTests(TransactionTestCase):
 
     def post(self, payload):
         return self.client.post("/api/writing/evaluations/", payload, content_type="application/json")
+
+    def test_feedback_language_is_sent_saved_and_returned_without_repeat_charges(self):
+        for language in ("ko", "en", "id"):
+            with self.subTest(language=language):
+                payload = self.payload(feedbackLanguage=language)
+                response = self.post(payload)
+                self.assertEqual(response.status_code, 201)
+                self.assertEqual(response.json()["feedbackLanguage"], language)
+                self.assertEqual(Evaluation.objects.get(pk=payload["id"]).feedback_language, language)
+                self.assertEqual(self.provider.call_args.args[0].payload["feedback_language"], language)
+                self.assertEqual(self.post(payload).status_code, 200)
+                detail = self.client.get(f'/api/writing/evaluations/{payload["id"]}/').json()
+                self.assertEqual(detail["feedbackLanguage"], language)
+                history = self.client.get("/api/writing/evaluations/").json()["evaluations"]
+                self.assertEqual(next(row for row in history if row["id"] == payload["id"])["feedbackLanguage"], language)
+        self.assertEqual(self.provider.call_count, 3)
+        self.assertEqual(CreditTransaction.objects.filter(kind="capture").count(), 3)
+        self.assertEqual(CreditAccount.objects.get(user=self.user).balance, 1)
+
+    def test_changed_language_for_same_id_conflicts_and_legacy_requests_default_to_korean(self):
+        payload = self.payload()
+        response = self.post(payload)
+        self.assertEqual(response.json()["feedbackLanguage"], "ko")
+        entry = Evaluation.objects.get(pk=payload["id"])
+        self.assertEqual(entry.submission_hash, digest({"set": str(self.set_id), "slot": 51, "answer": entry.answer}))
+        self.assertEqual(self.post(payload | {"feedbackLanguage": "ko"}).status_code, 200)
+        for language in ("en", "id"):
+            response = self.post(payload | {"feedbackLanguage": language})
+            self.assertEqual(response.status_code, 409)
+            self.assertEqual(response.json()["error"], "request_conflict")
+        self.provider.assert_called_once()
+        self.assertEqual(CreditTransaction.objects.filter(kind="capture").count(), 1)
+
+    def test_invalid_feedback_languages_do_not_reserve_credits_or_call_provider(self):
+        for language in (None, "", "fr", "en-US", [], {}, True, 1):
+            with self.subTest(language=language):
+                response = self.post(self.payload(feedbackLanguage=language))
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.json()["error"], "invalid_submission")
+        self.assertFalse(Evaluation.objects.exists())
+        self.assertFalse(CreditTransaction.objects.filter(kind="reserve").exists())
+        self.provider.assert_not_called()
+
+    def test_empty_answers_keep_selected_language_without_a_model_call(self):
+        for language, summary in (("en", "No answer was submitted, so the score is 0."),
+                                  ("id", "Tidak ada jawaban yang dikirim, sehingga nilainya 0.")):
+            response = self.post(self.payload(answer={"a": "", "b": ""}, feedbackLanguage=language))
+            self.assertEqual(response.json()["feedbackLanguage"], language)
+            self.assertEqual(response.json()["result"]["summary"], summary)
+            self.assertEqual(response.json()["chargedCredits"], 0)
+        self.provider.assert_not_called()
+
+    def test_failed_evaluation_keeps_requested_language(self):
+        self.provider.side_effect = ProviderError("provider_unavailable")
+        response = self.post(self.payload(feedbackLanguage="id"))
+        self.assertEqual(response.json()["status"], "failed")
+        self.assertEqual(response.json()["feedbackLanguage"], "id")
+        self.assertEqual(response.json()["chargedCredits"], 0)
 
     def test_success_is_saved_and_charged_only_once(self):
         payload = self.payload()
@@ -239,7 +340,7 @@ class EvaluationTests(TransactionTestCase):
 
     def test_concurrent_duplicate_busy_and_insufficient_credit(self):
         entered, release = Event(), Event()
-        payload = self.payload()
+        payload = self.payload(feedbackLanguage="en")
         def delayed(request, **kwargs):
             entered.set()
             if not release.wait(10):
@@ -248,7 +349,8 @@ class EvaluationTests(TransactionTestCase):
         def first():
             try:
                 return services.submit(user_id=self.user.pk, evaluation_id=uuid.UUID(payload["id"]),
-                    set_id=self.set_id, slot=51, answer=self.inputs["answer"], price_version=payload["priceVersion"])
+                    set_id=self.set_id, slot=51, answer=self.inputs["answer"], price_version=payload["priceVersion"],
+                    feedback_language="en")
             finally:
                 connections.close_all()
         self.provider.side_effect = delayed
@@ -256,7 +358,10 @@ class EvaluationTests(TransactionTestCase):
             future = pool.submit(first)
             try:
                 self.assertTrue(entered.wait(10))
-                self.assertEqual(self.post(payload).status_code, 202)
+                duplicate = self.post(payload)
+                self.assertEqual(duplicate.status_code, 202)
+                self.assertEqual(duplicate.json()["feedbackLanguage"], "en")
+                self.assertEqual(self.post(payload | {"feedbackLanguage": "id"}).status_code, 409)
                 self.assertEqual(self.post(self.payload()).json()["error"], "evaluation_busy")
                 with override_settings(WRITING_EVALUATION_MAX_CONCURRENT=2, WRITING_EVALUATION_CREDITS={51: 8, 52: 3, 53: 5, 54: 8}):
                     self.assertEqual(self.post(self.payload()).json()["error"], "insufficient_credits")

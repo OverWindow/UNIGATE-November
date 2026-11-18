@@ -1,4 +1,5 @@
 import type { Evaluation } from "./writing-api";
+import type { Language } from "./landing-content";
 
 // Keep these display limits aligned with backend/writing/contract.py.
 export const writingScoreLimits: Record<number, Record<string, number>> = {
@@ -7,7 +8,8 @@ export const writingScoreLimits: Record<number, Record<string, number>> = {
   54: { content: 12, organization: 12, language: 26 },
 };
 
-export function visibleReviewReasons(reasons: string[]): string[] {
+export function visibleReviewReasons(reasons: string[], language: Language = "ko"): string[] {
+  if (language !== "ko") return reasons.filter(reason => reason.trim());
   return reasons.map(reason => reason.split(/(?<=[.!?。])\s+|\n+/u).filter(sentence => {
     const text = sentence.trim();
     const genericEstimate = /(?:부분\s*점수|빈칸|0\s*[~∼～–-]\s*5\s*점)/u.test(text)
@@ -66,13 +68,17 @@ export function correctionSegments(text: string, corrections: { original: string
   return segments;
 }
 
-export function writingTaskLabel(id: string, question: Evaluation["question"]): string | undefined {
-  if (id === "a" || id === "b") return `${id === "a" ? "㉠" : "㉡"}의 문맥·의미·문법·격식`;
+export function writingTaskLabel(id: string, question: Evaluation["question"], language: Language = "ko"): string | undefined {
+  if (id === "a" || id === "b") {
+    const blank = id === "a" ? "㉠" : "㉡";
+    return { ko: `${blank}의 문맥·의미·문법·격식`, en: `${blank}: context, meaning, grammar and register`,
+      id: `${blank}: konteks, makna, tata bahasa, dan ragam bahasa` }[language];
+  }
   const match = /^(requirement|material|note):([1-9]\d*)$/.exec(id);
   if (!match || !question) return undefined;
   const index = Number(match[2]) - 1;
   if (match[1] === "requirement") return question.requirements[index];
   if (match[1] === "note") return question.material_notes[index];
   const title = question.materials[index]?.title;
-  return title ? `자료의 정보와 관계: ${title}` : undefined;
+  return title ? `${{ ko: "자료의 정보와 관계", en: "Data and relationships", id: "Data dan hubungannya" }[language]}: ${title}` : undefined;
 }

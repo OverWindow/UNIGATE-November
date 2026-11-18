@@ -11,10 +11,14 @@ interface Copy {
   login: string; loginNotice: string;
   answerFormat: string; plainFormat: string; manuscriptFormat: string;
   errors: Record<string, string>; kinds: Record<string, string>;
+  scoreLabels: Record<string, string>; shortScoreLabels: Record<string, string>; taskStatuses: Record<string, string>;
 }
 
 export const evaluationContent: Record<Language, Copy> = {
   ko: {
+    scoreLabels: { a: "㉠", b: "㉡", content: "내용 및 수행 과제", organization: "글의 전개 구조", language: "언어 사용" },
+    shortScoreLabels: { a: "㉠", b: "㉡", content: "내용 과제", organization: "구성", language: "언어" },
+    taskStatuses: { "충족": "충족", "부분 충족": "부분 충족", "미충족": "미충족" },
     answerFormat: "답안 입력 형식", plainFormat: "일반", manuscriptFormat: "원고지",
     answer: "내 답안", evaluate: "평가 요청", history: "내 평가 이력", credits: "크레딧", available: "사용 가능", reserved: "예약 중",
     cost: "이번 평가", unavailable: "이 문항은 아직 평가를 이용할 수 없습니다.", loading: "불러오는 중입니다.",
@@ -37,6 +41,9 @@ export const evaluationContent: Record<Language, Copy> = {
     }, kinds: { grant: "지급", reserve: "예약", capture: "차감", release: "예약 해제" },
   },
   en: {
+    scoreLabels: { a: "㉠", b: "㉡", content: "Content and task fulfillment", organization: "Organization", language: "Language use" },
+    shortScoreLabels: { a: "㉠", b: "㉡", content: "Content", organization: "Structure", language: "Language" },
+    taskStatuses: { "충족": "Met", "부분 충족": "Partially met", "미충족": "Not met" },
     answerFormat: "Answer format", plainFormat: "Plain", manuscriptFormat: "Manuscript",
     answer: "Your answer", evaluate: "Request evaluation", history: "My evaluations", credits: "Credits", available: "Available", reserved: "Reserved",
     cost: "This evaluation", unavailable: "Evaluation is not yet available for this question.", loading: "Loading…",
@@ -59,6 +66,9 @@ export const evaluationContent: Record<Language, Copy> = {
     }, kinds: { grant: "Granted", reserve: "Reserved", capture: "Charged", release: "Released" },
   },
   id: {
+    scoreLabels: { a: "㉠", b: "㉡", content: "Isi dan pemenuhan tugas", organization: "Struktur tulisan", language: "Penggunaan bahasa" },
+    shortScoreLabels: { a: "㉠", b: "㉡", content: "Isi", organization: "Struktur", language: "Bahasa" },
+    taskStatuses: { "충족": "Terpenuhi", "부분 충족": "Sebagian terpenuhi", "미충족": "Belum terpenuhi" },
     answerFormat: "Format jawaban", plainFormat: "Biasa", manuscriptFormat: "Kertas kotak",
     answer: "Jawaban Anda", evaluate: "Minta penilaian", history: "Riwayat penilaian", credits: "Kredit", available: "Tersedia", reserved: "Dicadangkan",
     cost: "Penilaian ini", unavailable: "Penilaian belum tersedia untuk soal ini.", loading: "Memuat…",

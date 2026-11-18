@@ -27,7 +27,7 @@ test("reading writing prompts does not submit an evaluation or request CSRF", as
 });
 
 test("evaluation sends original answers and retries only a rejected CSRF request", async () => {
-  const payload = { id: "synthetic-id", setId: "synthetic-set", typeSlot: 51, answer: { a: " \r\n원문 ", b: "" }, priceVersion: "v1" };
+  const payload = { id: "synthetic-id", setId: "synthetic-set", typeSlot: 51, answer: { a: " \r\n원문 ", b: "" }, priceVersion: "v1", feedbackLanguage: "id" };
   const calls = [];
   let csrf = 0, posts = 0;
   globalThis.fetch = async (path, options) => {

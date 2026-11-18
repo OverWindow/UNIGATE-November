@@ -14,22 +14,23 @@ export default function WritingResult({ entry, correctionId, activeCorrection, c
   const { language } = useApp();
   const t = evaluationContent[language];
   const result = entry.result;
+  const feedbackLanguage = entry.feedbackLanguage ?? "ko";
   const prefix = useId();
   const [activeCriterion, setActiveCriterion] = useState<string | null>(null);
-  const reviewReasons = visibleReviewReasons(result?.review_reasons ?? []);
+  const reviewReasons = visibleReviewReasons(result?.review_reasons ?? [], feedbackLanguage);
   const scoreLimits = writingScoreLimits[entry.typeSlot];
   const scores = ["a", "b", "content", "organization", "language"].flatMap(key => {
     const score = result?.scores[key];
     return score ? [[key, score] as const] : [];
   });
-  const labels: Record<string, string> = { a: "㉠", b: "㉡", content: "내용 및 수행 과제", organization: "글의 전개 구조", language: "언어 사용" };
-  const shortLabels: Record<string, string> = { a: "㉠", b: "㉡", content: "내용 과제", organization: "구성", language: "언어" };
+  const labels = t.scoreLabels;
+  const shortLabels = t.shortScoreLabels;
   return <section className="writing-evaluation-result" aria-label={t.result}>
     {entry.status === "failed" && <p className="writing-result-status" role="status">{t.failed}</p>}
-    {result && <div lang="ko">
+    {result && <div lang={feedbackLanguage}>
       <p className="writing-result-summary">{result.summary}</p>
       <div className="writing-score-details">
-        <div className="writing-scores">{scores.map(([key, score]) => <button type="button" key={key}
+        <div className="writing-scores" lang={language}>{scores.map(([key, score]) => <button type="button" key={key}
           id={`${prefix}-score-${key}`} aria-expanded={activeCriterion === key} aria-controls={`${prefix}-feedback-${key}`}
           aria-label={`${labels[key]} ${score.score} / ${scoreLimits?.[key] ?? "—"} ${t.points}`}
           onClick={() => setActiveCriterion(previous => previous === key ? null : key)}>
@@ -41,20 +42,20 @@ export default function WritingResult({ entry, correctionId, activeCorrection, c
         {scores.map(([key, score]) => <div key={key} id={`${prefix}-feedback-${key}`}
           className="writing-reveal" data-open={activeCriterion === key} aria-hidden={activeCriterion !== key} inert={activeCriterion !== key}
           role="region" aria-labelledby={`${prefix}-score-${key}`}>
-          <div><section className="writing-score-rationales"><h4>{labels[key]}</h4><p>{score.rationale}</p>
-            {score.quotes.map((quote, index) => <blockquote key={index}>{quote}</blockquote>)}
+          <div><section className="writing-score-rationales"><h4 lang={language}>{labels[key]}</h4><p>{score.rationale}</p>
+            {score.quotes.map((quote, index) => <blockquote lang="ko" key={index}>{quote}</blockquote>)}
           </section></div>
         </div>)}
       </div>
       {result.task_checks.length > 0 && <section className="writing-result-disclosure">
         <h3 className="writing-tasks-title" lang={language}>{t.tasks}<span className="writing-disclosure-count">{result.task_checks.length}</span></h3>
         <ul className="writing-task-list">{result.task_checks.map((check, index) => <li key={check.requirement_id}>
-          <div className="writing-task-heading"><span className="writing-task-status" data-status={check.status}>{check.status}</span>
-            <span>{writingTaskLabel(check.requirement_id, entry.question) ?? `${t.tasks} ${index + 1}`}</span></div>
+          <div className="writing-task-heading"><span className="writing-task-status" lang={language} data-status={check.status}>{t.taskStatuses[check.status] ?? check.status}</span>
+            <span lang={/^(requirement|note):/.test(check.requirement_id) ? "ko" : language}>{writingTaskLabel(check.requirement_id, entry.question, language) ?? `${t.tasks} ${index + 1}`}</span></div>
           {check.status !== "충족" && <details className="writing-task-details">
             <summary lang={language}>{t.details}<ChevronDown size={13} aria-hidden="true" /></summary>
             <div className="writing-task-reason"><p>{check.reason}</p>
-              {check.quotes.map((quote, quoteIndex) => <blockquote key={quoteIndex}>{quote}</blockquote>)}</div>
+              {check.quotes.map((quote, quoteIndex) => <blockquote lang="ko" key={quoteIndex}>{quote}</blockquote>)}</div>
           </details>}
         </li>)}</ul>
       </section>}
@@ -69,8 +70,8 @@ export default function WritingResult({ entry, correctionId, activeCorrection, c
           <li key={index} id={`${correctionId}-${index}`} tabIndex={-1} data-active={activeCorrection === index || undefined}>
             <span className="writing-correction-number" aria-hidden="true">{index + 1}</span>
             <div className="writing-correction-comparison">
-              <div><span lang={language}>{t.before}</span><p><del>{correction.original}</del></p></div>
-              <div><span lang={language}>{t.after}</span><p><ins>{correction.suggestion}</ins></p></div>
+              <div><span lang={language}>{t.before}</span><p lang="ko"><del>{correction.original}</del></p></div>
+              <div><span lang={language}>{t.after}</span><p lang="ko"><ins>{correction.suggestion}</ins></p></div>
             </div>
             <p className="writing-correction-reason">{correction.reason}</p>
           </li>)}</ol></div>

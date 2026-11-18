@@ -70,7 +70,11 @@ def evaluations(request):
         if len(request.body) > 262144:
             return api_response({"error": "payload_too_large"}, 413)
         data = json.loads(request.body)
-        if not isinstance(data, dict) or set(data) != {"id", "setId", "typeSlot", "answer", "priceVersion"}:
+        required = {"id", "setId", "typeSlot", "answer", "priceVersion"}
+        if not isinstance(data, dict) or not required <= set(data) <= required | {"feedbackLanguage"}:
+            raise ValueError
+        feedback_language = data.get("feedbackLanguage", "ko")
+        if feedback_language not in ("ko", "en", "id"):
             raise ValueError
         if type(data["typeSlot"]) is not int or data["typeSlot"] not in (51, 52, 53, 54):
             raise ValueError
@@ -90,7 +94,8 @@ def evaluations(request):
         return result
     try:
         entry, created = submit(user_id=request.user.pk, evaluation_id=evaluation_id, set_id=set_id,
-                                slot=data["typeSlot"], answer=data["answer"], price_version=data["priceVersion"])
+                                slot=data["typeSlot"], answer=data["answer"], price_version=data["priceVersion"],
+                                feedback_language=feedback_language)
     except ValueError:
         return api_response({"error": "invalid_submission"}, 400)
     return api_response(serialize(entry, detail=True), 202 if entry.status == "processing" else 201 if created else 200)

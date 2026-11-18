@@ -9,6 +9,8 @@ class Evaluation(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, models.PROTECT)
     set_id = models.UUIDField()
     type_slot = models.PositiveSmallIntegerField()
+    feedback_language = models.CharField(max_length=2, default="ko",
+        choices=[("ko", "한국어"), ("en", "English"), ("id", "Bahasa Indonesia")])
     submission_hash = models.CharField(max_length=64)
     question_snapshot = models.JSONField()
     answer = models.JSONField()

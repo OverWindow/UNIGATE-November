@@ -30,7 +30,9 @@ IBT는 기존 안내·준비 중 화면을 유지합니다. 쓰기는 이번 PBT
 
 로그인 사용자가 `/writing`에서 세트를 선택하고 `/writing/sets/[id]`에서 답안을 제출합니다.
 51·52번 두 빈칸, 53·54번 본문 답안을 입력하며 제출 전에 문항별 크레딧과 사용 가능 잔액을 확인합니다.
-한국어·영어·인도네시아어 UI를 제공하고 문제 원문·AI 피드백은 한국어입니다.
+한국어·영어·인도네시아어 UI를 제공하며 평가 요청의 `feedbackLanguage`에 당시 웹 언어(`ko`·`en`·`id`)를 전달합니다.
+AI 설명은 선택한 언어로 생성하고 문제 원문·답안 인용·수정 문장은 한국어로 유지합니다. 재시도는 최초 언어를 유지합니다.
+결과의 `feedbackLanguage`로 본문의 언어를 표시하며, 이후 웹 언어를 바꿔도 저장된 본문은 다시 번역하지 않습니다.
 `/writing/history`에서 평가·크레딧 거래를 조회하고 `/writing/history/[id]`에서 제출 당시 문제·원본 답안·결과를 확인합니다.
 입력 중인 답안은 페이지 상태에 유지되며 제출이 접수된 답안부터 서버에 저장합니다. 새로고침 시 미제출 답안은 사라집니다.
 
@@ -45,6 +47,9 @@ Next.js rewrite 제한은 180초입니다. 평가 요청은 서버가 알려 준
 코드 적용 후 **이 폴더에서** `npm run dev`로 개발 서버를 수동 재시작하거나 `npm run build` 후 운영 재배포합니다.
 이 명령은 DB를 변경하지 않습니다. DB 신규 테이블 3개·환경변수·관리자 지급·로컬 수동 migration 안내는
 [루트 README의 AI 쓰기 튜터](../README.md#topiq-ai-쓰기-튜터-pbt)를 따릅니다.
+평가 다국어 지원은 기존 `writing_evaluations.feedback_language` 컬럼 추가가 필요합니다.
+사용자가 백엔드 재시작 전에 `backend/`에서 `.\.venv\Scripts\python.exe manage.py migrate writing 0002_evaluation_feedback_language`를 수동 실행합니다.
+이 명령은 DB 스키마를 변경하며 기존 기록의 언어는 `ko`입니다. 운영은 기존 `deploy/start.sh`에서 자동 적용합니다.
 
 ## 크레딧 페이지
 

@@ -1,3 +1,5 @@
+import type { Language } from "./landing-content";
+
 export interface WritingSet { id: string; number: number; questionCount: number; submittedSlots: number[] }
 export interface WritingMaterial {
   kind: "bar" | "line" | "table"; title: string; unit: string; categories?: string[];
@@ -47,6 +49,7 @@ export interface Evaluation {
   id: string; setId: string; typeSlot: number; status: "processing" | "succeeded" | "failed";
   totalScore: number | null; maxScore: number; creditCost: number; chargedCredits: number;
   createdAt: string; completedAt: string | null; error: string;
+  feedbackLanguage: Language;
   answer?: LearnerAnswer;
   question?: { instruction: string; passage: string; topic: string; context_title: string; materials: WritingMaterial[]; material_notes: string[]; requirements: string[]; data_source: string; image_url?: string };
   result?: {
@@ -56,7 +59,7 @@ export interface Evaluation {
     summary: string; review_reasons: string[];
   } | null;
 }
-export interface Submission { id: string; setId: string; typeSlot: number; answer: LearnerAnswer; priceVersion: string }
+export interface Submission { id: string; setId: string; typeSlot: number; answer: LearnerAnswer; priceVersion: string; feedbackLanguage: Language }
 
 export async function submitWriting(body: Submission, signal: AbortSignal, timeoutSeconds: number): Promise<Evaluation> {
   for (let attempt = 0; attempt < 2; attempt++) {

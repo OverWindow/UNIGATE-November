@@ -7,7 +7,7 @@ from accounts.credits import evaluation_lock, locked_account, reserve, settle
 from question_bank.models import WritingQuestion
 from question_bank.writing import complete_sets, question as public_question
 
-from .contract import LearnerAnswer, build_request, digest, empty_response, validate_response
+from .contract import FEEDBACK_LANGUAGES, LearnerAnswer, build_request, digest, empty_response, validate_response
 from .models import Evaluation
 from .provider import ProviderError, evaluate
 
@@ -34,20 +34,23 @@ def expire_locked():
         entry.save(update_fields=["status", "error_code", "completed_at"])
 
 
-def existing_locked(user_id, evaluation_id, submission_hash):
+def existing_locked(user_id, evaluation_id, submission_hash, feedback_language):
     entry = Evaluation.objects.filter(pk=evaluation_id).first()
-    if entry and (entry.user_id != user_id or entry.submission_hash != submission_hash):
+    if entry and (entry.user_id != user_id or entry.submission_hash != submission_hash
+                  or entry.feedback_language != feedback_language):
         raise EvaluationError("request_conflict", 409)
     return entry
 
 
-def submit(*, user_id, evaluation_id, set_id, slot, answer, price_version):
+def submit(*, user_id, evaluation_id, set_id, slot, answer, price_version, feedback_language="ko"):
+    if not isinstance(feedback_language, str) or feedback_language not in FEEDBACK_LANGUAGES:
+        raise ValueError("지원하지 않는 평가 언어입니다.")
     # Whitespace is preserved. Hash identity does not change when model/prices change.
     answer = LearnerAnswer.model_validate(answer).for_slot(slot)
     submission_hash = digest({"set": str(set_id), "slot": slot, "answer": answer})
     with evaluation_lock():
         expire_locked()
-        existing = existing_locked(user_id, evaluation_id, submission_hash)
+        existing = existing_locked(user_id, evaluation_id, submission_hash, feedback_language)
         if existing:
             return existing, False
 
@@ -64,7 +67,7 @@ def submit(*, user_id, evaluation_id, set_id, slot, answer, price_version):
               "data_source": display["dataSource"], "materials": display["materials"],
               "material_notes": display["materialNotes"], "requirements": display["requirements"]}
     try:
-        request = build_request(f"writing:{set_id}:{slot}", source, answer)
+        request = build_request(f"writing:{set_id}:{slot}", source, answer, feedback_language=feedback_language)
     except ValueError:
         raise EvaluationError("question_unavailable", 503) from None
     local = empty_response(request)
@@ -81,7 +84,7 @@ def submit(*, user_id, evaluation_id, set_id, slot, answer, price_version):
     timeout = settings.WRITING_EVALUATION_TIMEOUT_SECONDS
     with evaluation_lock():
         expire_locked()
-        existing = existing_locked(user_id, evaluation_id, submission_hash)
+        existing = existing_locked(user_id, evaluation_id, submission_hash, feedback_language)
         if existing:
             return existing, False
         if local is None and Evaluation.objects.filter(status="processing").count() >= settings.WRITING_EVALUATION_MAX_CONCURRENT:
@@ -92,7 +95,7 @@ def submit(*, user_id, evaluation_id, set_id, slot, answer, price_version):
             raise EvaluationError("insufficient_credits", 409)
         entry = Evaluation.objects.create(
             id=evaluation_id, user_id=user_id, set_id=set_id, type_slot=slot, submission_hash=submission_hash,
-            question_snapshot=snapshot, answer=answer, request_hash=request.request_id,
+            question_snapshot=snapshot, answer=answer, request_hash=request.request_id, feedback_language=feedback_language,
             prompt_version=digest({"system": request.system, "rubric": request.payload["rubric"],
                                    "notes": "", "schema": request.payload["output_schema"]}),
             requested_model=settings.WRITING_EVALUATION_MODEL, model_options=options,
@@ -130,6 +133,7 @@ def submit(*, user_id, evaluation_id, set_id, slot, answer, price_version):
 
 def serialize(entry, *, detail=False):
     data = {"id": str(entry.pk), "setId": str(entry.set_id), "typeSlot": entry.type_slot,
+            "feedbackLanguage": entry.feedback_language,
             "status": entry.status, "totalScore": entry.total_score,
             "maxScore": {51: 10, 52: 10, 53: 30, 54: 50}[entry.type_slot],
             "creditCost": entry.credit_cost, "chargedCredits": entry.credit_cost if entry.status == "succeeded" else 0,

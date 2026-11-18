@@ -89,6 +89,25 @@ test("task labels resolve the exact saved requirement, material or note", () => 
   assert.equal(writingTaskLabel("note:1", undefined), undefined);
 });
 
+test("translated task captions preserve Korean question references", () => {
+  const question = { requirements: ["한국어 요구 사항"], materials: [{ title: "통계 자료" }], material_notes: ["증가 원인"] };
+  assert.equal(writingTaskLabel("a", question, "en"), "㉠: context, meaning, grammar and register");
+  assert.equal(writingTaskLabel("b", question, "id"), "㉡: konteks, makna, tata bahasa, dan ragam bahasa");
+  assert.equal(writingTaskLabel("material:1", question, "en"), "Data and relationships: 통계 자료");
+  assert.equal(writingTaskLabel("material:1", question, "id"), "Data dan hubungannya: 통계 자료");
+  for (const language of ["ko", "en", "id"]) {
+    assert.equal(writingTaskLabel("requirement:1", question, language), "한국어 요구 사항");
+    assert.equal(writingTaskLabel("note:1", question, language), "증가 원인");
+  }
+});
+
+test("English and Indonesian review reasons retain their full wording", () => {
+  for (const language of ["en", "id"]) {
+    const reasons = ["Check the source.\nPeriksa sumber.", "Korean phrase: 빈칸 점수 기준은 실험적 추정입니다."];
+    assert.deepEqual(visibleReviewReasons([...reasons, " "], language), reasons);
+  }
+});
+
 test("generic partial-score notices are hidden while concrete review reasons remain", () => {
   const notice = "빈칸별 세부 부분점수 기준이 제공되지 않아 0~5점 평가는 실험적 추정입니다.";
   const concrete = "㉠은 요청 의도가 모호하므로 문맥을 다시 확인해야 합니다.";

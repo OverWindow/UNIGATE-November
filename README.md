@@ -7,7 +7,9 @@ PDF 파일은 운영자가 나중에 수동으로 보냅니다. 이 랜딩페이
 ## TOPIQ AI 쓰기 튜터 (PBT)
 
 로그인한 사용자가 `/writing`에서 세트를 선택하고 `/writing/sets/[id]`에서 문항별 답안을 제출합니다.
-51·52번은 두 빈칸, 53·54번은 본문 답안을 입력합니다. 문제·평가 설명은 한국어이며 UI는 한국어·영어·인도네시아어입니다.
+51·52번은 두 빈칸, 53·54번은 본문 답안을 입력합니다. UI와 평가 설명은 한국어·영어·인도네시아어를 지원합니다.
+평가 설명(총평·채점 근거·수정 이유·검토 사항)은 요청 당시 웹 언어로 생성하고, 문제·답안 인용·수정 문장은 한국어를 유지합니다.
+생성 언어는 평가에 저장되므로 이후 웹 언어를 바꿔도 과거 평가 본문은 번역하거나 다시 생성하지 않습니다. 기존 기록은 한국어로 취급합니다.
 `/writing/history`에서 본인의 평가와 크레딧 거래를 조회하고 `/writing/history/[id]`에서 제출 당시 문제·원본 답안·평가를 확인합니다.
 입력 중인 답안은 현재 페이지에서만 유지되며 **제출이 접수된 답안부터 DB에 저장**됩니다.
 AI 평가는 학습용 참고 결과이며 공식 TOPIK 성적이 아닙니다.
@@ -32,8 +34,9 @@ PBT 51~54번이 모두 있는 세트만 표시하며, 막대·선 그래프와 �
 다음 평가/잔액/이력 조회·평가 접수 시 실패 처리하고 예약을 해제합니다. 조회가 없으면 예약은 그때까지 DB에 남습니다.
 이미 실패한 평가에 늦게 도착한 결과는 점수나 차감을 확정하지 않습니다. 중단된 작업을 자동 재실행하지 않습니다.
 
-`POST`의 UUID `id`는 실행 식별자이자 중복 요청 방지 키입니다. 같은 사용자·ID·답안은 기존 기록을 반환하고 다시 호출/차감하지 않습니다.
-같은 ID로 다른 문항·답안을 보내면 409입니다. 패키지 `request_id` 내용 해시와 실행 UUID는 별개입니다.
+`POST`의 UUID `id`는 실행 식별자이자 중복 요청 방지 키입니다. 같은 사용자·ID·답안·생성 언어는 기존 기록을 반환하고 다시 호출/차감하지 않습니다.
+같은 ID로 다른 문항·답안·생성 언어를 보내면 409입니다. 기존 제출 해시는 유지하고 저장된 언어를 별도로 비교하므로 기존 한국어 요청도 재조회할 수 있습니다.
+패키지 `request_id` 내용 해시에는 언어가 포함되며 실행 UUID와는 별개입니다.
 브라우저는 사용자·문항별 진행 ID만 sessionStorage에 저장하고 원본 답안은 브라우저 저장소에 기록하지 않습니다.
 통신 실패 시 기존 ID로 상태를 확인합니다. 새로고침 후 입력 내용이 사라졌다면 먼저 이력의 접수 여부를 확인하세요.
 의도적인 재평가는 새 UUID를 사용하며 이전 기록을 보존합니다. 외부 호출은 자동 재시도하지 않습니다.
@@ -53,7 +56,9 @@ PBT 51~54번이 모두 있는 세트만 표시하며, 막대·선 그래프와 �
 | GET | `/api/credits/` | 잔액·예약액·사용 가능액 |
 | GET | `/api/credits/transactions/?page=1` | 본인 지급·예약·차감·해제 내역, 페이지당 20건 |
 
-POST 필드는 `id`, `setId`, `typeSlot`, `answer`, `priceVersion`입니다.
+POST 필드는 `id`, `setId`, `typeSlot`, `answer`, `priceVersion`, `feedbackLanguage`입니다.
+`feedbackLanguage`는 `ko`·`en`·`id` 중 하나이며 누락 시 `ko`입니다. 다른 값은 `invalid_submission`(400)으로 거절합니다.
+프론트는 최초 요청의 언어를 재시도에도 사용합니다. 생성·목록·상세 응답의 `feedbackLanguage`는 저장된 생성 언어입니다.
 `answer`는 51·52번 `{ "a": "...", "b": "..." }`, 53·54번 `{ "text": "..." }`이며 원본 공백을 보존합니다.
 빈칸은 각각 2,000, 본문은 20,000 Unicode 코드 포인트까지 받습니다. 표시 글자 수는 줄바꿈을 제외하며 원고지 칸 수와 다릅니다.
 신규 완료/실패 기록은 HTTP 201, 기존 기록은 200, 기존 처리 중 기록은 202로 반환합니다. **실제 성공 여부는 `status`를 확인**합니다.
@@ -73,6 +78,9 @@ POST 필드는 `id`, `setId`, `typeSlot`, `answer`, `priceVersion`입니다.
 | `credit_transactions` | `id`, `account_id`, `evaluation_id`, `kind`, `amount`, `balance_after`, `reserved_after`, `actor_id`, `reason`, `created_at` | 지급·예약·차감·해제 감사 내역 |
 
 Django migration `migration/writing/0001_initial.py`, `migration/accounts/0003_creditaccount_credittransaction.py`로 관리합니다.
+평가 다국어 지원은 `migration/writing/0002_evaluation_feedback_language.py`로 기존 `writing_evaluations`에
+`feedback_language`(최대 2자, 기본값 `ko`) 컬럼 1개를 추가합니다. 기존 행도 `ko`가 되며 결과·제출 해시는 보존합니다.
+이 변경의 신규 API·신규 테이블·기존 컬럼 변경은 없습니다. 추가 의존성·환경변수·워커도 없습니다.
 잔액/예약액 제약과 평가별 거래 중복 방지 제약을 사용합니다. 짧은 PostgreSQL advisory transaction lock으로 프로세스 간 접수를 직렬화합니다.
 회원가입 시 자동 지급하지 않으며 계정은 최초 조회/평가/관리자 지급 시 잔액 0으로 생성됩니다.
 거래·평가 이력이 있는 사용자 삭제는 보호됩니다. 데이터 삭제·크레딧 결제 충전·만료 정책은 이 기능에 포함하지 않습니다.
@@ -112,6 +120,15 @@ Gunicorn의 gthread `timeout=30`은 개별 요청 30초 제한이 아닙니다. 
 운영은 기존 `deploy/start.sh`가 **migrate → collectstatic → Gunicorn**을 자동 실행합니다. 별도 워커/스케줄/관리 명령은 없습니다.
 **frontend-TOPIQ/**에서 `npm run dev`로 개발 서버를 수동 재시작하거나 `npm run build` 후 운영 재배포합니다. 프론트 명령은 DB를 변경하지 않습니다.
 
+이미 설치한 로컬 환경에 평가 다국어 지원을 반영할 때는 **사용자가 `backend/`에서 백엔드 재시작 전에** 아래 명령을 수동 실행합니다.
+목적은 생성 언어 컬럼 추가와 기존 행의 한국어 기본값 적용이며 DB 스키마가 변경됩니다. 에이전트와 개발 서버는 자동 적용하지 않습니다.
+
+```powershell
+.\.venv\Scripts\python.exe manage.py migrate writing 0002_evaluation_feedback_language
+```
+
+적용 후 백엔드를 재시작하고 프론트엔드도 위 방식으로 재시작/재배포합니다. 운영은 기존 `deploy/start.sh`의 자동 migration으로 적용합니다.
+
 초기 크레딧 지급은 migration 적용 후 관리자가 `/admin/accounts/creditaccount/`의 **크레딧 지급** 링크에서 수행합니다.
 사용자 ID·수량·사유를 입력하면 잔액과 지급 원장이 함께 저장됩니다. 권한은 `accounts.add_credittransaction`이며 같은 지급 요청 재전송은 중복 지급하지 않습니다.
 계정·거래 원장은 일반 관리자 편집/삭제로 수정할 수 없습니다. 활성 사용자의 ID는 Django 사용자 관리자에서 확인합니다.
@@ -127,6 +144,7 @@ Django가 테스트 DB를 생성·마이그레이션·삭제하며 서비스 DB�
 
 채점 계약·빈칸 치환·응답 검증, 로그인/CSRF/소유권, 중복 접수·예약 중 잔액 검사·전역 동시 한도,
 결과 저장 실패 시 차감 롤백·만료 복구·늦은 응답 거부·관리자 지급 중복 방지를 확인합니다.
+세 언어의 프롬프트·미응답 처리·저장/조회·언어 변경 충돌·중복 차감 방지와 기존 행의 migration 호환성도 검사합니다.
 `frontend-TOPIQ/`에서 `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`로 UI/API와 빌드를 검사합니다.
 평가 예제는 `backend/writing/tests/fixtures/`의 51·52·53·54·empty-51·empty-53 폴더에 보관합니다.
 각 폴더의 `input.json`, `request.json`, `response.json`을 위 테스트가 읽어 요청 구성·원문 보존·응답 검증을 확인합니다.

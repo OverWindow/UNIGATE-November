@@ -119,7 +119,8 @@ export default function WritingAnswer({ setId, setNumber, slot, draft, onChange,
       return;
     }
     const answer = slot < 53 ? { a: draft.a ?? "", b: draft.b ?? "" } : { text: draft.text ?? "" };
-    const submission = pending.current ?? { id: trackedId.current ?? crypto.randomUUID(), setId, typeSlot: slot, answer, priceVersion: config.priceVersion };
+    const submission = pending.current ?? { id: trackedId.current ?? crypto.randomUUID(), setId, typeSlot: slot, answer,
+      priceVersion: config.priceVersion, feedbackLanguage: language };
     pending.current = submission;
     remember(submission.id);
     operation.current?.abort();
