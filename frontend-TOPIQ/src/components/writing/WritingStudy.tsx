@@ -93,7 +93,7 @@ export default function WritingStudy({ id }: { id: string }) {
   return <div className="page-container writing-study">
     {locked && config ? <section className="writing-status writing-unlock" aria-labelledby="writing-unlock-title">
       <h1 id="writing-unlock-title">{t.unlockTitle}</h1>
-      <p>{t.unlockNote.replace("{limit}", String(config.evaluationLimit))}</p>
+      <p>{t.unlockNote}</p>
       <ul>{[51, 52, 53, 54].map(slot => <li key={slot}>{t.priceBreakdown.replace("{number}", String(slot)).replace("{credits}", String(config.questionPrices[slot]))}</li>)}</ul>
       <button type="button" className="button button-primary" disabled={unlocking} aria-busy={unlocking} onClick={() => void openSet()}>
         {unlocking ? t.unlocking : t.unlock.replace("{credits}", String(config.setCost))}

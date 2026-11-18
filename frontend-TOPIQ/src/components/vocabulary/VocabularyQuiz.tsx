@@ -25,6 +25,7 @@ export default function VocabularyQuiz({ id }: { id: string }) {
   const [meaningLanguage, setMeaningLanguage] = useState<MeaningLanguage>("en");
   const submission = useRef<AbortController | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
+  const feedback = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -44,6 +45,15 @@ export default function VocabularyQuiz({ id }: { id: string }) {
     heading.current?.focus({ preventScroll: true });
     heading.current?.scrollIntoView({ block: "nearest" });
   }, [index, questions]);
+
+  useEffect(() => {
+    if (!answer) return;
+    feedback.current?.focus({ preventScroll: true });
+    feedback.current?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+      block: "start",
+    });
+  }, [answer]);
 
   const question = questions[index];
   const finished = questions.length > 0 && index === questions.length;
@@ -79,6 +89,12 @@ export default function VocabularyQuiz({ id }: { id: string }) {
   return <div className="page-container vocabulary-quiz">
     <header className="vocabulary-quiz-header">
       <h1>{t.quizTitle}</h1>
+      {!error && data && question && <div className="vocabulary-quiz-progress">
+        <span>{reviewing ? t.reviewing : t.question} <strong>{index + 1} / {questions.length}</strong></span>
+        <div className="vocabulary-quiz-progress-track" role="progressbar" aria-label={t.quizTitle} aria-valuemin={0} aria-valuemax={questions.length} aria-valuenow={index}>
+          <span style={{ width: `${index / questions.length * 100}%` }} />
+        </div>
+      </div>}
     </header>
     {error ? <div className="vocabulary-status" role="alert">
       <p>{error instanceof VocabularyError && error.status === 404 ? t.notFound : t.quizError}</p>
@@ -95,12 +111,6 @@ export default function VocabularyQuiz({ id }: { id: string }) {
           <Link className="button vocabulary-secondary" href={`/vocabulary/sets/${id}`}>{t.browse}</Link>
         </div>
       </section> : <>
-        <div className="vocabulary-quiz-progress">
-          <span>{reviewing ? t.reviewing : t.question} <strong>{index + 1} / {questions.length}</strong></span>
-          <div className="vocabulary-quiz-progress-track" role="progressbar" aria-label={t.quizTitle} aria-valuemin={0} aria-valuemax={questions.length} aria-valuenow={index}>
-            <span style={{ width: `${index / questions.length * 100}%` }} />
-          </div>
-        </div>
         {!reviewing && questions.length < data.wordCount && <p className="vocabulary-quiz-note">{t.quizPartial}</p>}
         <form className="vocabulary-quiz-card" onSubmit={event => { event.preventDefault(); void check(); }}>
           <h2 ref={heading} tabIndex={-1} className="vocabulary-quiz-instruction" lang="ko">{question.instruction}</h2>
@@ -122,10 +132,12 @@ export default function VocabularyQuiz({ id }: { id: string }) {
             {changed && <button type="button" className="button vocabulary-secondary" onClick={() => setRevision(value => value + 1)}>{t.quizRestart}</button>}
           </div>}
           <div aria-live="polite">
-            {answer && <section className={`vocabulary-quiz-feedback${answer.isCorrect ? " is-correct" : ""}`}>
-              <h3>{answer.isCorrect ? t.correct : t.incorrect}</h3>
-              <h4>{t.correctAnswer}</h4><p lang="ko">{answer.correctAnswer}. {question.choices[answer.correctAnswer - 1]}</p>
-              <h4>{t.explanation}</h4><p lang="ko">{answer.explanation}</p>
+            {answer && <section ref={feedback} tabIndex={-1} aria-labelledby="quiz-correct-answer quiz-explanation" className={`vocabulary-quiz-feedback${answer.isCorrect ? " is-correct" : ""}`}>
+              {answer.isCorrect && <h3>{t.correct}</h3>}
+              <div className="vocabulary-quiz-answer-details">
+                <div><h4 id="quiz-correct-answer">{t.correctAnswer}</h4><p lang="ko">{answer.correctAnswer}. {question.choices[answer.correctAnswer - 1]}</p></div>
+                <div><h4 id="quiz-explanation">{t.explanation}</h4><p lang="ko">{answer.explanation}</p></div>
+              </div>
               <div className="vocabulary-toolbar"><strong lang="ko">{answer.word.korean}</strong>
                 <label>{t.meaningLanguage}<select value={meaningLanguage} onChange={event => setMeaningLanguage(event.target.value as MeaningLanguage)}>
                   <option value="en" lang="en">English</option><option value="vi" lang="vi">Tiếng Việt</option><option value="ja" lang="ja">日本語</option>
@@ -135,9 +147,11 @@ export default function VocabularyQuiz({ id }: { id: string }) {
               <p lang={answer.word.meanings[meaningLanguage]?.trim() ? meaningLanguage : language}>{answer.word.meanings[meaningLanguage]?.trim() || t.missingMeaning}</p>
             </section>}
           </div>
-          <div className="vocabulary-quiz-actions">
-            {answer ? <button type="button" className="button button-primary" onClick={next}>{index === questions.length - 1 ? t.showResult : t.next}<ArrowRight size={16} aria-hidden="true" /></button>
-              : <button type="submit" className="button button-primary" disabled={selected === null || checking || changed}>{checking ? t.checking : t.checkAnswer}</button>}
+          <div className="vocabulary-quiz-bottom-bar">
+            <div className="page-container vocabulary-quiz-actions">
+              {answer ? <button type="button" className="button button-primary" onClick={next}>{index === questions.length - 1 ? t.showResult : t.next}<ArrowRight size={16} aria-hidden="true" /></button>
+                : <button type="submit" className="button button-primary" disabled={selected === null || checking || changed}>{checking ? t.checking : t.checkAnswer}</button>}
+            </div>
           </div>
         </form>
       </>}

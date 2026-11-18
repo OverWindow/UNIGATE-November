@@ -1,4 +1,4 @@
-"""Read purchased PBT writing prompts and personal submission history."""
+"""Read the public PBT catalog and purchased writing prompts."""
 import math
 from functools import wraps
 
@@ -33,8 +33,6 @@ def response(data, status=200):
 def available(view):
     @wraps(view)
     def wrapped(request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            return response({"error": "authentication_required"}, 401)
         try:
             return view(request, *args, **kwargs)
         except (DatabaseError, WritingUnavailable):
@@ -141,15 +139,20 @@ def question(item):
 @available
 def sets(request):
     groups = list(complete_sets().only("set_id", "created_at"))
-    history = submitted_slots(request.user.pk, [group.pk for group in groups])
-    unlocked = set(CreditTransaction.objects.filter(account_id=request.user.pk, kind="unlock",
-        set_id__in=[group.pk for group in groups]).values_list("set_id", flat=True))
+    user_id = request.user.pk if request.user.is_authenticated else None
+    history = submitted_slots(user_id, [group.pk for group in groups])
+    unlocked = set()
+    if user_id is not None:
+        unlocked = set(CreditTransaction.objects.filter(account_id=user_id, kind="unlock",
+            set_id__in=[group.pk for group in groups]).values_list("set_id", flat=True))
     return response({"sets": [summary(group, number, history, group.pk in unlocked) for number, group in enumerate(groups, 1)]})
 
 
 @require_GET
 @available
 def detail(request, set_id):
+    if not request.user.is_authenticated:
+        return response({"error": "authentication_required"}, 401)
     groups = complete_sets()
     group = groups.filter(pk=set_id).first()
     if group is None:

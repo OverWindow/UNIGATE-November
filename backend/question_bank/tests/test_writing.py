@@ -98,7 +98,8 @@ class WritingAPITests(SimpleTestCase):
             mocked.start()
             self.addCleanup(mocked.stop)
         ledger = patch("question_bank.writing.CreditTransaction.objects")
-        ledger.start().filter.return_value.values_list.return_value = []
+        self.ledger = ledger.start()
+        self.ledger.filter.return_value.values_list.return_value = []
         self.addCleanup(ledger.stop)
         self.set_id = uuid.uuid4()
         self.group = WritingSet(set_id=self.set_id, created_at=timezone.now())
@@ -119,7 +120,7 @@ class WritingAPITests(SimpleTestCase):
     @patch("question_bank.writing.Evaluation.objects.filter")
     @patch("question_bank.writing.WritingQuestion.objects")
     @patch("question_bank.writing.complete_sets")
-    def test_guests_cannot_read_prompts_or_query_bank(self, complete, questions, history):
+    def test_guests_can_read_catalog_but_not_prompts_or_personal_history(self, complete, questions, history):
         groups = complete.return_value
         groups.only.return_value = [self.group]
         groups.filter.return_value.first.return_value = self.group
@@ -129,16 +130,22 @@ class WritingAPITests(SimpleTestCase):
         ]
         with patch("django.contrib.auth.middleware.get_user", return_value=AnonymousUser()):
             catalog = self.client.get("/api/writing/sets/")
+            self.assertEqual(catalog.status_code, 200)
+            self.assertEqual(catalog.json(), {"sets": [{"id": str(self.set_id), "number": 1, "questionCount": 4,
+                                                      "submittedSlots": [], "unlocked": False, "setCost": 100}]})
+            complete.assert_called_once()
+            complete.reset_mock()
             detail = self.client.get(self.path)
+        self.assertEqual(detail.status_code, 401)
+        self.assertEqual(detail.json(), {"error": "authentication_required"})
         for result in (catalog, detail):
-            self.assertEqual(result.status_code, 401)
-            self.assertEqual(result.json(), {"error": "authentication_required"})
             self.assertEqual(result["Cache-Control"], "private, no-store")
             self.assertIn("Cookie", result["Vary"])
             self.assertNotIn("sessionid", result.cookies)
         complete.assert_not_called()
         questions.filter.assert_not_called()
         history.assert_not_called()
+        self.ledger.filter.assert_not_called()
 
     @patch("question_bank.writing.has_access", return_value=False)
     @patch("question_bank.writing.WritingQuestion.objects")

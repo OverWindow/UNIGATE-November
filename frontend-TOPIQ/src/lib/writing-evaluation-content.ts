@@ -9,7 +9,6 @@ interface Copy {
   processingShort: string; close: string; totalScore: string; points: string; details: string;
   before: string; after: string; viewResult: string; applyCorrection: string; undoCorrection: string; correctedAnswer: string;
   login: string; loginNotice: string;
-  remaining: string; included: string; quotaPending: string;
   answerFormat: string; plainFormat: string; manuscriptFormat: string;
   errors: Record<string, string>; kinds: Record<string, string>;
   scoreLabels: Record<string, string>; shortScoreLabels: Record<string, string>; taskStatuses: Record<string, string>;
@@ -17,8 +16,6 @@ interface Copy {
 
 export const evaluationContent: Record<Language, Copy> = {
   ko: {
-    remaining: "남은 평가 {remaining}/{limit}회", included: "세트에 포함된 평가입니다. 추가 크레딧 차감은 없으며 실패한 평가는 횟수에 포함하지 않습니다.",
-    quotaPending: "처리 중인 평가는 남은 횟수를 임시로 사용합니다. 실패하면 횟수가 복구됩니다.",
     scoreLabels: { a: "㉠", b: "㉡", content: "내용 및 수행 과제", organization: "글의 전개 구조", language: "언어 사용" },
     shortScoreLabels: { a: "㉠", b: "㉡", content: "내용 과제", organization: "구성", language: "언어" },
     taskStatuses: { "충족": "충족", "부분 충족": "부분 충족", "미충족": "미충족" },
@@ -36,7 +33,7 @@ export const evaluationContent: Record<Language, Copy> = {
     before: "수정 전", after: "수정 제안", viewResult: "평가 결과 보기",
     login: "로그인", loginNotice: "로그인 후 열람한 세트의 쓰기 평가를 이용할 수 있습니다.",
     errors: {
-      set_locked: "먼저 세트를 열어 주세요.", evaluation_limit_reached: "이 문항의 평가 20회를 모두 사용했습니다. 문제와 기존 평가 결과는 계속 볼 수 있습니다.",
+      set_locked: "먼저 세트를 열어 주세요.", evaluation_limit_reached: "이 문항은 평가 한도 20회에 도달해 더 이상 평가를 요청할 수 없습니다.",
       insufficient_credits: "크레딧이 부족해요", price_changed: "평가 조건이 변경됐습니다. 새 조건을 확인한 뒤 다시 요청하세요.",
       evaluation_busy: "다른 평가가 진행 중입니다. 잠시 후 다시 요청하세요.", rate_limited: "요청이 많습니다. 잠시 후 다시 시도하세요.",
       evaluation_unavailable: "평가 서비스가 아직 준비되지 않았습니다.", question_unavailable: "문항 형식을 확인해야 해 평가할 수 없습니다.",
@@ -45,8 +42,6 @@ export const evaluationContent: Record<Language, Copy> = {
     }, kinds: { grant: "지급", reserve: "예약", capture: "차감", release: "예약 해제" },
   },
   en: {
-    remaining: "Evaluations remaining: {remaining}/{limit}", included: "Evaluations are included in this set. No additional credits are charged, and failed evaluations do not count.",
-    quotaPending: "Evaluations in progress temporarily use an attempt. Failed attempts are restored.",
     scoreLabels: { a: "㉠", b: "㉡", content: "Content and task fulfillment", organization: "Organization", language: "Language use" },
     shortScoreLabels: { a: "㉠", b: "㉡", content: "Content", organization: "Structure", language: "Language" },
     taskStatuses: { "충족": "Met", "부분 충족": "Partially met", "미충족": "Not met" },
@@ -64,7 +59,7 @@ export const evaluationContent: Record<Language, Copy> = {
     before: "Before", after: "Suggested change", viewResult: "View evaluation result",
     login: "Sign in", loginNotice: "Sign in to evaluate answers in sets you have opened.",
     errors: {
-      set_locked: "Open this set first.", evaluation_limit_reached: "All 20 evaluations for this question have been used. You can still view the question and previous results.",
+      set_locked: "Open this set first.", evaluation_limit_reached: "This question has reached the limit of 20 evaluations. No further evaluations can be requested.",
       insufficient_credits: "You do not have enough available credits.", price_changed: "Evaluation terms changed. Review the updated terms before submitting again.",
       evaluation_busy: "Another evaluation is in progress. Please try again shortly.", rate_limited: "Too many requests. Please try again later.",
       evaluation_unavailable: "Evaluation is not configured yet.", question_unavailable: "The question format needs to be checked.",
@@ -73,8 +68,6 @@ export const evaluationContent: Record<Language, Copy> = {
     }, kinds: { grant: "Granted", reserve: "Reserved", capture: "Charged", release: "Released" },
   },
   id: {
-    remaining: "Sisa penilaian: {remaining}/{limit}", included: "Penilaian termasuk dalam paket ini. Tidak ada biaya kredit tambahan dan penilaian gagal tidak dihitung.",
-    quotaPending: "Penilaian yang sedang diproses memakai jatah sementara. Jika gagal, jatah dikembalikan.",
     scoreLabels: { a: "㉠", b: "㉡", content: "Isi dan pemenuhan tugas", organization: "Struktur tulisan", language: "Penggunaan bahasa" },
     shortScoreLabels: { a: "㉠", b: "㉡", content: "Isi", organization: "Struktur", language: "Bahasa" },
     taskStatuses: { "충족": "Terpenuhi", "부분 충족": "Sebagian terpenuhi", "미충족": "Belum terpenuhi" },
@@ -92,7 +85,7 @@ export const evaluationContent: Record<Language, Copy> = {
     before: "Sebelum", after: "Saran perubahan", viewResult: "Lihat hasil penilaian",
     login: "Masuk", loginNotice: "Masuk untuk menilai jawaban pada paket yang sudah dibuka.",
     errors: {
-      set_locked: "Buka paket ini terlebih dahulu.", evaluation_limit_reached: "Semua 20 penilaian untuk soal ini sudah digunakan. Soal dan hasil sebelumnya tetap dapat dilihat.",
+      set_locked: "Buka paket ini terlebih dahulu.", evaluation_limit_reached: "Soal ini telah mencapai batas 20 penilaian. Penilaian tambahan tidak dapat diminta.",
       insufficient_credits: "Kredit yang tersedia tidak cukup.", price_changed: "Ketentuan penilaian berubah. Periksa ketentuan terbaru sebelum mengirim ulang.",
       evaluation_busy: "Penilaian lain sedang berlangsung. Coba lagi sebentar.", rate_limited: "Terlalu banyak permintaan. Coba lagi nanti.",
       evaluation_unavailable: "Layanan penilaian belum disiapkan.", question_unavailable: "Format soal perlu diperiksa.",

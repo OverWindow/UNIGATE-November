@@ -149,6 +149,7 @@ export default function WritingAnswer({ setId, setNumber, slot, draft, initialUs
   const keys: (keyof LearnerAnswer)[] = slot < 53 ? ["a", "b"] : ["text"];
   const limit = slot < 53 ? 100 : 1000;
   const enabled = config?.enabled;
+  const limitReached = usage.used >= usage.limit;
   const exhausted = usage.remaining === 0 && !uncertain;
   const isEmpty = keys.every(key => !(draft[key] ?? "").trim());
   const tooLong = keys.some(key => Array.from(draft[key] ?? "").length > limit);
@@ -178,22 +179,20 @@ export default function WritingAnswer({ setId, setNumber, slot, draft, initialUs
       {tooLong && <p role="alert">{t.errors.invalid_submission}</p>}
       {user && !enabled && <p>{t.unavailable}</p>}
       <div className="writing-answer-actions">
-        <button className="button button-primary" type="submit" aria-busy={busy || processing} aria-describedby={`writing-usage-${slot}`}
+        <button className="button button-primary" type="submit" aria-busy={busy || processing} aria-describedby={limitReached ? `writing-limit-${slot}` : undefined}
           disabled={!!user && (!enabled || busy || processing || isEmpty || tooLong || exhausted)}>
           {(busy || processing) && <span className="writing-spinner" aria-hidden="true" />}
           {busy || processing ? t.processingShort : uncertain ? t.retrySame : t.evaluate}
         </button>
-        <span id={`writing-usage-${slot}`} className="writing-evaluation-cost" aria-live="polite">{t.remaining.replace("{remaining}", String(usage.remaining)).replace("{limit}", String(usage.limit))}</span>
       </div>
-      <p className="writing-notice">{usage.used >= usage.limit ? t.errors.evaluation_limit_reached
-        : usage.pending > 0 ? t.quotaPending : t.included}</p>
+      {limitReached && <p id={`writing-limit-${slot}`} className="writing-notice" role="status">{t.errors.evaluation_limit_reached}</p>}
     </form>
     {loginNotice && !user && <div className="writing-login-notice" role="status">
       <p>{t.loginNotice}</p>
       <Link className="button button-primary" href={`/login?next=${encodeURIComponent(`/writing/sets/${setId}`)}`}>{t.login}</Link>
     </div>}
     {busy && !entry && <p className="writing-evaluation-loading" role="status">{t.processing}</p>}
-    {error && <p role="alert">{t.errors[error] ?? t.errors.default}</p>}
+    {error && !(limitReached && error === "evaluation_limit_reached") && <p role="alert">{t.errors[error] ?? t.errors.default}</p>}
     {uncertain && <div role="status"><p>{t.uncertain}</p><button type="button" className="button writing-secondary" disabled={busy} onClick={checkStatus}>{t.check}</button></div>}
     {entry && <div className="writing-result-launcher">
       <p role="status">{t[entry.status]}{entry.totalScore !== null && <strong>{entry.totalScore} / {entry.maxScore} {t.points}</strong>}</p>

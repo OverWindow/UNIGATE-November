@@ -259,7 +259,7 @@
 .writing-catalog-notice .writing-notice { margin: 0; }
 .writing-notice { margin: 0 0 24px; color: #65728a; font-size: 13px; line-height: 1.8; }
 .writing-set-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
-.writing-set-card { display: flex; flex-direction: column; min-width: 0; padding: 22px; border: 1px solid #dfe6f1; border-radius: 16px; background: #fff; transition: border-color .15s, box-shadow .15s; overflow-wrap: anywhere; }
+.writing-set-card { display: flex; flex-direction: column; min-width: 0; width: 100%; padding: 22px; border: 1px solid #dfe6f1; border-radius: 16px; background: #fff; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color .15s, box-shadow .15s; overflow-wrap: anywhere; }
 .writing-set-card:hover { border-color: #89a6d9; box-shadow: 0 8px 24px #24487b0d; }
 .writing-card-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .writing-set-number { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 32px; padding-inline: 6px; border-radius: 9px; background: #f0f4fc; color: #526e9f; font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
@@ -277,6 +277,18 @@
 .writing-set-action svg { flex-shrink: 0; }
 .writing-status { padding: 60px 12px; text-align: center; color: #65728a; line-height: 1.8; }
 .writing-status p { margin: 0 0 20px; }
+.writing-login-dialog { width: min(420px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); margin: auto; padding: 0; border: 1px solid #dfe6f1; border-radius: 18px; background: #fff; color: #233651; box-shadow: 0 20px 60px #14233d33; overflow-wrap: anywhere; }
+.writing-login-dialog::backdrop { background: #14233d80; }
+.writing-login-panel { position: relative; padding: 32px 28px 28px; }
+.writing-login-close { position: absolute; top: 10px; right: 10px; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: #65728a; }
+.writing-login-close:hover:not(:disabled) { background: #f0f4fc; }
+.writing-login-icon { color: #315eb7; }
+.writing-login-panel h2 { margin: 18px 0 10px; font-size: 22px; font-weight: 650; line-height: 1.4; }
+.writing-login-panel h2:focus { outline: none; }
+.writing-login-panel p { margin: 0 0 24px; color: #65728a; line-height: 1.7; word-break: keep-all; }
+.writing-login-panel > .button { width: 100%; }
+.writing-login-panel button:disabled { opacity: .5; cursor: not-allowed; }
+.writing-login-panel .writing-unlock-error { margin: 16px 0 0; color: #a33838; }
 .writing-unlock { max-width: 640px; margin: 0 auto; }
 .writing-unlock h1 { color: #24354d; font-size: clamp(24px, 4vw, 32px); line-height: 1.4; margin-bottom: 20px; }
 .writing-unlock ul { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 20px; padding: 0; margin: 0 0 24px; list-style: none; }

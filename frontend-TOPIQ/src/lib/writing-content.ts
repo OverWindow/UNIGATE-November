@@ -8,6 +8,7 @@ interface WritingCopy {
   submissionHistory: string; submitted: string; notSubmitted: string;
   viewQuestion: string; close: string;
   unlock: string; reopen: string; unlockTitle: string; unlockNote: string; priceBreakdown: string; unlocking: string; unlockError: string; insufficientCredits: string;
+  lockedTitle: string; loginRequired: string; loginToOpen: string; unlockConfirmation: string;
   catalog: {
     history: string;
     steps: [string, string, string]; stepsLabel: string;
@@ -16,8 +17,10 @@ interface WritingCopy {
 
 export const writingContent: Record<Language, WritingCopy> = {
   ko: {
+    lockedTitle: "잠긴 쓰기 세트입니다", loginRequired: "문제를 열람하려면 먼저 로그인해 주세요.", loginToOpen: "로그인 후 열기",
+    unlockConfirmation: "세트를 열면 {credits}크레딧이 차감됩니다.",
     unlock: "{credits}크레딧으로 세트 열기", reopen: "다시 열기", unlockTitle: "세트를 열고 쓰기 연습을 시작하세요",
-    unlockNote: "최초 열람 시 한 번만 차감합니다. 다시 열기는 무료이며 문항마다 성공 평가 {limit}회가 포함됩니다. 실패한 평가는 횟수에 포함하지 않습니다.",
+    unlockNote: "최초 열람 시 한 번만 차감합니다. 같은 세트는 추가 차감 없이 다시 열 수 있습니다.",
     priceBreakdown: "{number}번: {credits}크레딧", unlocking: "세트를 여는 중…", unlockError: "열람 처리를 확인하지 못했습니다. 다시 시도해도 같은 세트는 중복 차감하지 않습니다.",
     insufficientCredits: "세트를 열기 위한 크레딧이 부족합니다.",
     viewQuestion: "{number}번 문제 보기", close: "닫기",
@@ -37,8 +40,10 @@ export const writingContent: Record<Language, WritingCopy> = {
     types: { 51: "실용문 완성", 52: "설명문 완성", 53: "자료 설명", 54: "주제 글쓰기" },
   },
   en: {
+    lockedTitle: "This writing set is locked", loginRequired: "Sign in to access the questions.", loginToOpen: "Sign in to open",
+    unlockConfirmation: "Opening this set will deduct {credits} credits.",
     unlock: "Open set for {credits} credits", reopen: "Open again", unlockTitle: "Open this set to start writing",
-    unlockNote: "Credits are charged only once. Reopening is free, with {limit} successful evaluations per question included. Failed evaluations do not count.",
+    unlockNote: "Credits are charged only on first access. You can reopen the same set without an additional charge.",
     priceBreakdown: "Question {number}: {credits} credits", unlocking: "Opening set…", unlockError: "We could not confirm access. Retrying will not charge twice for the same set.",
     insufficientCredits: "You do not have enough credits to open this set.",
     viewQuestion: "View question {number}", close: "Close",
@@ -58,8 +63,10 @@ export const writingContent: Record<Language, WritingCopy> = {
     types: { 51: "Practical text", 52: "Explanatory text", 53: "Describing data", 54: "Essay writing" },
   },
   id: {
+    lockedTitle: "Paket menulis ini terkunci", loginRequired: "Silakan masuk untuk mengakses soal.", loginToOpen: "Masuk untuk membuka",
+    unlockConfirmation: "Membuka paket ini akan memotong {credits} kredit.",
     unlock: "Buka paket dengan {credits} kredit", reopen: "Buka kembali", unlockTitle: "Buka paket ini untuk mulai menulis",
-    unlockNote: "Kredit hanya dipotong satu kali. Membuka kembali gratis dan mencakup {limit} penilaian berhasil per soal. Penilaian gagal tidak dihitung.",
+    unlockNote: "Kredit hanya dipotong saat pertama dibuka. Paket yang sama dapat dibuka kembali tanpa biaya tambahan.",
     priceBreakdown: "Soal {number}: {credits} kredit", unlocking: "Membuka paket…", unlockError: "Akses belum dapat dipastikan. Mencoba lagi tidak akan memotong kredit dua kali untuk paket yang sama.",
     insufficientCredits: "Kredit tidak cukup untuk membuka paket ini.",
     viewQuestion: "Lihat soal {number}", close: "Tutup",
