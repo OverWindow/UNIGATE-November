@@ -783,6 +783,20 @@ docker build -t unigate-backend ./backend
 브라우저의 교차 사이트 쿠키 제한을 줄이려면 같은 사이트의 서브도메인(예: `www.example.com`, `api.example.com`)을 사용하고 실제 배포 도메인에서 확인하세요.
 
 백엔드는 `migrate --noinput` → `collectstatic --noinput` → Gunicorn 순서로 시작합니다. 관리자의 정적 파일은 WhiteNoise가 제공합니다.
+
+Gunicorn 요청 로그는 `backend/deploy/gunicorn.conf.py`에서 설정하며 표준 출력에 기록합니다.
+기존 요청 방식·경로·상태 코드·처리 시간에 다음 항목을 함께 기록합니다.
+
+- `ip`: Gunicorn에 직접 연결한 IP. Cloudtype에서는 프록시 IP일 수 있습니다.
+- `forwarded_for`: `X-Forwarded-For` 헤더의 전달 IP 목록. 헤더가 없으면 `-`이며, 프록시의 헤더 처리 정책을 확인하기 전에는 실제 사용자 IP로 단정하지 않습니다.
+- `bytes`: Gunicorn이 보낸 응답 본문의 바이트 수. 프록시가 최종 전송한 크기와 다를 수 있습니다.
+- `user_agent`: 요청의 User-Agent. 헤더가 없으면 `-`입니다.
+
+쿼리 문자열·요청 본문·쿠키·인증 헤더는 기록하지 않습니다. 로컬 `runserver` 로그에는 이 설정이 적용되지 않습니다.
+적용 시 Cloudtype에서 백엔드 이미지를 수동으로 재빌드·재배포합니다. 컨테이너 시작 시 기존 `deploy/start.sh`가
+`/app/backend`에서 `gunicorn -c /app/backend/deploy/gunicorn.conf.py config.wsgi:application`을 자동 실행하므로 별도 실행 명령은 없습니다.
+이 로그 설정 변경은 API·DB 테이블·컬럼·migration을 추가하거나 변경하지 않습니다.
+
 기존 배포의 단일 레플리카 / Recreate 구성을 유지하고, 동일한 PostgreSQL 서비스·볼륨·연결값을 사용합니다.
 마이그레이션 전 백업은 운영자가 별도로 수행합니다. 코드 교체가 DB 백업이나 복원을 대신하지 않습니다.
 DB 비밀번호·이메일 발송 키를 프론트 빌드 인자에 넣지 않습니다. 랜딩페이지 신청에는 Brevo가 필요 없지만 TOPIQ 이메일 인증에는 앞 절의 Brevo 설정이 필요합니다.

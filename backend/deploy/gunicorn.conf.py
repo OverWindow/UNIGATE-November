@@ -9,8 +9,12 @@ timeout = 30
 graceful_timeout = 25
 accesslog = "-"
 errorlog = "-"
-# Omit query strings, headers, and request bodies.
-access_log_format = "%(m)s %(U)s status=%(s)s duration=%(L)ss"
+# Keep the peer IP separate from the forwarded chain; omit query strings and bodies.
+access_log_format = (
+    'ip=%(h)s forwarded_for="%({x-forwarded-for}i)s" '
+    '%(m)s %(U)s status=%(s)s duration=%(L)ss '
+    'bytes=%(B)s user_agent="%(a)s"'
+)
 # Scheme is normalized by Nginx; Django handles the explicit trust setting.
 forwarded_allow_ips = ""
 
