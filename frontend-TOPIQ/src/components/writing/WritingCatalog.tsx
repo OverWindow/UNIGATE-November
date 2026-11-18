@@ -62,7 +62,7 @@ export default function WritingCatalog() {
                     </span>
                   </li>)}
                 </ul>
-                <span className="writing-set-action">{t.open}<ArrowRight size={17} aria-hidden="true" /></span>
+                <span className="writing-set-action">{set.unlocked ? t.reopen : t.unlock.replace("{credits}", String(set.setCost))}<ArrowRight size={17} aria-hidden="true" /></span>
               </Link>;
             })}</div>}
       </section>

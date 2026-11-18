@@ -277,6 +277,10 @@
 .writing-set-action svg { flex-shrink: 0; }
 .writing-status { padding: 60px 12px; text-align: center; color: #65728a; line-height: 1.8; }
 .writing-status p { margin: 0 0 20px; }
+.writing-unlock { max-width: 640px; margin: 0 auto; }
+.writing-unlock h1 { color: #24354d; font-size: clamp(24px, 4vw, 32px); line-height: 1.4; margin-bottom: 20px; }
+.writing-unlock ul { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 20px; padding: 0; margin: 0 0 24px; list-style: none; }
+.writing-unlock [role="alert"] { margin-top: 20px; }
 .writing-secondary { border: 1px solid #dbe2ed; background: #fff; color: #405674; }
 .writing-secondary:hover:not(:disabled) { background: #eef3fc; border-color: #94afe1; }
 .writing-secondary:disabled { opacity: .45; cursor: default; }

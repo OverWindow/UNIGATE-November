@@ -33,7 +33,8 @@ class CreditTransaction(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     account = models.ForeignKey(CreditAccount, models.PROTECT)
     evaluation = models.ForeignKey("writing.Evaluation", models.PROTECT, null=True)
-    kind = models.CharField(max_length=10, choices=[("grant", "지급"), ("reserve", "예약"), ("capture", "차감"), ("release", "예약 해제")])
+    set_id = models.UUIDField(null=True)
+    kind = models.CharField(max_length=10, choices=[("grant", "지급"), ("reserve", "예약"), ("capture", "차감"), ("release", "예약 해제"), ("welcome", "신규 가입 지급"), ("unlock", "세트 열람")])
     amount = models.PositiveIntegerField()
     balance_after = models.PositiveBigIntegerField()
     reserved_after = models.PositiveBigIntegerField()
@@ -46,8 +47,12 @@ class CreditTransaction(models.Model):
         indexes = [models.Index(fields=["account", "-created_at"])]
         constraints = [
             models.UniqueConstraint(fields=["evaluation", "kind"], name="credit_evaluation_event_unique"),
+            models.UniqueConstraint(fields=["account", "set_id"], condition=models.Q(kind="unlock"), name="credit_set_unlock_unique"),
+            models.UniqueConstraint(fields=["account"], condition=models.Q(kind="welcome"), name="credit_welcome_unique"),
             models.CheckConstraint(condition=(
-                models.Q(kind="grant", evaluation__isnull=True, actor__isnull=False)
-                | models.Q(kind__in=["reserve", "capture", "release"], evaluation__isnull=False, actor__isnull=True)
+                models.Q(kind="grant", evaluation__isnull=True, actor__isnull=False, set_id__isnull=True)
+                | models.Q(kind__in=["reserve", "capture", "release"], evaluation__isnull=False, actor__isnull=True, set_id__isnull=True)
+                | models.Q(kind="welcome", evaluation__isnull=True, actor__isnull=True, set_id__isnull=True, amount=100)
+                | models.Q(kind="unlock", evaluation__isnull=True, actor__isnull=True, set_id__isnull=False, amount=100)
             ), name="credit_transaction_source"),
         ]

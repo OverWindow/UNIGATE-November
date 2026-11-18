@@ -24,22 +24,23 @@ def locked_account(user_id):
     return CreditAccount.objects.select_for_update().get(user_id=user_id)
 
 
-def record(account, kind, amount, *, evaluation=None, actor=None, reason="", entry_id=None):
+def record(account, kind, amount, *, evaluation=None, actor=None, reason="", entry_id=None, set_id=None):
     account.save(update_fields=["balance", "reserved", "updated_at"])
     fields = {"id": entry_id} if entry_id else {}
     return CreditTransaction.objects.create(
         **fields, account=account, evaluation=evaluation, kind=kind, amount=amount,
-        balance_after=account.balance, reserved_after=account.reserved, actor=actor, reason=reason,
+        balance_after=account.balance, reserved_after=account.reserved, actor=actor, reason=reason, set_id=set_id,
     )
 
 
-def reserve(account, evaluation):
-    amount = evaluation.credit_cost
-    if account.balance - account.reserved < amount:
-        raise CreditError("insufficient_credits")
-    account.reserved += amount
-    if amount:
-        record(account, "reserve", amount, evaluation=evaluation)
+def welcome(user_id):
+    # Only the successful signup transaction calls this; existing accounts get no bonus.
+    with evaluation_lock():
+        account = locked_account(user_id)
+        if CreditTransaction.objects.filter(account=account, kind="welcome").exists():
+            return
+        account.balance += 100
+        record(account, "welcome", 100)
 
 
 def settle(evaluation, *, success):

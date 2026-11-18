@@ -42,7 +42,7 @@ test("evaluation sends original answers and retries only a rejected CSRF request
   assert.deepEqual(calls, ["/api/csrf/", "/api/writing/evaluations/", "/api/csrf/", "/api/writing/evaluations/"]);
 });
 
-test("ambiguous failures never automatically repeat a paid evaluation", async () => {
+test("ambiguous failures never automatically repeat an evaluation", async () => {
   for (const failure of [new Error("network"), Response.json({ error: "writing_unavailable" }, { status: 503 })]) {
     let posts = 0;
     globalThis.fetch = async path => {
@@ -54,6 +54,55 @@ test("ambiguous failures never automatically repeat a paid evaluation", async ()
     await assert.rejects(api.submitWriting({ id: "stable-id" }, new AbortController().signal, 45));
     assert.equal(posts, 1);
   }
+});
+
+test("opening a set uses a CSRF protected POST without client price or buyer", async () => {
+  const calls = [];
+  let csrf = 0, posts = 0;
+  globalThis.fetch = async (path, options) => {
+    calls.push(path);
+    if (path === "/api/csrf/") return Response.json({ csrfToken: `token-${++csrf}` });
+    assert.equal(path, "/api/writing/sets/synthetic-set/unlock/");
+    assert.equal(options.method, "POST");
+    assert.equal(options.headers["X-CSRFToken"], `token-${csrf}`);
+    assert.equal(options.cache, "no-store");
+    assert.deepEqual(JSON.parse(options.body), {});
+    return ++posts === 1 ? Response.json({ error: "csrf_failed" }, { status: 403 })
+      : Response.json({ setId: "synthetic-set", unlocked: true, chargedCredits: 100, credits: { balance: 0, reserved: 0, available: 0 } });
+  };
+  const result = await api.unlockWriting("synthetic-set", new AbortController().signal);
+  assert.equal(result.unlocked, true);
+  assert.equal(result.credits.available, 0);
+  assert.equal(posts, 2);
+  assert.equal(calls.length, 4);
+});
+
+test("set purchase failures and quota rejections preserve their codes without automatic retries", async () => {
+  for (const [status, code] of [[409, "insufficient_credits"], [403, "set_locked"], [409, "evaluation_limit_reached"], [503, "writing_unavailable"]]) {
+    let posts = 0;
+    globalThis.fetch = async path => {
+      if (path === "/api/csrf/") return Response.json({ csrfToken: "synthetic" });
+      posts++;
+      return Response.json({ error: code }, { status });
+    };
+    const request = code === "evaluation_limit_reached" ? api.submitWriting({ id: "stable-id" }, new AbortController().signal, 45)
+      : api.unlockWriting("synthetic-set", new AbortController().signal);
+    await assert.rejects(request, error => error.status === status && error.code === code);
+    assert.equal(posts, 1);
+  }
+});
+
+test("cancelled set access never sends a purchase and an existing purchase response is accepted", async () => {
+  const controller = new AbortController();
+  globalThis.fetch = async path => {
+    assert.equal(path, "/api/csrf/");
+    controller.abort();
+    return Response.json({ csrfToken: "synthetic" });
+  };
+  await assert.rejects(api.unlockWriting("synthetic-set", controller.signal));
+  globalThis.fetch = async path => Response.json(path === "/api/csrf/" ? { csrfToken: "synthetic" }
+    : { setId: "synthetic-set", unlocked: true, chargedCredits: 0, credits: { balance: 0, reserved: 0, available: 0 } });
+  assert.equal((await api.unlockWriting("synthetic-set", new AbortController().signal)).chargedCredits, 0);
 });
 
 test("cancellation during CSRF acquisition prevents evaluation submission", async () => {

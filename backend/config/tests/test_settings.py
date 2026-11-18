@@ -13,15 +13,11 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 
 
 class EnvironmentSettingsTests(unittest.TestCase):
-    def test_writing_prices_distinguish_unset_and_explicit_zero(self):
-        settings, _ = self.read_settings({"DJANGO_SECRET_KEY": "test", "WRITING_EVALUATION_CREDITS_51": "0", "WRITING_EVALUATION_MODEL": " fixture/model "})
-        self.assertEqual(settings["WRITING_EVALUATION_CREDITS"][51], 0)
-        self.assertIsNone(settings["WRITING_EVALUATION_CREDITS"][52])
+    def test_writing_evaluation_does_not_use_legacy_per_request_prices(self):
+        settings, _ = self.read_settings({"DJANGO_SECRET_KEY": "test", "WRITING_EVALUATION_CREDITS_51": "obsolete", "WRITING_EVALUATION_MODEL": " fixture/model "})
+        self.assertNotIn("WRITING_EVALUATION_CREDITS", settings)
         self.assertEqual(settings["WRITING_EVALUATION_MODEL"], "fixture/model")
         self.assertEqual(settings["WRITING_EVALUATION_MAX_CONCURRENT"], 1)
-        for value in ("-1", "1.5", "true", "1000001"):
-            with self.subTest(value=value), self.assertRaises(ImproperlyConfigured):
-                self.read_settings({"DJANGO_SECRET_KEY": "test", "WRITING_EVALUATION_CREDITS_51": value})
 
     def test_gunicorn_defaults_and_environment(self):
         path = BASE_DIR / "deploy" / "gunicorn.conf.py"

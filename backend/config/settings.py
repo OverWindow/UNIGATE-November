@@ -75,17 +75,11 @@ INSTALLED_APPS = [
 ]
 MIGRATION_MODULES = {"surveys": "migration.surveys", "accounts": "migration.accounts", "question_bank": "migration.question_bank", "pbt": "migration.pbt", "vocabulary": "migration.vocabulary", "writing": "migration.writing"}
 
-# Missing prices disable evaluation; zero is an explicit free price.
+# Evaluations are included in purchased sets; provider configuration controls availability.
 BIZROUTER_API_KEY = os.environ.get("BIZROUTER_API_KEY", "").strip()
 WRITING_EVALUATION_MODEL = os.environ.get("WRITING_EVALUATION_MODEL", "").strip()
 if len(WRITING_EVALUATION_MODEL) > 200:
     raise ImproperlyConfigured("WRITING_EVALUATION_MODEL must be at most 200 characters.")
-WRITING_EVALUATION_CREDITS = {}
-for slot in (51, 52, 53, 54):
-    value = os.environ.get(f"WRITING_EVALUATION_CREDITS_{slot}", "").strip()
-    if value and (not value.isascii() or not value.isdigit() or int(value) > 1_000_000):
-        raise ImproperlyConfigured(f"WRITING_EVALUATION_CREDITS_{slot} must be an integer from 0 to 1000000.")
-    WRITING_EVALUATION_CREDITS[slot] = int(value) if value else None
 try:
     WRITING_EVALUATION_TIMEOUT_SECONDS = int(os.environ.get("WRITING_EVALUATION_TIMEOUT_SECONDS", "45"))
     WRITING_EVALUATION_MAX_CONCURRENT = int(os.environ.get("WRITING_EVALUATION_MAX_CONCURRENT", "1"))

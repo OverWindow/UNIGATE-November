@@ -3,12 +3,13 @@ from datetime import timedelta
 from django.conf import settings
 from django.utils import timezone
 
-from accounts.credits import evaluation_lock, locked_account, reserve, settle
+from accounts.credits import balance_data, evaluation_lock, locked_account, record, settle
 from question_bank.models import WritingQuestion
 from question_bank.writing import complete_sets, question as public_question
 
 from .contract import FEEDBACK_LANGUAGES, LearnerAnswer, build_request, digest, empty_response, validate_response
 from .models import Evaluation
+from .access import EVALUATION_LIMIT, QUESTION_PRICES, SET_COST, evaluation_usage, has_access
 from .provider import ProviderError, evaluate
 
 
@@ -18,11 +19,11 @@ class EvaluationError(Exception):
 
 
 def config_data():
-    prices = {str(slot): settings.WRITING_EVALUATION_CREDITS[slot] for slot in (51, 52, 53, 54)}
     model = settings.WRITING_EVALUATION_MODEL
     enabled = bool(model and settings.BIZROUTER_API_KEY)
-    version = digest({"model": model, "prices": prices})
-    return {"prices": prices, "enabled": enabled, "priceVersion": version,
+    version = digest({"model": model, "policy": "set-unlock-v1", "prices": QUESTION_PRICES, "limit": EVALUATION_LIMIT})
+    return {"questionPrices": QUESTION_PRICES, "setCost": SET_COST, "evaluationLimit": EVALUATION_LIMIT,
+            "enabled": enabled, "priceVersion": version,
             "timeoutSeconds": settings.WRITING_EVALUATION_TIMEOUT_SECONDS}
 
 
@@ -42,6 +43,46 @@ def existing_locked(user_id, evaluation_id, submission_hash, feedback_language):
     return entry
 
 
+def prepare_question(set_id, item, answer, feedback_language="ko"):
+    display = public_question(item)
+    source = {"exam_format": "pbt", "section": "writing", "type_slot": item.type_slot,
+              "topic": display["topic"], "instruction": display["instruction"],
+              "context_title": display["contextTitle"], "passage": display["passage"],
+              "data_source": display["dataSource"], "materials": display["materials"],
+              "material_notes": display["materialNotes"], "requirements": display["requirements"]}
+    try:
+        request = build_request(f"writing:{set_id}:{item.type_slot}", source, answer, feedback_language=feedback_language)
+    except ValueError:
+        raise EvaluationError("question_unavailable", 503) from None
+    snapshot = source.copy()
+    if display["imageUrl"]:
+        snapshot["image_url"] = display["imageUrl"]
+    return request, snapshot
+
+
+def unlock(*, user_id, set_id):
+    with evaluation_lock():
+        expire_locked()
+        account = locked_account(user_id)
+        if has_access(user_id, set_id):
+            return {"setId": str(set_id), "unlocked": True, "chargedCredits": 0,
+                    "credits": balance_data(account)}, False
+        if not complete_sets().filter(pk=set_id).exists():
+            raise EvaluationError("not_found", 404)
+        items = list(WritingQuestion.objects.filter(set_id=set_id).order_by("type_slot"))
+        if [item.type_slot for item in items] != list(QUESTION_PRICES):
+            raise EvaluationError("question_unavailable", 503)
+        # Validate all four prompts before charging; no provider calls are made here.
+        for item in items:
+            prepare_question(set_id, item, {})
+        if account.balance - account.reserved < SET_COST:
+            raise EvaluationError("insufficient_credits", 409)
+        account.balance -= SET_COST
+        record(account, "unlock", SET_COST, set_id=set_id)
+        return {"setId": str(set_id), "unlocked": True, "chargedCredits": SET_COST,
+                "credits": balance_data(account)}, True
+
+
 def submit(*, user_id, evaluation_id, set_id, slot, answer, price_version, feedback_language="ko"):
     if not isinstance(feedback_language, str) or feedback_language not in FEEDBACK_LANGUAGES:
         raise ValueError("지원하지 않는 평가 언어입니다.")
@@ -53,30 +94,18 @@ def submit(*, user_id, evaluation_id, set_id, slot, answer, price_version, feedb
         existing = existing_locked(user_id, evaluation_id, submission_hash, feedback_language)
         if existing:
             return existing, False
+        if not has_access(user_id, set_id):
+            raise EvaluationError("set_locked", 403)
 
     if not complete_sets().filter(pk=set_id).exists():
         raise EvaluationError("not_found", 404)
     item = WritingQuestion.objects.filter(set_id=set_id, type_slot=slot).first()
     if item is None:
         raise EvaluationError("not_found", 404)
-    # Only allow prompt fields into the model, never upstream answers/metadata.
-    display = public_question(item)
-    source = {"exam_format": "pbt", "section": "writing", "type_slot": slot,
-              "topic": display["topic"], "instruction": display["instruction"],
-              "context_title": display["contextTitle"], "passage": display["passage"],
-              "data_source": display["dataSource"], "materials": display["materials"],
-              "material_notes": display["materialNotes"], "requirements": display["requirements"]}
-    try:
-        request = build_request(f"writing:{set_id}:{slot}", source, answer, feedback_language=feedback_language)
-    except ValueError:
-        raise EvaluationError("question_unavailable", 503) from None
+    request, snapshot = prepare_question(set_id, item, answer, feedback_language)
     local = empty_response(request)
-    snapshot = source.copy()
-    if display["imageUrl"]:
-        snapshot["image_url"] = display["imageUrl"]
     config = config_data()
-    cost = config["prices"][str(slot)]
-    if not config["enabled"] or cost is None:
+    if not config["enabled"]:
         raise EvaluationError("evaluation_unavailable", 503)
     if config["priceVersion"] != price_version:
         raise EvaluationError("price_changed", 409)
@@ -87,22 +116,21 @@ def submit(*, user_id, evaluation_id, set_id, slot, answer, price_version, feedb
         existing = existing_locked(user_id, evaluation_id, submission_hash, feedback_language)
         if existing:
             return existing, False
+        if not has_access(user_id, set_id):
+            raise EvaluationError("set_locked", 403)
+        if evaluation_usage(user_id, set_id)[str(slot)]["remaining"] == 0:
+            raise EvaluationError("evaluation_limit_reached", 409)
         if local is None and Evaluation.objects.filter(status="processing").count() >= settings.WRITING_EVALUATION_MAX_CONCURRENT:
             raise EvaluationError("evaluation_busy", 429)
-        account = locked_account(user_id)
-        actual_cost = 0 if local is not None else cost
-        if account.balance - account.reserved < actual_cost:
-            raise EvaluationError("insufficient_credits", 409)
         entry = Evaluation.objects.create(
             id=evaluation_id, user_id=user_id, set_id=set_id, type_slot=slot, submission_hash=submission_hash,
             question_snapshot=snapshot, answer=answer, request_hash=request.request_id, feedback_language=feedback_language,
             prompt_version=digest({"system": request.system, "rubric": request.payload["rubric"],
                                    "notes": "", "schema": request.payload["output_schema"]}),
             requested_model=settings.WRITING_EVALUATION_MODEL, model_options=options,
-            price_version=price_version, credit_cost=actual_cost, status="processing",
+            price_version=price_version, credit_cost=0, status="processing",
             expires_at=timezone.now() + timedelta(seconds=timeout + 60),
         )
-        reserve(account, entry)
 
     usage, resolved_model, checked, error = {}, "", None, ""
     try:
@@ -115,7 +143,7 @@ def submit(*, user_id, evaluation_id, set_id, slot, answer, price_version, feedb
         error = str(exc)
     except ValueError:
         error = "invalid_model_response"
-    # A crash or DB outage leaves a recoverable reservation, not an unrecorded charge.
+    # Processing entries hold a quota slot until completion or expiry.
     with evaluation_lock():
         expire_locked()
         current = Evaluation.objects.select_for_update().get(pk=entry.pk)
@@ -141,4 +169,5 @@ def serialize(entry, *, detail=False):
             "completedAt": entry.completed_at.isoformat() if entry.completed_at else None}
     if detail:
         data.update(answer=entry.answer, question=entry.question_snapshot, result=entry.result)
+        data["usage"] = evaluation_usage(entry.user_id, entry.set_id)[str(entry.type_slot)]
     return data

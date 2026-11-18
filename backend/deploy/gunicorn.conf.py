@@ -7,8 +7,10 @@ if workers < 1 or threads < 1:
     raise ValueError("GUNICORN_WORKERS and GUNICORN_THREADS must be positive integers.")
 timeout = 30
 graceful_timeout = 25
-accesslog = None
+accesslog = "-"
 errorlog = "-"
+# Omit query strings, headers, and request bodies.
+access_log_format = "%(m)s %(U)s status=%(s)s duration=%(L)ss"
 # Scheme is normalized by Nginx; Django handles the explicit trust setting.
 forwarded_allow_ips = ""
 

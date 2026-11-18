@@ -7,6 +7,7 @@ interface WritingCopy {
   source: string; unit: string; category: string; types: Record<number, string>;
   submissionHistory: string; submitted: string; notSubmitted: string;
   viewQuestion: string; close: string;
+  unlock: string; reopen: string; unlockTitle: string; unlockNote: string; priceBreakdown: string; unlocking: string; unlockError: string; insufficientCredits: string;
   catalog: {
     history: string;
     steps: [string, string, string]; stepsLabel: string;
@@ -15,6 +16,10 @@ interface WritingCopy {
 
 export const writingContent: Record<Language, WritingCopy> = {
   ko: {
+    unlock: "{credits}크레딧으로 세트 열기", reopen: "다시 열기", unlockTitle: "세트를 열고 쓰기 연습을 시작하세요",
+    unlockNote: "최초 열람 시 한 번만 차감합니다. 다시 열기는 무료이며 문항마다 성공 평가 {limit}회가 포함됩니다. 실패한 평가는 횟수에 포함하지 않습니다.",
+    priceBreakdown: "{number}번: {credits}크레딧", unlocking: "세트를 여는 중…", unlockError: "열람 처리를 확인하지 못했습니다. 다시 시도해도 같은 세트는 중복 차감하지 않습니다.",
+    insufficientCredits: "세트를 열기 위한 크레딧이 부족합니다.",
     viewQuestion: "{number}번 문제 보기", close: "닫기",
     title: "AI 쓰기 튜터",
     intro: "TOPIK II 쓰기를 연습하고, AI 평가와 첨삭으로 글을 다듬어 보세요.",
@@ -32,6 +37,10 @@ export const writingContent: Record<Language, WritingCopy> = {
     types: { 51: "실용문 완성", 52: "설명문 완성", 53: "자료 설명", 54: "주제 글쓰기" },
   },
   en: {
+    unlock: "Open set for {credits} credits", reopen: "Open again", unlockTitle: "Open this set to start writing",
+    unlockNote: "Credits are charged only once. Reopening is free, with {limit} successful evaluations per question included. Failed evaluations do not count.",
+    priceBreakdown: "Question {number}: {credits} credits", unlocking: "Opening set…", unlockError: "We could not confirm access. Retrying will not charge twice for the same set.",
+    insufficientCredits: "You do not have enough credits to open this set.",
     viewQuestion: "View question {number}", close: "Close",
     title: "AI Writing Tutor",
     intro: "Practice TOPIK II writing and refine your work with AI feedback and corrections.",
@@ -49,6 +58,10 @@ export const writingContent: Record<Language, WritingCopy> = {
     types: { 51: "Practical text", 52: "Explanatory text", 53: "Describing data", 54: "Essay writing" },
   },
   id: {
+    unlock: "Buka paket dengan {credits} kredit", reopen: "Buka kembali", unlockTitle: "Buka paket ini untuk mulai menulis",
+    unlockNote: "Kredit hanya dipotong satu kali. Membuka kembali gratis dan mencakup {limit} penilaian berhasil per soal. Penilaian gagal tidak dihitung.",
+    priceBreakdown: "Soal {number}: {credits} kredit", unlocking: "Membuka paket…", unlockError: "Akses belum dapat dipastikan. Mencoba lagi tidak akan memotong kredit dua kali untuk paket yang sama.",
+    insufficientCredits: "Kredit tidak cukup untuk membuka paket ini.",
     viewQuestion: "Lihat soal {number}", close: "Tutup",
     title: "Tutor Menulis AI",
     intro: "Berlatih menulis TOPIK II dan sempurnakan tulisan dengan penilaian serta koreksi AI.",

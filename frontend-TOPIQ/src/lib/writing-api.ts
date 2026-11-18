@@ -1,6 +1,6 @@
 import type { Language } from "./landing-content";
 
-export interface WritingSet { id: string; number: number; questionCount: number; submittedSlots: number[] }
+export interface WritingSet { id: string; number: number; questionCount: number; submittedSlots: number[]; unlocked: boolean; setCost: number }
 export interface WritingMaterial {
   kind: "bar" | "line" | "table"; title: string; unit: string; categories?: string[];
   series?: { label: string; values: number[] }[]; columns?: string[]; rows?: string[][];
@@ -10,7 +10,8 @@ export interface WritingQuestion {
   requirements: string[]; materials: WritingMaterial[]; materialNotes: string[]; dataSource: string;
   imageUrl: string;
 }
-export interface WritingDetail extends WritingSet { questions: WritingQuestion[] }
+export interface EvaluationUsage { used: number; pending: number; remaining: number; limit: number }
+export interface WritingDetail extends WritingSet { questions: WritingQuestion[]; evaluationUsage: Record<number, EvaluationUsage> }
 
 export class WritingError extends Error {
   constructor(public status: number, public code = "writing_unavailable") { super(code); }
@@ -42,14 +43,15 @@ async function requestJson<T>(path: string, signal: AbortSignal, options: Reques
 }
 
 export interface LearnerAnswer { a?: string; b?: string; text?: string }
-export interface EvaluationConfig { prices: Record<number, number | null>; enabled: boolean; priceVersion: string; timeoutSeconds: number }
+export interface EvaluationConfig { questionPrices: Record<number, number>; setCost: number; evaluationLimit: number; enabled: boolean; priceVersion: string; timeoutSeconds: number }
 export interface CreditBalance { balance: number; reserved: number; available: number }
-export interface CreditEntry { id: string; kind: "grant" | "reserve" | "capture" | "release"; amount: number; evaluationId: string | null; balanceAfter: number; reservedAfter: number; createdAt: string }
+export interface CreditEntry { id: string; kind: "grant" | "reserve" | "capture" | "release" | "welcome" | "unlock"; amount: number; evaluationId: string | null; setId: string | null; balanceAfter: number; reservedAfter: number; createdAt: string }
 export interface Evaluation {
   id: string; setId: string; typeSlot: number; status: "processing" | "succeeded" | "failed";
   totalScore: number | null; maxScore: number; creditCost: number; chargedCredits: number;
   createdAt: string; completedAt: string | null; error: string;
   feedbackLanguage: Language;
+  usage?: EvaluationUsage;
   answer?: LearnerAnswer;
   question?: { instruction: string; passage: string; topic: string; context_title: string; materials: WritingMaterial[]; material_notes: string[]; requirements: string[]; data_source: string; image_url?: string };
   result?: {
@@ -61,19 +63,27 @@ export interface Evaluation {
 }
 export interface Submission { id: string; setId: string; typeSlot: number; answer: LearnerAnswer; priceVersion: string; feedbackLanguage: Language }
 
-export async function submitWriting(body: Submission, signal: AbortSignal, timeoutSeconds: number): Promise<Evaluation> {
+async function postWriting<T>(path: string, body: object, signal: AbortSignal, timeout = 15000): Promise<T> {
   for (let attempt = 0; attempt < 2; attempt++) {
     const { csrfToken } = await requestJson<{ csrfToken: string }>("/api/csrf/", signal);
     try {
-      return await requestJson<Evaluation>("/api/writing/evaluations/", signal, {
+      return await requestJson<T>(`/api/writing/${path}`, signal, {
         method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken }, body: JSON.stringify(body),
-      }, (timeoutSeconds + 20) * 1000);
+      }, timeout);
     } catch (error) {
-      // Only a CSRF rejection guarantees that the evaluation was never started.
+      // Only a CSRF rejection guarantees that the operation was never started.
       if (!(error instanceof WritingError) || error.code !== "csrf_failed" || attempt > 0) throw error;
     }
   }
   throw new WritingError(403, "csrf_failed");
+}
+
+export function submitWriting(body: Submission, signal: AbortSignal, timeoutSeconds: number): Promise<Evaluation> {
+  return postWriting("evaluations/", body, signal, (timeoutSeconds + 20) * 1000);
+}
+
+export function unlockWriting(setId: string, signal: AbortSignal): Promise<{ setId: string; unlocked: boolean; chargedCredits: number; credits: CreditBalance }> {
+  return postWriting(`sets/${setId}/unlock/`, {}, signal);
 }
 
 export function creditsRequest<T>(path: string, signal: AbortSignal): Promise<T> {

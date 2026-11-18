@@ -18,21 +18,34 @@ Hub 소유의 `topik_bank.writing_sets`, `topik_bank.writing_questions`는 읽�
 PBT 51~54번이 모두 있는 세트만 표시하며, 막대·선 그래프와 표 자료를 지원합니다.
 평가 입력은 서버가 조회한 문제 표시 필드만 사용하고 참고답안·생성 메타데이터는 전송하지 않습니다.
 문항 형식은 `backend/writing/`에 편입한 v2 평가 계약의 표준 발문·빈칸·자료·요구 사항 규칙으로 검증합니다.
-호환되지 않는 문항은 `question_unavailable`로 거절하고 크레딧을 예약하지 않습니다.
+세트 최초 열람 전에 네 문항의 표시·평가 형식을 모두 검증합니다. 호환되지 않는 세트는 차감하지 않습니다.
 
 ### 평가와 크레딧
 
-별도 워커·대기열 없이 HTTP 요청 안에서 BizRouter Chat Completions를 호출합니다.
-먼저 평가 ID·원본 답안·문제 스냅샷을 저장하고 크레딧을 예약합니다. 모델 호출 동안 DB 잠금은 유지하지 않습니다.
-응답 구조·점수 범위·원문 인용·과제 누락을 검증한 뒤 **결과 저장과 차감 확정을 같은 트랜잭션**에서 처리합니다.
-53·54번 언어 점수는 이미 2배 적용된 짝수이며 서버에서 재차 곱하지 않습니다.
-전체 미응답은 모델 호출 없이 0점, 차감량 0으로 저장합니다. 가격·모델이 미설정인 문항은 미응답도 평가 접수를 비활성화합니다.
+신규 회원은 가입 완료 트랜잭션에서 **100크레딧을 최초 1회** 받습니다. 기존 회원의 로그인·잔액 조회에는 지급하지 않습니다.
+세트 가격은 **100크레딧(51번 20 + 52번 20 + 53번 30 + 54번 30)**이며 개별 문항 구매는 없습니다.
+사용자가 세트 열기 버튼을 누르면 서버가 사용 가능 잔액을 검사하고, 잔액 차감과 `unlock` 거래를 함께 저장합니다.
+사용자·세트별 `unlock` 거래가 열람권입니다. 중복 요청은 기존 권한을 반환하고 추가 차감하지 않습니다.
+GET 조회·링크 미리 불러오기에서는 구매하지 않으며, 로그인하지 않았거나 열람권이 없는 사용자에게 문제 본문을 제공하지 않습니다.
+한 번 연 세트는 잔액이 0이어도 재열람할 수 있습니다.
 
-사용 가능 잔액은 `balance - reserved`입니다. 가격 미설정은 무료가 아니며 명시적인 `0`만 무료입니다.
-잔액 부족·평가 동시 실행 한도 초과·가격 변경은 접수 전에 거절합니다. 가격 변경 후에는 사용자가 새 가격을 확인하고 다시 제출합니다.
-모델 오류·검증 실패는 실패 이력을 저장하고 예약을 해제합니다. 예기치 않은 서버/DB 중단은 처리 기한(호출 제한 시간 + 60초) 후
-다음 평가/잔액/이력 조회·평가 접수 시 실패 처리하고 예약을 해제합니다. 조회가 없으면 예약은 그때까지 DB에 남습니다.
-이미 실패한 평가에 늦게 도착한 결과는 점수나 차감을 확정하지 않습니다. 중단된 작업을 자동 재실행하지 않습니다.
+문항마다 **성공 평가 20회**를 포함하며 평가별 추가 차감은 없습니다. 횟수는 사용자·세트·문항별로 독립적입니다.
+평가 기록의 `succeeded`와 유효한 `processing`을 합산해 접수 가능 여부를 판단하고, 기존 DB 잠금 안에서 접수하여 동시 요청도 20회를 넘지 않습니다.
+실패·만료된 요청은 횟수를 소비하지 않으며, 처리 중 요청은 한 자리를 임시 점유합니다. 한도를 소진해도 문제와 기존 결과는 계속 볼 수 있습니다.
+새 평가의 기존 `credit_cost` 필드는 0으로 저장합니다. 이전 평가·거래·잔액은 migration에서 변경하거나 삭제하지 않습니다.
+
+별도 워커·대기열 없이 HTTP 요청 안에서 BizRouter Chat Completions를 호출합니다.
+먼저 평가 ID·원본 답안·문제 스냅샷을 저장합니다. 모델 호출 동안 DB 잠금은 유지하지 않습니다.
+응답 구조·점수 범위·원문 인용·과제 누락을 검증한 뒤 결과를 저장합니다.
+53·54번 언어 점수는 이미 2배 적용된 짝수이며 서버에서 재차 곱하지 않습니다.
+전체 미응답은 모델 호출 없이 0점의 성공 평가로 저장하며 1회를 사용합니다. 화면에서는 빈 답안 제출을 막습니다.
+모델 또는 서버 키가 미설정이면 평가 접수를 비활성화합니다.
+
+사용 가능 잔액은 `balance - reserved`입니다. 잔액 부족은 세트 열기 전에, 평가 횟수·동시 실행 한도 초과는 평가 접수 전에 거절합니다.
+평가 조건 버전이 바뀌면 새 조건을 불러온 뒤 다시 요청합니다.
+모델 오류·검증 실패는 실패 이력으로 남습니다. 예기치 않은 서버/DB 중단은 처리 기한(호출 제한 시간 + 60초) 후
+다음 평가/잔액/이력 조회·평가 접수·세트 열기에서 실패 처리합니다. 만료된 요청은 횟수 집계에서도 제외합니다.
+이전 과금 방식의 미완료 예약은 기존 방식으로 해제합니다. 이미 실패한 평가에 늦게 도착한 결과는 반영하지 않으며 자동 재실행하지 않습니다.
 
 `POST`의 UUID `id`는 실행 식별자이자 중복 요청 방지 키입니다. 같은 사용자·ID·답안·생성 언어는 기존 기록을 반환하고 다시 호출/차감하지 않습니다.
 같은 ID로 다른 문항·답안·생성 언어를 보내면 409입니다. 기존 제출 해시는 유지하고 저장된 언어를 별도로 비교하므로 기존 한국어 요청도 재조회할 수 있습니다.
@@ -47,27 +60,33 @@ PBT 51~54번이 모두 있는 세트만 표시하며, 막대·선 그래프와 �
 
 | 메서드 | API | 목적 |
 | --- | --- | --- |
-| GET | `/api/writing/sets/` | 기존 API: 로그인 전용 세트 목록 |
-| GET | `/api/writing/sets/<uuid:set_id>/` | 기존 API: 로그인 전용 문제 상세 |
-| GET | `/api/writing/evaluation-config/` | 문항별 가격·평가 가능 여부·가격 버전·호출 제한 시간 |
-| POST | `/api/writing/evaluations/` | 답안 저장·예약·동기 평가·결과 저장 |
+| GET | `/api/writing/sets/` | 로그인 전용 세트 목록, `unlocked`·`setCost` 포함 |
+| POST | `/api/writing/sets/<uuid:set_id>/unlock/` | 신규 API: 세트 최초 열람 100크레딧 차감·열람권 저장 |
+| GET | `/api/writing/sets/<uuid:set_id>/` | 열람권 확인 후 문제와 문항별 `evaluationUsage` 반환 |
+| GET | `/api/writing/evaluation-config/` | `questionPrices`·`setCost`·`evaluationLimit`·평가 가능 여부·조건 버전·호출 제한 시간 |
+| POST | `/api/writing/evaluations/` | 열람권·20회 한도 확인, 답안 저장·동기 평가·결과 저장 |
 | GET | `/api/writing/evaluations/?page=1` | 본인 평가 이력, 페이지당 20건 |
 | GET | `/api/writing/evaluations/<uuid:id>/` | 본인 평가 상태·답안·결과·문제 스냅샷 |
 | GET | `/api/credits/` | 잔액·예약액·사용 가능액 |
-| GET | `/api/credits/transactions/?page=1` | 본인 지급·예약·차감·해제 내역, 페이지당 20건 |
+| GET | `/api/credits/transactions/?page=1` | 본인 지급·세트 열람 및 이전 거래 내역, `setId` 포함, 페이지당 20건 |
 
-POST 필드는 `id`, `setId`, `typeSlot`, `answer`, `priceVersion`, `feedbackLanguage`입니다.
+세트 열기 POST 본문은 `{}`입니다. 가격·구매자는 서버에서 결정합니다. 최초 성공은 201, 재요청은 200이며
+`setId`, `unlocked`, `chargedCredits`, `credits`를 반환합니다. 재요청의 `chargedCredits`는 0입니다.
+문항별 사용량은 `used`, `pending`, `remaining`, `limit`이며 문제 상세의 `evaluationUsage`와 평가 상세의 `usage`로 반환합니다.
+평가 POST 필드는 `id`, `setId`, `typeSlot`, `answer`, `priceVersion`, `feedbackLanguage`입니다.
 `feedbackLanguage`는 `ko`·`en`·`id` 중 하나이며 누락 시 `ko`입니다. 다른 값은 `invalid_submission`(400)으로 거절합니다.
 프론트는 최초 요청의 언어를 재시도에도 사용합니다. 생성·목록·상세 응답의 `feedbackLanguage`는 저장된 생성 언어입니다.
 `answer`는 51·52번 `{ "a": "...", "b": "..." }`, 53·54번 `{ "text": "..." }`이며 원본 공백을 보존합니다.
-빈칸은 각각 2,000, 본문은 20,000 Unicode 코드 포인트까지 받습니다. 표시 글자 수는 줄바꿈을 제외하며 원고지 칸 수와 다릅니다.
+API는 빈칸 각각 200, 본문 1,000 Unicode 코드 포인트까지 받습니다. 표시 글자 수는 줄바꿈을 제외하며 원고지 칸 수와 다릅니다.
 신규 완료/실패 기록은 HTTP 201, 기존 기록은 200, 기존 처리 중 기록은 202로 반환합니다. **실제 성공 여부는 `status`를 확인**합니다.
-`evaluation_busy`/`rate_limited`는 429, `insufficient_credits`/`price_changed`/`request_conflict`는 409입니다.
+`evaluation_busy`/`rate_limited`는 429, `insufficient_credits`/`price_changed`/`request_conflict`/`evaluation_limit_reached`는 409,
+`set_locked`는 403, 비로그인은 401입니다.
 사용자는 모델·문제 내용·차감량을 지정할 수 없으며 타인의 평가 조회는 404입니다.
 
 ### DB 변경
 
-신규 테이블은 3개이며 기존 사용자·문제은행·읽기·듣기 테이블의 컬럼 추가/변경은 없습니다.
+쓰기 기능의 기존 테이블 3개를 재사용합니다. **이번 세트 과금 변경의 신규 테이블은 없습니다.**
+기존 사용자·문제은행·읽기·듣기 테이블의 컬럼 추가/변경도 없습니다.
 
 | 테이블 | 신규 컬럼 | 목적 |
 | --- | --- | --- |
@@ -75,14 +94,18 @@ POST 필드는 `id`, `setId`, `typeSlot`, `answer`, `priceVersion`, `feedbackLan
 | 위 테이블 | `request_hash`, `package_version`, `prompt_version`, `requested_model`, `resolved_model`, `model_options`, `price_version`, `credit_cost` | 평가 계약·모델·접수 시 가격 기록 |
 | 위 테이블 | `status`, `result`, `total_score`, `usage`, `error_code`, `created_at`, `expires_at`, `completed_at` | 처리 상태·검증 결과·토큰 사용량·복구 기한 |
 | `credit_accounts` | `user_id`, `balance`, `reserved`, `updated_at` | 사용자별 잔액·예약액 |
-| `credit_transactions` | `id`, `account_id`, `evaluation_id`, `kind`, `amount`, `balance_after`, `reserved_after`, `actor_id`, `reason`, `created_at` | 지급·예약·차감·해제 감사 내역 |
+| `credit_transactions` | `id`, `account_id`, `evaluation_id`, `kind`, `amount`, `balance_after`, `reserved_after`, `actor_id`, `reason`, `created_at` | 기존 지급·예약·차감·해제 내역 |
+| `credit_transactions` | **추가: `set_id` (nullable UUID)** | 세트 열람 거래의 대상 식별. 기존 거래는 NULL 유지 |
+| `credit_transactions` | **변경: `kind` 선택지·거래 출처 제약** | `welcome`(가입 지급), `unlock`(세트 열람) 유형 추가 |
 
 Django migration `migration/writing/0001_initial.py`, `migration/accounts/0003_creditaccount_credittransaction.py`로 관리합니다.
 평가 다국어 지원은 `migration/writing/0002_evaluation_feedback_language.py`로 기존 `writing_evaluations`에
 `feedback_language`(최대 2자, 기본값 `ko`) 컬럼 1개를 추가합니다. 기존 행도 `ko`가 되며 결과·제출 해시는 보존합니다.
-이 변경의 신규 API·신규 테이블·기존 컬럼 변경은 없습니다. 추가 의존성·환경변수·워커도 없습니다.
+세트 과금 변경은 `migration/accounts/0004_writing_set_credits.py`로 관리합니다.
+사용자별 `welcome` 1건, 사용자·세트별 `unlock` 1건을 조건부 유일 제약으로 보장합니다. 두 유형은 100크레딧이며 관리자·평가 연결 없이 기록합니다.
+이 변경의 신규 API는 위 세트 열기 POST 1개이고, 추가 의존성·환경변수·워커는 없습니다.
 잔액/예약액 제약과 평가별 거래 중복 방지 제약을 사용합니다. 짧은 PostgreSQL advisory transaction lock으로 프로세스 간 접수를 직렬화합니다.
-회원가입 시 자동 지급하지 않으며 계정은 최초 조회/평가/관리자 지급 시 잔액 0으로 생성됩니다.
+신규 가입 경로에서만 가입 지급을 호출합니다. 기존 사용자의 최초 크레딧 계정 생성 기본 잔액은 0이며 자동 지급하지 않습니다.
 거래·평가 이력이 있는 사용자 삭제는 보호됩니다. 데이터 삭제·크레딧 결제 충전·만료 정책은 이 기능에 포함하지 않습니다.
 
 ### 환경변수와 운영
@@ -93,7 +116,7 @@ Django migration `migration/writing/0001_initial.py`, `migration/accounts/0003_c
 | --- | --- |
 | `BIZROUTER_API_KEY` | 미설정 시 평가 비활성화. 서버용 키 |
 | `WRITING_EVALUATION_MODEL` | 미설정 시 평가 비활성화. BizRouter에서 허용된 모델 ID |
-| `WRITING_EVALUATION_CREDITS_51` ~ `_54` | 기본 미설정. 각 문항별 0~1,000,000 정수. 값이 없는 문항만 비활성화 |
+| `WRITING_EVALUATION_CREDITS_51` ~ `_54` | 더 이상 사용하지 않음. 기존 환경 설정에 남아 있어도 평가 과금에 영향 없음 |
 | `WRITING_EVALUATION_TIMEOUT_SECONDS` | 기본 45, 범위 5~120초. 외부 호출 제한 |
 | `WRITING_EVALUATION_MAX_CONCURRENT` | 기본 1, 범위 1~32. DB를 공유하는 서버 전체의 동시 평가 제한 |
 | `GUNICORN_WORKERS` | 기본 1. 양의 정수 |
@@ -129,7 +152,17 @@ Gunicorn의 gthread `timeout=30`은 개별 요청 30초 제한이 아닙니다. 
 
 적용 후 백엔드를 재시작하고 프론트엔드도 위 방식으로 재시작/재배포합니다. 운영은 기존 `deploy/start.sh`의 자동 migration으로 적용합니다.
 
-초기 크레딧 지급은 migration 적용 후 관리자가 `/admin/accounts/creditaccount/`의 **크레딧 지급** 링크에서 수행합니다.
+세트 과금을 적용하려면 **사용자가 `backend/`에서 백엔드 재시작 전에** 아래 명령을 수동 실행합니다.
+`0004_writing_set_credits`를 포함한 미적용 migration을 적용하여 DB 컬럼·제약을 변경합니다. 기존 잔액·지급 내역은 유지합니다.
+
+```powershell
+.\.venv\Scripts\python.exe manage.py migrate
+```
+
+에이전트와 로컬 개발 서버는 migrate를 실행하지 않습니다. 운영은 기존 `deploy/start.sh`의 자동 migration 후 Gunicorn 시작 절차를 유지합니다.
+백엔드와 `frontend-TOPIQ/`를 함께 재시작/재배포합니다. 별도 관리 명령·워커·수동 지급 작업은 신규 가입 지급에 필요하지 않습니다.
+
+기존 회원 또는 추가 크레딧 지급은 관리자가 `/admin/accounts/creditaccount/`의 **크레딧 지급** 링크에서 수행합니다.
 사용자 ID·수량·사유를 입력하면 잔액과 지급 원장이 함께 저장됩니다. 권한은 `accounts.add_credittransaction`이며 같은 지급 요청 재전송은 중복 지급하지 않습니다.
 계정·거래 원장은 일반 관리자 편집/삭제로 수정할 수 없습니다. 활성 사용자의 ID는 Django 사용자 관리자에서 확인합니다.
 
@@ -142,8 +175,9 @@ Django가 테스트 DB를 생성·마이그레이션·삭제하며 서비스 DB�
 .\.venv\Scripts\python.exe manage.py test writing accounts question_bank.tests.test_writing config.tests --noinput
 ```
 
-채점 계약·빈칸 치환·응답 검증, 로그인/CSRF/소유권, 중복 접수·예약 중 잔액 검사·전역 동시 한도,
-결과 저장 실패 시 차감 롤백·만료 복구·늦은 응답 거부·관리자 지급 중복 방지를 확인합니다.
+채점 계약·빈칸 치환·응답 검증, 로그인/CSRF/열람권, 신규 가입 1회 지급·실패 롤백·기존 회원 미지급,
+중복/동시 세트 구매·사용 가능 잔액 검사·차감 롤백, 문항별 20회·처리 중 점유·실패/만료 복구·전역 동시 한도,
+중복 평가·늦은 응답 거부·관리자 지급 중복 방지와 migration의 기존 데이터 보존을 확인합니다.
 세 언어의 프롬프트·미응답 처리·저장/조회·언어 변경 충돌·중복 차감 방지와 기존 행의 migration 호환성도 검사합니다.
 `frontend-TOPIQ/`에서 `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`로 UI/API와 빌드를 검사합니다.
 평가 예제는 `backend/writing/tests/fixtures/`의 51·52·53·54·empty-51·empty-53 폴더에 보관합니다.

@@ -6,7 +6,7 @@ from uuid import uuid4
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django import forms
 from django.core.exceptions import RequestDataTooBig, ValidationError
-from django.db import IntegrityError, transaction
+from django.db import DatabaseError, IntegrityError, transaction
 from django.http import HttpResponse, JsonResponse
 from django.middleware.csrf import get_token
 from django.utils.cache import patch_vary_headers
@@ -19,6 +19,7 @@ from surveys.learner import CATALOG, validate_survey
 from surveys.models import SignupSurveyResponse
 
 from .forms import LoginForm, SignupForm, normalize_email, users_for_email
+from .credits import welcome
 from .rate_limits import RateLimitUnavailable, check_limit, clear_login_failures, login_rate_limit_lock, record_attempt, request_subject
 from .email_delivery import EmailDeliveryError, send_verification_email
 from .email_verification import LANGUAGES, make_verification_token, read_verification_token
@@ -121,6 +122,7 @@ def signup(request):
                 is_staff=False, is_superuser=False, is_active=True,
             )
             SignupSurveyResponse.objects.create(user=user, language=data["language"], **survey)
+            welcome(user.pk)
             clear_login_failures(user.email)
     except IntegrityError as exc:
         if getattr(getattr(exc.__cause__, "diag", None), "constraint_name", None) == EMAIL_INDEX:
@@ -128,6 +130,9 @@ def signup(request):
         # Avoid database exception details, which can contain submitted email addresses.
         logger.error("Account creation failed (%s).", type(exc).__name__)
         return api_response({"error": "server_error"}, status=500)
+    except DatabaseError as exc:
+        logger.error("Account creation failed (%s).", type(exc).__name__)
+        return api_response({"error": "server_error"}, status=503)
     login(request, user, backend="django.contrib.auth.backends.ModelBackend")
     return api_response({"user": user_data(user), "csrfToken": get_token(request)}, status=201)
 

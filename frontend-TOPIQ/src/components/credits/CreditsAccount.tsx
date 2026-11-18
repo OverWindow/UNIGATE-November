@@ -103,7 +103,7 @@ function CreditWallet() {
                 <time dateTime={entry.createdAt}>{new Date(entry.createdAt).toLocaleString(language)}</time>
               </div>
               <dl className="credits-transaction-details"><div><dt>{t.balanceAfter}</dt><dd>{number(entry.balanceAfter)}</dd></div><div><dt>{t.reservedAfter}</dt><dd>{number(entry.reservedAfter)}</dd></div></dl>
-              <strong className={`credits-amount credits-amount-${entry.kind}`}>{entry.kind === "grant" ? "+" : entry.kind === "capture" ? "−" : ""}{number(entry.amount)} <span>{t.unit}</span></strong>
+              <strong className={`credits-amount credits-amount-${entry.kind}`}>{entry.kind === "grant" || entry.kind === "welcome" ? "+" : entry.kind === "capture" || entry.kind === "unlock" ? "−" : ""}{number(entry.amount)} <span>{t.unit}</span></strong>
             </li>)}</ul></div>}
           <nav className="credits-pagination" aria-label={t.transactions}>
             <button className="button credits-secondary" disabled={loading || current.page === 1} onClick={() => refresh(current.page - 1)}>{t.previous}</button>

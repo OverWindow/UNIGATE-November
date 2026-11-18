@@ -1,4 +1,4 @@
-"""Read public PBT writing prompts with optional personal submission history."""
+"""Read purchased PBT writing prompts and personal submission history."""
 import math
 from functools import wraps
 
@@ -9,6 +9,8 @@ from django.views.decorators.http import require_GET
 from django.utils.cache import patch_vary_headers
 
 from pbt.bank import media_url
+from accounts.models import CreditTransaction
+from writing.access import SET_COST, evaluation_usage, has_access
 from writing.models import Evaluation
 
 from .models import WritingQuestion, WritingSet
@@ -30,9 +32,11 @@ def response(data, status=200):
 
 def available(view):
     @wraps(view)
-    def wrapped(*args, **kwargs):
+    def wrapped(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return response({"error": "authentication_required"}, 401)
         try:
-            return view(*args, **kwargs)
+            return view(request, *args, **kwargs)
         except (DatabaseError, WritingUnavailable):
             return response({"error": "writing_unavailable"}, 503)
     return wrapped
@@ -58,9 +62,9 @@ def submitted_slots(user_id, set_ids):
     return history
 
 
-def summary(group, number, history):
+def summary(group, number, history, unlocked):
     return {"id": str(group.pk), "number": number, "questionCount": len(SLOTS),
-            "submittedSlots": history.get(group.pk, [])}
+            "submittedSlots": history.get(group.pk, []), "unlocked": unlocked, "setCost": SET_COST}
 
 
 def text(value):
@@ -138,7 +142,9 @@ def question(item):
 def sets(request):
     groups = list(complete_sets().only("set_id", "created_at"))
     history = submitted_slots(request.user.pk, [group.pk for group in groups])
-    return response({"sets": [summary(group, number, history) for number, group in enumerate(groups, 1)]})
+    unlocked = set(CreditTransaction.objects.filter(account_id=request.user.pk, kind="unlock",
+        set_id__in=[group.pk for group in groups]).values_list("set_id", flat=True))
+    return response({"sets": [summary(group, number, history, group.pk in unlocked) for number, group in enumerate(groups, 1)]})
 
 
 @require_GET
@@ -148,6 +154,8 @@ def detail(request, set_id):
     group = groups.filter(pk=set_id).first()
     if group is None:
         return response({"error": "not_found"}, 404)
+    if not has_access(request.user.pk, set_id):
+        return response({"error": "set_locked"}, 403)
     items = list(WritingQuestion.objects.filter(set_id=set_id).order_by("type_slot"))
     if [item.type_slot for item in items] != list(SLOTS):
         raise WritingUnavailable
@@ -155,4 +163,5 @@ def detail(request, set_id):
         created_at=group.created_at, set_id__lt=group.pk,
     )).count() + 1
     history = submitted_slots(request.user.pk, [set_id])
-    return response({**summary(group, number, history), "questions": [question(item) for item in items]})
+    return response({**summary(group, number, history, True), "questions": [question(item) for item in items],
+                     "evaluationUsage": evaluation_usage(request.user.pk, set_id)})

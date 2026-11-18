@@ -16,6 +16,7 @@ from django.utils import timezone
 from ..models import WritingQuestion, WritingSet
 from ..writing import WritingUnavailable, detail as set_detail, material, question, sets
 from writing.models import Evaluation
+from accounts.models import CreditAccount, CreditTransaction
 
 
 def prompt(slot):
@@ -92,6 +93,13 @@ class WritingAPITests(SimpleTestCase):
         evaluations = patch("question_bank.writing.Evaluation.objects")
         evaluations.start().filter.return_value.order_by.return_value.values_list.return_value.distinct.return_value = []
         self.addCleanup(evaluations.stop)
+        for name, value in (("has_access", True), ("evaluation_usage", {})):
+            mocked = patch(f"question_bank.writing.{name}", return_value=value)
+            mocked.start()
+            self.addCleanup(mocked.stop)
+        ledger = patch("question_bank.writing.CreditTransaction.objects")
+        ledger.start().filter.return_value.values_list.return_value = []
+        self.addCleanup(ledger.stop)
         self.set_id = uuid.uuid4()
         self.group = WritingSet(set_id=self.set_id, created_at=timezone.now())
         self.path = f"/api/writing/sets/{self.set_id}/"
@@ -102,7 +110,7 @@ class WritingAPITests(SimpleTestCase):
         result = self.client.get("/api/writing/sets/")
         self.assertEqual(result.status_code, 200)
         self.assertEqual(result.json(), {"sets": [{"id": str(self.set_id), "number": 1, "questionCount": 4,
-                                                  "submittedSlots": []}]})
+                                                  "submittedSlots": [], "unlocked": False, "setCost": 100}]})
         self.assertEqual(result["Cache-Control"], "private, no-store")
         self.assertNotIn("sessionid", result.cookies)
         complete.return_value.only.return_value = []
@@ -111,7 +119,7 @@ class WritingAPITests(SimpleTestCase):
     @patch("question_bank.writing.Evaluation.objects.filter")
     @patch("question_bank.writing.WritingQuestion.objects")
     @patch("question_bank.writing.complete_sets")
-    def test_guests_can_read_prompts_without_querying_personal_history(self, complete, questions, history):
+    def test_guests_cannot_read_prompts_or_query_bank(self, complete, questions, history):
         groups = complete.return_value
         groups.only.return_value = [self.group]
         groups.filter.return_value.first.return_value = self.group
@@ -123,14 +131,24 @@ class WritingAPITests(SimpleTestCase):
             catalog = self.client.get("/api/writing/sets/")
             detail = self.client.get(self.path)
         for result in (catalog, detail):
-            self.assertEqual(result.status_code, 200)
+            self.assertEqual(result.status_code, 401)
+            self.assertEqual(result.json(), {"error": "authentication_required"})
             self.assertEqual(result["Cache-Control"], "private, no-store")
             self.assertIn("Cookie", result["Vary"])
             self.assertNotIn("sessionid", result.cookies)
-        self.assertEqual(catalog.json()["sets"][0]["submittedSlots"], [])
-        self.assertEqual(detail.json()["submittedSlots"], [])
-        self.assertEqual([entry["number"] for entry in detail.json()["questions"]], [51, 52, 53, 54])
+        complete.assert_not_called()
+        questions.filter.assert_not_called()
         history.assert_not_called()
+
+    @patch("question_bank.writing.has_access", return_value=False)
+    @patch("question_bank.writing.WritingQuestion.objects")
+    @patch("question_bank.writing.complete_sets")
+    def test_locked_set_returns_no_prompt_or_image(self, complete, questions, access):
+        complete.return_value.filter.return_value.first.return_value = self.group
+        response = self.client.get(self.path)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json(), {"error": "set_locked"})
+        questions.filter.assert_not_called()
 
     def test_guests_cannot_evaluate_or_read_private_data(self):
         with patch("django.contrib.auth.middleware.get_user", return_value=AnonymousUser()):
@@ -184,6 +202,10 @@ class WritingSubmissionHistoryTests(TestCase):
         self.group = WritingSet(set_id=uuid.uuid4(), created_at=timezone.now())
         self.second = WritingSet(set_id=uuid.uuid4(), created_at=timezone.now())
         self.empty = WritingSet(set_id=uuid.uuid4(), created_at=timezone.now())
+        for user in (self.user, self.other):
+            wallet = CreditAccount.objects.create(user=user)
+            CreditTransaction.objects.create(account=wallet, set_id=self.group.pk, kind="unlock", amount=100,
+                                             balance_after=0, reserved_after=0)
         self.factory = RequestFactory()
         bank = patch("question_bank.writing.complete_sets")
         self.groups = bank.start().return_value
@@ -210,7 +232,7 @@ class WritingSubmissionHistoryTests(TestCase):
     def read(self, *, user=None, detail=False):
         request = self.factory.get("/api/writing/sets/")
         request.user = user or self.user
-        with self.assertNumQueries(1):
+        with self.assertNumQueries(3 if detail else 2):
             result = set_detail(request, self.group.pk) if detail else sets(request)
         self.assertEqual(result.status_code, 200)
         self.assertEqual(result["Cache-Control"], "private, no-store")

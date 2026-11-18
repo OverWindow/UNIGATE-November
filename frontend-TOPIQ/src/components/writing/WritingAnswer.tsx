@@ -2,22 +2,23 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { CircleAlert, X } from "lucide-react";
 import { useApp } from "@/app/providers";
-import { submitWriting, writingRequest, WritingError, type Evaluation, type EvaluationConfig, type LearnerAnswer, type Submission } from "@/lib/writing-api";
+import { submitWriting, writingRequest, WritingError, type Evaluation, type EvaluationConfig, type EvaluationUsage, type WritingDetail, type LearnerAnswer, type Submission } from "@/lib/writing-api";
 import { answerLength, evaluationContent } from "@/lib/writing-evaluation-content";
 import WritingResultModal from "./WritingResultModal";
 import ManuscriptEditor from "./ManuscriptEditor";
 
-const rejected = new Set(["insufficient_credits", "price_changed", "evaluation_busy", "rate_limited", "invalid_submission", "evaluation_unavailable", "question_unavailable", "not_found", "authentication_required", "csrf_failed"]);
+const rejected = new Set(["set_locked", "evaluation_limit_reached", "price_changed", "evaluation_busy", "rate_limited", "invalid_submission", "evaluation_unavailable", "question_unavailable", "not_found", "authentication_required", "csrf_failed"]);
 
-export default function WritingAnswer({ setId, setNumber, slot, draft, onChange, onSubmitted }: {
+export default function WritingAnswer({ setId, setNumber, slot, draft, initialUsage, onChange, onSubmitted }: {
   setId: string; setNumber: number; slot: number; draft: LearnerAnswer; onChange: (answer: LearnerAnswer) => void;
   onSubmitted: (slot: number) => void;
+  initialUsage: EvaluationUsage;
 }) {
-  const { language, user, refreshSession, creditBalance: balance, refreshCredits } = useApp();
+  const { language, user, refreshSession } = useApp();
   const t = evaluationContent[language];
   const [config, setConfig] = useState<EvaluationConfig | null>(null);
+  const [usage, setUsage] = useState(initialUsage);
   const [entry, setEntry] = useState<Evaluation | null>(null);
   const [resultOpen, setResultOpen] = useState(false);
   const resultTrigger = useRef<HTMLButtonElement>(null);
@@ -25,7 +26,6 @@ export default function WritingAnswer({ setId, setNumber, slot, draft, onChange,
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [uncertain, setUncertain] = useState(false);
-  const [creditNotice, setCreditNotice] = useState(0);
   const [loginNotice, setLoginNotice] = useState(false);
   const [manuscript, setManuscript] = useState(false);
   const [composing, setComposing] = useState(false);
@@ -40,14 +40,15 @@ export default function WritingAnswer({ setId, setNumber, slot, draft, onChange,
   }
 
   async function refresh(signal: AbortSignal) {
-    const [nextConfig] = await Promise.all([
-      writingRequest<EvaluationConfig>("evaluation-config/", signal), refreshCredits(signal),
+    const [nextConfig, detail] = await Promise.all([
+      writingRequest<EvaluationConfig>("evaluation-config/", signal), writingRequest<WritingDetail>(`sets/${setId}/`, signal),
     ]);
-    if (!signal.aborted) setConfig(nextConfig);
+    if (!signal.aborted) { setConfig(nextConfig); setUsage(detail.evaluationUsage[slot]); }
   }
 
   function accept(result: Evaluation) {
     setEntry(result); setUncertain(false); setError("");
+    if (result.usage) setUsage(result.usage);
     onSubmitted(result.typeSlot);
     if (result.status !== "processing") { pending.current = null; remember(null); }
     if (result.status === "succeeded" && autoOpened.current !== result.id) {
@@ -81,30 +82,27 @@ export default function WritingAnswer({ setId, setNumber, slot, draft, onChange,
         if (cause instanceof WritingError && cause.status === 401) void refreshSession();
       }
     });
-    return () => { controller.abort(); operation.current?.abort(); };
+    const focusController = new AbortController();
+    const refreshOnFocus = () => { void refresh(focusController.signal).catch(() => {}); };
+    window.addEventListener("focus", refreshOnFocus);
+    return () => { controller.abort(); focusController.abort(); operation.current?.abort(); window.removeEventListener("focus", refreshOnFocus); };
     // This form is keyed by question and authenticated user.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
 
   useEffect(() => {
-    if (entry?.status !== "processing") return;
+    if (entry?.status !== "processing" && usage.pending === 0) return;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
     async function poll() {
       await check(controller.signal);
       await refresh(controller.signal).catch(() => {});
-      if (!controller.signal.aborted && trackedId.current) timer = setTimeout(() => void poll(), 3000);
+      if (!controller.signal.aborted && (trackedId.current || usage.pending > 0)) timer = setTimeout(() => void poll(), 3000);
     }
     timer = setTimeout(() => void poll(), 3000);
     return () => { clearTimeout(timer); controller.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entry?.status]);
-
-  useEffect(() => {
-    if (!creditNotice) return;
-    const timer = setTimeout(() => setCreditNotice(0), 5000);
-    return () => clearTimeout(timer);
-  }, [creditNotice]);
+  }, [entry?.status, usage.pending]);
 
   async function send(event: FormEvent) {
     event.preventDefault();
@@ -112,12 +110,7 @@ export default function WritingAnswer({ setId, setNumber, slot, draft, onChange,
       setLoginNotice(true);
       return;
     }
-    if (!config || !enabled || !balance || busy || processing || isEmpty || tooLong) return;
-    // A retry may refer to an evaluation whose credits are already reserved.
-    if (balance.available < (cost ?? 0) && !uncertain) {
-      setCreditNotice(value => value + 1);
-      return;
-    }
+    if (!config || !enabled || busy || processing || isEmpty || tooLong || exhausted) return;
     const answer = slot < 53 ? { a: draft.a ?? "", b: draft.b ?? "" } : { text: draft.text ?? "" };
     const submission = pending.current ?? { id: trackedId.current ?? crypto.randomUUID(), setId, typeSlot: slot, answer,
       priceVersion: config.priceVersion, feedbackLanguage: language };
@@ -125,7 +118,7 @@ export default function WritingAnswer({ setId, setNumber, slot, draft, onChange,
     remember(submission.id);
     operation.current?.abort();
     const controller = new AbortController(); operation.current = controller;
-    setBusy(true); setError(""); setEntry(null); setResultOpen(true); setCreditNotice(0);
+    setBusy(true); setError(""); setEntry(null); setResultOpen(true);
     try {
       const result = await submitWriting(submission, controller.signal, config.timeoutSeconds);
       if (!controller.signal.aborted) accept(result);
@@ -134,8 +127,7 @@ export default function WritingAnswer({ setId, setNumber, slot, draft, onChange,
       if (cause instanceof WritingError && rejected.has(cause.code)) {
         pending.current = null; remember(null); setUncertain(false);
         setResultOpen(false);
-        if (cause.code === "insufficient_credits") setCreditNotice(value => value + 1);
-        else setError(cause.code);
+        setError(cause.code);
         if (cause.status === 401) void refreshSession();
       } else {
         setUncertain(true);
@@ -156,8 +148,8 @@ export default function WritingAnswer({ setId, setNumber, slot, draft, onChange,
 
   const keys: (keyof LearnerAnswer)[] = slot < 53 ? ["a", "b"] : ["text"];
   const limit = slot < 53 ? 100 : 1000;
-  const cost = config?.prices[slot];
-  const enabled = config?.enabled && cost !== null && cost !== undefined;
+  const enabled = config?.enabled;
+  const exhausted = usage.remaining === 0 && !uncertain;
   const isEmpty = keys.every(key => !(draft[key] ?? "").trim());
   const tooLong = keys.some(key => Array.from(draft[key] ?? "").length > limit);
   const processing = entry?.status === "processing";
@@ -186,23 +178,21 @@ export default function WritingAnswer({ setId, setNumber, slot, draft, onChange,
       {tooLong && <p role="alert">{t.errors.invalid_submission}</p>}
       {user && !enabled && <p>{t.unavailable}</p>}
       <div className="writing-answer-actions">
-        <button className="button button-primary" type="submit" aria-busy={busy || processing} aria-describedby={enabled ? `writing-cost-${slot}` : undefined}
-          disabled={!!user && (!enabled || !balance || busy || processing || isEmpty || tooLong)}>
+        <button className="button button-primary" type="submit" aria-busy={busy || processing} aria-describedby={`writing-usage-${slot}`}
+          disabled={!!user && (!enabled || busy || processing || isEmpty || tooLong || exhausted)}>
           {(busy || processing) && <span className="writing-spinner" aria-hidden="true" />}
           {busy || processing ? t.processingShort : uncertain ? t.retrySame : t.evaluate}
         </button>
-        {enabled && <span id={`writing-cost-${slot}`} className="writing-evaluation-cost">{cost} {t.credits}</span>}
+        <span id={`writing-usage-${slot}`} className="writing-evaluation-cost" aria-live="polite">{t.remaining.replace("{remaining}", String(usage.remaining)).replace("{limit}", String(usage.limit))}</span>
       </div>
+      <p className="writing-notice">{usage.used >= usage.limit ? t.errors.evaluation_limit_reached
+        : usage.pending > 0 ? t.quotaPending : t.included}</p>
     </form>
     {loginNotice && !user && <div className="writing-login-notice" role="status">
       <p>{t.loginNotice}</p>
       <Link className="button button-primary" href={`/login?next=${encodeURIComponent(`/writing/sets/${setId}`)}`}>{t.login}</Link>
     </div>}
     {busy && !entry && <p className="writing-evaluation-loading" role="status">{t.processing}</p>}
-    {creditNotice > 0 && <div className="writing-credit-toast" key={creditNotice} role="alert">
-      <CircleAlert size={20} aria-hidden="true" /><span>{t.errors.insufficient_credits}</span>
-      <button type="button" aria-label={t.close} onClick={() => setCreditNotice(0)}><X size={18} aria-hidden="true" /></button>
-    </div>}
     {error && <p role="alert">{t.errors[error] ?? t.errors.default}</p>}
     {uncertain && <div role="status"><p>{t.uncertain}</p><button type="button" className="button writing-secondary" disabled={busy} onClick={checkStatus}>{t.check}</button></div>}
     {entry && <div className="writing-result-launcher">

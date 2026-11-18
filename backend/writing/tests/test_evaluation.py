@@ -127,7 +127,7 @@ class ContractTests(SimpleTestCase):
 
 
 @override_settings(BIZROUTER_API_KEY="synthetic", WRITING_EVALUATION_MODEL="fixture/model",
-                   WRITING_EVALUATION_CREDITS={51: 3, 52: 3, 53: 5, 54: 8},
+                   PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"],
                    WRITING_EVALUATION_MAX_CONCURRENT=1, WRITING_EVALUATION_TIMEOUT_SECONDS=45)
 class EvaluationTests(TransactionTestCase):
     def setUp(self):
@@ -135,7 +135,7 @@ class EvaluationTests(TransactionTestCase):
         self.other = get_user_model().objects.create_user(username="writing-other")
         self.admin = get_user_model().objects.create_superuser(username="writing-admin", password="synthetic-only")
         self.client.force_login(self.user)
-        grant(user_id=self.user.pk, amount=10, actor=self.admin, reason="test fixture", entry_id=uuid.uuid4())
+        grant(user_id=self.user.pk, amount=110, actor=self.admin, reason="test fixture", entry_id=uuid.uuid4())
         self.inputs = fixture(51, "input")
         self.set_id = uuid.uuid4()
         bank = patch("writing.services.complete_sets")
@@ -144,7 +144,11 @@ class EvaluationTests(TransactionTestCase):
         questions = patch("writing.services.WritingQuestion.objects.filter")
         self.questions = questions.start()
         self.questions.return_value.first.return_value = SimpleNamespace(type_slot=51, content_json=self.inputs["question"])
+        self.questions.return_value.order_by.return_value = [
+            SimpleNamespace(type_slot=slot, content_json=fixture(slot, "input")["question"]) for slot in (51, 52, 53, 54)
+        ]
         self.addCleanup(questions.stop)
+        services.unlock(user_id=self.user.pk, set_id=self.set_id)
         provider = patch("writing.services.evaluate", side_effect=model_result)
         self.provider = provider.start()
         self.addCleanup(provider.stop)
@@ -171,8 +175,8 @@ class EvaluationTests(TransactionTestCase):
                 history = self.client.get("/api/writing/evaluations/").json()["evaluations"]
                 self.assertEqual(next(row for row in history if row["id"] == payload["id"])["feedbackLanguage"], language)
         self.assertEqual(self.provider.call_count, 3)
-        self.assertEqual(CreditTransaction.objects.filter(kind="capture").count(), 3)
-        self.assertEqual(CreditAccount.objects.get(user=self.user).balance, 1)
+        self.assertEqual(CreditTransaction.objects.filter(kind="capture").count(), 0)
+        self.assertEqual(CreditAccount.objects.get(user=self.user).balance, 10)
 
     def test_changed_language_for_same_id_conflicts_and_legacy_requests_default_to_korean(self):
         payload = self.payload()
@@ -186,7 +190,7 @@ class EvaluationTests(TransactionTestCase):
             self.assertEqual(response.status_code, 409)
             self.assertEqual(response.json()["error"], "request_conflict")
         self.provider.assert_called_once()
-        self.assertEqual(CreditTransaction.objects.filter(kind="capture").count(), 1)
+        self.assertEqual(CreditTransaction.objects.filter(kind="capture").count(), 0)
 
     def test_invalid_feedback_languages_do_not_reserve_credits_or_call_provider(self):
         for language in (None, "", "fr", "en-US", [], {}, True, 1):
@@ -214,24 +218,25 @@ class EvaluationTests(TransactionTestCase):
         self.assertEqual(response.json()["feedbackLanguage"], "id")
         self.assertEqual(response.json()["chargedCredits"], 0)
 
-    def test_success_is_saved_and_charged_only_once(self):
+    def test_success_is_saved_once_and_included_in_set(self):
         payload = self.payload()
         response = self.post(payload)
         self.assertEqual(response.status_code, 201, response.content)
         self.assertEqual(response.json()["totalScore"], 9)
-        self.assertEqual(response.json()["chargedCredits"], 3)
+        self.assertEqual(response.json()["chargedCredits"], 0)
+        self.assertEqual(response.json()["usage"], {"used": 1, "pending": 0, "remaining": 19, "limit": 20})
         entry = Evaluation.objects.get()
         self.assertEqual(entry.answer, self.inputs["answer"])
         self.assertEqual(entry.resolved_model, "fixture/resolved-model")
         self.assertEqual(self.post(payload).status_code, 200)
         self.provider.assert_called_once()
         wallet = CreditAccount.objects.get(user=self.user)
-        self.assertEqual((wallet.balance, wallet.reserved), (7, 0))
-        self.assertEqual(list(CreditTransaction.objects.filter(evaluation=entry).order_by("created_at").values_list("kind", flat=True)), ["reserve", "capture"])
-        with override_settings(WRITING_EVALUATION_MODEL="changed", WRITING_EVALUATION_CREDITS={51: None, 52: None, 53: None, 54: None}):
+        self.assertEqual((wallet.balance, wallet.reserved), (10, 0))
+        self.assertFalse(CreditTransaction.objects.filter(evaluation=entry).exists())
+        with override_settings(WRITING_EVALUATION_MODEL=""):
             self.assertEqual(self.post(payload).status_code, 200)
 
-    def test_failed_call_and_invalid_response_release_reservation(self):
+    def test_failed_call_and_invalid_response_restore_quota(self):
         for result in (ProviderError("provider_unavailable"), ([], {}, "fixture/model")):
             self.provider.side_effect = result if isinstance(result, Exception) else None
             self.provider.return_value = result
@@ -239,9 +244,10 @@ class EvaluationTests(TransactionTestCase):
             self.assertEqual(response.status_code, 201, response.content)
             self.assertEqual(response.json()["status"], "failed")
             self.assertEqual(response.json()["chargedCredits"], 0)
+            self.assertEqual(response.json()["usage"]["remaining"], 20)
         wallet = CreditAccount.objects.get(user=self.user)
         self.assertEqual((wallet.balance, wallet.reserved), (10, 0))
-        self.assertEqual(CreditTransaction.objects.filter(kind="release").count(), 2)
+        self.assertEqual(CreditTransaction.objects.filter(kind="release").count(), 0)
 
     def test_question_image_is_saved_without_changing_grading_input(self):
         inputs = fixture(53, "input")
@@ -266,21 +272,22 @@ class EvaluationTests(TransactionTestCase):
         self.assertEqual(response.json()["totalScore"], 0)
         self.assertEqual(response.json()["creditCost"], 0)
         self.provider.assert_not_called()
-        self.assertEqual(CreditTransaction.objects.count(), 1)
+        self.assertEqual(CreditTransaction.objects.count(), 2)
+        self.assertEqual(response.json()["usage"]["used"], 1)
 
-    def test_missing_price_is_not_free_and_price_change_requires_resubmission(self):
+    def test_missing_provider_and_changed_configuration_require_resubmission(self):
         payload = self.payload()
-        with override_settings(WRITING_EVALUATION_CREDITS={51: None, 52: None, 53: None, 54: None}):
+        with override_settings(WRITING_EVALUATION_MODEL=""):
             self.assertEqual(self.post(payload).json()["error"], "evaluation_unavailable")
-        with override_settings(WRITING_EVALUATION_CREDITS={51: 4, 52: 3, 53: 5, 54: 8}):
+        with override_settings(WRITING_EVALUATION_MODEL="changed/model"):
             self.assertEqual(self.post(payload).json()["error"], "price_changed")
         self.assertFalse(Evaluation.objects.exists())
         self.provider.assert_not_called()
 
-    def test_insufficient_balance_does_not_store_or_call(self):
-        with override_settings(WRITING_EVALUATION_CREDITS={51: 11, 52: 3, 53: 5, 54: 8}):
-            response = self.post(self.payload())
-        self.assertEqual(response.json()["error"], "insufficient_credits")
+    def test_unpurchased_set_does_not_store_or_call(self):
+        response = self.post(self.payload(setId=str(uuid.uuid4())))
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["error"], "set_locked")
         self.assertFalse(Evaluation.objects.exists())
         self.provider.assert_not_called()
 
@@ -322,9 +329,10 @@ class EvaluationTests(TransactionTestCase):
         self.assertEqual(response.json()["status"], "failed")
         self.assertEqual(response.json()["error"], "evaluation_expired")
         self.assertEqual(CreditTransaction.objects.filter(kind="capture").count(), 0)
-        self.assertEqual(CreditTransaction.objects.filter(kind="release").count(), 1)
+        self.assertEqual(CreditTransaction.objects.filter(kind="release").count(), 0)
+        self.assertEqual(response.json()["usage"]["remaining"], 20)
 
-    def test_result_save_failure_rolls_back_charge_then_recovers(self):
+    def test_result_save_failure_keeps_pending_quota_then_recovers(self):
         original = Evaluation.save
         def fail_result(instance, *args, **kwargs):
             if instance.status == "succeeded":
@@ -333,12 +341,13 @@ class EvaluationTests(TransactionTestCase):
         with patch.object(Evaluation, "save", fail_result):
             self.assertEqual(self.post(self.payload()).status_code, 503)
         wallet = CreditAccount.objects.get(user=self.user)
-        self.assertEqual((wallet.balance, wallet.reserved), (10, 3))
+        self.assertEqual((wallet.balance, wallet.reserved), (10, 0))
+        self.assertEqual(services.evaluation_usage(self.user.pk, self.set_id)["51"]["pending"], 1)
         self.assertFalse(CreditTransaction.objects.filter(kind="capture").exists())
         Evaluation.objects.update(expires_at=timezone.now() - timedelta(seconds=1))
         self.assertEqual(self.client.get("/api/credits/").json(), {"balance": 10, "reserved": 0, "available": 10})
 
-    def test_concurrent_duplicate_busy_and_insufficient_credit(self):
+    def test_concurrent_duplicate_and_global_busy_limit(self):
         entered, release = Event(), Event()
         payload = self.payload(feedbackLanguage="en")
         def delayed(request, **kwargs):
@@ -363,9 +372,8 @@ class EvaluationTests(TransactionTestCase):
                 self.assertEqual(duplicate.json()["feedbackLanguage"], "en")
                 self.assertEqual(self.post(payload | {"feedbackLanguage": "id"}).status_code, 409)
                 self.assertEqual(self.post(self.payload()).json()["error"], "evaluation_busy")
-                with override_settings(WRITING_EVALUATION_MAX_CONCURRENT=2, WRITING_EVALUATION_CREDITS={51: 8, 52: 3, 53: 5, 54: 8}):
-                    self.assertEqual(self.post(self.payload()).json()["error"], "insufficient_credits")
-                self.assertEqual(self.client.get("/api/credits/").json()["available"], 7)
+                self.assertEqual(duplicate.json()["usage"]["pending"], 1)
+                self.assertEqual(self.client.get("/api/credits/").json()["available"], 10)
             finally:
                 release.set()
             self.assertEqual(future.result(timeout=10)[0].status, "succeeded")

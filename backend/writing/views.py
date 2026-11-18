@@ -5,7 +5,7 @@ from uuid import UUID
 from django.core.exceptions import RequestDataTooBig
 from django.db import DatabaseError
 from django.views.decorators.debug import sensitive_variables
-from django.views.decorators.http import require_GET, require_http_methods
+from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
 from accounts.credits import balance_data, evaluation_lock, locked_account
 from accounts.models import CreditTransaction
@@ -14,7 +14,7 @@ from accounts.views import api_response
 from question_bank.writing import WritingUnavailable
 
 from .models import Evaluation
-from .services import EvaluationError, config_data, expire_locked, serialize, submit
+from .services import EvaluationError, config_data, expire_locked, serialize, submit, unlock
 
 
 def authenticated(view):
@@ -50,6 +50,20 @@ def page_rows(query, page):
 @authenticated
 def configuration(request):
     return api_response(config_data())
+
+
+@require_POST
+@authenticated
+def unlock_set(request, set_id):
+    if request.content_type != "application/json":
+        return api_response({"error": "unsupported_media_type"}, 415)
+    try:
+        if len(request.body) > 1024 or json.loads(request.body) != {}:
+            return api_response({"error": "invalid_submission"}, 400)
+    except (ValueError, RequestDataTooBig):
+        return api_response({"error": "invalid_submission"}, 400)
+    data, created = unlock(user_id=request.user.pk, set_id=set_id)
+    return api_response(data, 201 if created else 200)
 
 
 @require_http_methods(["GET", "POST"])
@@ -132,6 +146,7 @@ def transactions(request):
     return api_response({"transactions": [
         {"id": str(entry.pk), "kind": entry.kind, "amount": entry.amount,
          "evaluationId": str(entry.evaluation_id) if entry.evaluation_id else None,
+         "setId": str(entry.set_id) if entry.set_id else None,
          "balanceAfter": entry.balance_after, "reservedAfter": entry.reserved_after,
          "createdAt": entry.created_at.isoformat()} for entry in rows
     ], "nextPage": next_page})

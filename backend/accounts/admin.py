@@ -142,7 +142,7 @@ class CreditAccountAdmin(ReadOnlyAdmin):
 
 @admin.register(CreditTransaction)
 class CreditTransactionAdmin(ReadOnlyAdmin):
-    list_display = ["created_at", "account_id", "email", "kind", "amount", "evaluation_id", "actor_id"]
+    list_display = ["created_at", "account_id", "email", "kind", "amount", "set_id", "evaluation_id", "actor_id"]
     list_filter = ["kind"]
     search_fields = ["=account__user__id", "account__user__email", "account__user__first_name"]
     search_help_text = "이메일, 닉네임 또는 사용자 번호로 검색합니다."
