@@ -47,7 +47,7 @@ function CatalogPage({ level, page }: { level: number; page: number }) {
       <h1 className="catalog-title">{t.title}</h1><p className="catalog-description">{t.intro}</p>
     </div></section>
     <div className="page-container vocabulary-catalog">
-      <nav className="vocabulary-levels" data-level={level} aria-label={t.levelLabel}>
+      <nav className="vocabulary-levels section-switch" aria-label={t.levelLabel}>
         {[3, 4, 5, 6].map(value => <Link key={value} href={`/vocabulary?level=${value}&page=1`} aria-current={level === value ? "page" : undefined} scroll={false}>
           {vocabularyLevelLabel(value, language)}
         </Link>)}
@@ -62,8 +62,8 @@ function CatalogPage({ level, page }: { level: number; page: number }) {
       </div> : !currentData ? <p className="catalog-status" role="status">{t.loading}</p>
         : !currentData.catalog.sets.length ? <p className="catalog-status">{t.empty}</p> : <>
         <div className="vocabulary-set-grid">
-          {currentData.catalog.sets.map(group => <article className="vocabulary-set-card" key={group.id}>
-            <span className="vocabulary-set-number">{String(group.number).padStart(2, "0")}</span>
+          {currentData.catalog.sets.map(group => <article className="vocabulary-set-card catalog-card" key={group.id}>
+            <span className="catalog-set-number">{String(group.number).padStart(2, "0")}</span>
             <h3>{group.preview.map((word, index) => <span key={index} lang="ko">{word}</span>)}</h3>
             <div className="vocabulary-set-actions">
               <Link className="vocabulary-set-action" href={`/vocabulary/sets/${group.id}`}>{t.browse}<ExternalLink size={14} aria-hidden="true" /></Link>

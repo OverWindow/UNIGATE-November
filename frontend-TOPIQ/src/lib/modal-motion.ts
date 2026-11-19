@@ -10,8 +10,13 @@ export function closeWithMotion(element: HTMLElement | null, onClosed: () => voi
     { opacity: 0, transform: "translateY(8px) scale(.98)" },
   ], { duration: 180, easing: "ease-in", fill: "forwards" });
   void animation.finished.then(() => {
-    element.removeAttribute("data-closing");
-    onClosed();
+    try {
+      onClosed();
+    } finally {
+      // The same dialog can reopen. Release the final transparent frame.
+      animation.cancel();
+      element.removeAttribute("data-closing");
+    }
   }, () => { element.removeAttribute("data-closing"); });
   return animation;
 }

@@ -13,6 +13,8 @@ import { emptySurvey, signupSurveyCopy, surveyErrors } from "@/lib/learner-surve
 import SiteHeader from "./SiteHeader";
 import EmailVerificationRequest from "./EmailVerificationRequest";
 import LearnerSurveyForm from "./LearnerSurveyForm";
+import AuthBackground from "./AuthBackground";
+import styles from "./AuthBackground.module.css";
 
 export default function AuthScreen({ mode, verification, returnPath }: {
   mode: "login" | "signup"; verification?: VerifiedEmail; returnPath?: string;
@@ -121,7 +123,8 @@ export default function AuthScreen({ mode, verification, returnPath }: {
   return (
     <>
       <SiteHeader authHref={loginHref} />
-      <main className="auth-main" id="main-content" tabIndex={-1}>
+      <main className={`auth-main${!isSignup ? ` ${styles.main}` : ""}`} id="main-content" tabIndex={-1}>
+        {!isSignup && <AuthBackground />}
         <div className={`auth-card${isSignup ? " auth-signup-card" : " auth-login-card"}${isSurvey ? " auth-survey-card" : ""}`}>
           <h1 ref={headingRef} tabIndex={-1}>{title}</h1>
           {isSignup && (isSurvey || verification) && <p className="auth-description">{isSurvey ? s.description : e.finish}</p>}

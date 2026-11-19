@@ -9,16 +9,17 @@ const { closeWithMotion } = await import(`data:text/javascript;base64,${Buffer.f
 const originalWindow = globalThis.window;
 afterEach(() => { globalThis.window = originalWindow; });
 
-test("modal stays mounted until its closing animation finishes", async () => {
+test("modal closes after the animation and clears the transparent frame before it can reopen", async () => {
   let finish;
   const finished = new Promise(resolve => { finish = resolve; });
+  let closed = false;
+  let released = false;
   const element = {
     dataset: {},
-    animate: () => ({ finished }),
+    animate: () => ({ finished, cancel() { assert.equal(closed, true); released = true; } }),
     removeAttribute(name) { if (name === "data-closing") delete this.dataset.closing; },
   };
   globalThis.window = { matchMedia: () => ({ matches: false }) };
-  let closed = false;
   closeWithMotion(element, () => { closed = true; });
   assert.equal(closed, false);
   assert.equal(element.dataset.closing, "true");
@@ -26,6 +27,7 @@ test("modal stays mounted until its closing animation finishes", async () => {
   await finished;
   await Promise.resolve();
   assert.equal(closed, true);
+  assert.equal(released, true);
   assert.equal(element.dataset.closing, undefined);
 });
 

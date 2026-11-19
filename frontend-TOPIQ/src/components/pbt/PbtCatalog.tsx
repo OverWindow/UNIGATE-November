@@ -75,7 +75,7 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
       <h1 className="catalog-title">{t.title}</h1><p className="catalog-description">{t.intro}</p>
     </div></section>
     <div className="page-container pbt-catalog">
-      <div className="pbt-section-tabs" aria-label="TOPIK II">
+      <div className="pbt-section-tabs section-switch" aria-label="TOPIK II">
         {(["reading", "listening"] as const).map(value => <button type="button" key={value} aria-pressed={section === value} onClick={() => setSection(value)}>{t[value]}</button>)}
       </div>
       <div className="pbt-modes">
@@ -95,12 +95,12 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
           const canResume = mode === "practice" && !!inProgressId;
           const result = progress?.latestResult;
           const resultLabel = result ? `${t.latestScore} · ${t[mode]}: ${result.score} / ${result.maxScore} · ${t.submittedOn}: ${new Date(result.submittedAt).toLocaleDateString(locale)} · ${t.result}` : "";
-          return <article className="pbt-exam-card" key={exam.id}>
+          return <article className="pbt-exam-card catalog-card" key={exam.id}>
             <div className="pbt-card-top">
-              <span className="pbt-set-number">{String(exam.round).padStart(2, "0")}</span>
+              <span className="catalog-set-number">{String(exam.round).padStart(2, "0")}</span>
               {result ? <Link className="pbt-badge pbt-badge-score" href={`${basePath}/attempts/${result.id}/result`} title={resultLabel} aria-label={resultLabel}>
                 {result.score} / {result.maxScore} <ExternalLink size={13} aria-hidden="true" />
-              </Link> : <span className={`pbt-badge ${exam.guestAvailable ? "pbt-badge-free" : ""}`}>{exam.guestAvailable ? t.free : t.members}</span>}
+              </Link> : exam.guestAvailable && <span className="pbt-badge pbt-badge-free">{t.free}</span>}
             </div>
             <h2>{language === "ko" ? `${t[exam.section]} 모의고사 ${exam.round}회` : <>{t[exam.section]} · {t.round} {exam.round}</>}</h2>
             {exam.accessible ? <div className="pbt-card-actions">
@@ -114,10 +114,9 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
         })}
       </div> : !hasError && <p className="catalog-status">{t.empty}</p>}
       <section className="pbt-history" aria-labelledby="pbt-history"><h2 id="pbt-history">{t.history}</h2>
-        {!user ? status === "loading" ? <p className="pbt-muted" role="status">{t.loading}</p> : <div>
-          <p className="pbt-muted">{t.historyLoginRequired}</p>
-          <Link className="button pbt-secondary" href={`/login?next=${basePath}`}>{t.historyLogin}</Link>
-        </div> : <>
+        {!user ? status === "loading"
+          ? <p className="pbt-muted" role="status">{t.loading}</p>
+          : <p className="pbt-muted">{t.historyLoginRequired}</p> : <>
           {!loading && !attempts.length && <p className="pbt-muted">{t.noHistory}</p>}
           {attempts.map(attempt => <div className="pbt-history-row" key={attempt.id}>
             <div><strong>{language === "ko" ? attempt.title.replace(/ (\d+)$/, ` ${t[attempt.section]} 모의고사 $1회`) : `${attempt.title} · ${t[attempt.section]}`}</strong><small>{new Date(attempt.startedAt).toLocaleString(locale)}</small></div>

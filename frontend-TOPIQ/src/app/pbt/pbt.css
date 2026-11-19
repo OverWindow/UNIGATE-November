@@ -1,17 +1,6 @@
 .pbt-main, .pbt-workspace { background: #f7f9fc; min-height: 75vh; }
 .pbt-catalog { padding-block: 36px 70px; }
 .pbt-section-tabs { display: flex; gap: 5px; flex-wrap: wrap; }
-.pbt-section-tabs button { min-height: 44px; padding: 10px 25px; border-radius: 9px; color: #657186; font-weight: 600; transition: background-color .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease; }
-.pbt-section-tabs button:hover:not([aria-pressed=true]) { background: #eaf0fa; color: #253d67; box-shadow: 0 2px 8px #253d6714; }
-.pbt-section-tabs button:active { transform: scale(.96); }
-.pbt-section-tabs button:focus-visible { outline: 2px solid #2d5ec5; outline-offset: 3px; }
-.pbt-section-tabs button[aria-pressed=true] { background: #253d67; color: #fff; animation: pbt-section-select .24s ease-out; }
-.pbt-section-tabs button[aria-pressed=true]:hover { background: #314e7e; box-shadow: 0 4px 12px #253d6726; }
-@keyframes pbt-section-select { 50% { transform: scale(1.04); } }
-@media (prefers-reduced-motion: reduce) {
-  .pbt-section-tabs button { transition: none; }
-  .pbt-section-tabs button[aria-pressed=true] { animation: none; }
-}
 .pbt-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 24px 0 30px; }
 .pbt-mode { display: flex; align-items: center; gap: 14px; padding: 22px; border: 1px solid #dce3ee; border-radius: 14px; background: #fff; text-align: left; transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease; }
 .pbt-mode[aria-pressed=true] { border-color: #2d5ec5; box-shadow: inset 0 0 0 1px #2d5ec5; background: #f4f7ff; }
@@ -27,7 +16,6 @@
 .pbt-exam-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
 .pbt-exam-card { padding: 26px; border: 1px solid #e0e6ef; border-radius: 16px; background: #fff; box-shadow: 0 5px 18px #26467405; }
 .pbt-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.pbt-set-number { color: #9baecb; font-size: 32px; font-weight: 500; letter-spacing: -.05em; }
 .pbt-badge { padding: 5px 9px; border-radius: 6px; background: #f0f2f6; color: #657186; font-size: 11px; font-weight: 600; }
 .pbt-badge-free { background: #edf6f3; color: #28765d; }
 .pbt-badge-score { display: inline-flex; align-items: center; gap: 4px; background: #eef3ff; color: #2d5ec5; white-space: nowrap; }

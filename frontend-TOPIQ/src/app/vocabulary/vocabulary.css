@@ -2,25 +2,14 @@
 .vocabulary-main:has(.vocabulary-study) { min-height: calc(100dvh - var(--header-height)); padding-bottom: 0; }
 .vocabulary-main:has(.vocabulary-study, .vocabulary-quiz) + .site-footer { display: none; }
 .vocabulary-catalog { padding-top: 32px; }
-.vocabulary-levels { --level-gap: 8px; position: relative; display: grid; grid-template-columns: repeat(4, minmax(100px, 1fr)); gap: var(--level-gap); padding: 6px; width: fit-content; border: 1px solid #e0e6f0; border-radius: 14px; background: #fff; }
-.vocabulary-levels::before { content: ""; position: absolute; top: 6px; bottom: 6px; left: 6px; width: calc((100% - 36px) / 4); border-radius: 9px; background: #2d5ec5; transform: translateX(var(--level-offset, 0)); transition: transform .25s ease; }
-.vocabulary-levels[data-level="4"] { --level-offset: calc(100% + var(--level-gap)); }
-.vocabulary-levels[data-level="5"] { --level-offset: calc(200% + var(--level-gap) + var(--level-gap)); }
-.vocabulary-levels[data-level="6"] { --level-offset: calc(300% + var(--level-gap) + var(--level-gap) + var(--level-gap)); }
-.vocabulary-levels a { position: relative; min-width: 100px; padding: 12px 24px; border-radius: 9px; text-align: center; color: #5d6471; font-weight: 600; transition: color .25s ease; }
-.vocabulary-levels a[aria-current] { color: #fff; }
-@media (hover: hover) and (pointer: fine) {
-  .vocabulary-levels a:hover:not([aria-current]) { color: #224b9f; }
-}
-@media (prefers-reduced-motion: reduce) { .vocabulary-levels::before, .vocabulary-levels a { transition: none; } }
+.vocabulary-levels { display: grid; grid-template-columns: repeat(4, minmax(100px, 1fr)); gap: 8px; padding: 6px; width: fit-content; border: 1px solid #e0e6f0; border-radius: 14px; background: #fff; }
+.vocabulary-levels a { display: grid; place-items: center; text-align: center; }
 .vocabulary-catalog-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin: 32px 0 20px; }
 .vocabulary-catalog-heading h2 { margin: 0; font-size: 24px; font-weight: 650; }
 .vocabulary-catalog-heading p { margin: 0; color: var(--color-muted); font-size: 14px; }
 .vocabulary-catalog-heading p span { margin: 0 10px; color: #a4afc0; }
 .vocabulary-set-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
-.vocabulary-set-card { display: flex; flex-direction: column; padding: 24px; border: 1px solid #e0e6f0; border-radius: 16px; background: #fff; transition: border-color .15s, box-shadow .15s; }
-.vocabulary-set-card:hover { border-color: #91afe9; box-shadow: 0 6px 20px #244d9d0a; }
-.vocabulary-set-number { color: #9baecb; font-size: 32px; font-weight: 500; letter-spacing: -.05em; }
+.vocabulary-set-card { display: flex; flex-direction: column; padding: 24px; border: 1px solid #e0e6f0; border-radius: 16px; background: #fff; }
 .vocabulary-set-card h3 { display: flex; flex-wrap: wrap; gap: 6px 12px; flex: 1; margin: 24px 0 30px; color: var(--color-ink); font-size: 20px; font-weight: 600; line-height: 1.6; overflow-wrap: anywhere; }
 .vocabulary-set-card h3 span:not(:last-child)::after { content: '·'; margin-left: 12px; color: #b5bfcd; }
 .vocabulary-set-action { display: flex; justify-content: space-between; padding-top: 18px; border-top: 1px solid #edf0f5; color: var(--color-primary); font-size: 13px; font-weight: 600; }
@@ -168,8 +157,7 @@ body:has(.vocabulary-quiz-bottom-bar) { padding-bottom: calc(80px + env(safe-are
 @media (max-width: 960px) { .vocabulary-set-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .vocabulary-study-grid { grid-template-columns: 200px minmax(0, 1fr); gap: 20px; } }
 @media (max-width: 760px) {
   .vocabulary-quiz-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .vocabulary-levels { --level-gap: 4px; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; }
-  .vocabulary-levels::before { width: calc((100% - 24px) / 4); }
+  .vocabulary-levels { gap: 4px; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; }
   .vocabulary-levels a { min-width: 0; padding: 11px 8px; font-size: 14px; }
   .vocabulary-study-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; padding-block: 12px; }
   .vocabulary-word-list { max-height: min(280px, 40dvh); }

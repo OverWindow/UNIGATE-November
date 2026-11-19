@@ -3,7 +3,7 @@ import type { CreditEntry } from "./writing-api";
 
 interface Copy {
   title: string; available: string; balance: string; reserved: string; unit: string;
-  balanceNote: string; transactions: string; transactionNote: string; balanceAfter: string; reservedAfter: string;
+  transactions: string; transactionNote: string; balanceAfter: string; reservedAfter: string;
   result: string; history: string; empty: string; loading: string; error: string; retry: string; refresh: string;
   loginRequired: string; previous: string; next: string; page: string;
   kinds: Record<CreditEntry["kind"], string>;
@@ -13,7 +13,6 @@ export const creditsContent: Record<Language, Copy> = {
   ko: {
     title: "크레딧",
     available: "사용 가능", balance: "보유 크레딧", reserved: "보류", unit: "크레딧",
-    balanceNote: "보류 중인 크레딧은 사용할 수 없습니다.",
     transactions: "크레딧 내역", transactionNote: "가입하면 100크레딧을 받습니다. 쓰기 세트는 처음 열 때 100크레딧이 들며, 재열람과 문항당 평가 20회가 포함됩니다.",
     balanceAfter: "남은 크레딧", reservedAfter: "보류 크레딧", result: "평가 보기", history: "내 평가 이력",
     empty: "아직 크레딧 내역이 없습니다.", loading: "크레딧 정보를 불러오는 중입니다.",
@@ -24,7 +23,6 @@ export const creditsContent: Record<Language, Copy> = {
   en: {
     title: "Credits",
     available: "Available", balance: "Total balance", reserved: "On hold", unit: "credits",
-    balanceNote: "Credits on hold can't be used.",
     transactions: "Credit history", transactionNote: "Get 100 credits when you sign up. Each writing set costs 100 credits to open and includes repeat access and 20 evaluations per question.",
     balanceAfter: "Remaining credits", reservedAfter: "Credits on hold", result: "View evaluation", history: "My evaluations",
     empty: "No credit activity yet.", loading: "Loading your credits…",
@@ -35,7 +33,6 @@ export const creditsContent: Record<Language, Copy> = {
   id: {
     title: "Kredit",
     available: "Tersedia", balance: "Total saldo", reserved: "Ditahan", unit: "kredit",
-    balanceNote: "Kredit yang ditahan belum bisa digunakan.",
     transactions: "Riwayat kredit", transactionNote: "Dapatkan 100 kredit saat mendaftar. Setiap paket menulis memerlukan 100 kredit saat pertama dibuka, termasuk akses ulang dan 20 penilaian per soal.",
     balanceAfter: "Sisa kredit", reservedAfter: "Kredit ditahan", result: "Lihat penilaian", history: "Riwayat penilaian saya",
     empty: "Belum ada riwayat kredit.", loading: "Memuat informasi kredit…",

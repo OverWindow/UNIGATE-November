@@ -24,6 +24,11 @@ main:focus { outline: none; }
 .catalog-hero { padding-block: var(--catalog-top) var(--catalog-bottom); border-bottom: 1px solid #e3e9f3; background: radial-gradient(ellipse at 90% 20%, #e7efff, transparent 60%), #fbfcff; }
 .catalog-title { margin: 0; color: var(--color-ink); font-size: clamp(28px, 3.5vw, 42px); font-weight: 650; line-height: 1.35; letter-spacing: -.045em; word-break: keep-all; overflow-wrap: anywhere; }
 .catalog-description { margin: 16px 0 0; color: var(--color-muted); line-height: 1.8; word-break: keep-all; overflow-wrap: anywhere; }
+.catalog-card { transition: border-color .15s ease, box-shadow .15s ease; }
+.catalog-set-number { color: #9baecb; font-size: 32px; font-weight: 500; letter-spacing: -.05em; }
+@media (hover: hover) and (pointer: fine) {
+  .catalog-card:hover { border-color: #91afe9; box-shadow: 0 6px 20px #244d9d0a; }
+}
 .catalog-status { margin: 0 0 16px; padding: 44px 16px; border: 1px solid #dfe6f1; border-radius: 14px; background: #fff; color: var(--color-muted); text-align: center; line-height: 1.8; overflow-wrap: anywhere; }
 .catalog-status[role="alert"] { border-color: #ecd5cb; background: #fff9f6; color: #823e29; }
 .catalog-status > p:has(+ .button) { margin: 0 0 16px; }
@@ -44,6 +49,19 @@ main:focus { outline: none; }
 .button:is(.pbt-secondary, .writing-secondary, .vocabulary-secondary, .credits-secondary) { border-color: #dbe2ed; background: #fff; color: #405674; }
 .button:is(.pbt-secondary, .writing-secondary, .vocabulary-secondary, .credits-secondary):hover:not(:disabled) { border-color: #94afe1; background: #eef3fc; }
 .button:is(.pbt-secondary, .writing-secondary, .vocabulary-secondary, .credits-secondary):disabled { opacity: .5; }
+
+.section-switch > :is(a, button) { min-height: 44px; padding: 10px 25px; border-radius: 9px; color: #657186; font-weight: 600; transition: background-color .2s ease, color .2s ease, transform .2s ease; }
+.section-switch > :is(a, button):focus-visible { outline: 2px solid #2d5ec5; outline-offset: 3px; }
+.section-switch > :is([aria-pressed="true"], [aria-current="page"]) { background: #253d67; color: #fff; }
+@media (hover: hover) and (pointer: fine) {
+  .section-switch > :is(a, button):hover:not([aria-pressed="true"], [aria-current="page"]) { color: #253d67; }
+  .section-switch > :is([aria-pressed="true"], [aria-current="page"]):hover { color: #dbe8ff; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .section-switch > :is(a, button):active { transform: scale(.96); }
+  .section-switch > :is([aria-pressed="true"], [aria-current="page"]) { animation: section-select .24s ease-out; }
+}
+@keyframes section-select { 50% { transform: scale(1.04); } }
 
 @media (hover: hover) and (pointer: fine) {
   .button:hover:not(:disabled):not([aria-disabled="true"]) { box-shadow: 0 4px 12px #253d671a; }
@@ -356,7 +374,5 @@ details[open] .faq-indicator::after { transform: rotate(0); }
 .site-loading { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; min-height: 100dvh; background: #f5f7fc; }
 .site-navigation-loading { background: rgb(245 247 252 / 88%); }
 .site-loading > span { width: 44px; height: 44px; border: 3px solid #d8e2f3; border-top-color: #2d5ec5; border-radius: 50%; animation: site-loading-spin .8s linear infinite; }
-.site-page-transition { animation: site-page-in .24s cubic-bezier(.22, 1, .36, 1); }
 @keyframes site-loading-spin { to { transform: rotate(360deg); } }
-@keyframes site-page-in { from { opacity: 0; transform: translateY(8px); } }
-@media (prefers-reduced-motion: reduce) { .site-page-transition, .site-loading > span { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .site-loading > span { animation: none; } }

@@ -40,8 +40,10 @@ export default function WritingCatalog() {
   useEffect(() => () => unlockOperation.current?.abort(), []);
 
   function closeDialog() {
-    if (unlockOperation.current || dialog.current?.dataset.closing) return;
-    closeWithMotion(dialog.current, () => {
+    const element = dialog.current;
+    if (unlockOperation.current || !element?.open || element.dataset.closing) return;
+    closeWithMotion(element, () => {
+      element.close();
       setLockedSet(null);
       setUnlockError("");
     });
@@ -58,7 +60,11 @@ export default function WritingCatalog() {
       setSets(previous => previous?.map(set => set.id === lockedSet.id ? { ...set, unlocked: true } : set) ?? null);
       await refreshCredits(controller.signal).catch(() => {});
       if (!controller.signal.aborted) {
-        await new Promise<void>(resolve => { closeWithMotion(dialog.current, resolve); });
+        const element = dialog.current;
+        await new Promise<void>(resolve => {
+          closeWithMotion(element, () => { element?.close(); resolve(); });
+        });
+        if (controller.signal.aborted) return;
         setLockedSet(null);
         router.push(`/writing/sets/${lockedSet.id}`);
       }
@@ -108,7 +114,7 @@ export default function WritingCatalog() {
             : <div className="writing-set-grid">{sets.map(set => {
               const submitted = set.submittedSlots ?? [];
               const content = <>
-                <div className="writing-card-top"><span className="writing-badge">PBT</span></div>
+                <span className="catalog-set-number" aria-hidden="true">{String(set.number).padStart(2, "0")}</span>
                 <h2>{t.set} {set.number}</h2>
                 <ul className="writing-set-outline" aria-label={t.submissionHistory}>
                   {[51, 52, 53, 54].map(slot => <li key={slot}
@@ -124,8 +130,8 @@ export default function WritingCatalog() {
                   {!user ? t.loginToOpen : set.unlocked ? t.reopen : t.unlock.replace("{credits}", String(set.setCost))}<ArrowRight size={17} aria-hidden="true" /></span>
               </>;
               return user && set.unlocked
-                ? <Link className="writing-set-card" href={`/writing/sets/${set.id}`} key={set.id}>{content}</Link>
-                : <button className="writing-set-card" type="button" aria-haspopup="dialog" key={set.id}
+                ? <Link className="writing-set-card catalog-card" href={`/writing/sets/${set.id}`} key={set.id}>{content}</Link>
+                : <button className="writing-set-card catalog-card" type="button" aria-haspopup="dialog" key={set.id}
                   onClick={event => { trigger.current = event.currentTarget; setUnlockError(""); setLockedSet(set); }}>{content}</button>;
             })}</div>}
       </section>

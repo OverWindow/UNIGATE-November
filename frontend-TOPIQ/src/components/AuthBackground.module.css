@@ -1,0 +1,73 @@
+.main {
+  position: relative;
+  isolation: isolate;
+}
+
+.main > :global(.auth-card),
+.main > :global(.auth-home-link) {
+  position: relative;
+  z-index: 1;
+}
+
+.background {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 10% 88%, rgb(234 102 65 / 5%), transparent 42%),
+    radial-gradient(ellipse at 88% 8%, rgb(45 94 197 / 7%), transparent 48%);
+}
+
+.background::before,
+.background::after {
+  position: absolute;
+  width: 440px;
+  height: 440px;
+  border: 1px solid rgb(45 94 197 / 5%);
+  border-radius: 50%;
+  content: "";
+}
+
+.background::before {
+  top: -260px;
+  left: -150px;
+  box-shadow: 0 0 0 72px rgb(45 94 197 / 2%), 0 0 0 144px rgb(45 94 197 / 1.5%);
+}
+
+.background::after {
+  right: -210px;
+  bottom: -280px;
+  width: 520px;
+  height: 520px;
+  border-color: rgb(234 102 65 / 4%);
+  box-shadow: 0 0 0 80px rgb(234 102 65 / 1.5%);
+}
+
+.canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  mask-image: linear-gradient(transparent, #000 12% 88%, transparent);
+}
+
+@media (max-width: 767px) {
+  .background::before {
+    left: -280px;
+  }
+
+  .background::after {
+    right: -360px;
+  }
+
+  .canvas {
+    opacity: .75;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas {
+    opacity: .65;
+  }
+}

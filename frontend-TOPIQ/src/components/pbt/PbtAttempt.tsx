@@ -256,7 +256,7 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
             {submitError && <div role="alert" className="pbt-alert">{t.submitFailed} <button onClick={() => void submit()}>{t.retry}</button></div>}
           </div>
         </>}
-        {review ? <section className="pbt-review"><div className="pbt-review-heading"><h2>{t.review}</h2><div className="pbt-section-tabs">
+        {review ? <section className="pbt-review"><div className="pbt-review-heading"><h2>{t.review}</h2><div className="pbt-section-tabs section-switch">
           <button aria-pressed={!wrongOnly} onClick={() => setWrongOnly(false)}>{t.all}</button><button aria-pressed={wrongOnly} onClick={() => setWrongOnly(true)}>{t.wrongOnly} ({wrong.length})</button>
         </div></div>
           {(wrongOnly ? wrong : attempt.items).map(item => <div className="pbt-review-item" key={item.position}>

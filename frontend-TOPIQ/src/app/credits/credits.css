@@ -15,7 +15,6 @@
 .credits-balances dd span { font-size: 13px; font-weight: 500; white-space: nowrap; }
 .credits-balances .credits-available { border-color: #a9bde7; background: #eaf0fc; color: #244e9e; }
 .credits-available dt { color: #315eb7; }
-.credits-note { margin-top: 16px; color: #65728a; font-size: 13px; line-height: 1.8; word-break: keep-all; overflow-wrap: anywhere; }
 .credits-history { margin-top: 40px; }
 .credits-history-heading { position: relative; display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
 .credits-history h2 { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -.02em; }

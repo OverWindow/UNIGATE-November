@@ -17,7 +17,6 @@
 .writing-history > h1 { margin: 0 0 20px; font-size: clamp(25px, 4vw, 32px); font-weight: 650; letter-spacing: -.03em; }
 .writing-answer h2, .writing-evaluation-result h2, .writing-history > section > h2 { margin: 0 0 16px; font-size: 21px; font-weight: 650; }
 .writing-evaluation-result h3 { margin: 12px 0 6px; font-size: 13px; font-weight: 650; }
-.writing-history > .writing-wallet { margin-bottom: 20px; }
 .writing-history > section { margin-top: 32px; }
 .writing-answer-field { display: grid; gap: 8px; margin: 20px 0; font-weight: 600; }
 .writing-answer-field-inline { grid-template-columns: auto minmax(0, 1fr); align-items: start; column-gap: 12px; }
@@ -141,11 +140,10 @@
 .writing-correction-comparison del { color: #933f35; text-decoration-color: #c97c72; }
 .writing-correction-comparison ins { background: transparent; color: #256342; }
 .writing-correction-reason { margin: 6px 0 0; color: #52647e; font-size: 12px; }
-.writing-wallet { padding: 18px; background: #eaf0fc; border-radius: 10px; }
 .writing-history-list, .writing-credit-list { list-style: none; padding: 0; display: grid; gap: 12px; }
 .writing-history-list { gap: 0; margin: 0; border: 1px solid #dfe6f1; border-radius: 12px; background: #fff; overflow: hidden; }
 .writing-history-list > li + li { border-top: 1px solid #e7ecf3; }
-.writing-history-list a { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto auto auto; align-items: center; gap: 8px 16px; padding: 20px 24px; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.writing-history-list a { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto auto; align-items: center; gap: 8px 16px; padding: 20px 24px; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
 .writing-history-list a:hover { background: #f3f7ff; }
 @media (hover: hover) and (pointer: fine) {
   .writing-history-list a { transition: background-color .18s ease; }
@@ -254,9 +252,7 @@
 .writing-catalog-notice .writing-notice { margin: 0; }
 .writing-notice { margin: 0 0 24px; color: #65728a; font-size: 13px; line-height: 1.8; }
 .writing-set-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
-.writing-set-card { display: flex; flex-direction: column; min-width: 0; width: 100%; padding: 22px; border: 1px solid #dfe6f1; border-radius: 16px; background: #fff; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color .15s, box-shadow .15s; overflow-wrap: anywhere; }
-.writing-set-card:hover { border-color: #89a6d9; box-shadow: 0 8px 24px #24487b0d; }
-.writing-card-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.writing-set-card { display: flex; flex-direction: column; min-width: 0; width: 100%; padding: 22px; border: 1px solid #dfe6f1; border-radius: 16px; background: #fff; color: inherit; font: inherit; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
 .writing-badge { display: inline-flex; padding: 5px 10px; border-radius: 6px; background: #edf2fc; color: #3e619f; font-size: 12px; font-weight: 600; }
 .writing-set-card h2 { margin: 16px 0 20px; color: #233651; font-size: 21px; font-weight: 650; letter-spacing: -.025em; }
 .writing-set-outline { display: grid; margin: 0 0 20px; padding: 4px 16px; border-radius: 16px; background: #edf3ff; overflow: hidden; list-style: none; }
@@ -271,7 +267,7 @@
 .writing-status { padding: 60px 12px; text-align: center; color: #65728a; line-height: 1.8; }
 .writing-status p { margin: 0 0 20px; }
 .writing-login-dialog { width: min(420px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); margin: auto; padding: 0; border: 1px solid #dfe6f1; border-radius: 18px; background: #fff; color: #233651; box-shadow: 0 20px 60px #14233d33; overflow-wrap: anywhere; }
-.writing-login-dialog::backdrop { background: linear-gradient(transparent var(--header-height), #14233d80 var(--header-height)); }
+.writing-login-dialog::backdrop { background: #14233d80; }
 :is(.writing-result-modal, .writing-result-pending, .writing-login-dialog)[open] { animation: topiq-modal-in .24s cubic-bezier(.22, 1, .36, 1); }
 :is(.writing-result-modal, .writing-result-pending, .writing-login-dialog, .writing-question-modal)[data-closing] { pointer-events: none; }
 :is(.writing-result-modal, .writing-result-pending, .writing-login-dialog)::backdrop { animation: topiq-backdrop-in .24s ease-out; }
@@ -398,7 +394,7 @@ body:has(.writing-question-float) { padding-bottom: calc(56px + env(safe-area-in
   :is(.writing-result-modal, .writing-result-pending, .writing-login-dialog)[data-closing]::backdrop { animation: none; }
   .writing-question-float, .writing-answer-format::before, .writing-answer-format button { transition: none; }
   .writing-question-modal[open] { animation: none; }
-  .writing-set-card, .writing-question-nav::before, .writing-question-nav button { transition: none; }
+  .writing-question-nav::before, .writing-question-nav button { transition: none; }
   .writing-spinner, .writing-credit-toast, .writing-result-loader { animation: none; }
   .writing-reveal, .writing-scores > button, .writing-scores > button > svg, .writing-disclosure-trigger > svg, .writing-question-toggle > svg, .writing-task-details > summary > svg { transition: none; }
 }

@@ -4,19 +4,18 @@ import Link from "next/link";
 import useRouter from "@/lib/use-navigation-router";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
-import { writingRequest, WritingError, type CreditBalance, type Evaluation, type WritingSet } from "@/lib/writing-api";
+import { writingRequest, WritingError, type Evaluation, type WritingSet } from "@/lib/writing-api";
 import { evaluationContent } from "@/lib/writing-evaluation-content";
 import { writingContent } from "@/lib/writing-content";
 import WritingResultModal from "./WritingResultModal";
 
 export default function WritingHistory({ id }: { id?: string }) {
   const router = useRouter();
-  const { language, refreshSession, refreshCredits } = useApp();
+  const { language, refreshSession } = useApp();
   const t = evaluationContent[language];
   const w = writingContent[language];
   const [page, setPage] = useState(1);
   const [revision, setRevision] = useState(0);
-  const [balance, setBalance] = useState<CreditBalance | null>(null);
   const [entries, setEntries] = useState<{ evaluations: Evaluation[]; nextPage: number | null } | null>(null);
   const [detail, setDetail] = useState<Evaluation | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(id ?? null);
@@ -43,9 +42,6 @@ export default function WritingHistory({ id }: { id?: string }) {
     setError(""); setEntries(null);
     async function load() {
       try {
-        const wallet = await refreshCredits(controller.signal);
-        if (controller.signal.aborted) return;
-        setBalance(wallet);
         const history = await writingRequest<{ evaluations: Evaluation[]; nextPage: number | null }>(`evaluations/?page=${page}`, controller.signal);
         if (controller.signal.aborted) return;
         setEntries(history);
@@ -59,7 +55,7 @@ export default function WritingHistory({ id }: { id?: string }) {
     }
     void load();
     return () => { controller.abort(); clearTimeout(timer); };
-  }, [page, revision, refreshSession, refreshCredits]);
+  }, [page, revision, refreshSession]);
 
   useEffect(() => {
     setDetail(null); setDetailError("");
@@ -93,7 +89,6 @@ export default function WritingHistory({ id }: { id?: string }) {
   return <div className="page-container writing-study writing-history">
     {id && <nav className="writing-pager"><Link href="/writing/history">{t.history}</Link></nav>}
     <h1>{t.history}</h1>
-    {balance && <p className="writing-wallet">{t.available}: <strong>{balance.available}</strong> · {t.reserved}: {balance.reserved} {t.credits}</p>}
     {error && <div role="alert"><p>{t.errors[error] ?? t.errors.default}</p><button className="button writing-secondary" onClick={() => setRevision(value => value + 1)}>{t.check}</button></div>}
     {!error && !entries && <p role="status">{t.loading}</p>}
     {entries && <>
@@ -104,7 +99,6 @@ export default function WritingHistory({ id }: { id?: string }) {
           <strong className="writing-history-question">{questionLabel(entry)}</strong>
           <span>{entry.status === "processing" ? t.processingShort : t[entry.status]}</span>
           <span className="writing-history-score" title={t.totalScore}>{entry.totalScore !== null ? `${entry.totalScore} / ${entry.maxScore} ${t.points}` : "—"}</span>
-          <span>{t.charged}: {entry.chargedCredits}</span>
           <time className="writing-history-date" dateTime={entry.createdAt}>{date(entry.createdAt)}</time>
         </Link>
       </li>)}</ul>}

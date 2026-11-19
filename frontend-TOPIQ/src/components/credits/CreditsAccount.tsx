@@ -81,7 +81,6 @@ function CreditWallet() {
           <div><dt>{t.balance}</dt><dd>{number(current.balance.balance)} <span>{t.unit}</span></dd></div>
           <div><dt>{t.reserved}</dt><dd>{number(current.balance.reserved)} <span>{t.unit}</span></dd></div>
         </dl>
-        <p className="credits-note">{t.balanceNote}</p>
         <section className="credits-history" aria-labelledby="credit-transactions-heading">
           <div className="credits-history-heading">
             <h2 id="credit-transactions-heading">{t.transactions}</h2>
