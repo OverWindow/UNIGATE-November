@@ -7,14 +7,14 @@ from django.db import DatabaseError
 from django.views.decorators.debug import sensitive_variables
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
-from accounts.credits import balance_data, evaluation_lock, locked_account
-from accounts.models import CreditTransaction
+from accounts.credits import balance_data
+from accounts.models import CreditAccount, CreditTransaction
 from accounts.rate_limits import RateLimitUnavailable, record_attempt
 from accounts.views import api_response
 from question_bank.writing import WritingUnavailable
 
 from .models import Evaluation
-from .services import EvaluationError, config_data, expire_locked, serialize, submit, unlock
+from .services import EvaluationError, config_data, expire_for_user, serialize, submit, unlock
 
 
 def authenticated(view):
@@ -72,8 +72,7 @@ def unlock_set(request, set_id):
 def evaluations(request):
     if request.method == "GET":
         page = page_number(request)
-        with evaluation_lock():
-            expire_locked()
+        expire_for_user(request.user.pk)
         query = Evaluation.objects.filter(user=request.user).defer("question_snapshot", "answer", "result").order_by("-created_at", "-id")
         rows, next_page = page_rows(query, page)
         return api_response({"evaluations": [serialize(entry) for entry in rows], "nextPage": next_page})
@@ -118,8 +117,7 @@ def evaluations(request):
 @require_GET
 @authenticated
 def evaluation_detail(request, evaluation_id):
-    with evaluation_lock():
-        expire_locked()
+    expire_for_user(request.user.pk)
     entry = Evaluation.objects.filter(pk=evaluation_id, user=request.user).first()
     if entry is None:
         return api_response({"error": "not_found"}, 404)
@@ -129,18 +127,16 @@ def evaluation_detail(request, evaluation_id):
 @require_GET
 @authenticated
 def credits(request):
-    with evaluation_lock():
-        expire_locked()
-        data = balance_data(locked_account(request.user.pk))
-    return api_response(data)
+    expire_for_user(request.user.pk)
+    account, _ = CreditAccount.objects.get_or_create(user_id=request.user.pk)
+    return api_response(balance_data(account))
 
 
 @require_GET
 @authenticated
 def transactions(request):
     page = page_number(request)
-    with evaluation_lock():
-        expire_locked()
+    expire_for_user(request.user.pk)
     query = CreditTransaction.objects.filter(account_id=request.user.pk).order_by("-created_at", "-id")
     rows, next_page = page_rows(query, page)
     return api_response({"transactions": [

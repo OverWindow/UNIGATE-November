@@ -4,13 +4,14 @@ from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import timedelta
 from pathlib import Path
-from threading import Event
+from threading import Barrier, Event
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.db import DatabaseError, connections
+from django.db import DatabaseError, connection, connections
 from django.test import Client, SimpleTestCase, TransactionTestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from accounts.credits import grant
@@ -159,6 +160,12 @@ class EvaluationTests(TransactionTestCase):
 
     def post(self, payload):
         return self.client.post("/api/writing/evaluations/", payload, content_type="application/json")
+
+    def processing_evaluation(self, user, *, expired=True, cost=0):
+        return Evaluation.objects.create(
+            user=user, set_id=self.set_id, type_slot=51, question_snapshot={}, answer={},
+            credit_cost=cost, status="processing", expires_at=timezone.now() + timedelta(seconds=-1 if expired else 300),
+        )
 
     def test_feedback_language_is_sent_saved_and_returned_without_repeat_charges(self):
         for language in ("ko", "en", "id"):
@@ -331,6 +338,72 @@ class EvaluationTests(TransactionTestCase):
         self.assertEqual(CreditTransaction.objects.filter(kind="capture").count(), 0)
         self.assertEqual(CreditTransaction.objects.filter(kind="release").count(), 0)
         self.assertEqual(response.json()["usage"]["remaining"], 20)
+
+    def test_ordinary_reads_take_no_locks_and_leave_other_members_expired_evaluations_alone(self):
+        other = self.processing_evaluation(self.other)
+        active = self.processing_evaluation(self.user, expired=False)
+        for path in ("/api/credits/", "/api/credits/transactions/", "/api/writing/evaluations/",
+                     f"/api/writing/evaluations/{active.pk}/"):
+            with self.subTest(path=path):
+                with CaptureQueriesContext(connection) as queries:
+                    response = self.client.get(path)
+                self.assertEqual(response.status_code, 200)
+                sql = [query["sql"].upper() for query in queries]
+                self.assertFalse(any("PG_ADVISORY" in statement or "FOR UPDATE" in statement for statement in sql))
+                other.refresh_from_db()
+                self.assertEqual(other.status, "processing")
+
+    def test_reading_writing_history_or_detail_expires_the_owners_evaluation(self):
+        other = self.processing_evaluation(self.other)
+        for detail in (False, True):
+            with self.subTest(detail=detail):
+                entry = self.processing_evaluation(self.user)
+                path = "/api/writing/evaluations/"
+                response = self.client.get(f"{path}{entry.pk}/" if detail else path)
+                self.assertEqual(response.status_code, 200)
+                body = response.json()
+                row = body if detail else next(row for row in body["evaluations"] if row["id"] == str(entry.pk))
+                self.assertEqual((row["status"], row["error"]), ("failed", "evaluation_expired"))
+                other.refresh_from_db()
+                self.assertEqual(other.status, "processing")
+
+    def test_concurrent_balance_and_ledger_reads_release_a_legacy_reservation_once(self):
+        entry = self.processing_evaluation(self.user, cost=4)
+        other = self.processing_evaluation(self.other)
+        wallet = CreditAccount.objects.get(user=self.user)
+        wallet.reserved = 4
+        wallet.save(update_fields=["reserved"])
+        CreditTransaction.objects.create(account=wallet, evaluation=entry, kind="reserve",
+            amount=4, balance_after=wallet.balance, reserved_after=4)
+
+        # Both readers must see the expired evaluation before either can settle it.
+        gate = Barrier(2)
+        evaluation_lock = services.evaluation_lock
+        def wait_for_both_readers():
+            gate.wait(timeout=10)
+            return evaluation_lock()
+
+        def read(path):
+            try:
+                client = Client()
+                client.cookies.update(self.client.cookies)
+                return client.get(path)
+            finally:
+                connections.close_all()
+
+        with patch.object(services, "evaluation_lock", wait_for_both_readers), ThreadPoolExecutor(max_workers=2) as pool:
+            balance, ledger = pool.map(read, ("/api/credits/", "/api/credits/transactions/"))
+        self.assertEqual((balance.status_code, ledger.status_code), (200, 200))
+        self.assertEqual(balance.json(), {"balance": 10, "reserved": 0, "available": 10})
+        releases = [row for row in ledger.json()["transactions"] if row["kind"] == "release"]
+        self.assertEqual(len(releases), 1)
+        self.assertEqual((releases[0]["evaluationId"], releases[0]["amount"], releases[0]["reservedAfter"]),
+                         (str(entry.pk), 4, 0))
+        entry.refresh_from_db()
+        self.assertEqual((entry.status, entry.error_code), ("failed", "evaluation_expired"))
+        self.assertEqual(CreditTransaction.objects.filter(evaluation=entry, kind="release").count(), 1)
+        other.refresh_from_db()
+        self.assertEqual(other.status, "processing")
 
     def test_result_save_failure_keeps_pending_quota_then_recovers(self):
         original = Evaluation.save

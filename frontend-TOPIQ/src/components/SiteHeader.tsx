@@ -21,7 +21,7 @@ export function Logo({ className = "" }: { className?: string }) {
 }
 
 export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: string; onBeforeLogout?: (logout: () => void) => void }) {
-  const { language, setLanguage, user, status, refreshSession, refreshCredits, logout } = useApp();
+  const { language, setLanguage, user, status, refreshSession, logout } = useApp();
   const pathname = usePathname();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -39,15 +39,6 @@ export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: st
   const isAuthPage = ["/login", "/signup", "/verify-email"].includes(pathname);
   const loginHref = authHref || (isAuthPage
     ? "/login" : `/login?next=${encodeURIComponent(pathname)}`);
-
-  useEffect(() => {
-    if (status !== "authenticated" || !user) return;
-    const controller = new AbortController();
-    const refresh = () => { void refreshCredits(controller.signal).catch(() => {}); };
-    refresh();
-    window.addEventListener("focus", refresh);
-    return () => { controller.abort(); window.removeEventListener("focus", refresh); };
-  }, [status, user?.id, pathname, refreshCredits]);
 
   useEffect(() => {
     if (!languageOpen && !accountOpen) return;

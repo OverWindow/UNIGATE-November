@@ -27,12 +27,26 @@ def config_data():
             "timeoutSeconds": settings.WRITING_EVALUATION_TIMEOUT_SECONDS}
 
 
-def expire_locked():
+def _expired_evaluations(now, user_id=None):
+    entries = Evaluation.objects.filter(status="processing", expires_at__lte=now)
+    if user_id is not None:
+        entries = entries.filter(user_id=user_id)
+    return entries
+
+
+def expire_locked(*, user_id=None):
     now = timezone.now()
-    for entry in Evaluation.objects.select_for_update().filter(status="processing", expires_at__lte=now):
+    for entry in _expired_evaluations(now, user_id).select_for_update():
         settle(entry, success=False)
         entry.status, entry.error_code, entry.completed_at = "failed", "evaluation_expired", now
         entry.save(update_fields=["status", "error_code", "completed_at"])
+
+
+def expire_for_user(user_id):
+    if _expired_evaluations(timezone.now(), user_id).exists():
+        # The provider or another reader may settle the entry before we acquire the lock.
+        with evaluation_lock():
+            expire_locked(user_id=user_id)
 
 
 def existing_locked(user_id, evaluation_id, submission_hash, feedback_language):
