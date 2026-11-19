@@ -6,7 +6,8 @@ import ts from "typescript";
 async function load(path) {
   const source = await readFile(new URL(path, import.meta.url), "utf8");
   const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
-  return import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
+  const code = compiled.replace('"./csrf"', JSON.stringify(new URL("../src/lib/csrf.ts", import.meta.url).href));
+  return import(`data:text/javascript;base64,${Buffer.from(code).toString("base64")}`);
 }
 const { moveSentence } = await load("../src/lib/sentence-order.ts");
 const { isAnswered, answerText } = await load("../src/lib/pbt-api.ts");

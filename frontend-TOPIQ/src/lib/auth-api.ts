@@ -1,3 +1,4 @@
+import { setCsrfToken, withCsrfToken } from "./csrf";
 import type { Language } from "./landing-content";
 import type { SurveyInput } from "./learner-survey";
 
@@ -37,8 +38,6 @@ export class AuthError extends Error {
   }
 }
 
-let csrfToken: string | null = null;
-
 async function request(path: string, options: RequestInit = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15000);
@@ -63,15 +62,6 @@ async function readJson(response: Response) {
   }
 }
 
-async function getCsrfToken(): Promise<string> {
-  const response = await request("/api/csrf/");
-  if (!response.ok) throw new AuthError("server_error", response.status);
-  const data = await readJson(response);
-  if (typeof data.csrfToken !== "string") throw new AuthError("server_error");
-  csrfToken = data.csrfToken;
-  return data.csrfToken;
-}
-
 function parseUser(value: unknown): AuthUser {
   if (!value || typeof value !== "object" || !("id" in value) ||
       typeof value.id !== "number" || !("email" in value) || typeof value.email !== "string" ||
@@ -81,20 +71,14 @@ function parseUser(value: unknown): AuthUser {
   return { id: value.id, email: value.email, nickname: value.nickname };
 }
 
-async function post(path: string, body: object, retryCsrf = true): Promise<Record<string, unknown> | null> {
-  const token = csrfToken || await getCsrfToken();
-  const response = await request(path, {
+async function post(path: string, body: object): Promise<Record<string, unknown> | null> {
+  const response = await withCsrfToken(AuthError, token => request(path, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-CSRFToken": token },
     body: JSON.stringify(body),
-  });
+  }));
   if (response.status === 204) return null;
   const data = await readJson(response);
-  // CSRF rejection happens before the view, so a single refreshed retry is safe.
-  if (response.status === 403 && data.error === "csrf_failed" && retryCsrf) {
-    csrfToken = null;
-    return post(path, body, false);
-  }
   if (!response.ok) {
     const fields: Record<string, string[]> = {};
     if (data.fields && typeof data.fields === "object") {
@@ -106,7 +90,7 @@ async function post(path: string, body: object, retryCsrf = true): Promise<Recor
     throw new AuthError(typeof data.error === "string" ? data.error : "server_error", response.status, fields,
       Number.isFinite(retryAfter) ? Math.max(0, Math.min(3600, retryAfter)) : 0);
   }
-  if (typeof data.csrfToken === "string") csrfToken = data.csrfToken;
+  if (typeof data.csrfToken === "string") setCsrfToken(data.csrfToken);
   return data;
 }
 
@@ -147,7 +131,7 @@ export async function verifyEmail(token: string): Promise<VerifiedEmail> {
 
 export async function signOut() {
   await post("/api/auth/logout/", {});
-  csrfToken = null;
+  setCsrfToken(null);
 }
 
 export function safeReturnPath(value: string | null): string {

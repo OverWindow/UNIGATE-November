@@ -1,19 +1,25 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { after, test } from "node:test";
+import { after, beforeEach, test } from "node:test";
 import ts from "typescript";
+import { setCsrfToken } from "../src/lib/csrf.ts";
 
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; });
-const source = await readFile(new URL("../src/lib/auth-api.ts", import.meta.url), "utf8");
-const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
-let counter = 0;
-const freshApi = () => import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}#${counter++}`);
+beforeEach(() => setCsrfToken(null));
+async function loadApi(file) {
+  const source = await readFile(new URL(file, import.meta.url), "utf8");
+  const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
+  const code = compiled.replace('"./csrf"', JSON.stringify(new URL("../src/lib/csrf.ts", import.meta.url).href));
+  return import(`data:text/javascript;base64,${Buffer.from(code).toString("base64")}`);
+}
+const api = await loadApi("../src/lib/auth-api.ts");
+const { pbtRequest, submitOnPageExit } = await loadApi("../src/lib/pbt-api.ts");
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
 const user = { id: 1, email: "synthetic@example.invalid", nickname: "Learner" };
 
 test("return paths stay on TOPIQ and cannot loop through auth pages", async () => {
-  const { safeReturnPath } = await freshApi();
+  const { safeReturnPath } = api;
   for (const path of [null, "https://evil.example", "//evil.example", "/\\evil.example", "/login?next=/", "/signup", "/verify-email#token=fixture", "/hello\nworld"]) {
     assert.equal(safeReturnPath(path), "/");
   }
@@ -21,7 +27,7 @@ test("return paths stay on TOPIQ and cannot loop through auth pages", async () =
 });
 
 test("normalized return paths cannot become external navigation", async () => {
-  const { safeReturnPath } = await freshApi();
+  const { safeReturnPath } = api;
   const origin = "https://topiq.example.invalid";
   for (const path of ["/a/..//example.invalid", "/a/%2e%2e//example.invalid", "/.//example.invalid"]) {
     const result = safeReturnPath(path);
@@ -32,7 +38,6 @@ test("normalized return paths cannot become external navigation", async () => {
 });
 
 test("email send uses CSRF, language and an internal return path without expecting a user", async () => {
-  const api = await freshApi();
   globalThis.fetch = async (path, options) => {
     if (path === "/api/csrf/") return json({ csrfToken: "token" });
     assert.equal(path, "/api/auth/email/send/");
@@ -44,7 +49,6 @@ test("email send uses CSRF, language and an internal return path without expecti
 });
 
 test("verified email proof is submitted with signup and response data is validated", async () => {
-  const api = await freshApi();
   const survey = { nationalityCode: "ID", birthYear: 2000, topikReasons: ["employment"], topikReasonOther: "",
     koreanStudyDuration: "1_to_2_years", topikExperience: "none", currentTopikLevel: null,
     targetTopikLevel: 4, privacyConsent: true, privacyConsentVersion: "topiq_signup_privacy_v1" };
@@ -66,12 +70,17 @@ test("verified email proof is submitted with signup and response data is validat
   assert.deepEqual(proof, { email: user.email, token: "synthetic-proof", language: "en", next: "/#faq", expiresAt });
   assert.deepEqual(await api.signUp({ email: proof.email, nickname: user.nickname, password: "synthetic-only",
     password_confirm: "synthetic-only", verification_token: proof.token, language: "en", survey }), user);
+  globalThis.fetch = async (path, options) => {
+    assert.equal(path, "/api/pbt/attempts/");
+    assert.equal(options.headers["X-CSRFToken"], "rotated");
+    return json({});
+  };
+  await pbtRequest("attempts/", "POST", {});
   globalThis.fetch = async () => json({ email: user.email, expiresAt: "invalid" });
   await assert.rejects(api.verifyEmail("synthetic-proof"), error => error.code === "server_error");
 });
 
 test("expiry, provider failure and resend cooldown remain distinct errors", async () => {
-  const api = await freshApi();
   let code = "email_verification_expired";
   globalThis.fetch = async path => {
     if (path === "/api/csrf/") return json({ csrfToken: "token" });
@@ -87,7 +96,6 @@ test("expiry, provider failure and resend cooldown remain distinct errors", asyn
 });
 
 test("anonymous session is different from failed connection", async () => {
-  const api = await freshApi();
   globalThis.fetch = async () => json({ error: "authentication_required" }, 401);
   assert.equal(await api.getSession(), null);
   globalThis.fetch = async () => { throw new TypeError("offline"); };
@@ -97,7 +105,6 @@ test("anonymous session is different from failed connection", async () => {
 });
 
 test("session data is validated and requested without shared caching", async () => {
-  const api = await freshApi();
   globalThis.fetch = async (path, options) => {
     assert.equal(path, "/api/auth/me/");
     assert.equal(options.cache, "no-store");
@@ -110,7 +117,6 @@ test("session data is validated and requested without shared caching", async () 
 });
 
 test("login refreshes a rejected CSRF token once", async () => {
-  const api = await freshApi();
   let tokens = 0;
   let posts = 0;
   globalThis.fetch = async (path, options) => {
@@ -125,29 +131,62 @@ test("login refreshes a rejected CSRF token once", async () => {
 });
 
 test("CSRF retry is bounded and field errors remain available", async () => {
-  const api = await freshApi();
   let posts = 0;
   globalThis.fetch = async path => path === "/api/csrf/" ? json({ csrfToken: "token" })
     : (posts++, json({ error: "csrf_failed" }, 403));
   await assert.rejects(api.signIn(user.email, "synthetic-only"), error => error.code === "csrf_failed");
   assert.equal(posts, 2);
-  globalThis.fetch = async () => json({ error: "validation_error", fields: { email: ["email_unavailable"] } }, 400);
+  globalThis.fetch = async path => path === "/api/csrf/" ? json({ csrfToken: "fresh" })
+    : json({ error: "validation_error", fields: { email: ["email_unavailable"] } }, 400);
   await assert.rejects(api.signIn(user.email, "synthetic-only"), error => error.fields.email[0] === "email_unavailable");
 });
 
-test("rotated token is used for logout and 204 needs no JSON body", async () => {
-  const api = await freshApi();
+test("exam writes share the login token and fetch a fresh token after logout", async () => {
   let tokens = 0;
+  const examTokens = [];
   globalThis.fetch = async (path, options) => {
     if (path === "/api/csrf/") return json({ csrfToken: `initial-${++tokens}` });
+    if (path === "/api/ibt/attempts/") {
+      examTokens.push(options.headers["X-CSRFToken"]);
+      return json({});
+    }
     if (path === "/api/auth/logout/") {
       assert.equal(options.headers["X-CSRFToken"], "rotated");
       return new Response(null, { status: 204 });
     }
+    assert.equal(path, "/api/auth/login/");
     return json({ user, csrfToken: "rotated" });
   };
   await api.signIn(user.email, "synthetic-only");
+  await pbtRequest("attempts/", "POST", {}, "ibt");
   await api.signOut();
-  await api.signIn(user.email, "synthetic-only");
+  await pbtRequest("attempts/", "POST", {}, "ibt");
+  assert.deepEqual(examTokens, ["rotated", "initial-2"]);
   assert.equal(tokens, 2);
+});
+
+test("a token lookup started before login cannot overwrite the rotated token", async () => {
+  setCsrfToken("before-login");
+  const loginResponse = Promise.withResolvers();
+  const lookupStarted = Promise.withResolvers();
+  const lookupResponse = Promise.withResolvers();
+  const examTokens = [];
+  globalThis.fetch = async (path, options) => {
+    if (path === "/api/auth/login/") return loginResponse.promise;
+    if (path === "/api/csrf/") {
+      lookupStarted.resolve();
+      return lookupResponse.promise;
+    }
+    examTokens.push(options.headers["X-CSRFToken"]);
+    return examTokens.length === 1 ? json({ error: "csrf_failed" }, 403) : json({});
+  };
+  const login = api.signIn(user.email, "synthetic-only");
+  const answer = pbtRequest("attempts/test/answers/1/", "PUT", { selectedOption: 1 });
+  await lookupStarted.promise;
+  loginResponse.resolve(json({ user, csrfToken: "after-login" }));
+  await login;
+  lookupResponse.resolve(json({ csrfToken: "stale" }));
+  await answer;
+  submitOnPageExit("test", "pbt");
+  assert.deepEqual(examTokens, ["before-login", "after-login", "after-login"]);
 });

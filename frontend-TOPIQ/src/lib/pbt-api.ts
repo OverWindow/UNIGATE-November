@@ -1,3 +1,4 @@
+import { csrfToken, withCsrfToken } from "./csrf";
 import type { ExamFormat } from "./exam-content";
 
 export type Section = "reading" | "listening";
@@ -70,22 +71,18 @@ async function json(response: Response) {
   catch { throw new PbtError("server_error", response.status); }
 }
 
-let lastCsrfToken = "";
-
 export async function pbtRequest<T>(path: string, method = "GET", body?: object, examFormat: ExamFormat = "pbt", sessionToken?: string): Promise<T> {
-  // Fetch fresh CSRF after login/logout, which rotates Django's token.
-  const headers: Record<string, string> = {};
-  if (sessionToken) headers["X-Exam-Session"] = sessionToken;
-  if (method !== "GET") {
-    const csrf = await fetchResponse("/api/csrf/", {});
-    if (!csrf.ok) throw new PbtError("server_error", csrf.status);
-    const token = (await json(csrf)).csrfToken;
-    if (typeof token !== "string") throw new PbtError("server_error");
-    lastCsrfToken = token;
-    headers["X-CSRFToken"] = token;
-    headers["Content-Type"] = "application/json";
+  const payload = JSON.stringify(body);
+  function send(token?: string) {
+    const headers: Record<string, string> = {};
+    if (sessionToken) headers["X-Exam-Session"] = sessionToken;
+    if (token) {
+      headers["X-CSRFToken"] = token;
+      headers["Content-Type"] = "application/json";
+    }
+    return fetchResponse(`/api/${examFormat}/${path}`, { method, headers, body: payload });
   }
-  const response = await fetchResponse(`/api/${examFormat}/${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  const response = method === "GET" ? await send() : await withCsrfToken(PbtError, send);
   if (response.status === 404) throw new PbtError("not_found", 404);
   const data = await json(response);
   if (!response.ok) throw new PbtError(typeof data?.error === "string" ? data.error : "server_error", response.status,
@@ -94,11 +91,11 @@ export async function pbtRequest<T>(path: string, method = "GET", body?: object,
 }
 
 export function submitOnPageExit(id: string, examFormat: ExamFormat) {
-  if (!lastCsrfToken) return;
+  if (!csrfToken) return;
   // Re-entry closes the attempt if the browser cannot deliver this request.
   void fetch(`/api/${examFormat}/attempts/${id}/submit/`, {
     method: "POST", credentials: "same-origin", keepalive: true,
-    headers: { "X-CSRFToken": lastCsrfToken, "Content-Type": "application/json" }, body: "{}",
+    headers: { "X-CSRFToken": csrfToken, "Content-Type": "application/json" }, body: "{}",
   }).catch(() => {});
 }
 
