@@ -170,6 +170,34 @@
 .writing-result-waiting-content h2 { margin: 0; font-size: 14px; font-weight: 600; }
 .writing-result-pending .writing-result-waiting-content h2:focus { outline: none; }
 .writing-result-waiting-content p { margin: 0; font-size: 13px; }
+.writing-review-paper { display: block; width: 152px; height: 108px; }
+.writing-review-paper ~ p { min-height: 3.4em; text-wrap: pretty; word-break: keep-all; }
+@media (prefers-reduced-motion: no-preference) {
+  .writing-review-paper ~ p { animation: writing-review-hint-in .2s ease-out; }
+}
+@keyframes writing-review-hint-in { from { opacity: .4; } }
+.writing-review-ink path { stroke-dasharray: 1; }
+.writing-review-first { animation: writing-underline-first 4.8s ease-in-out infinite; }
+.writing-review-second { animation: writing-underline-second 4.8s ease-in-out infinite; }
+.writing-review-pencil { transform: translate(68px, 28px); animation: writing-review-pencil 4.8s ease-in-out infinite; }
+@keyframes writing-underline-first {
+  0%, 8% { stroke-dashoffset: 1; }
+  40%, 94% { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+@keyframes writing-underline-second {
+  0%, 54% { stroke-dashoffset: 1; }
+  84%, 94% { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+@keyframes writing-review-pencil {
+  0%, 8% { transform: translate(0, 0); }
+  40% { transform: translate(86px, 0); }
+  44% { transform: translate(86px, -4px); }
+  54% { transform: translate(0, 28px); }
+  84%, 94% { transform: translate(68px, 28px); opacity: 1; }
+  100% { transform: translate(68px, 24px); opacity: 0; }
+}
 .writing-result-modal-header { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 12px; padding: 10px 16px; border-bottom: 1px solid #e0e6ef; background: #fff; }
 .writing-result-modal-header > div { min-width: 0; }
 .writing-result-modal-header h2 { margin: 0; font-size: 17px; font-weight: 650; line-height: 1.4; }
@@ -396,5 +424,6 @@ body:has(.writing-question-float) { padding-bottom: calc(56px + env(safe-area-in
   .writing-question-modal[open] { animation: none; }
   .writing-question-nav::before, .writing-question-nav button { transition: none; }
   .writing-spinner, .writing-credit-toast, .writing-result-loader { animation: none; }
+  .writing-review-first, .writing-review-second, .writing-review-pencil { animation: none; }
   .writing-reveal, .writing-scores > button, .writing-scores > button > svg, .writing-disclosure-trigger > svg, .writing-question-toggle > svg, .writing-task-details > summary > svg { transition: none; }
 }

@@ -198,7 +198,7 @@ export default function WritingAnswer({ setId, setNumber, slot, draft, initialUs
       <p role="status">{t[entry.status]}{entry.totalScore !== null && <strong>{entry.totalScore} / {entry.maxScore} {t.points}</strong>}</p>
       <button ref={resultTrigger} type="button" className="button writing-secondary" onClick={() => setResultOpen(true)}>{t.viewResult}</button>
     </div>}
-    {resultOpen && <WritingResultModal entry={entry} setNumber={setNumber} evaluating={busy}
+    {resultOpen && <WritingResultModal entry={entry} setNumber={setNumber} evaluatingSlot={busy ? slot : undefined}
       error={uncertain && !busy ? t.uncertain : undefined} onRetry={checkStatus}
       returnFocusRef={resultTrigger} onClose={() => setResultOpen(false)} />}
   </section>;

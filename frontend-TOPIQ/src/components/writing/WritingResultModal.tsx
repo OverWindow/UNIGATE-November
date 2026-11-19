@@ -10,13 +10,14 @@ import { correctionSegments, toggleCorrection, type CorrectionMatch } from "@/li
 import { closeWithMotion } from "@/lib/modal-motion";
 import WritingMaterial from "./WritingMaterial";
 import WritingResult from "./WritingResult";
+import WritingEvaluationLoading from "./WritingEvaluationLoading";
 
 const tabs = ["question", "answer", "evaluation"] as const;
 type Tab = typeof tabs[number];
 
-export default function WritingResultModal({ entry, setNumber, error, onRetry, onClose, returnFocusRef, evaluating = false }: {
+export default function WritingResultModal({ entry, setNumber, error, onRetry, onClose, returnFocusRef, evaluatingSlot }: {
   entry: Evaluation | null; setNumber?: number; error?: string; onRetry?: () => void; onClose: () => void;
-  returnFocusRef?: RefObject<HTMLElement | null>; evaluating?: boolean;
+  returnFocusRef?: RefObject<HTMLElement | null>; evaluatingSlot?: number;
 }) {
   const { language } = useApp();
   const t = evaluationContent[language];
@@ -38,6 +39,7 @@ export default function WritingResultModal({ entry, setNumber, error, onRetry, o
   const tabLabels = { question: w.question, answer: t.answer, evaluation: t.result };
   const hasEdits = Object.values(appliedCorrections).some(matches => matches.length > 0);
   const waiting = !entry || entry.status === "processing" || Boolean(error);
+  const reviewSlot = entry?.status === "processing" ? entry.typeSlot : evaluatingSlot;
 
   function closeModal() {
     if (dialog.current?.dataset.closing) return;
@@ -63,7 +65,7 @@ export default function WritingResultModal({ entry, setNumber, error, onRetry, o
     };
   }, [returnFocusRef]);
 
-  useEffect(() => { title.current?.focus({ preventScroll: true }); }, [waiting, error]);
+  useEffect(() => { title.current?.focus({ preventScroll: true }); }, [waiting, error, reviewSlot]);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 900px)");
@@ -136,9 +138,11 @@ export default function WritingResultModal({ entry, setNumber, error, onRetry, o
     {waiting ? <>
       <button type="button" className="writing-result-close" onClick={closeModal} aria-label={t.close}><X size={20} aria-hidden="true" /></button>
       <div className="writing-result-waiting-content" role={error ? "alert" : "status"}>
-        {!error && <span className="writing-result-loader" aria-hidden="true" />}
-        <h2 ref={title} id={`${prefix}-title`} tabIndex={-1}>{error ? t.result : evaluating || entry?.status === "processing" ? t.processingShort : t.loading}</h2>
-        {error && <><p>{error}</p>{onRetry && <button type="button" className="button writing-secondary" onClick={onRetry}>{t.check}</button>}</>}
+        {!error && reviewSlot !== undefined ? <WritingEvaluationLoading key={reviewSlot} slot={reviewSlot} titleId={`${prefix}-title`} titleRef={title} /> : <>
+          {!error && <span className="writing-result-loader" aria-hidden="true" />}
+          <h2 ref={title} id={`${prefix}-title`} tabIndex={-1}>{error ? t.result : t.loading}</h2>
+          {error && <><p>{error}</p>{onRetry && <button type="button" className="button writing-secondary" onClick={onRetry}>{t.check}</button>}</>}
+        </>}
       </div>
     </> : entry && <>
     <header className="writing-result-modal-header">
