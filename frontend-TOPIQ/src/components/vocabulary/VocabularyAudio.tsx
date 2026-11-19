@@ -3,7 +3,7 @@
 import { LoaderCircle, Volume2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
-import { vocabularyContent } from "@/lib/vocabulary-content";
+import { vocabularyContent } from "@/lib/vocabulary/vocabulary-content";
 
 export default function VocabularyAudio({ word, url, partOfSpeech }: { word: string; url: string | null; partOfSpeech: string }) {
   const { language } = useApp();

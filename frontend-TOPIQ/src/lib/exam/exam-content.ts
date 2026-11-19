@@ -1,4 +1,4 @@
-import type { Language } from "./landing-content";
+import type { Language } from "../landing-content";
 
 export type ExamFormat = "pbt" | "ibt";
 

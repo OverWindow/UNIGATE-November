@@ -92,7 +92,7 @@ Web Worker는 사용하지 않습니다. 모델은 학습 화면에서 재사용
 퀴즈에는 추가 의존성·환경 변수·학습 기록 테이블이 없습니다. 백엔드 매핑 migration의 정확한 수동 적용 명령과 운영 전제는
 [루트 README의 퀴즈 항목](../README.md#세트별-문장-빈칸-퀴즈)을 따릅니다. 프론트는 이 폴더에서 `npm run build` 후 재배포합니다.
 
-`src/app/vocabulary/`, `src/components/vocabulary/`, `src/lib/vocabulary-api.ts`, `src/lib/vocabulary-content.ts`가 관련 코드입니다.
+`src/app/vocabulary/`, `src/components/vocabulary/`, `src/lib/vocabulary/vocabulary-api.ts`, `src/lib/vocabulary/vocabulary-content.ts`가 관련 코드입니다.
 브라우저의 `/api/vocabulary/` 조회는 기존 백엔드 origin으로 전달합니다. rewrite 적용을 위해 프론트엔드를 다시 빌드·배포합니다.
 먼저 백엔드 migration 및 초기 세트 등록이 필요합니다. 정확한 수동 명령과 실행 시점은
 [루트 README의 단어장 항목](../README.md#topiq-급수별-단어장)을 따릅니다.
@@ -271,22 +271,22 @@ PBT 읽기 70분·IBT 읽기 40분 제한은 유지됩니다. 에이전트가 �
 | 경로 | 용도 |
 | --- | --- |
 | `src/app/page.tsx` | 랜딩 페이지 진입점 |
-| `src/components/LandingPage.tsx` | 랜딩 화면과 학습 소개 |
+| `src/components/landing/LandingPage.tsx` | 랜딩 화면과 학습 소개 |
 | `src/lib/landing-content.ts` | 한국어·영어·인도네시아어 문구 |
 | `src/app/pbt/page.tsx`, `src/app/ibt/page.tsx` | PBT·IBT 페이지 진입점과 메타데이터 |
 | `src/components/pbt/` | PBT 목록·응시·결과·문항·음성 화면 |
-| `src/lib/pbt-api.ts`, `src/lib/pbt-content.ts` | PBT API·시간 계산·세 언어 문구 |
+| `src/lib/exam/pbt-api.ts`, `src/lib/exam/pbt-content.ts` | PBT API·시간 계산·세 언어 문구 |
 | `src/app/pbt/pbt.css` | PBT 반응형 화면 스타일 |
-| `src/lib/exam-content.ts` | 시험 형식 공통 타입과 시험 설명·메타데이터 |
+| `src/lib/exam/exam-content.ts` | 시험 형식 공통 타입과 시험 설명·메타데이터 |
 | `src/components/SiteFooter.tsx` | 랜딩·시험 페이지의 공통 푸터 |
 | `src/app/providers.tsx` | 공통 언어·인증 상태 |
-| `src/components/AuthScreen.tsx` | 로그인·가입 화면 |
+| `src/components/auth/AuthScreen.tsx` | 로그인·가입 화면 |
 | `src/components/SiteHeader.tsx` | 공통 헤더와 회원 상태 |
-| `src/lib/auth-api.ts` | 인증 요청·CSRF·안전한 복귀 경로 |
-| `src/lib/auth-content.ts` | 세 언어의 인증 문구 |
-| `src/components/EmailVerificationRequest.tsx` | 인증 메일 발송·재발송 화면 |
-| `src/components/EmailVerificationScreen.tsx` | 링크 검증과 인증 후 가입 화면 |
-| `src/lib/email-content.ts` | 세 언어의 이메일 인증 문구 |
+| `src/lib/auth/auth-api.ts` | 인증 요청·CSRF·안전한 복귀 경로 |
+| `src/lib/auth/auth-content.ts` | 세 언어의 인증 문구 |
+| `src/components/auth/EmailVerificationRequest.tsx` | 인증 메일 발송·재발송 화면 |
+| `src/components/auth/EmailVerificationScreen.tsx` | 링크 검증과 인증 후 가입 화면 |
+| `src/lib/auth/email-content.ts` | 세 언어의 이메일 인증 문구 |
 | `src/app/layout.tsx` | 공통 레이아웃과 메타데이터 |
 | `src/app/globals.css` | Tailwind CSS 가져오기와 공통 스타일 |
 | `next.config.ts` | Next.js 설정 |

@@ -5,8 +5,8 @@ import { ExternalLink } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useApp } from "@/app/providers";
-import { catalogSelection, VocabularyError, vocabularyRequest, type VocabularyCatalogData, type VocabularyLevel } from "@/lib/vocabulary-api";
-import { vocabularyContent, vocabularyLevelLabel } from "@/lib/vocabulary-content";
+import { catalogSelection, VocabularyError, vocabularyRequest, type VocabularyCatalogData, type VocabularyLevel } from "@/lib/vocabulary/vocabulary-api";
+import { vocabularyContent, vocabularyLevelLabel } from "@/lib/vocabulary/vocabulary-content";
 
 export function VocabularyLoading() {
   const { language } = useApp();

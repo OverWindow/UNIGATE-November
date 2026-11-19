@@ -1,4 +1,4 @@
-import type { Language } from "./landing-content";
+import type { Language } from "../landing-content";
 
 interface WritingCopy {
   title: string; intro: string; set: string; questions: string; open: string; notice: string;

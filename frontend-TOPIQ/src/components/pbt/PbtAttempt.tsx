@@ -5,16 +5,16 @@ import { ArrowLeft, ArrowRight, Grid3x3, X } from "lucide-react";
 import useRouter from "@/lib/use-navigation-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
-import { answerText, isAnswered, clockText, pbtRequest, PbtError, remainingSeconds, questionGroup, submitOnPageExit, type Answer, type Attempt } from "@/lib/pbt-api";
-import { guardTimedExit } from "@/lib/timed-exit";
+import { answerText, isAnswered, clockText, pbtRequest, PbtError, remainingSeconds, questionGroup, submitOnPageExit, type Answer, type Attempt } from "@/lib/exam/pbt-api";
+import { guardTimedExit } from "@/lib/exam/timed-exit";
 import { closeWithMotion } from "@/lib/modal-motion";
-import type { ExamFormat } from "@/lib/exam-content";
-import { examCopy, pbtErrorMessage } from "@/lib/pbt-content";
+import type { ExamFormat } from "@/lib/exam/exam-content";
+import { examCopy, pbtErrorMessage } from "@/lib/exam/pbt-content";
 import SiteHeader from "../SiteHeader";
 import PbtQuestion, { QuestionMaterial } from "./PbtQuestion";
 import ListeningPlayer, { type AudioProgress } from "./ListeningPlayer";
 import ListeningSession from "./ListeningSession";
-import { listeningCopy } from "@/lib/listening";
+import { listeningCopy } from "@/lib/exam/listening";
 
 export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: { id: string; review?: boolean; examFormat?: ExamFormat }) {
   const basePath = `/${examFormat}`;

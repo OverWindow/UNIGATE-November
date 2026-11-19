@@ -7,9 +7,9 @@ import { setCsrfToken } from "../src/lib/csrf.ts";
 const originalFetch = globalThis.fetch;
 after(() => { globalThis.fetch = originalFetch; });
 beforeEach(() => setCsrfToken(null));
-const source = await readFile(new URL("../src/lib/pbt-api.ts", import.meta.url), "utf8");
+const source = await readFile(new URL("../src/lib/exam/pbt-api.ts", import.meta.url), "utf8");
 const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
-const code = compiled.replace('"./csrf"', JSON.stringify(new URL("../src/lib/csrf.ts", import.meta.url).href));
+const code = compiled.replace('"../csrf"', JSON.stringify(new URL("../src/lib/csrf.ts", import.meta.url).href));
 const api = await import(`data:text/javascript;base64,${Buffer.from(code).toString("base64")}`);
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status });
 

@@ -5,8 +5,8 @@ import useRouter from "@/lib/use-navigation-router";
 import { ArrowRight } from "lucide-react";
 import { useApp } from "@/app/providers";
 import { homeContent } from "@/lib/home-content";
-import { pbtRequest, type Attempt, type Exam, type Mode, type Section } from "@/lib/pbt-api";
-import { pbtContent, pbtErrorMessage } from "@/lib/pbt-content";
+import { pbtRequest, type Attempt, type Exam, type Mode, type Section } from "@/lib/exam/pbt-api";
+import { pbtContent, pbtErrorMessage } from "@/lib/exam/pbt-content";
 import InteractiveDots from "./InteractiveDots";
 import styles from "./LandingPage.module.css";
 

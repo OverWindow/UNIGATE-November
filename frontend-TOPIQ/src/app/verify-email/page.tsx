@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import EmailVerificationScreen from "@/components/EmailVerificationScreen";
+import EmailVerificationScreen from "@/components/auth/EmailVerificationScreen";
 
 export const metadata: Metadata = {
   title: "이메일 인증 | TOPIQ",

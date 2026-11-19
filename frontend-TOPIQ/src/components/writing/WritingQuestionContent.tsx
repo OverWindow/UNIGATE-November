@@ -1,6 +1,6 @@
 import type { Language } from "@/lib/landing-content";
-import type { WritingQuestion } from "@/lib/writing-api";
-import { writingContent } from "@/lib/writing-content";
+import type { WritingQuestion } from "@/lib/writing/writing-api";
+import { writingContent } from "@/lib/writing/writing-content";
 import WritingMaterial from "./WritingMaterial";
 
 export default function WritingQuestionContent({ question, language }: { question: WritingQuestion; language: Language }) {

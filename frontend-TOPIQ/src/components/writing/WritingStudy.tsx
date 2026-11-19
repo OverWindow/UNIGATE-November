@@ -3,8 +3,8 @@
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
-import { WritingError, writingRequest, unlockWriting, type WritingDetail, type LearnerAnswer, type EvaluationConfig } from "@/lib/writing-api";
-import { writingContent } from "@/lib/writing-content";
+import { WritingError, writingRequest, unlockWriting, type WritingDetail, type LearnerAnswer, type EvaluationConfig } from "@/lib/writing/writing-api";
+import { writingContent } from "@/lib/writing/writing-content";
 import WritingAnswer from "./WritingAnswer";
 import WritingQuestionContent from "./WritingQuestionContent";
 import WritingQuestionPreview from "./WritingQuestionPreview";

@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { afterEach, test } from "node:test";
 import ts from "typescript";
 
-const source = await readFile(new URL("../src/lib/timed-exit.ts", import.meta.url), "utf8");
+const source = await readFile(new URL("../src/lib/exam/timed-exit.ts", import.meta.url), "utf8");
 const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
 const { guardTimedExit } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString("base64")}`);
 const original = Object.fromEntries(["window", "document", "Element", "HTMLAnchorElement"].map(key => [key, globalThis[key]]));

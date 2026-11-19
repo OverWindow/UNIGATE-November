@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useId, useRef, useState, type RefObject } from "react";
 import { BookOpen, ChevronUp, X } from "lucide-react";
 import type { Language } from "@/lib/landing-content";
-import type { WritingQuestion } from "@/lib/writing-api";
-import { writingContent } from "@/lib/writing-content";
+import type { WritingQuestion } from "@/lib/writing/writing-api";
+import { writingContent } from "@/lib/writing/writing-content";
 import { closeWithMotion } from "@/lib/modal-motion";
 import WritingQuestionContent from "./WritingQuestionContent";
 

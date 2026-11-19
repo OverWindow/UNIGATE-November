@@ -1,4 +1,4 @@
-import type { Language } from "./landing-content";
+import type { Language } from "../landing-content";
 
 interface AuthContent {
   login: string; welcome: string; signup: string; logout: string; retry: string; credits: string;

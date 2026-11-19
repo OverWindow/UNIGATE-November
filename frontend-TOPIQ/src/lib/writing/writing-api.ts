@@ -1,4 +1,4 @@
-import type { Language } from "./landing-content";
+import type { Language } from "../landing-content";
 
 export interface WritingSet { id: string; number: number; questionCount: number; submittedSlots: number[]; unlocked: boolean; setCost: number }
 export interface WritingMaterial {

@@ -1,4 +1,4 @@
-import type { Language } from "./landing-content";
+import type { Language } from "../landing-content";
 
 export function moveSentence(order: (string | null)[], id: string, target: number | null) {
   const next = [...order];

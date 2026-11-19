@@ -2,9 +2,9 @@
 
 import { useRef, useState, type DragEvent } from "react";
 import { useApp } from "@/app/providers";
-import { answerText, isAnswered, type Question } from "@/lib/pbt-api";
-import { pbtContent } from "@/lib/pbt-content";
-import { moveSentence, sentenceOrderCopy } from "@/lib/sentence-order";
+import { answerText, isAnswered, type Question } from "@/lib/exam/pbt-api";
+import { pbtContent } from "@/lib/exam/pbt-content";
+import { moveSentence, sentenceOrderCopy } from "@/lib/exam/sentence-order";
 
 export default function SentenceOrderQuestion({ question, disabled, review, onChange }: {
   question: Question; disabled?: boolean; review?: boolean; onChange?: (order: (string | null)[]) => void;

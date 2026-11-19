@@ -4,9 +4,9 @@ import { Info, X } from "lucide-react";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useApp } from "@/app/providers";
-import { vocabularyContent } from "@/lib/vocabulary-content";
-import { VocabularyError, vocabularyRequest, type ExampleMeaning, type MeaningLanguage } from "@/lib/vocabulary-api";
-import type { ExampleAnalysis, ExampleAnalyzer, ExampleSegment } from "@/lib/vocabulary-analysis";
+import { vocabularyContent } from "@/lib/vocabulary/vocabulary-content";
+import { VocabularyError, vocabularyRequest, type ExampleMeaning, type MeaningLanguage } from "@/lib/vocabulary/vocabulary-api";
+import type { ExampleAnalysis, ExampleAnalyzer, ExampleSegment } from "@/lib/vocabulary/vocabulary-analysis";
 import { closeWithMotion } from "@/lib/modal-motion";
 
 type Selection = ExampleSegment & { trigger: HTMLButtonElement };

@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
-import type { ExamFormat } from "@/lib/exam-content";
-import { pbtRequest, PbtError } from "@/lib/pbt-api";
+import type { ExamFormat } from "@/lib/exam/exam-content";
+import { pbtRequest, PbtError } from "@/lib/exam/pbt-api";
 import { surveyCopy } from "@/lib/learner-survey";
-import { examCopy, pbtErrorMessage } from "@/lib/pbt-content";
+import { examCopy, pbtErrorMessage } from "@/lib/exam/pbt-content";
 import type { Language } from "@/lib/landing-content";
 import PbtAttempt from "./PbtAttempt";
 import SiteHeader from "../SiteHeader";

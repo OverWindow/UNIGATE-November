@@ -1,7 +1,7 @@
 import { useId } from "react";
 import type { Language } from "@/lib/landing-content";
-import type { WritingMaterial as Material } from "@/lib/writing-api";
-import { writingContent } from "@/lib/writing-content";
+import type { WritingMaterial as Material } from "@/lib/writing/writing-api";
+import { writingContent } from "@/lib/writing/writing-content";
 
 const colors = ["#3866bf", "#c16635", "#248276", "#8a54a5"];
 const format = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 2 });

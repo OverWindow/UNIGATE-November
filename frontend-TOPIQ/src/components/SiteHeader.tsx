@@ -7,7 +7,7 @@ import useRouter from "@/lib/use-navigation-router";
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, CreditCard, Globe, LogOut, Menu, UserRound, X } from "lucide-react";
 import { useApp } from "@/app/providers";
-import { authContent } from "@/lib/auth-content";
+import { authContent } from "@/lib/auth/auth-content";
 import { landingContent, type Language } from "@/lib/landing-content";
 
 const languages: { code: Language; name: string }[] = [

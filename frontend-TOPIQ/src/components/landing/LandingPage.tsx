@@ -5,11 +5,11 @@ import { Check, ExternalLink, Minus, Plus } from "lucide-react";
 import { useState } from "react";
 import { useApp } from "@/app/providers";
 import { homeContent } from "@/lib/home-content";
-import SiteHeader from "./SiteHeader";
-import SiteFooter from "./SiteFooter";
+import SiteHeader from "../SiteHeader";
+import SiteFooter from "../SiteFooter";
 import HomeTestSelector from "./HomeTestSelector";
 import LandingCharacter from "./LandingCharacter";
-import instituteLogo from "../../public/brand/niied-logo.png";
+import instituteLogo from "../../../public/brand/niied-logo.png";
 import styles from "./LandingPage.module.css";
 
 export default function LandingPage() {

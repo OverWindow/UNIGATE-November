@@ -1,5 +1,5 @@
 import type { Language } from "./landing-content";
-import type { CreditEntry } from "./writing-api";
+import type { CreditEntry } from "./writing/writing-api";
 
 interface Copy {
   title: string; available: string; balance: string; reserved: string; unit: string;

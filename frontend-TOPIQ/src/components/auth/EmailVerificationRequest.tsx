@@ -3,9 +3,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Mail } from "lucide-react";
 import { useApp } from "@/app/providers";
-import { AuthError, sendEmailVerification } from "@/lib/auth-api";
-import { authContent } from "@/lib/auth-content";
-import { emailContent } from "@/lib/email-content";
+import { AuthError, sendEmailVerification } from "@/lib/auth/auth-api";
+import { authContent } from "@/lib/auth/auth-content";
+import { emailContent } from "@/lib/auth/email-content";
 
 export default function EmailVerificationRequest({ next }: { next: string }) {
   const { language } = useApp();

@@ -5,9 +5,9 @@ import { ArrowRight, ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import useRouter from "@/lib/use-navigation-router";
 import { useApp } from "@/app/providers";
-import { pbtRequest, type Attempt, type Exam, type Mode, type Section } from "@/lib/pbt-api";
-import type { ExamFormat } from "@/lib/exam-content";
-import { examCopy, ibtTimedHints, pbtErrorMessage } from "@/lib/pbt-content";
+import { pbtRequest, type Attempt, type Exam, type Mode, type Section } from "@/lib/exam/pbt-api";
+import type { ExamFormat } from "@/lib/exam/exam-content";
+import { examCopy, ibtTimedHints, pbtErrorMessage } from "@/lib/exam/pbt-content";
 import SiteHeader from "../SiteHeader";
 import SiteFooter from "../SiteFooter";
 

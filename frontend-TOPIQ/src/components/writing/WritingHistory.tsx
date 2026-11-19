@@ -4,9 +4,9 @@ import Link from "next/link";
 import useRouter from "@/lib/use-navigation-router";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
-import { writingRequest, WritingError, type Evaluation, type WritingSet } from "@/lib/writing-api";
-import { evaluationContent } from "@/lib/writing-evaluation-content";
-import { writingContent } from "@/lib/writing-content";
+import { writingRequest, WritingError, type Evaluation, type WritingSet } from "@/lib/writing/writing-api";
+import { evaluationContent } from "@/lib/writing/writing-evaluation-content";
+import { writingContent } from "@/lib/writing/writing-content";
 import WritingResultModal from "./WritingResultModal";
 
 export default function WritingHistory({ id }: { id?: string }) {

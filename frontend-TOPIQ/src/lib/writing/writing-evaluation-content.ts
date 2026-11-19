@@ -1,4 +1,4 @@
-import type { Language } from "./landing-content";
+import type { Language } from "../landing-content";
 
 interface Copy {
   answer: string; evaluate: string; history: string; credits: string; available: string; reserved: string;

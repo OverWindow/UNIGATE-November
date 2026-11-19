@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 import { useApp } from "@/app/providers";
-import { writingContent } from "@/lib/writing-content";
+import { writingContent } from "@/lib/writing/writing-content";
 
 export default function WritingAccess({ children }: { children: ReactNode }) {
   const { user, status, language, refreshSession } = useApp();

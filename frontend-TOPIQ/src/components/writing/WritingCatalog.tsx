@@ -5,8 +5,8 @@ import useRouter from "@/lib/use-navigation-router";
 import { ArrowRight, Check, Info, Lock, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
-import { writingRequest, unlockWriting, WritingError, type WritingSet } from "@/lib/writing-api";
-import { writingContent } from "@/lib/writing-content";
+import { writingRequest, unlockWriting, WritingError, type WritingSet } from "@/lib/writing/writing-api";
+import { writingContent } from "@/lib/writing/writing-content";
 import { closeWithMotion } from "@/lib/modal-motion";
 
 export default function WritingCatalog() {

@@ -4,9 +4,9 @@ import Link from "next/link";
 import { Info, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useApp } from "@/app/providers";
-import { authContent } from "@/lib/auth-content";
+import { authContent } from "@/lib/auth/auth-content";
 import { creditsContent } from "@/lib/credits-content";
-import { creditsRequest, WritingError, type CreditBalance, type CreditEntry } from "@/lib/writing-api";
+import { creditsRequest, WritingError, type CreditBalance, type CreditEntry } from "@/lib/writing/writing-api";
 
 export default function CreditsAccount() {
   const { user, status, language, refreshSession } = useApp();

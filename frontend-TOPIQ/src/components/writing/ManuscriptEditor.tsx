@@ -1,7 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
-import { layoutManuscript, manuscriptColumns, manuscriptOffsetAt, manuscriptPosition } from "@/lib/writing-manuscript";
+import { layoutManuscript, manuscriptColumns, manuscriptOffsetAt, manuscriptPosition } from "@/lib/writing/writing-manuscript";
 
 interface Props {
   id: string; value: string; onChange: (value: string) => void; manuscript: boolean;

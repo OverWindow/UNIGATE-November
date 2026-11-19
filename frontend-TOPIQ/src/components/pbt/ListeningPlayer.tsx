@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
-import type { Mode } from "@/lib/pbt-api";
-import { pbtContent } from "@/lib/pbt-content";
+import type { Mode } from "@/lib/exam/pbt-api";
+import { pbtContent } from "@/lib/exam/pbt-content";
 
 type Phase = "ready" | "waiting" | "loading" | "playing" | "ended" | "used" | "blocked" | "error";
 export type AudioProgress = { playbackKey?: string; elapsed: number; duration: number | null };

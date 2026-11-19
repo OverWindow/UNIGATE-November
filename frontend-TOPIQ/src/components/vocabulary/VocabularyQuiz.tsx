@@ -5,8 +5,8 @@ import { ArrowRight, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
 import { VocabularyError, vocabularyRequest, type MeaningLanguage, type VocabularyAnswer,
-  type VocabularyQuestion, type VocabularyQuiz as QuizData } from "@/lib/vocabulary-api";
-import { vocabularyContent } from "@/lib/vocabulary-content";
+  type VocabularyQuestion, type VocabularyQuiz as QuizData } from "@/lib/vocabulary/vocabulary-api";
+import { vocabularyContent } from "@/lib/vocabulary/vocabulary-content";
 
 export default function VocabularyQuiz({ id }: { id: string }) {
   const { language } = useApp();

@@ -1,4 +1,4 @@
-import type { Language } from "./landing-content";
+import type { Language } from "../landing-content";
 import type { ExamFormat } from "./exam-content";
 
 const ko = {

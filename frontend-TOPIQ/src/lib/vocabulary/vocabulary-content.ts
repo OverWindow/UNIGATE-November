@@ -1,4 +1,4 @@
-import type { Language } from "./landing-content";
+import type { Language } from "../landing-content";
 
 const ko = {
   title: "TOPIK 단어장", intro: "급수에 맞는 단어를 약 20개씩, 뜻과 예문으로 살펴보세요.",

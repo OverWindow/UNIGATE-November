@@ -24,7 +24,7 @@ export const setSession = next => { state = next; };
 export const useApp = () => state;
 export const usePathname = () => state.path;`);
 const { setSession } = await import(contextUrl);
-const copyUrl = await compile("../src/lib/writing-content.ts");
+const copyUrl = await compile("../src/lib/writing/writing-content.ts");
 const { writingContent } = await import(copyUrl);
 const { default: WritingAccess } = await import(await compile("../src/components/writing/WritingAccess.tsx", {
   "react/jsx-runtime": pathToFileURL(require.resolve("react/jsx-runtime")).href,
@@ -33,7 +33,7 @@ const { default: WritingAccess } = await import(await compile("../src/components
   "next/navigation": contextUrl,
   "lucide-react": dataUrl("export const Lock = () => null;"),
   "@/app/providers": contextUrl,
-  "@/lib/writing-content": copyUrl,
+  "@/lib/writing/writing-content": copyUrl,
 }));
 
 function render(path, changes = {}) {

@@ -1,5 +1,5 @@
 import type { Evaluation } from "./writing-api";
-import type { Language } from "./landing-content";
+import type { Language } from "../landing-content";
 
 // Keep these display limits aligned with backend/writing/contract.py.
 export const writingScoreLimits: Record<number, Record<string, number>> = {

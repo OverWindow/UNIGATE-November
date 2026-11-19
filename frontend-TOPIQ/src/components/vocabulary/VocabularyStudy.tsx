@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Minus, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { createExampleAnalyzer } from "@/lib/vocabulary-analysis";
+import { createExampleAnalyzer } from "@/lib/vocabulary/vocabulary-analysis";
 import { useApp } from "@/app/providers";
-import { VocabularyError, vocabularyRequest, type MeaningLanguage, type VocabularyDetail } from "@/lib/vocabulary-api";
-import { vocabularyContent } from "@/lib/vocabulary-content";
+import { VocabularyError, vocabularyRequest, type MeaningLanguage, type VocabularyDetail } from "@/lib/vocabulary/vocabulary-api";
+import { vocabularyContent } from "@/lib/vocabulary/vocabulary-content";
 import VocabularyAudio from "./VocabularyAudio";
 import VocabularyExample from "./VocabularyExample";
 

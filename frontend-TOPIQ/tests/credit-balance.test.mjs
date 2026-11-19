@@ -35,8 +35,8 @@ function load(relativePath) {
   });
   return exports;
 }
-const writingApi = load("lib/writing-api.ts");
-imports["@/lib/writing-api"] = writingApi;
+const writingApi = load("lib/writing/writing-api.ts");
+imports["@/lib/writing/writing-api"] = writingApi;
 const { default: SiteHeader } = load("components/SiteHeader.tsx");
 const { default: CreditsAccount } = load("components/credits/CreditsAccount.tsx");
 const { default: WritingCreditBadge } = load("components/writing/WritingCreditBadge.tsx");

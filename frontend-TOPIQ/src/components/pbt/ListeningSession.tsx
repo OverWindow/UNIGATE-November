@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Pause, Play, Volume2 } from "lucide-react";
 import { useApp } from "@/app/providers";
-import { clockText, type Mode } from "@/lib/pbt-api";
-import type { ExamFormat } from "@/lib/exam-content";
-import { pbtContent } from "@/lib/pbt-content";
-import { listeningClock, listeningCopy, phaseSeconds, readListeningCheckpoint, saveListeningCheckpoint, solvingSeconds, type ListeningCheckpoint } from "@/lib/listening";
+import { clockText, type Mode } from "@/lib/exam/pbt-api";
+import type { ExamFormat } from "@/lib/exam/exam-content";
+import { pbtContent } from "@/lib/exam/pbt-content";
+import { listeningClock, listeningCopy, phaseSeconds, readListeningCheckpoint, saveListeningCheckpoint, solvingSeconds, type ListeningCheckpoint } from "@/lib/exam/listening";
 
 interface Props {
   examFormat: ExamFormat;

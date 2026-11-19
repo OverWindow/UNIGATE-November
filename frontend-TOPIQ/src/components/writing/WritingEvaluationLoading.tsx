@@ -1,6 +1,6 @@
 import { useEffect, useState, type RefObject } from "react";
 import { useApp } from "@/app/providers";
-import { evaluationContent } from "@/lib/writing-evaluation-content";
+import { evaluationContent } from "@/lib/writing/writing-evaluation-content";
 
 export default function WritingEvaluationLoading({ slot, titleId, titleRef }: {
   slot: number; titleId: string; titleRef: RefObject<HTMLHeadingElement | null>;

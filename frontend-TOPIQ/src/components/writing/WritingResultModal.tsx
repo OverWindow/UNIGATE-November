@@ -3,10 +3,10 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 import { ChevronDown, X } from "lucide-react";
 import { useApp } from "@/app/providers";
-import type { Evaluation } from "@/lib/writing-api";
-import { evaluationContent } from "@/lib/writing-evaluation-content";
-import { writingContent } from "@/lib/writing-content";
-import { correctionSegments, toggleCorrection, type CorrectionMatch } from "@/lib/writing-result";
+import type { Evaluation } from "@/lib/writing/writing-api";
+import { evaluationContent } from "@/lib/writing/writing-evaluation-content";
+import { writingContent } from "@/lib/writing/writing-content";
+import { correctionSegments, toggleCorrection, type CorrectionMatch } from "@/lib/writing/writing-result";
 import { closeWithMotion } from "@/lib/modal-motion";
 import WritingMaterial from "./WritingMaterial";
 import WritingResult from "./WritingResult";

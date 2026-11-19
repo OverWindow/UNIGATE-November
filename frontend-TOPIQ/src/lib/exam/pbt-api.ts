@@ -1,4 +1,4 @@
-import { csrfToken, withCsrfToken } from "./csrf";
+import { csrfToken, withCsrfToken } from "../csrf";
 import type { ExamFormat } from "./exam-content";
 
 export type Section = "reading" | "listening";

@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useApp } from "@/app/providers";
-import { submitWriting, writingRequest, WritingError, type Evaluation, type EvaluationConfig, type EvaluationUsage, type WritingDetail, type LearnerAnswer, type Submission } from "@/lib/writing-api";
-import { answerLength, evaluationContent } from "@/lib/writing-evaluation-content";
+import { submitWriting, writingRequest, WritingError, type Evaluation, type EvaluationConfig, type EvaluationUsage, type WritingDetail, type LearnerAnswer, type Submission } from "@/lib/writing/writing-api";
+import { answerLength, evaluationContent } from "@/lib/writing/writing-evaluation-content";
 import WritingResultModal from "./WritingResultModal";
 import ManuscriptEditor from "./ManuscriptEditor";
 

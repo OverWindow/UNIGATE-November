@@ -6,13 +6,13 @@ import { useSearchParams } from "next/navigation";
 import useRouter from "@/lib/use-navigation-router";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useApp } from "@/app/providers";
-import { AuthError, safeReturnPath, type SignupInput, type VerifiedEmail } from "@/lib/auth-api";
-import { authContent } from "@/lib/auth-content";
-import { emailContent } from "@/lib/email-content";
+import { AuthError, safeReturnPath, type SignupInput, type VerifiedEmail } from "@/lib/auth/auth-api";
+import { authContent } from "@/lib/auth/auth-content";
+import { emailContent } from "@/lib/auth/email-content";
 import { emptySurvey, signupSurveyCopy, surveyErrors } from "@/lib/learner-survey";
-import SiteHeader from "./SiteHeader";
+import SiteHeader from "../SiteHeader";
 import EmailVerificationRequest from "./EmailVerificationRequest";
-import LearnerSurveyForm from "./LearnerSurveyForm";
+import LearnerSurveyForm from "../LearnerSurveyForm";
 import AuthBackground from "./AuthBackground";
 import styles from "./AuthBackground.module.css";
 

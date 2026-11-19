@@ -3,9 +3,9 @@
 import { ChevronDown } from "lucide-react";
 import { useId, useState } from "react";
 import { useApp } from "@/app/providers";
-import type { Evaluation } from "@/lib/writing-api";
-import { evaluationContent } from "@/lib/writing-evaluation-content";
-import { visibleReviewReasons, writingScoreLimits, writingTaskLabel } from "@/lib/writing-result";
+import type { Evaluation } from "@/lib/writing/writing-api";
+import { evaluationContent } from "@/lib/writing/writing-evaluation-content";
+import { visibleReviewReasons, writingScoreLimits, writingTaskLabel } from "@/lib/writing/writing-result";
 
 export default function WritingResult({ entry, correctionId, activeCorrection, correctionsOpen, onToggleCorrections }: {
   entry: Evaluation; correctionId: string; activeCorrection: number | null;

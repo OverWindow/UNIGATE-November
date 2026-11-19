@@ -2,8 +2,8 @@
 
 import { Fragment } from "react";
 import { useApp } from "@/app/providers";
-import { answerText, type Answer, type Question } from "@/lib/pbt-api";
-import { pbtContent } from "@/lib/pbt-content";
+import { answerText, type Answer, type Question } from "@/lib/exam/pbt-api";
+import { pbtContent } from "@/lib/exam/pbt-content";
 import SentenceOrderQuestion from "./SentenceOrderQuestion";
 
 function Highlight({ text, highlight }: { text: string; highlight: string }) {

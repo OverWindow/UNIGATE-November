@@ -4,11 +4,11 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
-import { AuthError, verifyEmail, type VerifiedEmail } from "@/lib/auth-api";
-import { authContent } from "@/lib/auth-content";
-import { emailContent } from "@/lib/email-content";
+import { AuthError, verifyEmail, type VerifiedEmail } from "@/lib/auth/auth-api";
+import { authContent } from "@/lib/auth/auth-content";
+import { emailContent } from "@/lib/auth/email-content";
 import AuthScreen from "./AuthScreen";
-import SiteHeader from "./SiteHeader";
+import SiteHeader from "../SiteHeader";
 
 export default function EmailVerificationScreen() {
   const { language, setLanguage } = useApp();

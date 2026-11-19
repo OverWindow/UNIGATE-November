@@ -1,6 +1,6 @@
-import { setCsrfToken, withCsrfToken } from "./csrf";
-import type { Language } from "./landing-content";
-import type { SurveyInput } from "./learner-survey";
+import { setCsrfToken, withCsrfToken } from "../csrf";
+import type { Language } from "../landing-content";
+import type { SurveyInput } from "../learner-survey";
 
 export interface AuthUser {
   id: number;

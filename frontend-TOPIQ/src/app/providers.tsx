@@ -1,8 +1,8 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { getSession, signIn, signOut, signUp, type AuthUser, type SignupInput } from "@/lib/auth-api";
-import { creditsRequest, type CreditBalance } from "@/lib/writing-api";
+import { getSession, signIn, signOut, signUp, type AuthUser, type SignupInput } from "@/lib/auth/auth-api";
+import { creditsRequest, type CreditBalance } from "@/lib/writing/writing-api";
 import type { Language } from "@/lib/landing-content";
 
 interface AppContextValue {

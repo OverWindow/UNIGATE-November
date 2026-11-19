@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import PbtCatalog from "@/components/pbt/PbtCatalog";
-import { examContent } from "@/lib/exam-content";
+import { examContent } from "@/lib/exam/exam-content";
 
 export const metadata: Metadata = {
   title: "TOPIQ | TOPIK II IBT 모의고사",

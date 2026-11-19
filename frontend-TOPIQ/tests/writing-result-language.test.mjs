@@ -27,8 +27,8 @@ const { default: WritingResult } = await import(await compile("../src/components
   "react/jsx-runtime": pathToFileURL(require.resolve("react/jsx-runtime")).href,
   "lucide-react": dataUrl("export const ChevronDown = () => null;"),
   "@/app/providers": contextUrl,
-  "@/lib/writing-evaluation-content": await compile("../src/lib/writing-evaluation-content.ts"),
-  "@/lib/writing-result": await compile("../src/lib/writing-result.ts"),
+  "@/lib/writing/writing-evaluation-content": await compile("../src/lib/writing/writing-evaluation-content.ts"),
+  "@/lib/writing/writing-result": await compile("../src/lib/writing/writing-result.ts"),
 }));
 
 function entry(feedbackLanguage) {

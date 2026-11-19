@@ -10,11 +10,11 @@ beforeEach(() => setCsrfToken(null));
 async function loadApi(file) {
   const source = await readFile(new URL(file, import.meta.url), "utf8");
   const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
-  const code = compiled.replace('"./csrf"', JSON.stringify(new URL("../src/lib/csrf.ts", import.meta.url).href));
+  const code = compiled.replace('"../csrf"', JSON.stringify(new URL("../src/lib/csrf.ts", import.meta.url).href));
   return import(`data:text/javascript;base64,${Buffer.from(code).toString("base64")}`);
 }
-const api = await loadApi("../src/lib/auth-api.ts");
-const { pbtRequest, submitOnPageExit } = await loadApi("../src/lib/pbt-api.ts");
+const api = await loadApi("../src/lib/auth/auth-api.ts");
+const { pbtRequest, submitOnPageExit } = await loadApi("../src/lib/exam/pbt-api.ts");
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
 const user = { id: 1, email: "synthetic@example.invalid", nickname: "Learner" };
 
