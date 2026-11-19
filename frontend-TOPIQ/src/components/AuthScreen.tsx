@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { ArrowLeft, Check, Eye, EyeOff } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import useRouter from "@/lib/use-navigation-router";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useApp } from "@/app/providers";
 import { AuthError, safeReturnPath, type SignupInput, type VerifiedEmail } from "@/lib/auth-api";
@@ -35,7 +36,7 @@ export default function AuthScreen({ mode, verification, returnPath }: {
   const s = signupSurveyCopy[language];
   const isSignup = mode === "signup";
   const isSurvey = isSignup && signupStep === "survey";
-  const title = isSignup ? isSurvey ? s.title : t.signup : t.login;
+  const title = isSignup ? isSurvey ? s.title : t.signup : t.welcome;
   const loginHref = `/login?next=${encodeURIComponent(next)}`;
   const signupHref = `/signup?next=${encodeURIComponent(next)}`;
 
@@ -147,13 +148,13 @@ export default function AuthScreen({ mode, verification, returnPath }: {
                 </div>}
                 <div className="auth-field">
                   <label htmlFor="password">{t.password}</label>
-                  <div className="password-input"><input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete={isSignup ? "new-password" : "current-password"} maxLength={4096} required aria-invalid={!!fields.password} aria-describedby={fields.password ? "password-error" : isSignup ? "password-hint" : undefined} /><button type="button" className="password-toggle" aria-label={showPassword ? t.hide : t.show} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff size={20} aria-hidden="true" /> : <Eye size={20} aria-hidden="true" />}</button></div>
+                  <div className="password-input"><input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete={isSignup ? "new-password" : "current-password"} maxLength={4096} required placeholder="••••••••" aria-invalid={!!fields.password} aria-describedby={fields.password ? "password-error" : isSignup ? "password-hint" : undefined} /><button type="button" className="password-toggle" aria-label={showPassword ? t.hide : t.show} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff size={20} aria-hidden="true" /> : <Eye size={20} aria-hidden="true" />}</button></div>
                   {fields.password && <p className="field-error" id="password-error">{fieldMessage("password")}</p>}
                   {isSignup && <p className="field-hint" id="password-hint">{t.passwordHint}</p>}
                 </div>
                 {isSignup && <div className="auth-field">
                   <label htmlFor="password_confirm">{t.confirm}</label>
-                  <input id="password_confirm" name="password_confirm" type={showPassword ? "text" : "password"} autoComplete="new-password" maxLength={4096} required aria-invalid={!!fields.password_confirm} aria-describedby={fields.password_confirm ? "password-confirm-error" : undefined} />
+                  <input id="password_confirm" name="password_confirm" type={showPassword ? "text" : "password"} autoComplete="new-password" maxLength={4096} required placeholder="••••••••" aria-invalid={!!fields.password_confirm} aria-describedby={fields.password_confirm ? "password-confirm-error" : undefined} />
                   {fields.password_confirm && <p className="field-error" id="password-confirm-error">{fieldMessage("password_confirm")}</p>}
                 </div>}
                 </div>

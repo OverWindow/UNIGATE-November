@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import useRouter from "@/lib/use-navigation-router";
 import { ArrowRight } from "lucide-react";
 import { useApp } from "@/app/providers";
 import { homeContent } from "@/lib/home-content";

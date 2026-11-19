@@ -8,17 +8,13 @@ interface WritingCopy {
   submissionHistory: string; submitted: string; notSubmitted: string;
   viewQuestion: string; close: string;
   unlock: string; reopen: string; unlockTitle: string; unlockNote: string; priceBreakdown: string; unlocking: string; unlockError: string; insufficientCredits: string;
-  lockedTitle: string; loginRequired: string; loginToOpen: string; unlockConfirmation: string;
-  catalog: {
-    history: string;
-    steps: [string, string, string]; stepsLabel: string;
-  };
+  lockedTitle: string; loginRequired: string; loginToOpen: string;
+  catalog: { history: string };
 }
 
 export const writingContent: Record<Language, WritingCopy> = {
   ko: {
     lockedTitle: "잠긴 쓰기 세트입니다", loginRequired: "문제를 열람하려면 먼저 로그인해 주세요.", loginToOpen: "로그인 후 열기",
-    unlockConfirmation: "세트를 열면 {credits}크레딧이 차감됩니다.",
     unlock: "{credits}크레딧으로 세트 열기", reopen: "다시 열기", unlockTitle: "세트를 열고 쓰기 연습을 시작하세요",
     unlockNote: "최초 열람 시 한 번만 차감합니다. 같은 세트는 추가 차감 없이 다시 열 수 있습니다.",
     priceBreakdown: "{number}번: {credits}크레딧", unlocking: "세트를 여는 중…", unlockError: "열람 처리를 확인하지 못했습니다. 다시 시도해도 같은 세트는 중복 차감하지 않습니다.",
@@ -28,10 +24,7 @@ export const writingContent: Record<Language, WritingCopy> = {
     intro: "TOPIK II 쓰기를 연습하고, AI 평가와 첨삭으로 글을 다듬어 보세요.",
     set: "쓰기 세트", questions: "4문항 · 51–54번", open: "문제 풀기",
     submissionHistory: "제출 이력", submitted: "제출 이력 있음", notSubmitted: "제출 이력 없음",
-    catalog: {
-      history: "내 평가 기록",
-      steps: ["문제 선택", "답안 작성", "AI 평가 확인"], stepsLabel: "쓰기 학습 순서",
-    },
+    catalog: { history: "내 평가 기록" },
     notice: "AI 평가는 학습을 위한 참고 결과이며 공식 TOPIK 성적이 아닙니다. 평가 설명은 요청 시 선택한 화면 언어로, 수정 문장은 한국어로 제공됩니다.",
     loading: "쓰기 문제를 불러오고 있습니다.", empty: "아직 준비된 PBT 쓰기 세트가 없습니다.",
     error: "문제를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.", notFound: "이 쓰기 세트를 찾을 수 없습니다.",
@@ -41,7 +34,6 @@ export const writingContent: Record<Language, WritingCopy> = {
   },
   en: {
     lockedTitle: "This writing set is locked", loginRequired: "Sign in to access the questions.", loginToOpen: "Sign in to open",
-    unlockConfirmation: "Opening this set will deduct {credits} credits.",
     unlock: "Open set for {credits} credits", reopen: "Open again", unlockTitle: "Open this set to start writing",
     unlockNote: "Credits are charged only on first access. You can reopen the same set without an additional charge.",
     priceBreakdown: "Question {number}: {credits} credits", unlocking: "Opening set…", unlockError: "We could not confirm access. Retrying will not charge twice for the same set.",
@@ -51,10 +43,7 @@ export const writingContent: Record<Language, WritingCopy> = {
     intro: "Practice TOPIK II writing and refine your work with AI feedback and corrections.",
     set: "Writing set", questions: "4 questions · 51–54", open: "Practice now",
     submissionHistory: "Submissions", submitted: "Previously submitted", notSubmitted: "Not submitted yet",
-    catalog: {
-      history: "My evaluations",
-      steps: ["Choose questions", "Write your answers", "Review AI feedback"], stepsLabel: "Writing practice steps",
-    },
+    catalog: { history: "My evaluations" },
     notice: "AI evaluations support learning and are not official TOPIK scores. Feedback uses the page language selected when you submit. Corrected sentences remain in Korean.",
     loading: "Loading writing questions…", empty: "No PBT writing sets are available yet.",
     error: "Unable to load the questions. Please try again.", notFound: "This writing set could not be found.",
@@ -64,7 +53,6 @@ export const writingContent: Record<Language, WritingCopy> = {
   },
   id: {
     lockedTitle: "Paket menulis ini terkunci", loginRequired: "Silakan masuk untuk mengakses soal.", loginToOpen: "Masuk untuk membuka",
-    unlockConfirmation: "Membuka paket ini akan memotong {credits} kredit.",
     unlock: "Buka paket dengan {credits} kredit", reopen: "Buka kembali", unlockTitle: "Buka paket ini untuk mulai menulis",
     unlockNote: "Kredit hanya dipotong saat pertama dibuka. Paket yang sama dapat dibuka kembali tanpa biaya tambahan.",
     priceBreakdown: "Soal {number}: {credits} kredit", unlocking: "Membuka paket…", unlockError: "Akses belum dapat dipastikan. Mencoba lagi tidak akan memotong kredit dua kali untuk paket yang sama.",
@@ -74,10 +62,7 @@ export const writingContent: Record<Language, WritingCopy> = {
     intro: "Berlatih menulis TOPIK II dan sempurnakan tulisan dengan penilaian serta koreksi AI.",
     set: "Paket menulis", questions: "4 soal · 51–54", open: "Mulai latihan",
     submissionHistory: "Riwayat kiriman", submitted: "Pernah dikirim", notSubmitted: "Belum dikirim",
-    catalog: {
-      history: "Penilaian saya",
-      steps: ["Pilih soal", "Tulis jawaban", "Lihat penilaian AI"], stepsLabel: "Langkah latihan menulis",
-    },
+    catalog: { history: "Penilaian saya" },
     notice: "Penilaian AI membantu belajar dan bukan nilai resmi TOPIK. Penjelasan menggunakan bahasa halaman saat jawaban dikirim. Kalimat perbaikan tetap dalam bahasa Korea.",
     loading: "Memuat soal menulis…", empty: "Belum ada paket menulis PBT yang tersedia.",
     error: "Soal tidak dapat dimuat. Silakan coba lagi.", notFound: "Paket menulis ini tidak ditemukan.",

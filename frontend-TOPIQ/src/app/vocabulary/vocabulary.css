@@ -1,9 +1,6 @@
 .vocabulary-main { min-height: 70vh; background: #f8f9fc; padding-bottom: 72px; }
 .vocabulary-main:has(.vocabulary-study) { min-height: calc(100dvh - var(--header-height)); padding-bottom: 0; }
 .vocabulary-main:has(.vocabulary-study, .vocabulary-quiz) + .site-footer { display: none; }
-.vocabulary-hero { padding: 56px 0 40px; background: radial-gradient(ellipse at 90% 20%, #e7efff, transparent 60%), #fbfcff; border-bottom: 1px solid #e3e9f3; }
-.vocabulary-hero h1 { margin: 0; font-size: clamp(28px, 3.5vw, 42px); font-weight: 650; letter-spacing: -.045em; line-height: 1.35; word-break: keep-all; }
-.vocabulary-hero p:last-child { margin: 16px 0 0; color: var(--color-muted); line-height: 1.8; }
 .vocabulary-catalog { padding-top: 32px; }
 .vocabulary-levels { --level-gap: 8px; position: relative; display: grid; grid-template-columns: repeat(4, minmax(100px, 1fr)); gap: var(--level-gap); padding: 6px; width: fit-content; border: 1px solid #e0e6f0; border-radius: 14px; background: #fff; }
 .vocabulary-levels::before { content: ""; position: absolute; top: 6px; bottom: 6px; left: 6px; width: calc((100% - 36px) / 4); border-radius: 9px; background: #2d5ec5; transform: translateX(var(--level-offset, 0)); transition: transform .25s ease; }
@@ -12,6 +9,9 @@
 .vocabulary-levels[data-level="6"] { --level-offset: calc(300% + var(--level-gap) + var(--level-gap) + var(--level-gap)); }
 .vocabulary-levels a { position: relative; min-width: 100px; padding: 12px 24px; border-radius: 9px; text-align: center; color: #5d6471; font-weight: 600; transition: color .25s ease; }
 .vocabulary-levels a[aria-current] { color: #fff; }
+@media (hover: hover) and (pointer: fine) {
+  .vocabulary-levels a:hover:not([aria-current]) { color: #224b9f; }
+}
 @media (prefers-reduced-motion: reduce) { .vocabulary-levels::before, .vocabulary-levels a { transition: none; } }
 .vocabulary-catalog-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin: 32px 0 20px; }
 .vocabulary-catalog-heading h2 { margin: 0; font-size: 24px; font-weight: 650; }
@@ -33,9 +33,6 @@
 .vocabulary-pagination [aria-disabled] { color: #717b8b; }
 .vocabulary-status { padding-block: 64px; text-align: center; color: var(--color-muted); line-height: 1.8; }
 .vocabulary-error .button + .button { margin-left: 12px; }
-.vocabulary-secondary { background: #fff; border-color: #dbe2ed; color: #334664; }
-.vocabulary-secondary:hover:not(:disabled) { border-color: #91afe9; background: #f1f5ff; }
-.vocabulary-secondary:disabled { opacity: .45; }
 .vocabulary-study-grid { display: grid; grid-template-columns: 240px minmax(0, 1fr); align-items: start; gap: 28px; padding-block: 20px; }
 .vocabulary-word-list { display: flex; flex-direction: column; min-height: 0; border: 1px solid #e0e6f0; border-radius: 14px; background: #fff; overflow: hidden; }
 .vocabulary-list-toggle { flex-shrink: 0; width: 100%; display: flex; justify-content: space-between; gap: 12px; padding: 14px 18px; border: 0; border-bottom: 1px solid #edf0f5; background: #fff; text-align: left; color: #526078; font-size: 13px; font-weight: 600; }
@@ -92,9 +89,14 @@
 .vocabulary-hint-tooltip { position: fixed; z-index: 1001; width: max-content; max-width: min(280px, calc(100vw - 24px)); max-height: 50dvh; overflow-y: auto; padding: 10px 12px; border: 1px solid #d5e1fa; border-radius: 10px; background: #fff; color: #526078; box-shadow: 0 6px 20px #25456c1a; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
 .vocabulary-dictionary-link { padding: 0; border: 0; background: transparent; color: #214fa7; font: inherit; text-decoration: underline; cursor: pointer; }
 .vocabulary-dictionary-popup { position: fixed; z-index: 1000; width: min(360px, calc(100vw - 24px)); max-height: min(480px, 65dvh); box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; padding: 20px; border: 1px solid #cdd9eb; border-radius: 14px; background: #fff; color: #24334b; box-shadow: 0 12px 40px #162f7f26; font-size: 14px; line-height: 1.7; overflow-wrap: anywhere; }
+.vocabulary-dictionary-popup { animation: vocabulary-popup-in .24s cubic-bezier(.22, 1, .36, 1); }
+.vocabulary-dictionary-popup[data-closing] { pointer-events: none; }
+@keyframes vocabulary-popup-in { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+@media (prefers-reduced-motion: reduce) { .vocabulary-dictionary-popup { animation: none; } }
 .vocabulary-dictionary-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .vocabulary-dictionary-heading > strong { font-size: 18px; }
-.vocabulary-dictionary-close { display: grid; place-items: center; flex: 0 0 36px; height: 36px; border: 0; border-radius: 8px; background: #f1f5fb; color: #526078; font-size: 24px; cursor: pointer; }
+.vocabulary-dictionary-close { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 36px; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: #526078; cursor: pointer; transition: background-color .15s, color .15s; }
+.vocabulary-dictionary-close:hover, .vocabulary-dictionary-close:focus-visible { background: #eef3fc; color: #2d5ec5; }
 .vocabulary-dictionary-popup p { margin: 8px 0; }
 .vocabulary-dictionary-entry { padding-top: 16px; margin-top: 16px; border-top: 1px solid #e6edf6; }
 .vocabulary-dictionary-entry h4 { margin: 0; font-size: 18px; }
@@ -166,7 +168,6 @@ body:has(.vocabulary-quiz-bottom-bar) { padding-bottom: calc(80px + env(safe-are
 @media (max-width: 960px) { .vocabulary-set-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .vocabulary-study-grid { grid-template-columns: 200px minmax(0, 1fr); gap: 20px; } }
 @media (max-width: 760px) {
   .vocabulary-quiz-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .vocabulary-hero { padding: 36px 0 28px; }
   .vocabulary-levels { --level-gap: 4px; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; }
   .vocabulary-levels::before { width: calc((100% - 24px) / 4); }
   .vocabulary-levels a { min-width: 0; padding: 11px 8px; font-size: 14px; }

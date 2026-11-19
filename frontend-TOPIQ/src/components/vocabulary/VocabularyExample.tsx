@@ -1,12 +1,13 @@
 "use client";
 
-import { Info } from "lucide-react";
+import { Info, X } from "lucide-react";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useApp } from "@/app/providers";
 import { vocabularyContent } from "@/lib/vocabulary-content";
 import { VocabularyError, vocabularyRequest, type ExampleMeaning, type MeaningLanguage } from "@/lib/vocabulary-api";
 import type { ExampleAnalysis, ExampleAnalyzer, ExampleSegment } from "@/lib/vocabulary-analysis";
+import { closeWithMotion } from "@/lib/modal-motion";
 
 type Selection = ExampleSegment & { trigger: HTMLButtonElement };
 
@@ -82,6 +83,10 @@ function MeaningPopup({ wordId, version, selection, meaningLanguage, close, relo
   const [data, setData] = useState<ExampleMeaning | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [revision, setRevision] = useState(0);
+  const requestClose = useCallback(() => {
+    if (panel.current?.dataset.closing) return;
+    closeWithMotion(panel.current, close);
+  }, [close]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -106,10 +111,10 @@ function MeaningPopup({ wordId, version, selection, meaningLanguage, close, relo
       popup.style.top = `${Math.max(12, Math.min(top, window.innerHeight - height - 12))}px`;
     }
     function outside(event: PointerEvent) {
-      if (event.target instanceof Node && !popup?.contains(event.target) && !selection.trigger.contains(event.target)) close();
+      if (event.target instanceof Node && !popup?.contains(event.target) && !selection.trigger.contains(event.target)) requestClose();
     }
     function escape(event: KeyboardEvent) {
-      if (event.key === "Escape") { event.preventDefault(); close(); }
+      if (event.key === "Escape") { event.preventDefault(); requestClose(); }
     }
     position();
     closeButton.current?.focus({ preventScroll: true });
@@ -127,7 +132,7 @@ function MeaningPopup({ wordId, version, selection, meaningLanguage, close, relo
       document.removeEventListener("keydown", escape);
       if (popup.contains(document.activeElement) && selection.trigger.isConnected) selection.trigger.focus({ preventScroll: true });
     };
-  }, [selection.trigger, close]);
+  }, [selection.trigger, requestClose]);
 
   const changed = error instanceof VocabularyError && error.code === "example_changed";
   const busy = error instanceof VocabularyError && error.status === 429;
@@ -135,7 +140,7 @@ function MeaningPopup({ wordId, version, selection, meaningLanguage, close, relo
   return createPortal(<div ref={panel} className="vocabulary-dictionary-popup" role="dialog" aria-labelledby={titleId}>
     <div className="vocabulary-dictionary-heading">
       <strong id={titleId} lang="ko">{selection.text}</strong>
-      <button ref={closeButton} type="button" className="vocabulary-dictionary-close" onClick={close} aria-label={t.dictionaryClose}>×</button>
+      <button ref={closeButton} type="button" className="vocabulary-dictionary-close" onClick={requestClose} aria-label={t.dictionaryClose}><X size={18} aria-hidden="true" /></button>
     </div>
     {error ? <div role="alert"><p>{disabled ? t.dictionaryPreparing : changed ? t.dictionaryChanged : busy ? t.dictionaryBusy : t.dictionaryError}</p>
       {!disabled && <button type="button" className="vocabulary-dictionary-link" onClick={changed ? reload : () => setRevision(value => value + 1)}>{changed ? t.dictionaryReload : t.retry}</button>}

@@ -7,6 +7,7 @@ import type { Evaluation } from "@/lib/writing-api";
 import { evaluationContent } from "@/lib/writing-evaluation-content";
 import { writingContent } from "@/lib/writing-content";
 import { correctionSegments, toggleCorrection, type CorrectionMatch } from "@/lib/writing-result";
+import { closeWithMotion } from "@/lib/modal-motion";
 import WritingMaterial from "./WritingMaterial";
 import WritingResult from "./WritingResult";
 
@@ -37,6 +38,11 @@ export default function WritingResultModal({ entry, setNumber, error, onRetry, o
   const tabLabels = { question: w.question, answer: t.answer, evaluation: t.result };
   const hasEdits = Object.values(appliedCorrections).some(matches => matches.length > 0);
   const waiting = !entry || entry.status === "processing" || Boolean(error);
+
+  function closeModal() {
+    if (dialog.current?.dataset.closing) return;
+    closeWithMotion(dialog.current, onClose);
+  }
 
   useEffect(() => {
     const element = dialog.current;
@@ -126,9 +132,9 @@ export default function WritingResultModal({ entry, setNumber, error, onRetry, o
   }
 
   return <dialog ref={dialog} className={waiting ? "writing-result-pending" : "writing-result-modal"} aria-labelledby={`${prefix}-title`}
-    onCancel={event => { event.preventDefault(); onClose(); }} onKeyDown={containTabFocus}>
+    onCancel={event => { event.preventDefault(); closeModal(); }} onKeyDown={containTabFocus}>
     {waiting ? <>
-      <button type="button" className="writing-result-close" onClick={onClose} aria-label={t.close}><X size={20} aria-hidden="true" /></button>
+      <button type="button" className="writing-result-close" onClick={closeModal} aria-label={t.close}><X size={20} aria-hidden="true" /></button>
       <div className="writing-result-waiting-content" role={error ? "alert" : "status"}>
         {!error && <span className="writing-result-loader" aria-hidden="true" />}
         <h2 ref={title} id={`${prefix}-title`} tabIndex={-1}>{error ? t.result : evaluating || entry?.status === "processing" ? t.processingShort : t.loading}</h2>
@@ -144,7 +150,7 @@ export default function WritingResultModal({ entry, setNumber, error, onRetry, o
         {entry?.totalScore != null && <p className="writing-header-score" role="status">
           <span>{t.totalScore}</span><strong>{entry.totalScore}</strong><span>/ {entry.maxScore} {t.points}</span>
         </p>}
-        <button type="button" className="writing-result-close" onClick={onClose} aria-label={t.close}><X size={20} aria-hidden="true" /></button>
+        <button type="button" className="writing-result-close" onClick={closeModal} aria-label={t.close}><X size={20} aria-hidden="true" /></button>
       </div>
     </header>
       <div className="writing-result-tabs" role="tablist" aria-label={t.result}>

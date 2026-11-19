@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import useRouter from "@/lib/use-navigation-router";
 import { useApp } from "@/app/providers";
 import { pbtRequest, PbtError, type Attempt, type FeedbackState } from "@/lib/pbt-api";
 import { emptySurvey, surveyCopy, surveyErrors } from "@/lib/learner-survey";

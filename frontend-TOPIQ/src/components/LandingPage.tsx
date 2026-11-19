@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useApp } from "@/app/providers";
 import { homeContent } from "@/lib/home-content";
 import SiteHeader from "./SiteHeader";
+import SiteFooter from "./SiteFooter";
 import HomeTestSelector from "./HomeTestSelector";
 import LandingCharacter from "./LandingCharacter";
 import instituteLogo from "../../public/brand/niied-logo.png";
@@ -68,12 +69,7 @@ export default function LandingPage() {
           </section>
         </div>
       </main>
-      <footer className={`${styles.flow} ${styles.footer}`}>
-        <div className={styles.container}><div className={styles.footerContent}>
-          <div className={styles.footerLine}><span>UNIGATE TOPIQ</span><span>© 2026 UNIGATE. All rights reserved.</span></div>
-          <p>{t.trademark}</p>
-        </div></div>
-      </footer>
     </div>
+    <SiteFooter />
   </>;
 }

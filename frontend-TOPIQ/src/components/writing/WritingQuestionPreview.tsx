@@ -5,6 +5,7 @@ import { BookOpen, ChevronUp, X } from "lucide-react";
 import type { Language } from "@/lib/landing-content";
 import type { WritingQuestion } from "@/lib/writing-api";
 import { writingContent } from "@/lib/writing-content";
+import { closeWithMotion } from "@/lib/modal-motion";
 import WritingQuestionContent from "./WritingQuestionContent";
 
 interface Props {
@@ -69,6 +70,10 @@ function QuestionPanel({ id, question, language, promptRef, trigger, onClose }: 
   const heading = useRef<HTMLHeadingElement>(null);
   const titleId = useId();
   const t = writingContent[language];
+  const requestClose = useCallback(() => {
+    if (dialog.current?.dataset.closing) return;
+    closeWithMotion(dialog.current, onClose);
+  }, [onClose]);
 
   useEffect(() => {
     const element = dialog.current;
@@ -77,7 +82,7 @@ function QuestionPanel({ id, question, language, promptRef, trigger, onClose }: 
     function handleEscape(event: KeyboardEvent) {
       if (event.key !== "Escape" || event.isComposing || event.defaultPrevented || document.querySelector("dialog:modal")) return;
       event.preventDefault();
-      onClose();
+      requestClose();
     }
     document.addEventListener("keydown", handleEscape);
     return () => {
@@ -87,12 +92,12 @@ function QuestionPanel({ id, question, language, promptRef, trigger, onClose }: 
       const target = trigger.current?.dataset.visible === "true" ? trigger.current : promptRef.current?.querySelector("h2");
       if (target?.isConnected) target.focus({ preventScroll: true });
     };
-  }, [onClose, promptRef, trigger]);
+  }, [requestClose, promptRef, trigger]);
 
   return <dialog ref={dialog} id={id} open className="writing-question-modal" aria-modal="false" aria-labelledby={titleId}>
     <header className="writing-question-modal-header">
       <h2 ref={heading} id={titleId} tabIndex={-1}>{t.question} {question.number}</h2>
-      <button type="button" className="writing-result-close" aria-label={t.close} onClick={onClose}><X size={18} aria-hidden="true" /></button>
+      <button type="button" className="writing-result-close" aria-label={t.close} onClick={requestClose}><X size={18} aria-hidden="true" /></button>
     </header>
     <div className="writing-question-modal-body" tabIndex={0} role="region" aria-labelledby={titleId}>
       <WritingQuestionContent question={question} language={language} />

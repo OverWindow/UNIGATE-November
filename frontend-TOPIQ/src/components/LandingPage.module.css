@@ -87,11 +87,6 @@
 .faqAnswer[data-open="true"] { grid-template-rows: 1fr; visibility: visible; }
 .faqAnswer > div { min-height: 0; overflow: hidden; }
 .faqAnswer p { max-width: 672px; margin: 0; padding: 0 32px 20px 0; color: #4b5563; font-size: 14px; line-height: 28px; }
-.footer { padding-block: 32px 64px; background: radial-gradient(ellipse at 55% 0%, #ea664108, transparent 70%), #fff; }
-.footerContent { padding-top: 20px; border-top: 1px solid #e5e7ebcc; color: #6b7280; font-size: 12px; line-height: 16px; }
-.footerLine { display: flex; flex-direction: column; align-items: center; justify-content: space-between; gap: 8px; }
-.footerLine > span:first-child { color: #374151; font-weight: 500; }
-.footerContent p { margin: 16px 0 0; line-height: 20px; text-align: center; }
 
 @media (min-width: 640px) {
   .container { padding-inline: 32px; }
@@ -103,7 +98,6 @@
   .tests .description { font-size: 16px; }
   .testForm { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 24px; }
   .organizationDivider { display: block; }
-  .footerLine { flex-direction: row; }
 }
 
 @media (min-width: 768px) {
@@ -124,7 +118,7 @@
   .sectionIntro { margin-inline: 0; text-align: left; }
   .testForm { grid-template-columns: repeat(3, minmax(0, 1fr)) auto; align-items: end; }
   .guideGrid { grid-template-columns: .8fr 1.2fr; gap: 64px; }
-  .guideIntro, .faq .heading, .footerContent p { text-align: left; }
+  .guideIntro, .faq .heading { text-align: left; }
   .organizations { justify-content: flex-start; }
 }
 

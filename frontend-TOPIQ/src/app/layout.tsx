@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
+import NavigationOverlay from "@/components/NavigationOverlay";
 import Providers from "./providers";
 import "./globals.css";
 
@@ -13,7 +14,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ko" data-scroll-behavior="smooth">
       <body>
-        <Providers>{children}</Providers>
+        <Providers><Suspense fallback={null}><NavigationOverlay /></Suspense>{children}</Providers>
         <Script
           src="https://www.googletagmanager.com/gtm.js?id=G-MNFFKP03XD"
           strategy="afterInteractive"

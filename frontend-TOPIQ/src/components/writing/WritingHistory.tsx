@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import useRouter from "@/lib/use-navigation-router";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
 import { writingRequest, WritingError, type CreditBalance, type Evaluation, type WritingSet } from "@/lib/writing-api";
@@ -98,7 +98,7 @@ export default function WritingHistory({ id }: { id?: string }) {
     {!error && !entries && <p role="status">{t.loading}</p>}
     {entries && <>
       {entries.evaluations.length === 0 ? <p>{t.empty}</p> : <ul className="writing-history-list">{entries.evaluations.map(entry => <li key={entry.id}>
-        <Link href={`/writing/history/${entry.id}`} prefetch={false}
+        <Link href={`/writing/history/${entry.id}`} prefetch={false} data-navigation-overlay="off"
           onClick={event => { resultTrigger.current = event.currentTarget; }}
           onNavigate={event => { event.preventDefault(); setDetail(null); setDetailError(""); setSelectedId(entry.id); }}>
           <strong className="writing-history-question">{questionLabel(entry)}</strong>
@@ -114,6 +114,5 @@ export default function WritingHistory({ id }: { id?: string }) {
     {selectedId && <WritingResultModal key={selectedId} entry={detail} setNumber={detail ? setNumbers[detail.setId] : undefined}
       error={detailError ? t.errors[detailError] ?? t.errors.default : undefined} onRetry={() => setDetailRevision(value => value + 1)}
       onClose={closeResult} returnFocusRef={resultTrigger} />}
-    <p className="writing-notice">{w.notice}</p>
   </div>;
 }

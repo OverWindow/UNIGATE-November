@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import useRouter from "@/lib/use-navigation-router";
 import { ArrowRight, Check, Info, Lock, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
 import { writingRequest, unlockWriting, WritingError, type WritingSet } from "@/lib/writing-api";
 import { writingContent } from "@/lib/writing-content";
+import { closeWithMotion } from "@/lib/modal-motion";
 
 export default function WritingCatalog() {
   const { language, user, refreshSession, refreshCredits } = useApp();
@@ -39,9 +40,11 @@ export default function WritingCatalog() {
   useEffect(() => () => unlockOperation.current?.abort(), []);
 
   function closeDialog() {
-    if (unlockOperation.current) return;
-    setLockedSet(null);
-    setUnlockError("");
+    if (unlockOperation.current || dialog.current?.dataset.closing) return;
+    closeWithMotion(dialog.current, () => {
+      setLockedSet(null);
+      setUnlockError("");
+    });
   }
 
   async function openSet() {
@@ -55,6 +58,7 @@ export default function WritingCatalog() {
       setSets(previous => previous?.map(set => set.id === lockedSet.id ? { ...set, unlocked: true } : set) ?? null);
       await refreshCredits(controller.signal).catch(() => {});
       if (!controller.signal.aborted) {
+        await new Promise<void>(resolve => { closeWithMotion(dialog.current, resolve); });
         setLockedSet(null);
         router.push(`/writing/sets/${lockedSet.id}`);
       }
@@ -88,30 +92,24 @@ export default function WritingCatalog() {
   }, [lockedSet]);
 
   return <>
-    <section className="writing-hero" aria-labelledby="writing-title"><div className="page-container writing-hero-heading">
+    <section className="catalog-hero" aria-labelledby="writing-title"><div className="page-container writing-hero-heading">
       <div className="writing-hero-copy">
-        <h1 id="writing-title">{t.title}</h1>
-        <p className="writing-hero-description">{t.intro}</p>
+        <h1 id="writing-title" className="catalog-title">{t.title}</h1>
+        <p className="catalog-description">{t.intro}</p>
       </div>
       <Link className="writing-history-link" href="/writing/history">{c.history}<ArrowRight size={16} aria-hidden="true" /></Link>
     </div></section>
-    <div className="writing-flow"><ol className="page-container" aria-label={c.stepsLabel}>
-      {c.steps.map((step, index) => <li key={step}>
-        <span className="writing-step-number" aria-hidden="true">0{index + 1}</span><span>{step}</span>
-        {index < c.steps.length - 1 && <ArrowRight size={16} aria-hidden="true" />}
-      </li>)}
-    </ol></div>
     <div className="page-container writing-catalog">
       <section id="writing-sets" tabIndex={-1} aria-label={t.back}>
-        {error ? <div className="writing-status" role="alert"><p>{t.error}</p>
+        {error ? <div className="catalog-status" role="alert"><p>{t.error}</p>
           <button className="button writing-secondary" onClick={() => setRevision(value => value + 1)}>{t.retry}</button>
-        </div> : sets === null ? <p className="writing-status" role="status">{t.loading}</p>
-          : sets.length === 0 ? <p className="writing-status">{t.empty}</p>
+        </div> : sets === null ? <p className="catalog-status" role="status">{t.loading}</p>
+          : sets.length === 0 ? <p className="catalog-status">{t.empty}</p>
             : <div className="writing-set-grid">{sets.map(set => {
               const submitted = set.submittedSlots ?? [];
               const content = <>
-                <div className="writing-card-top"><span className="writing-set-number" aria-hidden="true">{String(set.number).padStart(2, "0")}</span><span className="writing-badge">PBT</span></div>
-                <h2>{t.set} {set.number}</h2><p>{t.questions}</p>
+                <div className="writing-card-top"><span className="writing-badge">PBT</span></div>
+                <h2>{t.set} {set.number}</h2>
                 <ul className="writing-set-outline" aria-label={t.submissionHistory}>
                   {[51, 52, 53, 54].map(slot => <li key={slot}
                     className={submitted.includes(slot) ? "is-submitted" : undefined}
@@ -140,9 +138,8 @@ export default function WritingCatalog() {
         <button className="writing-login-close" type="button" aria-label={t.close} disabled={unlocking} onClick={closeDialog}><X size={20} aria-hidden="true" /></button>
         <Lock className="writing-login-icon" size={28} aria-hidden="true" />
         <h2 ref={dialogTitle} id="writing-login-title" tabIndex={-1}>{user ? `${t.set} ${lockedSet.number}` : t.lockedTitle}</h2>
-        <p id="writing-login-description">{user ? t.unlockConfirmation.replace("{credits}", String(lockedSet.setCost)) : t.loginRequired}</p>
+        <p id="writing-login-description">{user ? t.unlockNote : t.loginRequired}</p>
         {user ? <>
-          <p>{t.unlockNote}</p>
           <button className="button button-primary" type="button" disabled={unlocking} aria-busy={unlocking} onClick={() => void openSet()}>
             {unlocking ? t.unlocking : t.unlock.replace("{credits}", String(lockedSet.setCost))}
           </button>

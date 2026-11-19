@@ -45,7 +45,6 @@ export default function OpenSourceLicenses({ entries, bundled }: { entries: Entr
   const { language } = useApp();
   const t = content[language];
   return <main id="main-content" className="licenses-main page-container" tabIndex={-1}>
-    <p className="eyebrow">TOPIQ · OPEN SOURCE</p>
     <h1>{t.title}</h1>
     <p className="licenses-intro">{t.intro}</p>
     <section className="licenses-data" aria-labelledby="licenses-data-title">

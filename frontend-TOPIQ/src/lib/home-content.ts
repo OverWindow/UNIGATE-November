@@ -6,7 +6,6 @@ interface HomeContent {
   guide: { title: string; organizations: string; ministry: string; institute: string; points: string[]; action: string };
   uses: { title: string; description: string; cards: { title: string; description: string }[] };
   faq: { title: string; items: { question: string; answer: string }[] };
-  trademark: string;
 }
 
 export const homeContent: Record<Language, HomeContent> = {
@@ -40,7 +39,6 @@ export const homeContent: Record<Language, HomeContent> = {
         { question: "TOPIQ 모의고사 점수는 공식 성적인가요?", answer: "아닙니다. TOPIQ 점수와 예측 급수는 현재 실력을 확인하고 학습 계획을 세우기 위한 참고 자료입니다. 공식 성적은 국립국제교육원이 시행하는 TOPIK에 응시해야 받을 수 있습니다." },
       ],
     },
-    trademark: "UNIGATE는 등록상표입니다. 대한민국 출원 제40-2026-0039342호, 인도네시아 등록 제IDM001488588호.",
   },
   en: {
     hero: {
@@ -72,7 +70,6 @@ export const homeContent: Record<Language, HomeContent> = {
         { question: "Is a TOPIQ mock test score an official TOPIK score?", answer: "No. TOPIQ scores and predicted levels help you understand your current skills and plan your study. You must take a TOPIK test administered by the National Institute for International Education to receive an official score." },
       ],
     },
-    trademark: "UNIGATE is a registered trademark. Republic of Korea application No. 40-2026-0039342 and Indonesia registration No. IDM001488588.",
   },
   id: {
     hero: {
@@ -104,6 +101,5 @@ export const homeContent: Record<Language, HomeContent> = {
         { question: "Apakah nilai simulasi TOPIQ merupakan nilai resmi TOPIK?", answer: "Tidak. Nilai TOPIQ dan perkiraan level membantu Anda memahami kemampuan saat ini dan merencanakan belajar. Untuk memperoleh nilai resmi, ikuti TOPIK yang diselenggarakan oleh National Institute for International Education." },
       ],
     },
-    trademark: "UNIGATE adalah merek terdaftar. Permohonan Republik Korea No. 40-2026-0039342 dan pendaftaran Indonesia No. IDM001488588.",
   },
 };

@@ -10,7 +10,7 @@ import { vocabularyContent, vocabularyLevelLabel } from "@/lib/vocabulary-conten
 
 export function VocabularyLoading() {
   const { language } = useApp();
-  return <div className="page-container vocabulary-status" role="status">{vocabularyContent[language].loading}</div>;
+  return <div className="page-container catalog-status" role="status">{vocabularyContent[language].loading}</div>;
 }
 
 export default function VocabularyCatalog() {
@@ -43,8 +43,8 @@ function CatalogPage({ level, page }: { level: number; page: number }) {
   const currentError = error?.level === level && error.page === page ? error.cause : null;
   const summary = currentData?.levels.find(item => item.level === level);
   return <>
-    <section className="vocabulary-hero"><div className="page-container">
-      <h1>{t.title}</h1><p>{t.intro}</p>
+    <section className="catalog-hero"><div className="page-container">
+      <h1 className="catalog-title">{t.title}</h1><p className="catalog-description">{t.intro}</p>
     </div></section>
     <div className="page-container vocabulary-catalog">
       <nav className="vocabulary-levels" data-level={level} aria-label={t.levelLabel}>
@@ -55,11 +55,12 @@ function CatalogPage({ level, page }: { level: number; page: number }) {
       <div className="vocabulary-catalog-heading"><h2>{vocabularyLevelLabel(level, language)}</h2>
         {summary && <p>{summary.wordCount.toLocaleString()}{language === "ko" ? "" : " "}{t.words}</p>}
       </div>
-      {currentError ? <div className="vocabulary-status vocabulary-error" role="alert">
+      {currentError ? <div className="catalog-status vocabulary-error" role="alert">
         <p>{currentError instanceof VocabularyError && currentError.status === 404 ? t.notFound : t.error}</p>
         <button className="button vocabulary-secondary" onClick={() => setRevision(value => value + 1)}>{t.retry}</button>
         {page !== 1 && <Link className="button vocabulary-secondary" href={`/vocabulary?level=${level}&page=1`}>{t.back}</Link>}
-      </div> : !currentData ? <p className="vocabulary-status" role="status">{t.loading}</p> : <>
+      </div> : !currentData ? <p className="catalog-status" role="status">{t.loading}</p>
+        : !currentData.catalog.sets.length ? <p className="catalog-status">{t.empty}</p> : <>
         <div className="vocabulary-set-grid">
           {currentData.catalog.sets.map(group => <article className="vocabulary-set-card" key={group.id}>
             <span className="vocabulary-set-number">{String(group.number).padStart(2, "0")}</span>
@@ -72,7 +73,6 @@ function CatalogPage({ level, page }: { level: number; page: number }) {
             </div>
           </article>)}
         </div>
-        {!currentData.catalog.sets.length && <p className="vocabulary-status">{t.empty}</p>}
         {currentData.catalog.pageCount > 1 && <nav className="vocabulary-pagination" aria-label={t.pagination}>
           {page > 1 ? <Link href={`/vocabulary?level=${level}&page=${page - 1}`}>{t.previous}</Link> : <span aria-disabled="true">{t.previous}</span>}
           <span aria-current="page">{page} / {currentData.catalog.pageCount}</span>

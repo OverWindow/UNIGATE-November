@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Grid3x3, X } from "lucide-react";
-import { useRouter } from "next/navigation";
+import useRouter from "@/lib/use-navigation-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
 import { answerText, isAnswered, clockText, pbtRequest, PbtError, remainingSeconds, questionGroup, submitOnPageExit, type Answer, type Attempt } from "@/lib/pbt-api";
 import { guardTimedExit } from "@/lib/timed-exit";
+import { closeWithMotion } from "@/lib/modal-motion";
 import type { ExamFormat } from "@/lib/exam-content";
 import { examCopy, pbtErrorMessage } from "@/lib/pbt-content";
 import SiteHeader from "../SiteHeader";
@@ -30,8 +31,11 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
   const submittingRef = useRef(false);
   const [dialog, setDialog] = useState<"questions" | "submit" | "exit" | null>(null);
   const pageSession = useRef("");
+  const attemptActive = useRef(false);
   const timedSessionActive = useRef(false);
   const exitAction = useRef<(() => void) | null>(null);
+  const visibleDialog = useRef<"questions" | "submit" | "exit" | null>(null);
+  const closeAnimation = useRef<Animation | null>(null);
   const [position, setPosition] = useState(1);
   const [remaining, setRemaining] = useState<number | null>(null);
   const [revision, setRevision] = useState(0);
@@ -47,7 +51,7 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
   }, []);
   const isListening = attempt?.section === "listening";
   const timedListening = isListening && attempt?.mode === "timed";
-  const timedActive = !review && attempt?.mode === "timed" && attempt.status === "in_progress";
+  const inProgress = !review && attempt?.status === "in_progress";
   const [audioProgress, setAudioProgress] = useState<AudioProgress | null>(null);
   const updateAudioProgress = useCallback((next: AudioProgress) => {
     setAudioProgress(current => current && current.playbackKey === next.playbackKey && current.elapsed === next.elapsed && current.duration === next.duration ? current : next);
@@ -70,7 +74,8 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
     void request.then(data => {
       if (!active) return;
       if (!review && data.status === "submitted") { router.replace(`${basePath}/attempts/${id}/result`); return; }
-      timedSessionActive.current = !review && data.mode === "timed";
+      attemptActive.current = !review && data.status === "in_progress";
+      timedSessionActive.current = attemptActive.current && data.mode === "timed";
       receivedAt.current = performance.now();
       autoSubmitted.current = false;
       completedPositionRef.current = null; completionHandled.current = null; setCompletedPosition(null);
@@ -88,24 +93,25 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
   }, [id, review, revision, status, user?.id, router, basePath, examFormat]);
 
   const requestExit = useCallback((leave: () => void) => {
-    if (!timedSessionActive.current) { leave(); return; }
+    if (!attemptActive.current) { leave(); return; }
     exitAction.current = leave;
     setDialog("exit");
   }, []);
 
   useEffect(() => {
-    if (!timedActive) return;
+    if (!inProgress) return;
     return guardTimedExit({
-      id: `${examFormat}:${id}`, fallback: basePath, isActive: () => timedSessionActive.current, requestExit,
+      id: `${examFormat}:${id}`, fallback: basePath, isActive: () => attemptActive.current, requestExit,
       pageExit: () => {
         if (!timedSessionActive.current) return;
+        attemptActive.current = false;
         timedSessionActive.current = false;
         pageSession.current = "";
         submitOnPageExit(id, examFormat);
       },
       restore: () => { setAttempt(null); setRevision(n => n + 1); },
     });
-  }, [timedActive, id, examFormat, basePath, requestExit]);
+  }, [inProgress, id, examFormat, basePath, requestExit]);
 
   useEffect(() => {
     if (!attempt || review || isListening) return;
@@ -124,17 +130,31 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
   }, [busy]);
 
   useEffect(() => {
+    const element = dialogRef.current;
+    if (!element) return;
     if (dialog) {
-      if (!dialogRef.current?.open) dialogRef.current?.showModal();
+      closeAnimation.current?.cancel();
+      closeAnimation.current = null;
+      visibleDialog.current = dialog;
+      if (!element.open) element.showModal();
       dialogTitleRef.current?.focus();
-    } else dialogRef.current?.close();
+    } else if (element.open) {
+      closeAnimation.current = closeWithMotion(element, () => {
+        element.close();
+        visibleDialog.current = null;
+        closeAnimation.current = null;
+      });
+    }
   }, [dialog]);
+
+  useEffect(() => () => closeAnimation.current?.cancel(), []);
 
   const submit = useCallback(async (leave?: () => void) => {
     if (submittingRef.current || busyRef.current) return;
     submittingRef.current = true; setSubmitting(true); setSubmitError(false); setDialog(null);
     try {
       await pbtRequest<Attempt>(`attempts/${id}/submit/`, "POST", {}, examFormat);
+      attemptActive.current = false;
       timedSessionActive.current = false;
       if (leave) leave();
       else router.replace(`${basePath}/attempts/${id}/result`);
@@ -157,6 +177,7 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
       await pbtRequest(`attempts/${id}/answers/${itemPosition}/`, "PUT", value, examFormat, pageSession.current);
     } catch (cause) {
       if (cause instanceof PbtError && ["attempt_closed", "attempt_session_required"].includes(cause.code)) {
+        attemptActive.current = false;
         timedSessionActive.current = false;
         router.replace(`${basePath}/attempts/${id}/result`);
       }
@@ -208,7 +229,10 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
     </div>
   </div>;
 
-  return <div className={!review && attempt ? "pbt-session" : undefined}><SiteHeader onBeforeLogout={timedActive ? action => requestExit(() => { router.replace(basePath); action(); }) : undefined} /><main id="main-content" className={`pbt-workspace${review ? "" : " pbt-exam"}`} tabIndex={-1}>
+  const shownDialog = dialog ?? visibleDialog.current;
+  const exitTimed = attempt?.mode === "timed";
+
+  return <div className={!review && attempt ? "pbt-session" : undefined}><SiteHeader onBeforeLogout={inProgress ? action => requestExit(() => { router.replace(basePath); action(); }) : undefined} /><main id="main-content" className={`pbt-workspace${review ? "" : " pbt-exam"}`} tabIndex={-1}>
     <div className={review ? "page-container" : "pbt-exam-content"}>
       {(review || !attempt) && <div className={review ? undefined : "pbt-exam-width pbt-exam-loading"}>
         <Link className="text-link pbt-back" href={basePath}><ArrowLeft size={14} aria-hidden="true" /> {t.back}</Link>
@@ -269,12 +293,12 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
         </>}
       </>}
     </div>
-    <dialog ref={dialogRef} className={`pbt-dialog${dialog === "questions" ? " pbt-navigator-dialog" : ""}`} onCancel={() => setDialog(null)} aria-labelledby="pbt-dialog-title">
-      {dialog === "questions" && <button className="pbt-dialog-close" type="button" aria-label={t.close} onClick={() => setDialog(null)}>
+    <dialog ref={dialogRef} className={`pbt-dialog${shownDialog === "questions" ? " pbt-navigator-dialog" : ""}`} onCancel={event => { event.preventDefault(); setDialog(null); }} aria-labelledby="pbt-dialog-title">
+      {shownDialog === "questions" && <button className="pbt-dialog-close" type="button" aria-label={t.close} onClick={() => setDialog(null)}>
         <X size={18} strokeWidth={1.7} aria-hidden="true" />
       </button>}
-      <h2 ref={dialogTitleRef} id="pbt-dialog-title" tabIndex={-1}>{dialog === "questions" ? t.allQuestions : dialog === "exit" ? t.exitTitle : t.confirm}</h2>
-      {dialog === "questions" ? <>
+      <h2 ref={dialogTitleRef} id="pbt-dialog-title" tabIndex={-1}>{shownDialog === "questions" ? t.allQuestions : shownDialog === "exit" ? (exitTimed ? t.exitTitle : t.practiceExitTitle) : t.confirm}</h2>
+      {shownDialog === "questions" ? <>
         <p className="pbt-navigator-summary">{t.answered} <strong>{answered} / {total}</strong><span>{t.unanswered} <strong>{total - answered}</strong></span></p>
         <div className="pbt-number-grid">
           {attempt?.items.map(item => <button key={item.position} className={isAnswered(item) ? "is-answered" : ""} aria-current={group.some(q => q.position === item.position) ? "step" : undefined} aria-label={`${item.position}: ${isAnswered(item) ? `${t.yourAnswer} ${answerText(item)}` : t.noAnswer}`} disabled={busy || submitting || audioPlaying} onClick={() => go(item.position)}>{item.position}</button>)}
@@ -282,9 +306,12 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
         <div className="pbt-navigator-legend"><span><i className="is-current" />{t.currentQuestion}</span><span><i className="is-answered" />{t.answered}</span><span><i />{t.noAnswer}</span></div>
         {attempt?.mode !== "timed" && <p className="pbt-muted">{t.saveHint}</p>}
         <div className="pbt-dialog-actions"><button className="button button-primary" disabled={disabled} onClick={() => setDialog("submit")}>{t.submit}</button></div>
-      </> : dialog === "exit" ? <>
-        <p>{t.exitWarning}</p>
-        <div className="pbt-dialog-actions"><button className="button pbt-secondary" onClick={() => setDialog(null)}>{t.cancel}</button><button className="button button-primary" disabled={busy || submitting} onClick={() => void submit(exitAction.current ?? undefined)}>{t.exitConfirm}</button></div>
+      </> : shownDialog === "exit" ? <>
+        <p>{exitTimed ? t.exitWarning : t.practiceExitWarning}</p>
+        <div className="pbt-dialog-actions"><button className="button pbt-secondary" disabled={busy || submitting} onClick={() => {
+          if (exitTimed) void submit(exitAction.current ?? undefined);
+          else { attemptActive.current = false; exitAction.current?.(); }
+        }}>{exitTimed ? t.exitConfirm : t.practiceExitConfirm}</button><button className="button button-primary" onClick={() => setDialog(null)}>{t.cancel}</button></div>
       </> : <>
         <p>{t.unanswered}: {total - answered}</p>
         <div className="pbt-dialog-actions"><button className="button pbt-secondary" onClick={() => setDialog(null)}>{t.cancel}</button><button className="button button-primary" onClick={() => void submit()} disabled={busy || submitting}>{t.submit}</button></div>

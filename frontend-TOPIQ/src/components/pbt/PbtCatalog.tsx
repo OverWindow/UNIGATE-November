@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowRight, ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import useRouter from "@/lib/use-navigation-router";
 import { useApp } from "@/app/providers";
 import { pbtRequest, type Attempt, type Exam, type Mode, type Section } from "@/lib/pbt-api";
 import type { ExamFormat } from "@/lib/exam-content";
@@ -36,7 +36,7 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
       try {
         // The catalog establishes the guest session before fetching its history.
         const catalog = await pbtRequest<{ exams: Exam[] }>("exams/", "GET", undefined, examFormat);
-        const history = await pbtRequest<{ attempts: Attempt[] }>("attempts/", "GET", undefined, examFormat);
+        const history = user ? await pbtRequest<{ attempts: Attempt[] }>("attempts/", "GET", undefined, examFormat) : { attempts: [] };
         if (active) { setExams(catalog.exams); setAttempts(history.attempts); }
       } catch (cause) { if (active) setError(cause); }
       finally { if (active) setLoading(false); }
@@ -67,10 +67,12 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
   }
 
   const timedHint = perPassage ? ibtTimedHints[language].listening : examFormat === "ibt" ? ibtTimedHints[language].reading : t.timedHint;
+  const sectionExams = exams.filter(exam => exam.section === section);
+  const hasError = !!error || status === "error";
 
   return <><SiteHeader /><main id="main-content" className="pbt-main" tabIndex={-1}>
-    <section className="pbt-hero"><div className="page-container">
-      <h1>{t.title}</h1><p>{t.intro}</p>
+    <section className="catalog-hero"><div className="page-container">
+      <h1 className="catalog-title">{t.title}</h1><p className="catalog-description">{t.intro}</p>
     </div></section>
     <div className="page-container pbt-catalog">
       <div className="pbt-section-tabs" aria-label="TOPIK II">
@@ -81,11 +83,16 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
           <span className="pbt-radio" /><span><strong>{t[value]}</strong><small>{value === "practice" ? t.practiceHint : timedHint}</small></span>
         </button>)}
       </div>
-      {(error || status === "error") ? <div role="alert" className="pbt-alert">{pbtErrorMessage(error, t)} <button onClick={retry}>{t.retry}</button></div> : null}
-      {loading || status === "loading" ? <p role="status">{t.loading}</p> : <div className="pbt-exam-grid">
-        {exams.filter(exam => exam.section === section).map(exam => {
+      {hasError && <div className="catalog-status" role="alert">
+        <p>{pbtErrorMessage(error, t)}</p>
+        <button className="button pbt-secondary" onClick={retry}>{t.retry}</button>
+      </div>}
+      {!hasError && (loading || status === "loading") ? <p className="catalog-status" role="status">{t.loading}</p>
+        : sectionExams.length ? <div className="pbt-exam-grid">
+        {sectionExams.map(exam => {
           const progress = user ? exam.myProgress?.[mode] : null;
           const inProgressId = progress?.inProgressId ?? attempts.find(attempt => attempt.examId === exam.id && attempt.mode === mode && attempt.status === "in_progress")?.id;
+          const canResume = mode === "practice" && !!inProgressId;
           const result = progress?.latestResult;
           const resultLabel = result ? `${t.latestScore} · ${t[mode]}: ${result.score} / ${result.maxScore} · ${t.submittedOn}: ${new Date(result.submittedAt).toLocaleDateString(locale)} · ${t.result}` : "";
           return <article className="pbt-exam-card" key={exam.id}>
@@ -97,23 +104,29 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
             </div>
             <h2>{language === "ko" ? `${t[exam.section]} 모의고사 ${exam.round}회` : <>{t[exam.section]} · {t.round} {exam.round}</>}</h2>
             {exam.accessible ? <div className="pbt-card-actions">
-              <button type="button" className={`button ${inProgressId ? "pbt-restart" : "button-primary"}`} disabled={!!starting} onClick={() => void start(exam, inProgressId)}>{starting === exam.id ? t.loading : t.start}</button>
-              {mode === "practice" && inProgressId && <Link className="button button-primary" href={`${basePath}/attempts/${inProgressId}`}>{t.resume}</Link>}
+              {canResume && <Link className="button button-primary" href={`${basePath}/attempts/${inProgressId}`}>{t.resume}</Link>}
+              <button type="button" className={`button ${canResume ? "pbt-secondary" : "button-primary"}`} disabled={!!starting} onClick={() => void start(exam, inProgressId)}>
+                {starting === exam.id ? t.loading : inProgressId ? t.retake : t.start}
+              </button>
             </div>
               : <Link className="button pbt-secondary" href={`/login?next=${basePath}`}>{t.login}<ExternalLink size={14} aria-hidden="true" /></Link>}
           </article>;
         })}
-        {!exams.some(exam => exam.section === section) && !error && <p>{t.empty}</p>}
-      </div>}
+      </div> : !hasError && <p className="catalog-status">{t.empty}</p>}
       <section className="pbt-history" aria-labelledby="pbt-history"><h2 id="pbt-history">{t.history}</h2>
-        {!loading && !attempts.length && <p className="pbt-muted">{t.noHistory}</p>}
-        {attempts.map(attempt => <div className="pbt-history-row" key={attempt.id}>
-          <div><strong>{language === "ko" ? attempt.title.replace(/ (\d+)$/, ` ${t[attempt.section]} 모의고사 $1회`) : `${attempt.title} · ${t[attempt.section]}`}</strong><small>{new Date(attempt.startedAt).toLocaleString(locale)}</small></div>
-          {attempt.status === "submitted" && attempt.score !== null && <span>{attempt.score} / {attempt.maxScore}</span>}
-          {attempt.mode === "timed" && attempt.status === "in_progress"
-            ? <button type="button" className="text-link" disabled={!!starting} onClick={() => void endAndReview(attempt)}>{t.endAndReview} <ArrowRight size={14} aria-hidden="true" /></button>
-            : <Link className="text-link" href={`${basePath}/attempts/${attempt.id}${attempt.status === "submitted" ? "/result" : ""}`}>{attempt.status === "submitted" ? t.result : t.resume} <ArrowRight size={14} aria-hidden="true" /></Link>}
-        </div>)}
+        {!user ? status === "loading" ? <p className="pbt-muted" role="status">{t.loading}</p> : <div>
+          <p className="pbt-muted">{t.historyLoginRequired}</p>
+          <Link className="button pbt-secondary" href={`/login?next=${basePath}`}>{t.historyLogin}</Link>
+        </div> : <>
+          {!loading && !attempts.length && <p className="pbt-muted">{t.noHistory}</p>}
+          {attempts.map(attempt => <div className="pbt-history-row" key={attempt.id}>
+            <div><strong>{language === "ko" ? attempt.title.replace(/ (\d+)$/, ` ${t[attempt.section]} 모의고사 $1회`) : `${attempt.title} · ${t[attempt.section]}`}</strong><small>{new Date(attempt.startedAt).toLocaleString(locale)}</small></div>
+            {attempt.status === "submitted" && attempt.score !== null && <span>{attempt.score} / {attempt.maxScore}</span>}
+            {attempt.mode === "timed" && attempt.status === "in_progress"
+              ? <button type="button" className="text-link" disabled={!!starting} onClick={() => void endAndReview(attempt)}>{t.endAndReview} <ArrowRight size={14} aria-hidden="true" /></button>
+              : <Link className="text-link" href={`${basePath}/attempts/${attempt.id}${attempt.status === "submitted" ? "/result" : ""}`}>{attempt.status === "submitted" ? t.result : t.resume} <ArrowRight size={14} aria-hidden="true" /></Link>}
+          </div>)}
+        </>}
       </section>
     </div>
   </main><SiteFooter /></>;

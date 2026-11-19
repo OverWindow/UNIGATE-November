@@ -13,10 +13,10 @@ export default function CreditsAccount() {
   const t = creditsContent[language];
   const a = authContent[language];
   return <div className="page-container credits-page">
-    {(status !== "authenticated" || !user) && <div className="credits-heading"><h1>{t.title}</h1></div>}
-    {status === "loading" ? <p className="credits-status" role="status">{a.loading}</p>
-      : status === "error" ? <div className="credits-status" role="alert"><p>{a.network}</p><button className="button credits-secondary" onClick={() => void refreshSession()}>{a.retry}</button></div>
-      : status !== "authenticated" || !user ? <div className="credits-status"><p>{t.loginRequired}</p><Link className="button button-primary" href="/login?next=%2Fcredits">{a.login}</Link></div>
+    {(status !== "authenticated" || !user) && <div className="credits-heading"><h1 className="catalog-title">{t.title}</h1></div>}
+    {status === "loading" ? <p className="catalog-status" role="status">{a.loading}</p>
+      : status === "error" ? <div className="catalog-status" role="alert"><p>{a.network}</p><button className="button credits-secondary" onClick={() => void refreshSession()}>{a.retry}</button></div>
+      : status !== "authenticated" || !user ? <div className="catalog-status"><p>{t.loginRequired}</p><Link className="button button-primary" href="/login?next=%2Fcredits">{a.login}</Link></div>
       : <CreditWallet key={user.id} />}
   </div>;
 }
@@ -67,14 +67,14 @@ function CreditWallet() {
 
   return <>
     <div className="credits-heading">
-      <h1>{t.title}</h1>
+      <h1 className="catalog-title">{t.title}</h1>
       <button className="button credits-secondary credits-refresh" type="button" aria-label={t.refresh} title={t.refresh}
         disabled={loading} aria-busy={loading} onClick={() => refresh()}>
         <RefreshCw size={20} strokeWidth={1.8} aria-hidden="true" />
       </button>
     </div>
-    {error && <div className="credits-status" role="alert"><p>{t.error}</p><button className="button credits-secondary" onClick={() => refresh()}>{t.retry}</button></div>}
-    {!current ? !error && <p className="credits-status credits-loading" role="status"><RefreshCw className="credits-loading-icon" size={20} aria-hidden="true" />{t.loading}</p>
+    {error && <div className="catalog-status" role="alert"><p>{t.error}</p><button className="button credits-secondary" onClick={() => refresh()}>{t.retry}</button></div>}
+    {!current ? !error && <p className="catalog-status credits-loading" role="status"><RefreshCw className="credits-loading-icon" size={20} aria-hidden="true" />{t.loading}</p>
       : <div className="credits-content" aria-busy={loading}>
         <dl className="credits-balances">
           <div className="credits-available"><dt>{t.available}</dt><dd>{number(current.balance.available)} <span>{t.unit}</span></dd></div>
@@ -95,8 +95,8 @@ function CreditWallet() {
               {infoOpen && <span className="credits-info-tooltip" id="credit-reservation-info" role="tooltip"><span>{t.transactionNote}</span></span>}
             </span>
           </div>
-          {current.transactions.length === 0 ? <p className="credits-empty">{t.empty}</p>
-            : <div className="credits-transactions-scroll" role="region" aria-labelledby="credit-transactions-heading" tabIndex={0}>
+          {current.transactions.length === 0 ? <p className="catalog-status">{t.empty}</p>
+            : <div className="credits-transactions-panel">
               <ul className="credits-transactions">{current.transactions.map(entry => <li key={entry.id}>
               <div className="credits-transaction-heading">
                 <span className={`credits-kind credits-kind-${entry.kind}`}>{t.kinds[entry.kind]}</span>

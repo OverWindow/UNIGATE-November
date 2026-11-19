@@ -52,7 +52,7 @@ interface LandingContent {
     description: string;
     items: { question: string; answer: string }[];
   };
-  footer: { parent: string; top: string; licenses: string };
+  footer: { parent: string; top: string; licenses: string; trademark: string };
 }
 
 export const landingContent: Record<Language, LandingContent> = {
@@ -132,7 +132,7 @@ export const landingContent: Record<Language, LandingContent> = {
         { question: "모바일에서도 볼 수 있나요?", answer: "네. 휴대폰, 태블릿, PC 화면에 맞춰 학습 소개를 살펴볼 수 있습니다. 모바일에서는 상단 메뉴 버튼으로 원하는 영역으로 이동할 수 있습니다." },
       ],
     },
-    footer: { parent: "UNIGATE 소개", top: "맨 위로", licenses: "오픈소스 라이선스" },
+    footer: { parent: "UNIGATE 소개", top: "맨 위로", licenses: "오픈소스 라이선스", trademark: "UNIGATE는 등록상표입니다. 대한민국 출원 제40-2026-0039342호, 인도네시아 등록 제IDM001488588호." },
   },
   en: {
     navigation: ["Home", "PBT", "IBT", "Vocabulary", "AI Writing Tutor"],
@@ -210,7 +210,7 @@ export const landingContent: Record<Language, LandingContent> = {
         { question: "Can I view the page on my phone?", answer: "Yes. The page adapts to phones, tablets, and computers. On smaller screens, use the menu button in the header to jump to a section." },
       ],
     },
-    footer: { parent: "About UNIGATE", top: "Back to top", licenses: "Open-source licenses" },
+    footer: { parent: "About UNIGATE", top: "Back to top", licenses: "Open-source licenses", trademark: "UNIGATE is a registered trademark. Republic of Korea application No. 40-2026-0039342 and Indonesia registration No. IDM001488588." },
   },
   id: {
     navigation: ["Beranda", "PBT", "IBT", "Kosakata", "Tutor Menulis AI"],
@@ -288,6 +288,6 @@ export const landingContent: Record<Language, LandingContent> = {
         { question: "Apakah halaman ini bisa dibuka di ponsel?", answer: "Ya. Tampilan menyesuaikan ponsel, tablet, dan komputer. Pada layar kecil, gunakan tombol menu di bagian atas untuk menuju bagian yang kamu inginkan." },
       ],
     },
-    footer: { parent: "Tentang UNIGATE", top: "Kembali ke atas", licenses: "Lisensi sumber terbuka" },
+    footer: { parent: "Tentang UNIGATE", top: "Kembali ke atas", licenses: "Lisensi sumber terbuka", trademark: "UNIGATE adalah merek terdaftar. Permohonan Republik Korea No. 40-2026-0039342 dan pendaftaran Indonesia No. IDM001488588." },
   },
 };

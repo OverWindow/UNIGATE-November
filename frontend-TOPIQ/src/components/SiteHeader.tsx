@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import useRouter from "@/lib/use-navigation-router";
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, CreditCard, Globe, LogOut, Menu, UserRound, X } from "lucide-react";
 import { useApp } from "@/app/providers";
