@@ -1,7 +1,8 @@
 from unittest.mock import patch
 
-from django.db import DatabaseError
+from django.db import connection, DatabaseError
 from django.test import Client, TransactionTestCase
+from django.test.utils import CaptureQueriesContext
 
 from question_bank.models import Item
 from ..bank import BankNotReady
@@ -31,6 +32,45 @@ class AnswerStorageTests(BankFixtures, TransactionTestCase):
         response = client.put(path + f"answers/{position}/", {"selectedOption": option},
                               content_type="application/json")
         self.assertEqual(response.status_code, 200)
+
+    def test_pbt_loads_one_bank_item_per_new_answer_and_only_reads_the_current_answer(self):
+        attempt, path = self.start(self.exam)
+        with patch.object(Item, "from_db", wraps=Item.from_db) as bank_items:
+            with CaptureQueriesContext(connection) as first:
+                self.answer(self.client, path, 1, 2)
+            for position in range(2, 51):
+                self.answer(self.client, path, position, 2)
+            self.assertEqual(bank_items.call_count, 50)
+
+            with CaptureQueriesContext(connection) as edit:
+                self.answer(self.client, path, 1, 3)
+            self.assertEqual(bank_items.call_count, 50)
+
+        for captured in (first, edit):
+            reads = [row["sql"] for row in captured if 'FROM "pbt_attempt_items"' in row["sql"]]
+            self.assertEqual(len(reads), 1)
+            self.assertIn('"pbt_attempt_items"."position" = 1', reads[0].partition(" WHERE ")[2])
+        self.assertFalse(any('"topik_bank".' in row["sql"] for row in edit))
+        self.assertFalse(any('UPDATE "pbt_attempts"' in row["sql"] for row in edit))
+        attempt.refresh_from_db()
+        self.assertEqual(attempt.answered_count, 50)
+
+    def test_new_answers_require_a_published_set_and_complete_numbering(self):
+        attempt, path = self.start(self.exam)
+        self.reading.review_status = "draft"
+        self.reading.save(update_fields=["review_status"])
+        url = path + "answers/1/"
+        response = self.client.put(url, {"selectedOption": 2}, content_type="application/json")
+        self.assertEqual((response.status_code, response.json()["error"]), (409, "exam_not_ready"))
+
+        self.reading.review_status = "reviewed"
+        self.reading.save(update_fields=["review_status"])
+        self.reading.items.filter(position=50).update(position=None)
+        response = self.client.put(url, {"selectedOption": 2}, content_type="application/json")
+        self.assertEqual((response.status_code, response.json()["error"]), (409, "exam_not_ready"))
+        self.assertFalse(attempt.items.exists())
+        attempt.refresh_from_db()
+        self.assertEqual(attempt.answered_count, 0)
 
     def test_only_answers_are_stored_and_all_questions_are_returned(self):
         for exam in self.exams:
@@ -119,7 +159,7 @@ class AnswerStorageTests(BankFixtures, TransactionTestCase):
             self.store_legacy_items(attempt)
             original = list(attempt.items.values())
             with patch("pbt.services.load_set", side_effect=BankNotReady), \
-                    patch("pbt.views.load_set", side_effect=BankNotReady):
+                    patch("pbt.views.load_question", side_effect=BankNotReady):
                 self.assertEqual(self.client.get(path).status_code, 200)
                 self.assertEqual(list(attempt.items.values()), original)
                 self.answer(self.client, path, 1, 2)
@@ -144,7 +184,7 @@ class AnswerStorageTests(BankFixtures, TransactionTestCase):
             attempt, path = self.start(exam)
             self.answer(self.client, path, 1, 2)
             with patch("pbt.services.load_set", side_effect=BankNotReady), \
-                    patch("pbt.views.load_set", side_effect=BankNotReady):
+                    patch("pbt.views.load_question", side_effect=BankNotReady):
                 detail = self.client.get(path)
                 self.assertEqual((detail.status_code, detail.json()["error"]), (409, "exam_not_ready"))
                 missing = self.client.put(path + "answers/2/", {"selectedOption": 2}, content_type="application/json")

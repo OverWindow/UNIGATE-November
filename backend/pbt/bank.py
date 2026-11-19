@@ -26,17 +26,38 @@ def media_url(value):
 
 
 def load_set(set_id, section, exam_format="pbt"):
-    question_set = QuestionSet.objects.filter(pk=set_id, exam_format=exam_format, section=section, review_status__in=["reviewed", "pilot", "active"], published_at__isnull=False).first()
-    if not question_set:
+    return list(_load_questions(set_id, section, exam_format).values())
+
+
+def load_question(set_id, section, exam_format, position):
+    return _load_questions(set_id, section, exam_format, position)[position]
+
+
+def _load_questions(set_id, section, exam_format, position=None):
+    if not QuestionSet.objects.filter(pk=set_id, exam_format=exam_format, section=section,
+            review_status__in=["reviewed", "pilot", "active"], published_at__isnull=False).exists():
         raise BankNotReady("set_unavailable")
-    items = list(Item.objects.filter(set_id=set_id).order_by("position").prefetch_related(
+    count = EXAM_FORMATS[exam_format]["question_count"]
+    positions = list(range(1, count + 1))
+    pair_starts = range(15 if section == "listening" else 23, count, 2) if exam_format == "ibt" else ()
+    source = Item.objects.filter(set_id=set_id).order_by("position")
+    if position is not None:
+        # Check the whole set's numbering before fetching content and media for just the answer.
+        if position not in positions or list(source.values_list("position", flat=True)) != positions:
+            raise BankNotReady(f"requires_{count}_questions")
+        positions = [position]
+        if position in pair_starts:
+            positions = [position, position + 1]
+        elif position - 1 in pair_starts:
+            positions = [position - 1, position]
+        source = source.filter(position__in=positions)
+    items = list(source.prefetch_related(
         Prefetch("visual_assets", queryset=VisualAsset.objects.filter(is_current=True).order_by("created_at", "visual_asset_id")),
         Prefetch("audio_bindings", queryset=ItemAudioBinding.objects.filter(is_current=True, audio_asset__deleted_at__isnull=True).select_related("audio_asset").order_by("created_at")),
     ))
-    count = EXAM_FORMATS[exam_format]["question_count"]
-    if [item.position for item in items] != list(range(1, count + 1)):
+    if [item.position for item in items] != positions:
         raise BankNotReady(f"requires_{count}_questions")
-    result = []
+    result = {}
     for item in items:
         if item.exam_format != exam_format or item.section != section or item.review_status not in ("reviewed", "pilot", "active") or item.correct_answer not in (1, 2, 3, 4):
             raise BankNotReady("invalid_question")
@@ -94,16 +115,15 @@ def load_set(set_id, section, exam_format="pbt"):
                 raise BankNotReady("invalid_sentence_order") from None
             snapshot.update(answerMode="sentence_order", sentences=sentences,
                             prompt="다음 문장들을 순서에 맞게 배열하십시오.")
-        result.append({"position": item.position, "source_item_id": item.pk, "snapshot": snapshot,
-                       "correct_answer": item.correct_answer, "explanation": item.explanation,
-                       "points": 1 if exam_format == "ibt" else 2,
-                       "transcript": (transcript or item.stem) if listening else ""})
-    if exam_format == "ibt":
-        # These slots share one passage/audio; store grouping with the attempt.
-        for position in range(15 if section == "listening" else 23, 31, 2):
-            first, second = result[position - 1]["snapshot"], result[position]["snapshot"]
+        result[item.position] = {"position": item.position, "source_item_id": item.pk, "snapshot": snapshot,
+                                 "correct_answer": item.correct_answer, "explanation": item.explanation,
+                                 "points": 1 if exam_format == "ibt" else 2,
+                                 "transcript": (transcript or item.stem) if listening else ""}
+    for start in pair_starts:
+        if start in result:
+            first, second = result[start]["snapshot"], result[start + 1]["snapshot"]
             shared_field = "audioUrl" if section == "listening" else "passage"
             if first["itemType"] != second["itemType"] or not first[shared_field] or first[shared_field] != second[shared_field]:
                 raise BankNotReady("invalid_question_group")
-            first["groupId"] = second["groupId"] = f"ibt-{section}-{position}"
+            first["groupId"] = second["groupId"] = f"ibt-{section}-{start}"
     return result

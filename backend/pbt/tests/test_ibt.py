@@ -1,6 +1,7 @@
 import io
 import uuid
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.core.management import call_command, get_commands
 from django.db import IntegrityError, transaction
@@ -259,6 +260,44 @@ class IbtTests(BankFixtures, TransactionTestCase):
         item.save()
         with self.assertRaisesRegex(BankNotReady, "invalid_question_group"):
             load_set(self.ibt_reading.pk, "reading", "ibt")
+
+    def test_first_save_checks_two_items_from_either_end_of_a_shared_pair(self):
+        for exam, start in ((self.ibt_exam, 23), (self.ibt_listen_exam, 15)):
+            attempt = Attempt.objects.get(pk=self.start(exam)["id"])
+            for position, pair_start in ((start + 1, start), (start, start), (29, 29), (30, 29)):
+                with self.subTest(section=exam.section, position=position):
+                    with patch.object(Item, "from_db", wraps=Item.from_db) as bank_items:
+                        response = self.client.put(f"/api/ibt/attempts/{attempt.pk}/answers/{position}/",
+                            {"selectedOption": 2}, content_type="application/json")
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(bank_items.call_count, 2)
+                    saved = attempt.items.get(position=position)
+                    self.assertEqual(saved.snapshot["groupId"], f"ibt-{exam.section}-{pair_start}")
+                    self.assertEqual(saved.source_item_id, Item.objects.get(set_id=exam.source_set_id, position=position).pk)
+
+    def test_broken_pair_blocks_either_member_but_not_an_unrelated_new_answer(self):
+        for exam, source in ((self.ibt_exam, self.ibt_reading), (self.ibt_listen_exam, self.ibt_listening)):
+            attempt = Attempt.objects.get(pk=self.start(exam)["id"])
+            last = source.items.get(position=30)
+            if exam.section == "reading":
+                last.content_json["passage"] = "Different passage"
+                last.save(update_fields=["content_json"])
+            else:
+                other_audio = self.listening.items.get(position=1).audio_bindings.get().audio_asset
+                other_audio.storage_url = "https://example.invalid/other.mp3"
+                other_audio.save(update_fields=["storage_url"])
+                last.audio_bindings.update(audio_asset=other_audio)
+            path = f"/api/ibt/attempts/{attempt.pk}/"
+            self.assertEqual(self.client.put(path + "answers/7/", {"selectedOption": 2},
+                                             content_type="application/json").status_code, 200)
+            for position in (29, 30):
+                response = self.client.put(path + f"answers/{position}/", {"selectedOption": 2},
+                                           content_type="application/json")
+                self.assertEqual((response.status_code, response.json()["error"]), (409, "exam_not_ready"))
+            self.assertEqual(self.client.get(path).status_code, 409)
+            self.assertEqual(list(attempt.items.values_list("position", flat=True)), [7])
+            attempt.refresh_from_db()
+            self.assertEqual(attempt.answered_count, 1)
 
     def test_grammar_uses_content_stem_when_passage_is_empty(self):
         item = self.ibt_reading.items.get(position=1)

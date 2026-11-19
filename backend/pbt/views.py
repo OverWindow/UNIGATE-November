@@ -15,7 +15,7 @@ from django.views.decorators.http import require_GET, require_POST, require_http
 from accounts.rate_limits import record_attempt, request_subject, RateLimitUnavailable
 from accounts.email_delivery import EmailDeliveryError
 from question_bank.models import QuestionSet
-from .bank import BankNotReady, load_set
+from .bank import BankNotReady, load_question, load_set
 from .models import Attempt, AttemptItem, Exam, ExamAttemptFeedback
 from .result_delivery import (LINK_LIFETIME, feedback_state, has_result_access, new_token,
                               send_result_email, token_hash)
@@ -224,12 +224,13 @@ def answer(request, attempt_id, position, exam_format="pbt"):
             raise Http404
         item = attempt.items.filter(position=position).first()
         if item is None:
-            question = load_set(attempt.exam.source_set_id, attempt.section, exam_format)[position - 1]
+            question = load_question(attempt.exam.source_set_id, attempt.section, exam_format, position)
             item = AttemptItem(attempt=attempt, **question)
             item.snapshot = {**item.snapshot, "_answerOnly": True}
         ordering = item.snapshot.get("answerMode") == "sentence_order"
         if ordering != ("selectedOrder" in data):
             return response({"error": "invalid_request"}, 400)
+        was_answered = is_answered(item)
         if ordering:
             item.selected_order = data["selectedOrder"]
         else:
@@ -241,9 +242,10 @@ def answer(request, attempt_id, position, exam_format="pbt"):
         else:
             item.answered_at = timezone.now()
             item.save()
-        attempt.answered_count = sum(is_answered(row) for row in
-            attempt.items.only("snapshot", "selected_option", "selected_order"))
-        attempt.save(update_fields=["answered_count"])
+        now_answered = is_answered(item)
+        if was_answered != now_answered:
+            attempt.answered_count += 1 if now_answered else -1
+            attempt.save(update_fields=["answered_count"])
         return response({"position": position, **data, "serverNow": timezone.now().isoformat()})
 
 
