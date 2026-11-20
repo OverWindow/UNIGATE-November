@@ -92,6 +92,10 @@ export function startCreditPurchase(attemptId: string, priceId: string, signal: 
   return postJson<CreditPurchaseStatus & { checkoutUrl: string | null }>("/api/credits/purchases/", { attemptId, priceId }, signal);
 }
 
+export function openBillingPortal(signal: AbortSignal) {
+  return postJson<{ portalUrl: string | null }>("/api/credits/billing-portal/", {}, signal);
+}
+
 export function creditsRequest<T>(path: string, signal: AbortSignal): Promise<T> {
   return requestJson<T>(`/api/credits/${path}`, signal);
 }

@@ -21,7 +21,12 @@ sequenceDiagram
     D->>S: 새 주문에 사용할 가격 확인
     S-->>D: 가격 정보
     D->>DB: 주문에 회원, Price ID, 금액, 통화, 1,000크레딧 저장
-    D->>S: 주문의 Price ID로 일회성 Checkout 세션 생성 (수량 1)
+    opt 회원의 Stripe 고객 ID가 없는 경우
+        D->>S: 회원 전용 고객 생성
+        S-->>D: Stripe 고객 ID
+        D->>DB: 크레딧 계정에 고객 ID 저장
+    end
+    D->>S: 고객 ID와 주문의 Price ID로 Checkout 생성 (수량 1, 청구서 발행)
     S-->>D: 세션 ID와 결제창 URL
     D->>DB: 주문에 세션 ID 저장
     D-->>N: 주문 ID와 결제창 URL
@@ -39,6 +44,21 @@ sequenceDiagram
         N->>D: 로그인한 사용자의 주문 상태 조회
         D-->>N: 대기 또는 적립 완료
         N-->>B: 대기 중에는 재조회, 완료되면 잔액과 내역 갱신
+    end
+
+    B->>N: 결제 내역 버튼 클릭
+    N->>D: POST /api/credits/billing-portal/ (로그인 쿠키와 CSRF 토큰)
+    D->>DB: 로그인한 회원의 Stripe 고객 ID 조회
+    alt 고객 연결 완료
+        D->>S: 해당 고객의 포털 세션 생성
+        S-->>D: 임시 포털 URL
+        D-->>N: 포털 URL
+        N-->>B: 포털 URL
+        B->>S: 내 청구서 조회
+        S-->>B: 돌아가기 선택 시 TOPIQ /credits로 이동
+    else 첫 연결 전
+        D-->>N: portalUrl 값이 null
+        N-->>B: 크레딧 페이지에 안내 표시
     end
 ```
 

@@ -4,7 +4,7 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import stripe
 from django.contrib.auth import get_user_model
@@ -12,10 +12,12 @@ from django.db import DatabaseError, close_old_connections, connection
 from django.test import Client, TestCase, TransactionTestCase, override_settings
 
 from accounts.models import CreditAccount, CreditPurchase, CreditTransaction
+from accounts.payments import checkout_customer
 
 
 PURCHASES = "/api/credits/purchases/"
 PRICE = "/api/credits/price/"
+PORTAL = "/api/credits/billing-portal/"
 WEBHOOK = "/api/payments/stripe/webhook/"
 SIGNING_SECRET = "local-unit-test-signing-value"
 CHECKOUT_URL = "https://checkout.stripe.com/c/pay/test-session"
@@ -62,6 +64,10 @@ class CreditPurchaseTests(TestCase):
         self.csrf = self.client.get("/api/csrf/").json()["csrfToken"]
         self.attempt_id = str(uuid.uuid4())
         stripe_client = self.enterContext(patch("accounts.payments.stripe.StripeClient"))
+        self.customers = stripe_client.return_value.v1.customers
+        self.customers.create.return_value.id = "cus_fixture_owner"
+        self.portals = stripe_client.return_value.v1.billing_portal.sessions
+        self.portals.create.return_value.url = "https://billing.stripe.com/p/session/fixture"
         self.prices = stripe_client.return_value.v1.prices
         self.prices.retrieve.return_value = stripe_price()
         self.sessions = stripe_client.return_value.v1.checkout.sessions
@@ -143,10 +149,75 @@ class CreditPurchaseTests(TestCase):
         params = self.sessions.create.call_args.args[0]
         self.assertNotIn("payment_method_types", params)
         self.assertEqual(params["currency"], "krw")
+        self.assertEqual(params["customer"], "cus_fixture_owner")
+        self.assertEqual(params["invoice_creation"], {"enabled": True})
         self.assertEqual(params["line_items"], [{"price": PRICE_ID, "quantity": 1}])
         self.assertEqual(params["success_url"], f"https://topiq.example.invalid/credits?purchase={order.pk}")
         self.assertEqual(params["cancel_url"], params["success_url"] + "&cancelled=1")
         self.assert_wallet(150, 0)
+
+    def test_customer_creation_reuses_its_key_after_a_lost_response_on_a_different_order(self):
+        self.customers.create.side_effect = [
+            stripe.APIConnectionError("fixture lost response"), self.customers.create.return_value,
+        ]
+        self.assertEqual(self.post_attempt().status_code, 503)
+        self.sessions.create.assert_not_called()
+        self.attempt_id = str(uuid.uuid4())
+        self.new_order()
+        first, second = self.customers.create.call_args_list
+        self.assertEqual(first, second)
+        self.assertIn("idempotency_key", first.kwargs["options"])
+
+    def test_existing_checkout_without_customer_can_resume_and_credit(self):
+        order = CreditPurchase.objects.create(user=self.user, attempt_id=self.attempt_id, amount=AMOUNT,
+                                              stripe_price_id=PRICE_ID, stripe_session_id=SESSION_ID)
+        self.assertEqual(self.post_attempt().json()["checkoutUrl"], CHECKOUT_URL)
+        self.sessions.retrieve.assert_called_once_with(SESSION_ID)
+        self.customers.create.assert_not_called()
+        self.sessions.create.assert_not_called()
+        self.assertEqual(post_webhook(self.client, order).status_code, 200)
+        self.assert_wallet(1150, 1)
+
+    def test_lost_pre_portal_checkout_response_uses_original_idempotency_key(self):
+        order = CreditPurchase.objects.create(user=self.user, attempt_id=self.attempt_id, amount=AMOUNT,
+                                              stripe_price_id=PRICE_ID)
+        self.sessions.create.side_effect = [
+            stripe.IdempotencyError("fixture parameter mismatch", http_status=400), self.sessions.create.return_value,
+        ]
+        self.assertEqual(self.post_attempt().json()["checkoutUrl"], CHECKOUT_URL)
+        modern, legacy = self.sessions.create.call_args_list
+        self.assertEqual(modern.kwargs, legacy.kwargs)
+        self.assertEqual(legacy.kwargs["options"]["idempotency_key"], str(order.pk))
+        self.assertNotIn("invoice_creation", legacy.args[0])
+        self.assertNotIn("customer", legacy.args[0])
+        self.assertEqual(post_webhook(self.client, order).status_code, 200)
+        self.assert_wallet(1150, 1)
+
+    def test_portal_uses_only_the_signed_in_customer_and_fixed_return_url(self):
+        def post(data):
+            return self.client.post(PORTAL, data, content_type="application/json", HTTP_X_CSRFTOKEN=self.csrf)
+
+        self.assertEqual(Client().post(PORTAL, {}, content_type="application/json").status_code, 401)
+        self.assertEqual(self.client.post(PORTAL, {}, content_type="application/json").status_code, 403)
+        self.assertEqual(self.client.get(PORTAL).status_code, 405)
+        self.assertEqual(post({"customer": "cus_fixture_other"}).status_code, 400)
+        self.assertEqual(post({"return_url": "https://example.invalid"}).status_code, 400)
+        self.assertEqual(post({}).json(), {"portalUrl": None})
+        self.customers.create.assert_not_called()
+        self.portals.create.assert_not_called()
+        self.new_order()
+        other = get_user_model().objects.create_user(username="another-portal-owner")
+        CreditAccount.objects.create(user=other, stripe_customer_id="cus_fixture_other")
+        for user, customer in [(self.user, "cus_fixture_owner"), (other, "cus_fixture_other")]:
+            self.client.force_login(user)
+            self.csrf = self.client.get("/api/csrf/").json()["csrfToken"]
+            with self.settings(STRIPE_PRICE_ID="", STRIPE_WEBHOOK_SECRET=""):
+                response = post({})
+            self.assertEqual(response.json(), {"portalUrl": self.portals.create.return_value.url})
+            self.assertIn("no-store", response["Cache-Control"])
+            self.portals.create.assert_called_with({"customer": customer, "return_url": "https://topiq.example.invalid/credits"})
+        self.portals.create.side_effect = stripe.APIConnectionError("fixture portal unavailable")
+        self.assertEqual(post({}).status_code, 503)
 
     def test_lost_stripe_response_retries_original_price_even_after_setting_changes(self):
         session = self.sessions.create.return_value
@@ -232,6 +303,9 @@ class CreditPurchaseTests(TestCase):
             "id": second_session, "url": f"https://checkout.stripe.com/c/pay/{second_session}", "status": "open",
         }, None)
         second = self.new_order()
+        self.customers.create.assert_called_once()
+        self.assertEqual([call.args[0]["customer"] for call in self.sessions.create.call_args_list],
+                         ["cus_fixture_owner", "cus_fixture_owner"])
         self.assertNotEqual(first.pk, second.pk)
         for order in (first, second):
             self.assertEqual(post_webhook(self.client, order, id=order.stripe_session_id).status_code, 200)
@@ -272,6 +346,26 @@ class CreditPurchaseTests(TestCase):
 
 @override_settings(**TEST_SETTINGS)
 class ConcurrentCreditPurchaseTests(TransactionTestCase):
+    def test_simultaneous_first_checkouts_share_one_stripe_customer(self):
+        user = get_user_model().objects.create_user(username="concurrent-portal-owner")
+        CreditPurchase.objects.create(user=user, attempt_id=uuid.uuid4(), amount=AMOUNT, stripe_price_id=PRICE_ID)
+        ready = Barrier(2, timeout=10)
+        customers = Mock()
+        customers.create.return_value.id = "cus_concurrent_fixture"
+
+        def get_customer(_):
+            close_old_connections()
+            try:
+                ready.wait()
+                return checkout_customer(user.pk, customers)
+            finally:
+                connection.close()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            self.assertEqual(list(pool.map(get_customer, range(2))), ["cus_concurrent_fixture"] * 2)
+        customers.create.assert_called_once()
+        self.assertEqual(CreditAccount.objects.get(user=user).stripe_customer_id, "cus_concurrent_fixture")
+
     def test_simultaneous_completed_events_post_a_single_ledger_entry(self):
         user = get_user_model().objects.create_user(username="concurrent-purchase-owner")
         order = CreditPurchase.objects.create(user=user, attempt_id=uuid.uuid4(), stripe_price_id=PRICE_ID,

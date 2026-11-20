@@ -69,6 +69,7 @@ afterEach(() => { delete globalThis.window; globalThis.fetch = originalFetch; })
 test("only signed-in users request the price; returning guests keep their order when signing in", () => {
   const wallet = mount(CreditsAccount);
   assert.match(wallet.html, /충전 가격을 불러오는 중/);
+  assert.match(wallet.html, /결제 내역/);
   assert.deepEqual(requests.filter(call => call.url === "/api/credits/price/"), [{ url: "/api/credits/price/", method: "GET" }]);
   wallet.unmount();
   session.user = null;
@@ -77,6 +78,7 @@ test("only signed-in users request the price; returning guests keep their order 
   search = new URLSearchParams({ purchase: orderId });
   const guest = mount(CreditsAccount);
   assert.doesNotMatch(guest.html, /충전 가격/);
+  assert.doesNotMatch(guest.html, /결제 내역/);
   assert.equal(requests.filter(call => call.url === "/api/credits/price/").length, 1);
   assert.ok(guest.html.includes(encodeURIComponent(`/credits?purchase=${orderId}`)));
   guest.unmount();
@@ -119,15 +121,36 @@ function savedCheckout(t, attemptId) {
 }
 
 function mountPurchaseButton() {
-  let click;
+  let click, viewPayments;
   function Purchase() {
     const tree = CreditPurchase({ userId: 1, returnId: null, cancelled: false, onFulfilled: () => {} });
-    click = React.Children.toArray(tree.props.children)[0].props.onClick;
+    const controls = React.Children.toArray(tree.props.children);
+    click = controls[0].props.onClick;
+    viewPayments = controls.find(control => control.props.children === "결제 내역").props.onClick;
     return tree;
   }
   const tree = mount(Purchase);
-  return { ...tree, click };
+  return { ...tree, click, viewPayments };
 }
+
+test("payment history opens one portal from a double click even when pricing is unavailable", async () => {
+  const redirects = [], posts = [];
+  const portalUrl = "https://billing.stripe.com/p/session/test-portal";
+  window.location = { assign: url => redirects.push(url) };
+  globalThis.fetch = async (url, options) => {
+    if (url === "/api/credits/price/") return Response.json({}, { status: 503 });
+    if (url === "/api/csrf/") return Response.json({ csrfToken: "synthetic" });
+    posts.push([url, options.method, options.headers["X-CSRFToken"], JSON.parse(options.body)]);
+    return Response.json({ portalUrl });
+  };
+  const tree = mountPurchaseButton();
+  tree.viewPayments();
+  tree.viewPayments();
+  await setImmediate();
+  assert.deepEqual(posts, [["/api/credits/billing-portal/", "POST", "synthetic", {}]]);
+  assert.deepEqual(redirects, [portalUrl]);
+  tree.unmount();
+});
 
 test("resumed checkout displays the original amount and double clicks or retries keep its attempt and Price ID", async t => {
   const attemptId = "10c9b4ea-f68f-44c2-bb79-4bf13d951ab2";

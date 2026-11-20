@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
 import { creditsContent } from "@/lib/credits-content";
-import { creditsRequest, startCreditPurchase, WritingError, type CreditPrice, type CreditPurchaseStatus } from "@/lib/writing/writing-api";
+import { creditsRequest, openBillingPortal, startCreditPurchase, WritingError, type CreditPrice, type CreditPurchaseStatus } from "@/lib/writing/writing-api";
 
 type Notice = keyof typeof creditsContent.ko.checkout;
 interface Attempt { attemptId: string; price: CreditPrice; orderId?: string }
@@ -28,6 +28,7 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
   const [price, setPrice] = useState<CreditPrice | "unavailable" | null>(initialAttempt?.price ?? null);
   const [priceRevision, setPriceRevision] = useState(0);
   const [checkCount, setCheckCount] = useState(0);
+  const [portalNotice, setPortalNotice] = useState<keyof typeof t.portal | null>(null);
   const operation = useRef<AbortController | null>(null);
 
   const remember = useCallback((value: Attempt | null) => {
@@ -97,6 +98,7 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
     if (!selected || selected === "unavailable") return;
     const controller = new AbortController();
     operation.current = controller;
+    setPortalNotice(null);
     setNotice("opening");
     try {
       const current = attempt.current ?? { attemptId: crypto.randomUUID(), price: selected };
@@ -132,8 +134,28 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
     }
   }
 
+  async function viewPayments() {
+    if (operation.current) return;
+    const controller = new AbortController();
+    operation.current = controller;
+    setPortalNotice("opening");
+    try {
+      const { portalUrl } = await openBillingPortal(controller.signal);
+      if (controller.signal.aborted) return;
+      if (portalUrl) window.location.assign(portalUrl);
+      setPortalNotice(portalUrl ? null : "empty");
+    } catch (cause) {
+      if (controller.signal.aborted) return;
+      setPortalNotice("error");
+      if (cause instanceof WritingError && cause.status === 401) void refreshSession();
+    } finally {
+      if (operation.current === controller) operation.current = null;
+    }
+  }
+
   const retryCheck = notice === "delayed" || notice === "checkError";
-  const blocked = notice === "opening" || notice === "checking" || retryCheck;
+  const opening = notice === "opening" || portalNotice === "opening";
+  const blocked = opening || notice === "checking" || retryCheck;
   return <div className="credits-purchase">
     {price === "unavailable" ? <>
       <p role="status">{t.priceUnavailable}</p>
@@ -141,6 +163,10 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
     </> : price ? <button type="button" className="button button-primary" disabled={blocked} onClick={() => void buy()}>
       {t.buy(price.credits.toLocaleString(language), price.amount.toLocaleString(language))}
     </button> : <p role="status">{t.priceLoading}</p>}
+    <button type="button" className="button credits-secondary" disabled={opening} onClick={() => void viewPayments()}>
+      {t.paymentHistory}
+    </button>
+    {portalNotice && <p role="status">{t.portal[portalNotice]}</p>}
     {notice && <p role="status">{t.checkout[notice]}</p>}
     {retryCheck && <button type="button" className="button credits-secondary" onClick={() => setCheckCount(count => count + 1)}>{t.checkAgain}</button>}
   </div>;

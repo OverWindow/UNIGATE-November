@@ -15,9 +15,14 @@ Checkout에 표시할 결제수단은 Stripe Dashboard에서 관리합니다. �
 | GET | `/api/credits/price/` | 로그인한 회원에게 현재 충전 가격(Price ID·금액·통화)과 적립량 제공 |
 | POST | `/api/credits/purchases/` | 로그인·CSRF 인증 후 구매 시도 ID와 화면에서 확인한 Price ID로 주문·결제 세션 생성 |
 | GET | `/api/credits/purchases/<id>/` | 로그인한 사용자의 주문 상태 조회 |
+| POST | `/api/credits/billing-portal/` | 로그인·CSRF 인증 후 본인 전용 Stripe 고객 포털 주소 발급. 고객 연결 전에는 `portalUrl: null` 반환 |
 | POST | `/api/payments/stripe/webhook/` | Django가 Stripe 서명을 확인하고 세션 완료·만료 처리 |
 
 `backend/migration/accounts/`의 Django 마이그레이션이 결제 스키마를 관리합니다. `credit_purchases`에는 주문·회원·구매 시도(`id`, `user_id`, `attempt_id`), 주문 당시의 가격과 지급량(`stripe_price_id`, `amount`, `currency`, `credits`), 처리 상태와 생성 시각(`status`, `created_at`), Stripe 세션과 적립 내역(`stripe_session_id`, `transaction_id`)을 기록합니다. Django가 주문을 생성할 때 Stripe에서 읽은 금액을 저장하고, 적립 시 `credit_transactions.kind`에 유료 충전(`purchase`)을 기록합니다.
+
+**결제 내역.** Django는 첫 충전 시도에서 회원 전용 Stripe 고객을 만들고 기존 `credit_accounts` 테이블의 `stripe_customer_id`에 저장합니다(빈 값 허용, 고유). 새 Checkout에 같은 고객 ID를 지정하고 일회성 청구서 생성을 활성화합니다. 회원은 `/credits`의 **결제 내역** 버튼으로 본인 청구서를 열고 다시 TOPIQ로 돌아올 수 있습니다. 도입 전에 생성한 결제창의 충전은 기존 크레딧 내역에서 확인합니다. 일회성 결제 청구서에는 별도 발행 수수료가 적용됩니다. [Stripe 청구서 발행 요금](https://support.stripe.com/questions/pricing-for-post-payment-invoices-for-one-time-purchases-via-checkout-and-payment-links)
+
+**Stripe 포털 설정.** 테스트 전에 샌드박스에서, 배포 전에 라이브 모드에서 각각 기본 고객 포털의 **Invoice history**를 켜고 설정을 저장합니다. API가 회원별로 임시 포털 세션을 생성하므로 공개 로그인 링크를 만들 필요는 없습니다. 테스트와 운영은 각 Stripe 환경에 대응하는 별도 DB를 사용합니다. [고객 포털 설정](https://dashboard.stripe.com/settings/billing/portal)
 
 ### 로컬에서 테스트 결제하기
 
@@ -29,7 +34,7 @@ Checkout에 표시할 결제수단은 Stripe Dashboard에서 관리합니다. �
    stripe listen --events checkout.session.completed,checkout.session.expired --forward-to http://localhost:8000/api/payments/stripe/webhook/
    ```
 
-3. **패키지와 DB 적용.** 사용자가 `backend/`에서 개발 서버 시작 전에 아래 명령을 차례로 실행합니다. 첫 명령은 Stripe Python SDK를 설치하고 두 번째 명령은 구매 테이블, Price ID 컬럼과 거래 제약 등 미적용 DB 마이그레이션을 적용합니다.
+3. **패키지와 DB 적용.** 사용자가 `backend/`에서 개발 서버 시작 전에 아래 명령을 차례로 실행합니다. 첫 명령은 기존 의존성을 설치합니다. 두 번째 명령은 회원의 Stripe 고객 ID 컬럼을 추가하는 `accounts.0007_credit_account_stripe_customer`를 포함하여 미적용 DB 마이그레이션을 적용합니다.
 
    ```powershell
    .\.venv\Scripts\python.exe -m pip install -r requirements.txt
@@ -38,6 +43,7 @@ Checkout에 표시할 결제수단은 Stripe Dashboard에서 관리합니다. �
    ```
 
 4. **확인.** 다른 터미널의 `frontend-TOPIQ/`에서 `npm run dev`를 실행합니다. `http://localhost:3001/credits`에서 로그인해 버튼과 Checkout에 같은 원화 금액이 표시되는지 확인합니다. 테스트 카드로 결제한 뒤 잔액과 거래 내역에 1,000크레딧이 한 번 반영되는지 확인합니다. [Stripe 테스트 카드](https://docs.stripe.com/testing)
+5. **결제 내역 확인.** 서로 다른 테스트 회원 두 명으로 각각 결제합니다. 각 회원의 **결제 내역** 버튼을 눌러 포털의 청구서 번호와 금액을 대조하고 TOPIQ로 돌아가는 링크가 `/credits`를 여는지 확인합니다. Stripe 고객 연결 전인 회원에게는 페이지 안에 안내가 표시됩니다.
 
 결제 회귀 테스트는 서비스 DB와 분리된 PostgreSQL 연결 설정에서 `backend/`의 `.\.venv\Scripts\python.exe manage.py test accounts.tests.test_credit_purchases --noinput`으로 실행합니다. Django가 테스트 DB를 만들고 삭제하며, 테스트용 Stripe 응답과 서명된 웹훅으로 주문 중복·동시 적립·실패 롤백을 검증합니다.
 

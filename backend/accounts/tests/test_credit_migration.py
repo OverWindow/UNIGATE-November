@@ -6,7 +6,6 @@ from django.db.migrations.executor import MigrationExecutor
 from django.test import TransactionTestCase
 from django.utils import timezone
 
-from accounts.models import CreditAccount, CreditTransaction
 from writing.models import Evaluation
 
 
@@ -37,7 +36,12 @@ class SetCreditMigrationTests(TransactionTestCase):
         with connection.cursor() as cursor:
             columns = {table: {column.name for column in connection.introspection.get_table_description(cursor, table)}
                        for table in ("credit_accounts", "credit_transactions", "writing_evaluations")}
-        MigrationExecutor(connection).migrate([("accounts", "0004_writing_set_credits")])
+        after = [("accounts", "0004_writing_set_credits")]
+        executor = MigrationExecutor(connection)
+        executor.migrate(after)
+        apps = executor.loader.project_state(after).apps
+        CreditAccount = apps.get_model("accounts", "CreditAccount")
+        CreditTransaction = apps.get_model("accounts", "CreditTransaction")
         self.assertEqual(set(connection.introspection.table_names()), tables)
         self.assertEqual(list(CreditAccount.objects.order_by("user_id").values()), wallets)
         self.assertEqual(list(CreditTransaction.objects.order_by("id").values(*transactions[0])), transactions)

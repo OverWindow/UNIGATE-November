@@ -7,6 +7,7 @@ interface Copy {
   result: string; history: string; empty: string; loading: string; error: string; retry: string; refresh: string;
   loginRequired: string; previous: string; next: string; page: string;
   buy: (credits: string, amount: string) => string; checkAgain: string; priceLoading: string; priceUnavailable: string;
+  paymentHistory: string; portal: Record<"opening" | "empty" | "error", string>;
   checkout: Record<"opening" | "checking" | "delayed" | "cancelled" | "fulfilled" | "expired" | "startError" | "checkError" | "unavailable" | "priceChanged", string>;
   kinds: Record<CreditEntry["kind"], string>;
 }
@@ -22,6 +23,11 @@ export const creditsContent: Record<Language, Copy> = {
     loginRequired: "로그인하면 내 크레딧 내역을 확인할 수 있습니다.", previous: "이전", next: "다음", page: "페이지",
     buy: (credits, amount) => `${credits}크레딧 충전 · ${amount}원`, checkAgain: "결제 상태 다시 확인",
     priceLoading: "충전 가격을 불러오는 중입니다.", priceUnavailable: "충전 가격을 불러올 수 없습니다.",
+    paymentHistory: "결제 내역", portal: {
+      opening: "Stripe 결제 내역을 여는 중입니다.",
+      empty: "Stripe에서 볼 수 있는 결제 내역이 아직 없습니다. 이전 충전은 아래 크레딧 내역에서 확인해 주세요.",
+      error: "결제 내역을 열지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    },
     checkout: {
       opening: "Stripe 결제창을 여는 중입니다.", checking: "결제 확인 중입니다.",
       delayed: "결제 확인에 시간이 걸리고 있습니다. 잠시 후 상태를 다시 확인해 주세요.",
@@ -43,6 +49,11 @@ export const creditsContent: Record<Language, Copy> = {
     loginRequired: "Sign in to view your credit history.", previous: "Previous", next: "Next", page: "Page",
     buy: (credits, amount) => `Buy ${credits} credits · ₩${amount}`, checkAgain: "Check payment status",
     priceLoading: "Loading the purchase price…", priceUnavailable: "Couldn’t load the purchase price.",
+    paymentHistory: "Payment history", portal: {
+      opening: "Opening your Stripe payment history…",
+      empty: "You don’t have any invoices to view in Stripe yet. You can find past top-ups in your credit history below.",
+      error: "Couldn’t open your payment history. Please try again shortly.",
+    },
     checkout: {
       opening: "Opening Stripe Checkout…", checking: "Confirming your payment…",
       delayed: "Your payment is still being confirmed. Check its status again shortly.",
@@ -64,6 +75,11 @@ export const creditsContent: Record<Language, Copy> = {
     loginRequired: "Masuk untuk melihat riwayat kredit Anda.", previous: "Sebelumnya", next: "Berikutnya", page: "Halaman",
     buy: (credits, amount) => `Beli ${credits} kredit · ₩${amount}`, checkAgain: "Periksa status pembayaran",
     priceLoading: "Memuat harga kredit…", priceUnavailable: "Harga kredit tidak dapat dimuat.",
+    paymentHistory: "Riwayat pembayaran", portal: {
+      opening: "Membuka riwayat pembayaran Stripe…",
+      empty: "Belum ada faktur yang dapat dilihat di Stripe. Isi ulang sebelumnya dapat dilihat di riwayat kredit di bawah.",
+      error: "Riwayat pembayaran tidak dapat dibuka. Silakan coba lagi sebentar.",
+    },
     checkout: {
       opening: "Membuka halaman pembayaran Stripe…", checking: "Mengonfirmasi pembayaran…",
       delayed: "Pembayaran masih diproses. Periksa kembali statusnya sebentar lagi.",

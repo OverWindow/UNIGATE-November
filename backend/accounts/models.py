@@ -23,6 +23,7 @@ class RateLimit(models.Model):
 
 class CreditAccount(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, models.PROTECT, primary_key=True)
+    stripe_customer_id = models.CharField(max_length=255, unique=True, null=True, editable=False)
     balance = models.PositiveBigIntegerField(default=0)
     reserved = models.PositiveBigIntegerField(default=0)
     updated_at = models.DateTimeField(auto_now=True)

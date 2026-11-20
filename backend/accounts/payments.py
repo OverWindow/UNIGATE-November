@@ -13,7 +13,7 @@ from django.views.decorators.debug import sensitive_variables
 from django.views.decorators.http import require_GET, require_POST
 
 from .credits import locked_account, record
-from .models import CREDIT_PURCHASE_QUANTITY, CreditPurchase
+from .models import CREDIT_PURCHASE_QUANTITY, CreditAccount, CreditPurchase
 from .views import api_response, read_payload
 
 
@@ -21,8 +21,8 @@ class PaymentsUnavailable(Exception):
     pass
 
 
-def stripe_client():
-    if not settings.STRIPE_SECRET_KEY or not settings.STRIPE_WEBHOOK_SECRET:
+def stripe_client(*, require_webhook=True):
+    if not settings.STRIPE_SECRET_KEY or (require_webhook and not settings.STRIPE_WEBHOOK_SECRET):
         raise PaymentsUnavailable
     return stripe.StripeClient(
         settings.STRIPE_SECRET_KEY, http_client=stripe.RequestsClient(timeout=8), max_network_retries=0,
@@ -60,9 +60,22 @@ def purchase_price(request):
     return api_response(price)
 
 
-def checkout(purchase, sessions):
+@transaction.atomic
+def checkout_customer(user_id, customers):
+    account = locked_account(user_id)
+    if not account.stripe_customer_id:
+        # Use the same key even if the first response was lost and a new order is started.
+        first_order = CreditPurchase.objects.filter(user_id=user_id).earliest("created_at", "pk")
+        customer = customers.create(options={"idempotency_key": f"topiq-customer-{first_order.pk}"})
+        account.stripe_customer_id = customer.id
+        account.save(update_fields=["stripe_customer_id"])
+    return account.stripe_customer_id
+
+
+def checkout(purchase, client, *, retry):
     if purchase.status != "pending":
         return None
+    sessions = client.v1.checkout.sessions
     if purchase.stripe_session_id:
         session = sessions.retrieve(purchase.stripe_session_id)
     else:
@@ -72,7 +85,7 @@ def checkout(purchase, sessions):
             purchase.refresh_from_db()
             return None
         return_url = f"{settings.TOPIQ_PUBLIC_URL}/credits?purchase={purchase.pk}"
-        session = sessions.create({
+        params = {
             "mode": "payment",
             "currency": purchase.currency,
             "adaptive_pricing": {"enabled": False},
@@ -80,7 +93,18 @@ def checkout(purchase, sessions):
             "metadata": {"credit_purchase_id": str(purchase.pk)},
             "success_url": return_url,
             "cancel_url": f"{return_url}&cancelled=1",
-        }, options={"idempotency_key": str(purchase.pk)})
+        }
+        customer_id = checkout_customer(purchase.user_id, client.v1.customers)
+        options = {"idempotency_key": str(purchase.pk)}
+        try:
+            session = sessions.create({
+                **params, "customer": customer_id, "invoice_creation": {"enabled": True},
+            }, options=options)
+        except stripe.IdempotencyError as exc:
+            if not retry or exc.http_status != 400 or exc.code == "idempotency_key_in_use":
+                raise
+            # Recover a pre-portal Checkout whose response was lost, using its original parameters and key.
+            session = sessions.create(params, options=options)
         CreditPurchase.objects.filter(pk=purchase.pk, stripe_session_id__isnull=True).update(stripe_session_id=session.id)
 
     if session.status == "expired":
@@ -125,7 +149,7 @@ def create_purchase(request):
         if purchase.stripe_price_id != expected_price:
             return api_response({"error": "price_changed"}, 409)
         try:
-            url = checkout(purchase, client.v1.checkout.sessions)
+            url = checkout(purchase, client, retry=not created)
         except stripe.InvalidRequestError as exc:
             # A rejected, superseded Price cannot open a new Checkout Session.
             if (not purchase.stripe_session_id and settings.STRIPE_PRICE_ID
@@ -136,6 +160,27 @@ def create_purchase(request):
     except (PaymentsUnavailable, stripe.StripeError, DatabaseError):
         return api_response({"error": "payments_unavailable"}, 503)
     return api_response({"id": purchase.pk, "status": purchase.status, "checkoutUrl": url}, 201 if created else 200)
+
+
+@require_POST
+@sensitive_variables()
+def billing_portal(request):
+    if not request.user.is_authenticated:
+        return api_response({"error": "authentication_required"}, 401)
+    _, error = read_payload(request, set())
+    if error is not None:
+        return error
+    try:
+        customer_id = (CreditAccount.objects.filter(user_id=request.user.pk)
+                       .values_list("stripe_customer_id", flat=True).first())
+        if not customer_id:
+            return api_response({"portalUrl": None})
+        session = stripe_client(require_webhook=False).v1.billing_portal.sessions.create({
+            "customer": customer_id, "return_url": f"{settings.TOPIQ_PUBLIC_URL}/credits",
+        })
+    except (PaymentsUnavailable, stripe.StripeError, DatabaseError):
+        return api_response({"error": "payments_unavailable"}, 503)
+    return api_response({"portalUrl": session.url})
 
 
 @require_GET

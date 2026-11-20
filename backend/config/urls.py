@@ -21,6 +21,7 @@ urlpatterns = [
     path("api/credits/", evaluation_views.credits),
     path("api/credits/transactions/", evaluation_views.transactions),
     path("api/credits/price/", payments.purchase_price),
+    path("api/credits/billing-portal/", payments.billing_portal),
     path("api/credits/purchases/", payments.create_purchase),
     path("api/credits/purchases/<uuid:purchase_id>/", payments.purchase_status),
     path("api/payments/stripe/webhook/", payments.stripe_webhook),
