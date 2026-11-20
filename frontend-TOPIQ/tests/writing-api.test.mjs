@@ -26,6 +26,24 @@ test("reading writing prompts does not submit an evaluation or request CSRF", as
   assert.equal(getEventListeners(controller.signal, "abort").length, 0);
 });
 
+test("credit checkout retries CSRF with the same attempt and quoted Price ID", async () => {
+  let posts = 0;
+  const attemptId = "b73071f7-5483-40d7-b61b-3a5ecf8ae60c";
+  const priceId = "price_test_topiq";
+  globalThis.fetch = async (path, options) => {
+    if (path === "/api/csrf/") return Response.json({ csrfToken: `token-${posts}` });
+    assert.equal(path, "/api/credits/purchases/");
+    assert.equal(options.method, "POST");
+    assert.equal(options.headers["X-CSRFToken"], `token-${posts}`);
+    assert.deepEqual(JSON.parse(options.body), { attemptId, priceId });
+    return ++posts === 1 ? Response.json({ error: "csrf_failed" }, { status: 403 })
+      : Response.json({ id: attemptId, status: "pending", checkoutUrl: "https://checkout.stripe.com/example" });
+  };
+  const order = await api.startCreditPurchase(attemptId, priceId, new AbortController().signal);
+  assert.equal(posts, 2);
+  assert.equal(order.status, "pending");
+});
+
 test("evaluation sends original answers and retries only a rejected CSRF request", async () => {
   const payload = { id: "synthetic-id", setId: "synthetic-set", typeSlot: 51, answer: { a: " \r\n원문 ", b: "" }, priceVersion: "v1", feedbackLanguage: "id" };
   const calls = [];

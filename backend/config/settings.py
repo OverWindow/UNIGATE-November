@@ -25,6 +25,9 @@ if not SECRET_KEY:
     raise ImproperlyConfigured("Set DJANGO_SECRET_KEY before starting Django.")
 
 DEBUG = DJANGO_ENV == "development"
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "").strip()
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "").strip()
+STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID", "").strip()
 BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "").strip()
 BREVO_SENDER_EMAIL = os.environ.get("BREVO_SENDER_EMAIL", "").strip()
 BREVO_SENDER_NAME = os.environ.get("BREVO_SENDER_NAME", "TOPIQ").strip() or "TOPIQ"

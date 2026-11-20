@@ -4,6 +4,47 @@
 단일 페이지에서 안내 콘텐츠, 비용 비교, 대학 갤러리와 통계 팝업을 제공하고, PDF 신청 정보를 PostgreSQL에 저장합니다.
 PDF 파일은 운영자가 나중에 수동으로 보냅니다. 이 랜딩페이지에는 자동 다운로드·메일 발송·회원가입·이용자 로그인·결제·백그라운드 작업이 없습니다. 별도 TOPIQ의 인증 기능은 공유 백엔드에 유지합니다.
 
+## TOPIQ 크레딧 충전
+
+TOPIQ 회원은 `/credits`에서 Stripe Checkout 카드 결제로 1,000크레딧을 충전합니다. 버튼에 표시하는 원화 금액과 결제창의 가격은 백엔드 환경변수 `STRIPE_PRICE_ID`로 지정합니다. Django가 결제를 확인하면 잔액과 거래 내역에 `유료 충전 +1,000`을 함께 기록합니다. 브라우저를 닫아도 Stripe 웹훅이 적립을 처리합니다. [수정 가능한 결제 흐름도](docs/stripe-credit-payment-flow.md)
+
+| 메서드 | API | 용도 |
+| --- | --- | --- |
+| GET | `/api/credits/price/` | 로그인한 회원에게 현재 충전 가격(Price ID·금액·통화)과 적립량 제공 |
+| POST | `/api/credits/purchases/` | 로그인·CSRF 인증 후 구매 시도 ID와 화면에서 확인한 Price ID로 주문·결제 세션 생성 |
+| GET | `/api/credits/purchases/<id>/` | 로그인한 사용자의 주문 상태 조회 |
+| POST | `/api/payments/stripe/webhook/` | Django가 Stripe 서명을 확인하고 세션 완료·만료 처리 |
+
+`backend/migration/accounts/`의 Django 마이그레이션이 결제 스키마를 관리합니다. `credit_purchases`에는 주문·회원·구매 시도(`id`, `user_id`, `attempt_id`), 주문 당시의 가격과 지급량(`stripe_price_id`, `amount`, `currency`, `credits`), 처리 상태와 생성 시각(`status`, `created_at`), Stripe 세션과 적립 내역(`stripe_session_id`, `transaction_id`)을 기록합니다. Django가 주문을 생성할 때 Stripe에서 읽은 금액을 저장하고, 적립 시 `credit_transactions.kind`에 유료 충전(`purchase`)을 기록합니다.
+
+### 로컬에서 테스트 결제하기
+
+1. **상품 가격과 백엔드 설정.** Stripe 샌드박스의 상품 카탈로그에서 1,000크레딧 상품의 활성 일회성 고정 가격을 선택합니다. 처음 등록한다면 통화는 KRW, 금액은 5,000원으로 설정합니다. 가격의 `price_...` 값을 `backend/.env.development`의 `STRIPE_PRICE_ID`에, 같은 샌드박스의 API 비밀 키를 `STRIPE_SECRET_KEY`에 설정합니다. `TOPIQ_PUBLIC_URL`은 브라우저에서 여는 TOPIQ 주소와 맞춥니다(로컬 기본값 `http://localhost:3001`). [Stripe 상품·가격 관리](https://docs.stripe.com/products-prices/manage-prices)
+2. **웹훅 전달.** Stripe CLI를 설치한 뒤 별도 터미널에서 아래 명령을 수동 실행합니다. 리스너가 표시한 이 환경의 서명 키를 `backend/.env.development`의 `STRIPE_WEBHOOK_SECRET`에 설정하고 테스트 중에는 리스너를 실행해 둡니다. 전달 대상은 Django 개발 서버입니다. [Stripe CLI 설치](https://docs.stripe.com/cli/install) · [웹훅 전달](https://docs.stripe.com/cli/listen)
+
+   ```powershell
+   stripe login
+   stripe listen --events checkout.session.completed,checkout.session.expired --forward-to http://localhost:8000/api/payments/stripe/webhook/
+   ```
+
+3. **패키지와 DB 적용.** 사용자가 `backend/`에서 개발 서버 시작 전에 아래 명령을 차례로 실행합니다. 첫 명령은 Stripe Python SDK를 설치하고 두 번째 명령은 구매 테이블, Price ID 컬럼과 거래 제약 등 미적용 DB 마이그레이션을 적용합니다.
+
+   ```powershell
+   .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+   .\.venv\Scripts\python.exe manage.py migrate
+   .\.venv\Scripts\python.exe manage.py runserver
+   ```
+
+4. **확인.** 다른 터미널의 `frontend-TOPIQ/`에서 `npm run dev`를 실행합니다. `http://localhost:3001/credits`에서 로그인해 버튼과 Checkout에 같은 원화 금액이 표시되는지 확인합니다. 테스트 카드로 결제한 뒤 잔액과 거래 내역에 1,000크레딧이 한 번 반영되는지 확인합니다. [Stripe 테스트 카드](https://docs.stripe.com/testing)
+
+결제 회귀 테스트는 서비스 DB와 분리된 PostgreSQL 연결 설정에서 `backend/`의 `.\.venv\Scripts\python.exe manage.py test accounts.tests.test_credit_purchases --noinput`으로 실행합니다. Django가 테스트 DB를 만들고 삭제하며, 테스트용 Stripe 응답과 서명된 웹훅으로 주문 중복·동시 적립·실패 롤백을 검증합니다.
+
+### 운영 적용
+
+사업자 국가·상품에 대한 Stripe 실결제 지원 여부와 환불 시 크레딧 회수 기준을 확인한 뒤 적용합니다. Stripe Workbench에서 **자체 계정의 스냅샷 웹훅**을 공개 Django HTTPS 주소의 `/api/payments/stripe/webhook/`로 등록하고 `checkout.session.completed`, `checkout.session.expired` 이벤트를 선택합니다. 백엔드에 운영용 `STRIPE_SECRET_KEY`, 운영 상품의 `STRIPE_PRICE_ID`, 해당 엔드포인트의 `STRIPE_WEBHOOK_SECRET`, 운영 TOPIQ 주소인 `TOPIQ_PUBLIC_URL`을 설정한 후 백엔드와 TOPIQ를 재배포합니다. 운영에서는 기존 `deploy/start.sh`가 migration 적용 후 Gunicorn을 실행합니다. 이후 금액만 변경할 때는 같은 상품에 새 KRW 가격을 만들고 백엔드의 `STRIPE_PRICE_ID`를 교체한 후 백엔드를 재시작합니다. [Stripe 웹훅 등록](https://docs.stripe.com/webhooks)
+
+Stripe에서 결제는 성공했지만 적립 대기가 계속되면 Workbench에서 해당 세션의 `checkout.session.completed` 전달 결과를 확인합니다. 전송 실패 원인을 해결한 후 해당 이벤트를 재전송하면 Django가 같은 주문의 적립 여부를 확인하고 처리합니다.
+
 ## TOPIQ AI 쓰기 튜터 (PBT)
 
 누구나 `/writing`에서 세트 목록을 볼 수 있습니다. 비로그인 사용자가 세트를 누르면 페이지 이동 없이 잠금·로그인 안내 팝업을 표시하고,
@@ -116,7 +157,7 @@ Django migration `migration/writing/0001_initial.py`, `migration/accounts/0003_c
 이 변경의 신규 API는 위 세트 열기 POST 1개이고, 추가 의존성·환경변수·워커는 없습니다.
 잔액/예약액 제약과 평가별 거래 중복 방지 제약을 사용합니다. 짧은 PostgreSQL advisory transaction lock으로 프로세스 간 접수를 직렬화합니다.
 신규 가입 경로에서만 가입 지급을 호출합니다. 기존 사용자의 최초 크레딧 계정 생성 기본 잔액은 0이며 자동 지급하지 않습니다.
-거래·평가 이력이 있는 사용자 삭제는 보호됩니다. 데이터 삭제·크레딧 결제 충전·만료 정책은 이 기능에 포함하지 않습니다.
+거래·평가 이력이 있는 사용자 삭제는 보호됩니다. 데이터 삭제·크레딧 만료 정책은 이 기능에 포함하지 않습니다. 유료 충전 절차는 위의 ‘TOPIQ 크레딧 충전’ 항목을 참고하세요.
 
 ### 환경변수와 운영
 

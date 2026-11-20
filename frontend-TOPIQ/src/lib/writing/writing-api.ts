@@ -45,7 +45,9 @@ async function requestJson<T>(path: string, signal: AbortSignal, options: Reques
 export interface LearnerAnswer { a?: string; b?: string; text?: string }
 export interface EvaluationConfig { questionPrices: Record<number, number>; setCost: number; evaluationLimit: number; enabled: boolean; priceVersion: string; timeoutSeconds: number }
 export interface CreditBalance { balance: number; reserved: number; available: number }
-export interface CreditEntry { id: string; kind: "grant" | "reserve" | "capture" | "release" | "welcome" | "unlock"; amount: number; evaluationId: string | null; setId: string | null; balanceAfter: number; reservedAfter: number; createdAt: string }
+export interface CreditEntry { id: string; kind: "grant" | "reserve" | "capture" | "release" | "welcome" | "unlock" | "purchase"; amount: number; evaluationId: string | null; setId: string | null; balanceAfter: number; reservedAfter: number; createdAt: string }
+export interface CreditPurchaseStatus { id: string; status: "pending" | "fulfilled" | "expired" }
+export interface CreditPrice { priceId: string; amount: number; currency: "krw"; credits: number }
 export interface Evaluation {
   id: string; setId: string; typeSlot: number; status: "processing" | "succeeded" | "failed";
   totalScore: number | null; maxScore: number; creditCost: number; chargedCredits: number;
@@ -63,11 +65,11 @@ export interface Evaluation {
 }
 export interface Submission { id: string; setId: string; typeSlot: number; answer: LearnerAnswer; priceVersion: string; feedbackLanguage: Language }
 
-async function postWriting<T>(path: string, body: object, signal: AbortSignal, timeout = 15000): Promise<T> {
+async function postJson<T>(path: string, body: object, signal: AbortSignal, timeout = 15000): Promise<T> {
   for (let attempt = 0; attempt < 2; attempt++) {
     const { csrfToken } = await requestJson<{ csrfToken: string }>("/api/csrf/", signal);
     try {
-      return await requestJson<T>(`/api/writing/${path}`, signal, {
+      return await requestJson<T>(path, signal, {
         method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken }, body: JSON.stringify(body),
       }, timeout);
     } catch (error) {
@@ -79,11 +81,15 @@ async function postWriting<T>(path: string, body: object, signal: AbortSignal, t
 }
 
 export function submitWriting(body: Submission, signal: AbortSignal, timeoutSeconds: number): Promise<Evaluation> {
-  return postWriting("evaluations/", body, signal, (timeoutSeconds + 20) * 1000);
+  return postJson("/api/writing/evaluations/", body, signal, (timeoutSeconds + 20) * 1000);
 }
 
 export function unlockWriting(setId: string, signal: AbortSignal): Promise<{ setId: string; unlocked: boolean; chargedCredits: number; credits: CreditBalance }> {
-  return postWriting(`sets/${setId}/unlock/`, {}, signal);
+  return postJson(`/api/writing/sets/${setId}/unlock/`, {}, signal);
+}
+
+export function startCreditPurchase(attemptId: string, priceId: string, signal: AbortSignal) {
+  return postJson<CreditPurchaseStatus & { checkoutUrl: string | null }>("/api/credits/purchases/", { attemptId, priceId }, signal);
 }
 
 export function creditsRequest<T>(path: string, signal: AbortSignal): Promise<T> {

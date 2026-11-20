@@ -1,23 +1,30 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Info, RefreshCw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useApp } from "@/app/providers";
 import { authContent } from "@/lib/auth/auth-content";
 import { creditsContent } from "@/lib/credits-content";
 import { creditsRequest, WritingError, type CreditBalance, type CreditEntry } from "@/lib/writing/writing-api";
+import CreditPurchase from "./CreditPurchase";
 
 export default function CreditsAccount() {
   const { user, status, language, refreshSession } = useApp();
   const t = creditsContent[language];
   const a = authContent[language];
+  const search = useSearchParams();
+  const purchase = search.get("purchase");
+  const returnId = purchase && /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(purchase) ? purchase : null;
+  const cancelled = search.get("cancelled") === "1";
+  const next = returnId ? `/credits?purchase=${returnId}${cancelled ? "&cancelled=1" : ""}` : "/credits";
   return <div className="page-container credits-page">
     {(status !== "authenticated" || !user) && <div className="credits-heading"><h1 className="catalog-title">{t.title}</h1></div>}
     {status === "loading" ? <p className="catalog-status" role="status">{a.loading}</p>
       : status === "error" ? <div className="catalog-status" role="alert"><p>{a.network}</p><button className="button credits-secondary" onClick={() => void refreshSession()}>{a.retry}</button></div>
-      : status !== "authenticated" || !user ? <div className="catalog-status"><p>{t.loginRequired}</p><Link className="button button-primary" href="/login?next=%2Fcredits">{a.login}</Link></div>
-      : <CreditWallet key={user.id} />}
+      : status !== "authenticated" || !user ? <div className="catalog-status"><p>{t.loginRequired}</p><Link className="button button-primary" href={`/login?next=${encodeURIComponent(next)}`}>{a.login}</Link></div>
+      : <CreditWallet key={user.id} userId={user.id} returnId={returnId} cancelled={cancelled} />}
   </div>;
 }
 
@@ -28,7 +35,7 @@ interface WalletData {
   nextPage: number | null;
 }
 
-function CreditWallet() {
+function CreditWallet({ userId, returnId, cancelled }: { userId: number; returnId: string | null; cancelled: boolean }) {
   const { language, refreshSession, refreshCredits } = useApp();
   const t = creditsContent[language];
   const [page, setPage] = useState(1);
@@ -64,6 +71,10 @@ function CreditWallet() {
   function refresh(nextPage = page) {
     setLoading(true); setError(false); setPage(nextPage); setRevision(value => value + 1);
   }
+  const refreshAfterPurchase = useCallback(() => {
+    setPage(1);
+    setRevision(value => value + 1);
+  }, []);
 
   return <>
     <div className="credits-heading">
@@ -74,13 +85,16 @@ function CreditWallet() {
       </button>
     </div>
     {error && <div className="catalog-status" role="alert"><p>{t.error}</p><button className="button credits-secondary" onClick={() => refresh()}>{t.retry}</button></div>}
-    {!current ? !error && <p className="catalog-status credits-loading" role="status"><RefreshCw className="credits-loading-icon" size={20} aria-hidden="true" />{t.loading}</p>
-      : <div className="credits-content" aria-busy={loading}>
+    {!current && !error && <p className="catalog-status credits-loading" role="status"><RefreshCw className="credits-loading-icon" size={20} aria-hidden="true" />{t.loading}</p>}
+    {current && <div className="credits-content" aria-busy={loading}>
         <dl className="credits-balances">
           <div className="credits-available"><dt>{t.available}</dt><dd>{number(current.balance.available)} <span>{t.unit}</span></dd></div>
           <div><dt>{t.balance}</dt><dd>{number(current.balance.balance)} <span>{t.unit}</span></dd></div>
           <div><dt>{t.reserved}</dt><dd>{number(current.balance.reserved)} <span>{t.unit}</span></dd></div>
         </dl>
+      </div>}
+    <CreditPurchase userId={userId} returnId={returnId} cancelled={cancelled} onFulfilled={refreshAfterPurchase} />
+    {current && <div className="credits-content" aria-busy={loading}>
         <section className="credits-history" aria-labelledby="credit-transactions-heading">
           <div className="credits-history-heading">
             <h2 id="credit-transactions-heading">{t.transactions}</h2>
@@ -102,7 +116,7 @@ function CreditWallet() {
                 <time dateTime={entry.createdAt}>{new Date(entry.createdAt).toLocaleString(language)}</time>
               </div>
               <dl className="credits-transaction-details"><div><dt>{t.balanceAfter}</dt><dd>{number(entry.balanceAfter)}</dd></div><div><dt>{t.reservedAfter}</dt><dd>{number(entry.reservedAfter)}</dd></div></dl>
-              <strong className={`credits-amount credits-amount-${entry.kind}`}>{entry.kind === "grant" || entry.kind === "welcome" ? "+" : entry.kind === "capture" || entry.kind === "unlock" ? "−" : ""}{number(entry.amount)} <span>{t.unit}</span></strong>
+              <strong className={`credits-amount credits-amount-${entry.kind}`}>{entry.kind === "grant" || entry.kind === "welcome" || entry.kind === "purchase" ? "+" : entry.kind === "capture" || entry.kind === "unlock" ? "−" : ""}{number(entry.amount)} <span>{t.unit}</span></strong>
             </li>)}</ul></div>}
           <nav className="credits-pagination" aria-label={t.transactions}>
             <button className="button credits-secondary" disabled={loading || current.page === 1} onClick={() => refresh(current.page - 1)}>{t.previous}</button>

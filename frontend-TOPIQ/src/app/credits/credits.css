@@ -15,6 +15,10 @@
 .credits-balances dd span { font-size: 13px; font-weight: 500; white-space: nowrap; }
 .credits-balances .credits-available { border-color: #a9bde7; background: #eaf0fc; color: #244e9e; }
 .credits-available dt { color: #315eb7; }
+.credits-purchase { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+.credits-purchase .button { min-height: 44px; }
+.credits-purchase .button:disabled { opacity: .6; }
+.credits-purchase p { margin: 0; color: #405370; font-size: 14px; }
 .credits-history { margin-top: 40px; }
 .credits-history-heading { position: relative; display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
 .credits-history h2 { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -.02em; }
@@ -29,12 +33,12 @@
 .credits-transactions li + li { border-top: 1px solid #e7ecf3; }
 .credits-transaction-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
 .credits-kind { padding: 5px 10px; border-radius: 6px; background: #eef2f8; color: #52647e; font-size: 13px; font-weight: 600; }
-.credits-kind-grant, .credits-kind-welcome { background: #eaf5ef; color: #286143; }
+.credits-kind-grant, .credits-kind-welcome, .credits-kind-purchase { background: #eaf5ef; color: #286143; }
 .credits-kind-capture, .credits-kind-unlock { background: #edf2fc; color: #315eb7; }
 .credits-transaction-heading time { color: #65728a; font-size: 13px; }
 .credits-amount { justify-self: end; font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .credits-amount span { font-size: 12px; font-weight: 500; }
-.credits-amount-grant, .credits-amount-welcome { color: #286143; }
+.credits-amount-grant, .credits-amount-welcome, .credits-amount-purchase { color: #286143; }
 .credits-amount-capture, .credits-amount-unlock { color: #315eb7; }
 .credits-transaction-details { display: flex; flex-wrap: wrap; justify-self: center; gap: 4px 24px; margin: 0; font-size: 13px; color: #596a81; }
 .credits-transaction-details > div { display: flex; align-items: baseline; gap: 8px; }

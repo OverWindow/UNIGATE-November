@@ -4,6 +4,9 @@ from django.conf import settings
 from django.db import models
 
 
+CREDIT_PURCHASE_QUANTITY = 1000
+
+
 class RateLimit(models.Model):
     scope = models.CharField(max_length=64)
     key_hash = models.CharField(max_length=64)
@@ -34,7 +37,7 @@ class CreditTransaction(models.Model):
     account = models.ForeignKey(CreditAccount, models.PROTECT)
     evaluation = models.ForeignKey("writing.Evaluation", models.PROTECT, null=True)
     set_id = models.UUIDField(null=True)
-    kind = models.CharField(max_length=10, choices=[("grant", "지급"), ("reserve", "예약"), ("capture", "차감"), ("release", "예약 해제"), ("welcome", "신규 가입 지급"), ("unlock", "세트 열람")])
+    kind = models.CharField(max_length=10, choices=[("grant", "지급"), ("reserve", "예약"), ("capture", "차감"), ("release", "예약 해제"), ("welcome", "신규 가입 지급"), ("unlock", "세트 열람"), ("purchase", "유료 충전")])
     amount = models.PositiveIntegerField()
     balance_after = models.PositiveBigIntegerField()
     reserved_after = models.PositiveBigIntegerField()
@@ -54,5 +57,32 @@ class CreditTransaction(models.Model):
                 | models.Q(kind__in=["reserve", "capture", "release"], evaluation__isnull=False, actor__isnull=True, set_id__isnull=True)
                 | models.Q(kind="welcome", evaluation__isnull=True, actor__isnull=True, set_id__isnull=True, amount=100)
                 | models.Q(kind="unlock", evaluation__isnull=True, actor__isnull=True, set_id__isnull=False, amount=100)
+                | models.Q(kind="purchase", evaluation__isnull=True, actor__isnull=True, set_id__isnull=True, amount=CREDIT_PURCHASE_QUANTITY)
             ), name="credit_transaction_source"),
+        ]
+
+
+class CreditPurchase(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, models.PROTECT)
+    attempt_id = models.UUIDField()
+    stripe_price_id = models.CharField(max_length=255, null=True)
+    amount = models.PositiveIntegerField()
+    currency = models.CharField(max_length=3, default="krw")
+    credits = models.PositiveIntegerField(default=CREDIT_PURCHASE_QUANTITY)
+    status = models.CharField(max_length=10, default="pending", choices=[
+        ("pending", "결제 대기"), ("fulfilled", "적립 완료"), ("expired", "만료"),
+    ])
+    stripe_session_id = models.CharField(max_length=255, unique=True, null=True)
+    transaction = models.OneToOneField(CreditTransaction, models.PROTECT, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "credit_purchases"
+        constraints = [
+            models.UniqueConstraint(fields=["user", "attempt_id"], name="credit_purchase_attempt_unique"),
+            models.CheckConstraint(condition=(
+                models.Q(status="fulfilled", transaction__isnull=False, stripe_session_id__isnull=False)
+                | models.Q(status__in=["pending", "expired"], transaction__isnull=True)
+            ), name="credit_purchase_fulfillment"),
         ]
