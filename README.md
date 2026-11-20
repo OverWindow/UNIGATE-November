@@ -8,6 +8,8 @@ PDF 파일은 운영자가 나중에 수동으로 보냅니다. 이 랜딩페이
 
 TOPIQ 회원은 `/credits`에서 Stripe Checkout 카드 결제로 1,000크레딧을 충전합니다. 버튼에 표시하는 원화 금액과 결제창의 가격은 백엔드 환경변수 `STRIPE_PRICE_ID`로 지정합니다. Django가 결제를 확인하면 잔액과 거래 내역에 `유료 충전 +1,000`을 함께 기록합니다. 브라우저를 닫아도 Stripe 웹훅이 적립을 처리합니다. [수정 가능한 결제 흐름도](docs/stripe-credit-payment-flow.md)
 
+Checkout에 표시할 결제수단은 Stripe Dashboard에서 관리합니다. 테스트 결제 전에는 샌드박스에서, 운영 전환 전에는 라이브 모드에서 TOPIQ Checkout에 적용되는 기본 결제수단 구성에 **카드(Cards)만 활성화**되어 있는지 확인하세요. 현재 크레딧 적립은 즉시 승인되는 카드 결제를 기준으로 동작합니다. [Stripe 결제수단 설정](https://dashboard.stripe.com/settings/payment_methods) · [Checkout 전환 가이드](https://docs.stripe.com/payments/payment-methods/dynamic-payment-methods)
+
 | 메서드 | API | 용도 |
 | --- | --- | --- |
 | GET | `/api/credits/price/` | 로그인한 회원에게 현재 충전 가격(Price ID·금액·통화)과 적립량 제공 |

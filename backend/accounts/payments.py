@@ -75,7 +75,6 @@ def checkout(purchase, sessions):
         session = sessions.create({
             "mode": "payment",
             "currency": purchase.currency,
-            "payment_method_types": ["card"],
             "adaptive_pricing": {"enabled": False},
             "line_items": [{"quantity": 1, "price": purchase.stripe_price_id}],
             "metadata": {"credit_purchase_id": str(purchase.pk)},

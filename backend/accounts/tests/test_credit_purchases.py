@@ -141,7 +141,7 @@ class CreditPurchaseTests(TestCase):
                           order.stripe_price_id), (self.user.pk, SESSION_ID, AMOUNT, "krw", 1000, PRICE_ID))
         self.sessions.create.assert_called_once()
         params = self.sessions.create.call_args.args[0]
-        self.assertEqual(params["payment_method_types"], ["card"])
+        self.assertNotIn("payment_method_types", params)
         self.assertEqual(params["currency"], "krw")
         self.assertEqual(params["line_items"], [{"price": PRICE_ID, "quantity": 1}])
         self.assertEqual(params["success_url"], f"https://topiq.example.invalid/credits?purchase={order.pk}")
