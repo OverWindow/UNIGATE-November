@@ -7,10 +7,13 @@ interface AuthContent {
   show: string; hide: string; submitting: string; loading: string;
   noAccount: string; hasAccount: string; home: string;
   network: string; errors: Record<string, string>;
+  googleLink: string; googleLinkHelp: string; googleEmailHelp: string;
 }
 
 export const authContent: Record<Language, AuthContent> = {
   ko: {
+    googleLink: "Google 계정 연결", googleLinkHelp: "이 이메일로 가입한 TOPIQ 계정이 있어요. 기존 TOPIQ 비밀번호를 입력하고 연결을 승인해 주세요.",
+    googleEmailHelp: "이메일 소유를 확인한 뒤 가입을 이어갑니다. Google 로그인을 시작한 브라우저에서 인증 링크를 열어 주세요.",
     login: "로그인", welcome: "환영합니다.", signup: "회원가입", logout: "로그아웃", retry: "다시 연결", credits: "크레딧",
     email: "이메일", nickname: "닉네임", password: "비밀번호", confirm: "비밀번호 확인",
     passwordHint: "8자 이상으로, 흔한 비밀번호나 숫자만으로 된 비밀번호는 사용할 수 없어요.",
@@ -19,6 +22,10 @@ export const authContent: Record<Language, AuthContent> = {
     noAccount: "아직 계정이 없으신가요?", hasAccount: "이미 계정이 있으신가요?", home: "홈으로 돌아가기",
     network: "서버에 연결하지 못했어요. 연결을 확인하고 다시 시도해 주세요.",
     errors: {
+      google_restart: "Google 로그인 화면에서 다시 시작해 주세요. 이메일 인증 링크는 같은 브라우저에서 열어 주세요.",
+      google_invalid: "Google 계정을 확인하지 못했어요. 다시 로그인해 주세요.",
+      google_conflict: "이 계정은 연결할 수 없어요. 기존 로그인 방법으로 다시 로그인해 주세요.",
+      google_unavailable: "Google 로그인에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.",
       required: "입력해 주세요.", invalid: "올바른 형식으로 입력해 주세요.",
       max_length: "입력한 내용이 너무 깁니다.", min_length: "입력한 내용을 확인해 주세요.",
       email_unavailable: "사용할 수 없는 이메일입니다. 기존 계정이 있다면 로그인해 주세요.",
@@ -39,6 +46,8 @@ export const authContent: Record<Language, AuthContent> = {
     },
   },
   en: {
+    googleLink: "Link Google account", googleLinkHelp: "You have a TOPIQ account with this email. Enter your existing TOPIQ password to approve the link.",
+    googleEmailHelp: "Verify your email to finish signing up. Open the email link in the browser where you started Google sign-in.",
     login: "Log in", welcome: "Welcome.", signup: "Sign up", logout: "Log out", retry: "Reconnect", credits: "Credits",
     email: "Email", nickname: "Nickname", password: "Password", confirm: "Confirm password",
     passwordHint: "Use at least 8 characters. Avoid common passwords and passwords made up of only numbers.",
@@ -47,6 +56,10 @@ export const authContent: Record<Language, AuthContent> = {
     noAccount: "New to TOPIQ?", hasAccount: "Already have an account?", home: "Back to home",
     network: "We couldn't connect to the server. Check your connection and try again.",
     errors: {
+      google_restart: "Start Google sign-in again. Open the email verification link in the same browser.",
+      google_invalid: "We couldn't verify your Google account. Please sign in again.",
+      google_conflict: "This account can't be linked. Use your existing sign-in method.",
+      google_unavailable: "Google sign-in is unavailable. Please try again shortly.",
       required: "Please fill in this field.", invalid: "Please enter a valid value.",
       max_length: "This value is too long.", min_length: "Please check this value.",
       email_unavailable: "This email is unavailable. Log in if you already have an account.",
@@ -67,6 +80,8 @@ export const authContent: Record<Language, AuthContent> = {
     },
   },
   id: {
+    googleLink: "Hubungkan akun Google", googleLinkHelp: "Email ini terdaftar di TOPIQ. Masukkan kata sandi TOPIQ untuk menyetujui penautan akun.",
+    googleEmailHelp: "Verifikasi email untuk melanjutkan pendaftaran. Buka tautan email di browser tempat kamu memulai proses masuk dengan Google.",
     login: "Masuk", welcome: "Selamat datang.", signup: "Daftar", logout: "Keluar", retry: "Hubungkan lagi", credits: "Kredit",
     email: "Email", nickname: "Nama panggilan", password: "Kata sandi", confirm: "Konfirmasi kata sandi",
     passwordHint: "Gunakan minimal 8 karakter. Hindari kata sandi umum atau yang hanya berisi angka.",
@@ -75,6 +90,10 @@ export const authContent: Record<Language, AuthContent> = {
     noAccount: "Belum punya akun?", hasAccount: "Sudah punya akun?", home: "Kembali ke beranda",
     network: "Tidak dapat terhubung ke server. Periksa koneksi dan coba lagi.",
     errors: {
+      google_restart: "Mulai lagi proses masuk dengan Google. Buka tautan verifikasi email di browser yang sama.",
+      google_invalid: "Akun Google belum dapat diverifikasi. Silakan masuk lagi.",
+      google_conflict: "Akun ini tidak dapat ditautkan. Gunakan metode masuk sebelumnya.",
+      google_unavailable: "Tidak dapat terhubung ke Google. Coba lagi sebentar lagi.",
       required: "Harap isi kolom ini.", invalid: "Masukkan nilai dengan format yang benar.",
       max_length: "Isian ini terlalu panjang.", min_length: "Periksa isian ini.",
       email_unavailable: "Email ini tidak tersedia. Masuk jika kamu sudah memiliki akun.",

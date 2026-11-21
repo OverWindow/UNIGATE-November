@@ -19,6 +19,8 @@ from surveys.learner import CATALOG, validate_survey
 from surveys.models import SignupSurveyResponse
 
 from .forms import LoginForm, SignupForm, normalize_email, users_for_email
+from .google_identity import pending_flow
+from .models import GoogleIdentity
 from .credits import welcome
 from .rate_limits import RateLimitUnavailable, check_limit, clear_login_failures, login_rate_limit_lock, record_attempt, request_subject
 from .email_delivery import EmailDeliveryError, send_verification_email
@@ -107,6 +109,12 @@ def signup(request):
     form = SignupForm(data)
     if not form.is_valid():
         return form_error(form)
+    return complete_signup(request, data, email=form.cleaned_data["email"], nickname=form.cleaned_data["nickname"],
+                           password=form.cleaned_data["password"])
+
+
+@sensitive_variables()
+def complete_signup(request, data, *, email, nickname, password=None, google_sub=None):
     if data.get("language") not in LANGUAGES:
         return api_response({"error": "validation_error", "fields": {"language": ["invalid"]}}, status=400)
     try:
@@ -117,14 +125,19 @@ def signup(request):
     try:
         with transaction.atomic():
             user = get_user_model().objects.create_user(
-                username=f"u_{uuid4().hex}", email=form.cleaned_data["email"],
-                first_name=form.cleaned_data["nickname"], password=form.cleaned_data["password"],
+                username=f"u_{uuid4().hex}", email=email,
+                first_name=nickname, password=password,
                 is_staff=False, is_superuser=False, is_active=True,
             )
+            if google_sub is not None:
+                GoogleIdentity.objects.create(user=user, google_sub=google_sub)
             SignupSurveyResponse.objects.create(user=user, language=data["language"], **survey)
             welcome(user.pk)
             clear_login_failures(user.email)
     except IntegrityError as exc:
+        if google_sub is not None and (GoogleIdentity.objects.filter(google_sub=google_sub).exists()
+                                       or users_for_email(email).exists()):
+            return api_response({"error": "google_conflict"}, status=409)
         if getattr(getattr(exc.__cause__, "diag", None), "constraint_name", None) == EMAIL_INDEX:
             return api_response({"error": "validation_error", "fields": {"email": ["email_unavailable"]}}, status=400)
         # Avoid database exception details, which can contain submitted email addresses.
@@ -133,8 +146,14 @@ def signup(request):
     except DatabaseError as exc:
         logger.error("Account creation failed (%s).", type(exc).__name__)
         return api_response({"error": "server_error"}, status=503)
-    login(request, user, backend="django.contrib.auth.backends.ModelBackend")
-    return api_response({"user": user_data(user), "csrfToken": get_token(request)}, status=201)
+    return login_response(request, user, status=201)
+
+
+def login_response(request, user, *, status=200):
+    request.session.pop("google_pending", None)
+    request.session.pop("google_challenge", None)
+    login(request, user, backend=getattr(user, "backend", "django.contrib.auth.backends.ModelBackend"))
+    return api_response({"user": user_data(user), "csrfToken": get_token(request)}, status=status)
 
 
 @never_cache
@@ -150,23 +169,31 @@ def login_view(request):
     if not form.is_valid():
         return form_error(form)
     email = form.cleaned_data["email"]
+    user, error = check_password_login(request, email, form.cleaned_data["password"])
+    return error if error is not None else login_response(request, user)
+
+
+@sensitive_variables()
+def check_password_login(request, email, password, *, target_id=None):
     with login_rate_limit_lock(email):
         wait = check_limit("login", email, limit=5)
         if wait:
-            return limited_response(wait)
-        candidate = users_for_email(email).first()
+            return None, limited_response(wait)
+        candidates = users_for_email(email)
+        if target_id is not None:
+            candidates = candidates.select_for_update().filter(pk=target_id)
+        candidate = candidates.first()
         if candidate is None:
             # Match Django's nonexistent-user password hashing cost.
-            get_user_model()().set_password(form.cleaned_data["password"])
+            get_user_model()().set_password(password)
             user = None
         else:
-            user = authenticate(request, username=candidate.get_username(), password=form.cleaned_data["password"])
+            user = authenticate(request, username=candidate.get_username(), password=password)
         if user is None:
             wait = record_attempt("login", email, limit=5, window=300)
-            return limited_response(wait) if wait else api_response({"error": "invalid_credentials"}, status=401)
+            return None, limited_response(wait) if wait else api_response({"error": "invalid_credentials"}, status=401)
         clear_login_failures(email)
-    login(request, user)
-    return api_response({"user": user_data(user), "csrfToken": get_token(request)})
+    return user, None
 
 
 @never_cache
@@ -191,7 +218,7 @@ def me(request):
 def send_email_verification(request):
     if request.user.is_authenticated:
         return api_response({"error": "already_authenticated"}, status=409)
-    data, error = read_payload(request, {"email", "language", "next"})
+    data, error = read_payload(request, {"email", "language", "next", "google_flow"})
     if error is not None:
         return error
     try:
@@ -199,6 +226,11 @@ def send_email_verification(request):
     except ValidationError as exc:
         return api_response({"error": "validation_error", "fields": {"email": [item.code for item in exc.error_list]}}, status=400)
     language = data.get("language", "ko")
+    flow = data.get("google_flow", "")
+    if flow:
+        pending = pending_flow(request, flow, "signup")
+        if not pending or pending["email"] != email:
+            return api_response({"error": "google_restart"}, status=409)
     if language not in LANGUAGES:
         return api_response({"error": "validation_error", "fields": {"language": ["invalid"]}}, status=400)
     for action, key, limit, window in (
@@ -211,7 +243,7 @@ def send_email_verification(request):
             return limited_response(wait)
     if users_for_email(email).exists():
         return api_response({"error": "validation_error", "fields": {"email": ["email_unavailable"]}}, status=400)
-    token = make_verification_token(email, language, data.get("next", "/"))
+    token = make_verification_token(email, language, data.get("next", "/"), google_flow=flow)
     try:
         send_verification_email(email, token, language)
     except EmailDeliveryError:
@@ -234,5 +266,11 @@ def verify_email(request):
         verified = read_verification_token(token)
     except ValidationError as exc:
         return api_response({"error": exc.code}, status=400)
-    return api_response({"email": verified["email"], "language": verified["language"],
-                         "next": verified["next"], "expiresAt": verified["expires_at"]})
+    result = {"email": verified["email"], "language": verified["language"],
+              "next": verified["next"], "expiresAt": verified["expires_at"]}
+    if flow := verified.get("google_flow"):
+        pending = pending_flow(request, flow, "signup")
+        if not pending or pending["email"] != verified["email"]:
+            return api_response({"error": "google_restart"}, status=409)
+        result.update(googleFlow=flow, expiresAt=min(result["expiresAt"], pending["expires_at"]))
+    return api_response(result)

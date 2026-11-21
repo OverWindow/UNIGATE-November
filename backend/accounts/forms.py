@@ -26,8 +26,11 @@ class LoginForm(forms.Form):
         return normalize_email(self.cleaned_data["email"])
 
 
-class SignupForm(LoginForm):
+class NicknameForm(forms.Form):
     nickname = forms.CharField(min_length=1, max_length=30)
+
+
+class SignupForm(LoginForm, NicknameForm):
     password_confirm = forms.CharField(max_length=4096, strip=False)
     verification_token = forms.CharField(max_length=4096, strip=False)
 

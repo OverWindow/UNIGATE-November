@@ -24,17 +24,20 @@ def safe_return_path(value):
 
 
 @sensitive_variables()
-def make_verification_token(email, language="ko", next_path="/"):
-    return signing.dumps({
+def make_verification_token(email, language="ko", next_path="/", *, google_flow=""):
+    payload = {
         "email": email.strip().lower(),
         "language": language if language in LANGUAGES else "ko",
         "next": safe_return_path(next_path),
         "expires_at": int(time.time()) + TOKEN_MAX_AGE,
-    }, salt=TOKEN_SALT)
+    }
+    if google_flow:
+        payload["google_flow"] = google_flow
+    return signing.dumps(payload, salt=TOKEN_SALT)
 
 
 @sensitive_variables()
-def read_verification_token(token, email=None):
+def read_verification_token(token, email=None, *, google_flow=""):
     try:
         data = signing.loads(token, salt=TOKEN_SALT, max_age=TOKEN_MAX_AGE)
     except signing.SignatureExpired:
@@ -48,7 +51,7 @@ def read_verification_token(token, email=None):
         raise ValidationError("Invalid verification link.", code="email_verification_invalid")
     if data["expires_at"] <= time.time():
         raise ValidationError("Verification link expired.", code="email_verification_expired")
-    if email is not None and data["email"] != email:
+    if email is not None and (data["email"] != email or data.get("google_flow", "") != google_flow):
         raise ValidationError("Verify this email address first.", code="email_verification_mismatch")
     data["next"] = safe_return_path(data["next"])
     return data

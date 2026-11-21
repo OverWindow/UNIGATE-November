@@ -19,6 +19,7 @@ export interface SignupInput {
 }
 
 export interface VerifiedEmail {
+  googleFlow?: string;
   email: string;
   token: string;
   language: Language;
@@ -113,8 +114,46 @@ export async function signUp(input: SignupInput): Promise<AuthUser> {
   return parseUser(result.user);
 }
 
-export async function sendEmailVerification(email: string, language: Language, next: string): Promise<number> {
-  const data = await post("/api/auth/email/send/", { email, language, next: safeReturnPath(next) });
+export interface GoogleStep {
+  step: "link" | "signup";
+  email: string;
+  flow: string;
+  needsEmail: boolean;
+  expiresAt: number;
+}
+
+export async function startGoogle() {
+  const data = await post("/api/auth/google/start/", {});
+  if (data?.enabled === false) return null;
+  if (data?.enabled !== true || typeof data.clientId !== "string" || typeof data.nonce !== "string") {
+    throw new AuthError("server_error");
+  }
+  return { clientId: data.clientId, nonce: data.nonce };
+}
+
+export async function verifyGoogle(credential: string): Promise<GoogleStep | AuthUser> {
+  const data = await post("/api/auth/google/", { credential });
+  if (data?.user) return parseUser(data.user);
+  if (!data || (data.step !== "signup" && data.step !== "link") || typeof data.email !== "string" ||
+      typeof data.flow !== "string" || typeof data.needsEmail !== "boolean" || typeof data.expiresAt !== "number") {
+    throw new AuthError("server_error");
+  }
+  return { step: data.step, email: data.email, flow: data.flow, needsEmail: data.needsEmail, expiresAt: data.expiresAt };
+}
+
+export async function finishGoogleSignup(flow: string, input: Pick<SignupInput, "nickname" | "survey" | "language" | "verification_token">) {
+  const data = await post("/api/auth/google/signup/", { flow, nickname: input.nickname, survey: input.survey,
+    language: input.language, verification_token: input.verification_token });
+  return parseUser(data?.user);
+}
+
+export async function linkGoogle(flow: string, password: string) {
+  return parseUser((await post("/api/auth/google/link/", { flow, password }))?.user);
+}
+
+export async function sendEmailVerification(email: string, language: Language, next: string, googleFlow?: string): Promise<number> {
+  const data = await post("/api/auth/email/send/", { email, language, next: safeReturnPath(next),
+    ...(googleFlow && { google_flow: googleFlow }) });
   if (data?.status !== "verification_sent" || typeof data.retryAfter !== "number" ||
       !Number.isFinite(data.retryAfter) || data.retryAfter < 0) throw new AuthError("server_error");
   return data.retryAfter;
@@ -126,7 +165,8 @@ export async function verifyEmail(token: string): Promise<VerifiedEmail> {
       !Number.isFinite(data.expiresAt) || !["ko", "en", "id"].includes(String(data.language)) ||
       typeof data.next !== "string") throw new AuthError("server_error");
   return { email: data.email, token, language: data.language as Language,
-    next: safeReturnPath(data.next), expiresAt: data.expiresAt };
+    next: safeReturnPath(data.next), expiresAt: data.expiresAt,
+    ...(typeof data.googleFlow === "string" && { googleFlow: data.googleFlow }) };
 }
 
 export async function signOut() {

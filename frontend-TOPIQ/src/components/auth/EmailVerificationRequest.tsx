@@ -7,9 +7,11 @@ import { AuthError, sendEmailVerification } from "@/lib/auth/auth-api";
 import { authContent } from "@/lib/auth/auth-content";
 import { emailContent } from "@/lib/auth/email-content";
 
-export default function EmailVerificationRequest({ next }: { next: string }) {
+export default function EmailVerificationRequest({ next, googleEmail, googleFlow }: {
+  next: string; googleEmail?: string; googleFlow?: string;
+}) {
   const { language } = useApp();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(googleEmail || "");
   const [sent, setSent] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -41,7 +43,7 @@ export default function EmailVerificationRequest({ next }: { next: string }) {
     }
     setPending(true);
     try {
-      const retryAfter = await sendEmailVerification(email.trim(), language, next);
+      const retryAfter = await sendEmailVerification(email.trim(), language, next, googleFlow);
       setEmail(email.trim());
       setSent(true);
       setRemaining(retryAfter);
@@ -71,7 +73,7 @@ export default function EmailVerificationRequest({ next }: { next: string }) {
           <div className="auth-field">
             <label htmlFor="email">{a.email}</label>
             <input id="email" name="email" type="email" autoComplete="email" required maxLength={254}
-              value={email} onChange={(event) => setEmail(event.target.value)} placeholder={a.emailPlaceholder}
+              value={email} readOnly={!!googleFlow} onChange={(event) => setEmail(event.target.value)} placeholder={a.emailPlaceholder}
               aria-invalid={!!fieldError} aria-describedby={fieldError ? "email-error" : undefined} />
             {fieldError && <p className="field-error" id="email-error">{message(fieldError)}</p>}
           </div>
@@ -80,7 +82,7 @@ export default function EmailVerificationRequest({ next }: { next: string }) {
         <button type="submit" className="button button-primary auth-submit auth-compact-submit" disabled={pending || remaining > 0} aria-busy={pending}>
           {pending ? a.submitting : remaining > 0 ? t.cooldown.replace("{seconds}", String(remaining)) : sent ? t.resend : t.send}
         </button>
-        {sent && <button className="verification-change" type="button" onClick={() => {
+        {sent && !googleFlow && <button className="verification-change" type="button" onClick={() => {
           setSent(false); setError(""); setFieldError(""); setCooldownUntil(0); setRemaining(0);
         }}>{t.change}</button>}
       </fieldset>

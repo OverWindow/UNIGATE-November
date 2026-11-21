@@ -7,6 +7,11 @@ from django.db import models
 CREDIT_PURCHASE_QUANTITY = 1000
 
 
+class GoogleIdentity(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, primary_key=True)
+    google_sub = models.CharField(max_length=255, unique=True)
+
+
 class RateLimit(models.Model):
     scope = models.CharField(max_length=64)
     key_hash = models.CharField(max_length=64)

@@ -18,6 +18,49 @@ const { pbtRequest, submitOnPageExit } = await loadApi("../src/lib/exam/pbt-api.
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
 const user = { id: 1, email: "synthetic@example.invalid", nickname: "Learner" };
 
+test("Google posts use same-origin CSRF, bind the pending flow and rotate CSRF after linking", async () => {
+  const step = { step: "link", email: user.email, flow: "pending", expiresAt: 12345, needsEmail: false };
+  const calls = [];
+  globalThis.fetch = async (path, options) => {
+    if (path === "/api/csrf/") return json({ csrfToken: "initial" });
+    calls.push([path, JSON.parse(options.body), options.headers["X-CSRFToken"]]);
+    assert.equal(options.credentials, "same-origin");
+    if (path.endsWith("/start/")) return json({ enabled: true, clientId: "client", nonce: "nonce" });
+    if (path.endsWith("/google/")) return json(step);
+    if (path.endsWith("/link/")) return json({ user, csrfToken: "rotated" });
+    return new Response(null, { status: 204 });
+  };
+  assert.deepEqual(await api.startGoogle(), { clientId: "client", nonce: "nonce" });
+  assert.deepEqual(await api.verifyGoogle("fixture"), step);
+  assert.deepEqual(await api.linkGoogle(step.flow, "password"), user);
+  await api.signOut();
+  assert.deepEqual(calls, [
+    ["/api/auth/google/start/", {}, "initial"], ["/api/auth/google/", { credential: "fixture" }, "initial"],
+    ["/api/auth/google/link/", { flow: "pending", password: "password" }, "initial"],
+    ["/api/auth/logout/", {}, "rotated"],
+  ]);
+});
+
+test("external-email Google signup carries the same flow through email verification and completion", async () => {
+  const input = { nickname: "Learner", language: "en", verification_token: "proof", survey: {} };
+  globalThis.fetch = async (path, options) => {
+    if (path === "/api/csrf/") return json({ csrfToken: "csrf" });
+    const body = JSON.parse(options.body);
+    if (path.endsWith("/send/")) {
+      assert.equal(body.google_flow, "flow");
+      return json({ status: "verification_sent", retryAfter: 60 });
+    }
+    if (path.endsWith("/verify/")) return json({ email: user.email, expiresAt: 12345, language: "en", next: "/credits", googleFlow: "flow" });
+    assert.equal(path, "/api/auth/google/signup/");
+    assert.deepEqual(body, { ...input, flow: "flow" });
+    return json({ user });
+  };
+  await api.sendEmailVerification(user.email, "en", "/credits", "flow");
+  const proof = await api.verifyEmail("proof");
+  assert.equal(proof.googleFlow, "flow");
+  assert.deepEqual(await api.finishGoogleSignup(proof.googleFlow, { ...input, email: "ignored", password: "ignored" }), user);
+});
+
 test("return paths stay on TOPIQ and cannot loop through auth pages", async () => {
   const { safeReturnPath } = api;
   for (const path of [null, "https://evil.example", "//evil.example", "/\\evil.example", "/login?next=/", "/signup", "/verify-email#token=fixture", "/hello\nworld"]) {

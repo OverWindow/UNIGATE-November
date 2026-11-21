@@ -309,6 +309,7 @@ details[open] .faq-indicator::after { transform: rotate(0); }
 .auth-card { width: min(100%, 480px); padding: 38px 40px; border: 1px solid #e3e9f3; border-radius: 24px; background: #fff; box-shadow: 0 16px 50px -20px #2d4b7620; }
 .auth-card h1 { margin: 0; font-size: 29px; font-weight: 650; line-height: 1.4; letter-spacing: -.045em; word-break: keep-all; overflow-wrap: anywhere; }
 .auth-login-card h1 { margin-bottom: 28px; }
+.auth-google { display: grid; justify-items: center; margin: 20px 0; }
 .auth-signup-card > h1 + .auth-form { margin-top: 28px; }
 .auth-description { margin: 14px 0 28px; color: #647185; font-size: 14px; line-height: 1.85; word-break: keep-all; }
 .auth-form > fieldset { display: grid; gap: 20px; min-width: 0; margin: 0; padding: 0; border: 0; }

@@ -4,6 +4,24 @@
 단일 페이지에서 안내 콘텐츠, 비용 비교, 대학 갤러리와 통계 팝업을 제공하고, PDF 신청 정보를 PostgreSQL에 저장합니다.
 PDF 파일은 운영자가 나중에 수동으로 보냅니다. 이 랜딩페이지에는 자동 다운로드·메일 발송·회원가입·이용자 로그인·결제·백그라운드 작업이 없습니다. 별도 TOPIQ의 인증 기능은 공유 백엔드에 유지합니다.
 
+## TOPIQ Google 로그인
+
+TOPIQ는 Google Identity Services 팝업에서 받은 ID 토큰을 Django에서 검증하고 기존 로그인 세션을 발급합니다. 기존 이메일 회원은 TOPIQ 비밀번호를 확인한 뒤 연결합니다. 신규 회원은 닉네임·학습 설문·개인정보 동의를 제출하면 가입 크레딧 100개를 받습니다. Google에서 이메일 소유권을 확인할 수 없는 주소는 가입을 시작한 브라우저에서 TOPIQ 인증 메일 링크를 열어야 합니다. [네트워크 흐름도](docs/google-login-flow.md)
+
+1. Google Auth Platform에서 서비스 이름·지원 이메일·대상을 설정하고 **웹 애플리케이션** 유형의 OAuth 클라이언트를 만듭니다. 승인된 JavaScript 원본에 개발 환경의 `http://localhost`, `http://localhost:3001`과 운영 환경의 `https://topiq.unigate.kr`을 해당 클라이언트별로 등록합니다. 테스트 게시 상태이면 테스트 사용자도 등록합니다. [Google 웹 설정](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid)
+2. Django의 로컬 `.env.development` 또는 운영 환경 변수에 해당 환경의 공개 웹 클라이언트 ID를 `GOOGLE_CLIENT_ID`로 설정합니다. 버튼은 기존 Next.js 프록시를 통해 이 ID를 받습니다. 값을 비우면 Google 로그인이 비활성화됩니다. 외부 이메일 가입에는 기존 Brevo 발송 설정을 사용합니다.
+3. **로컬**에서는 코드 반영 후 서버 시작 전에 사용자가 `backend/`에서 다음 명령을 순서대로 실행합니다. 첫 명령은 가상 환경에 검증 라이브러리를 설치하고, 두 번째는 DB 마이그레이션을 적용합니다. `accounts.0008_googleidentity`는 회원 참조 기본 키 `user_id`와 고유 Google 식별자 `google_sub`를 갖는 `accounts_googleidentity` 테이블을 추가합니다. 세 번째 명령은 개발 서버를 시작합니다.
+
+   ```powershell
+   .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+   .\.venv\Scripts\python.exe manage.py migrate
+   .\.venv\Scripts\python.exe manage.py runserver
+   ```
+
+4. 별도 터미널의 `frontend-TOPIQ/`에서 `npm run dev`를 실행한 후 `http://localhost:3001/login`에서 실제 Google 팝업을 확인합니다. 개발용 Google 계정으로 신규 가입, 기존 이메일 회원 연결, 로그아웃 후 재로그인과 크레딧 잔액을 확인합니다. **운영**은 환경 변수 설정 후 백엔드와 TOPIQ 프론트엔드를 배포합니다. 백엔드 시작 스크립트가 Gunicorn 실행 전에 마이그레이션을 자동 적용합니다.
+
+인증 회귀 테스트는 `backend/`에서 `.\.venv\Scripts\python.exe manage.py test accounts --noinput`으로 실행합니다. Django가 별도 PostgreSQL 테스트 DB를 생성·삭제하며, Google 토큰 검증에는 테스트용 서명과 공개키를 사용합니다. 프론트엔드 검증은 `frontend-TOPIQ/`에서 `npm test`, `npm run lint`, `npm run typecheck`, `npm run build`를 실행합니다.
+
 ## TOPIQ 크레딧 충전
 
 TOPIQ 회원은 `/credits`에서 Stripe Checkout 카드 결제로 1,000크레딧을 충전합니다. 버튼에 표시하는 원화 금액과 결제창의 가격은 백엔드 환경변수 `STRIPE_PRICE_ID`로 지정합니다. Django가 결제를 확인하면 잔액과 거래 내역에 `유료 충전 +1,000`을 함께 기록합니다. 브라우저를 닫아도 Stripe 웹훅이 적립을 처리합니다. [수정 가능한 결제 흐름도](docs/stripe-credit-payment-flow.md)
