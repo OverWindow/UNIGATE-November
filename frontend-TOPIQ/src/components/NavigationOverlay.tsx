@@ -10,18 +10,18 @@ export default function NavigationOverlay() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const route = `${pathname}?${searchParams.toString()}`;
-  const [pending, setPending] = useState(false);
+  const [pendingFrom, setPendingFrom] = useState<string | null>(null);
   const safetyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const label = { ko: "페이지를 불러오는 중", en: "Loading page", id: "Memuat halaman" }[language];
 
   const start = useCallback(() => {
-    setPending(true);
+    setPendingFrom(route);
     if (safetyTimer.current) clearTimeout(safetyTimer.current);
-    safetyTimer.current = setTimeout(() => setPending(false), 10000);
-  }, []);
+    safetyTimer.current = setTimeout(() => setPendingFrom(null), 10000);
+  }, [route]);
 
   useEffect(() => {
-    setPending(false);
+    setPendingFrom(null);
     if (safetyTimer.current) clearTimeout(safetyTimer.current);
   }, [route]);
 
@@ -50,5 +50,5 @@ export default function NavigationOverlay() {
 
   useEffect(() => () => { if (safetyTimer.current) clearTimeout(safetyTimer.current); }, []);
 
-  return pending ? <div className="site-loading site-navigation-loading" role="status" aria-label={label}><span aria-hidden="true" /></div> : null;
+  return pendingFrom === route ? <div className="site-loading site-navigation-loading" role="status" aria-label={label}><span aria-hidden="true" /></div> : null;
 }

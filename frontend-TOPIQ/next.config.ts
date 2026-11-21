@@ -12,6 +12,12 @@ const nextConfig: NextConfig = {
   output: "standalone",
   reactStrictMode: true,
   experimental: { proxyTimeout: 180000 },
+  async redirects() {
+    return [
+      { source: "/privacy", destination: "/settings/privacy", permanent: true },
+      { source: "/terms", destination: "/settings/terms", permanent: true },
+    ];
+  },
   async headers() {
     return [{ source: "/garu-0.13.0/:path*", headers: [
       { key: "Cache-Control", value: "public, max-age=31536000, immutable" },

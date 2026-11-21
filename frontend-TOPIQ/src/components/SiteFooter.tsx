@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { ArrowUp, ExternalLink } from "lucide-react";
 import { useApp } from "@/app/providers";
+import { authContent } from "@/lib/auth/auth-content";
 import { landingContent } from "@/lib/landing-content";
 import { Logo } from "./SiteHeader";
 
 export default function SiteFooter() {
   const { language } = useApp();
   const t = landingContent[language];
+  const { privacy, terms } = authContent[language];
 
   return (
     <footer className="site-footer">
@@ -25,7 +27,11 @@ export default function SiteFooter() {
         </div>
         <div className="footer-bottom">
           <span>© 2026 UNIGATE. All rights reserved.</span>
-          <Link href="/open-source-licenses">{t.footer.licenses}</Link>
+          <ul className="footer-document-links">
+            <li><Link href="/settings/privacy"><strong>{privacy}</strong></Link></li>
+            <li><Link href="/settings/terms">{terms}</Link></li>
+            <li><Link href="/open-source-licenses">{t.footer.licenses}</Link></li>
+          </ul>
         </div>
         <p className="footer-trademark">{t.footer.trademark}</p>
       </div>

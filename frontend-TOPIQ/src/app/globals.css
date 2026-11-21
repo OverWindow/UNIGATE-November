@@ -123,6 +123,7 @@ main:focus { outline: none; }
 .account-profile-name { margin: 0; color: #253450; font-size: 14px; font-weight: 650; line-height: 1.5; overflow-wrap: anywhere; }
 .account-profile-email { margin: 3px 0 0; color: #748198; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 .account-menu-section { padding: 8px; border-top: 1px solid #edf0f5; }
+.account-menu { max-height: calc(100dvh - var(--header-height) - 12px); overflow-y: auto; }
 .account-menu button, .account-menu a { justify-content: flex-start; gap: 11px; min-height: 50px; padding: 14px 16px; font-size: 14px; transition: background-color .15s, color .15s; }
 .account-menu button svg, .account-menu a svg { flex-shrink: 0; }
 .account-menu button:disabled { opacity: .6; }
@@ -222,6 +223,9 @@ details[open] .faq-indicator::after { transform: rotate(0); }
 .footer-links a:hover { color: var(--color-primary); }
 .footer-links svg { width: 14px; height: 14px; }
 .footer-bottom { display: flex; justify-content: space-between; gap: 12px; padding-top: 22px; border-top: 1px solid #edf0f5; color: #5c6c84; font-size: 11px; line-height: 1.8; letter-spacing: .015em; }
+.footer-document-links { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; }
+.footer-document-links a { display: inline-flex; align-items: center; min-height: 24px; }
+.footer-document-links a:hover { color: var(--color-primary); text-decoration: underline; }
 .footer-trademark { margin-top: 10px; color: #8a94a8; font-size: 10px; line-height: 1.7; letter-spacing: .015em; }
 
 @media (min-width: 1200px) and (max-width: 1290px) {

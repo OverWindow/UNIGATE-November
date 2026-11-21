@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import useRouter from "@/lib/use-navigation-router";
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, CreditCard, Globe, LogOut, Menu, UserRound, X } from "lucide-react";
+import { Check, ChevronDown, CreditCard, Globe, LogOut, Menu, Settings, UserRound, X } from "lucide-react";
 import { useApp } from "@/app/providers";
 import { authContent } from "@/lib/auth/auth-content";
 import { landingContent, type Language } from "@/lib/landing-content";
@@ -136,6 +136,10 @@ export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: st
                     <Link href="/credits" aria-current={pathname === "/credits" ? "page" : undefined} onClick={() => setAccountOpen(false)}>
                       <CreditCard size={19} strokeWidth={1.7} aria-hidden="true" />
                       <span>{a.credits}</span>
+                    </Link>
+                    <Link href="/settings" aria-current={pathname === "/settings" ? "page" : undefined} onClick={() => setAccountOpen(false)}>
+                      <Settings size={19} strokeWidth={1.7} aria-hidden="true" />
+                      <span>{a.settings}</span>
                     </Link>
                   </div>
                   <div className="account-menu-section">
