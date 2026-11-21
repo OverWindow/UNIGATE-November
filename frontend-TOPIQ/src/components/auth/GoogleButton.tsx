@@ -1,67 +1,122 @@
 "use client";
 
-import Script from "next/script";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
 import { AuthError, startGoogle, verifyGoogle, type GoogleStep } from "@/lib/auth/auth-api";
 import { authContent } from "@/lib/auth/auth-content";
+import { csrfToken } from "@/lib/csrf";
 
 interface GoogleId {
   initialize(options: { client_id: string; nonce: string; callback: (result: { credential: string }) => void }): void;
   renderButton(element: HTMLElement, options: { type: "standard"; size: "medium"; text: "signin_with"; locale: string; width: string }): void;
 }
 
+type Verification = ReturnType<typeof verifyGoogle>;
+
+interface GoogleSignIn {
+  client: Promise<GoogleId | null>;
+  needsNewChallenge?: () => boolean;
+  verification?: Verification;
+  onVerification?: (verification: Verification) => void;
+  consumed?: boolean;
+}
+
 declare global {
-  interface Window { google?: { accounts?: { id?: GoogleId } } }
+  interface Window {
+    google?: { accounts?: { id?: GoogleId } };
+    topiqGoogleSignIn?: GoogleSignIn;
+  }
+}
+
+async function initializeGoogle() {
+  // The Google start endpoint gives its challenge a ten-minute lifetime.
+  const expiresAt = Date.now() + 10 * 60 * 1000;
+  const config = await startGoogle();
+  const signIn = window.topiqGoogleSignIn;
+  if (!config || !signIn) return null;
+  const sessionToken = csrfToken;
+  signIn.needsNewChallenge = () => Date.now() >= expiresAt || csrfToken !== sessionToken;
+  const script = document.createElement("script");
+  script.id = "topiq-google-identity";
+  script.src = `https://accounts.google.com/gsi/client?hl=${encodeURIComponent(document.documentElement.lang)}`;
+  await new Promise<void>((resolve, reject) => {
+    script.onload = () => resolve();
+    script.onerror = () => { script.remove(); reject(new AuthError("google_unavailable")); };
+    document.head.appendChild(script);
+  });
+  const id = window.google?.accounts?.id;
+  if (!id) throw new AuthError("google_unavailable");
+  id.initialize({ client_id: config.clientId, nonce: config.nonce, callback: ({ credential }) => {
+    if (!signIn.onVerification || signIn.verification || signIn.consumed) return;
+    signIn.verification = verifyGoogle(credential);
+    signIn.onVerification(signIn.verification);
+  } });
+  return id;
 }
 
 export default function GoogleButton({ onStep }: { onStep: (step: GoogleStep) => void }) {
   const { language, refreshSession } = useApp();
   const t = authContent[language];
   const host = useRef<HTMLDivElement>(null);
-  const initial = useRef<ReturnType<typeof startGoogle> | null>(null);
-  const [config, setConfig] = useState<Awaited<ReturnType<typeof startGoogle>>>(null);
-  const [ready, setReady] = useState(false);
+  const [client, setClient] = useState<GoogleId | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
+  const finishSignIn = useEffectEvent(async (result: Awaited<Verification>) => {
+    if ("step" in result) onStep(result);
+    else await refreshSession();
+  });
+
   useEffect(() => {
+    // The SDK and its one-time nonce belong to the document, across auth routes.
+    const signIn: GoogleSignIn = window.topiqGoogleSignIn ??= { client: initializeGoogle() };
+    if (signIn.consumed || (!signIn.verification && signIn.needsNewChallenge?.())) {
+      window.location.reload();
+      return;
+    }
     let active = true;
-    initial.current ??= startGoogle();
-    void initial.current.then(result => { if (active) setConfig(result); }).catch(failure => {
+    async function handleVerification(verification: Verification) {
+      setBusy(true);
+      try {
+        const result = await verification;
+        if (active) await finishSignIn(result);
+      } catch (failure) {
+        if (active) setError(failure instanceof AuthError ? failure.code : "google_unavailable");
+      } finally {
+        if (active || !signIn.onVerification) {
+          signIn.consumed = true;
+          delete signIn.verification;
+        }
+        if (active) setBusy(false);
+      }
+    }
+    signIn.onVerification = handleVerification;
+    if (signIn.verification) void handleVerification(signIn.verification);
+    void signIn.client.then(client => {
+      if (!client && window.topiqGoogleSignIn === signIn) delete window.topiqGoogleSignIn;
+      if (active) setClient(client);
+    }).catch(failure => {
+      if (window.topiqGoogleSignIn === signIn) delete window.topiqGoogleSignIn;
       if (active) setError(failure instanceof AuthError ? failure.code : "google_unavailable");
     });
-    return () => { active = false; };
+    return () => {
+      active = false;
+      if (signIn.onVerification === handleVerification) delete signIn.onVerification;
+    };
   }, []);
 
   useEffect(() => {
-    if (!ready || !config || !host.current) return;
+    if (!client || busy || error || !host.current) return;
     const element = host.current;
-    const id = window.google?.accounts?.id;
-    if (!id) { setError("google_unavailable"); return; }
     let active = true;
-    let submitted = false;
-    id.initialize({ client_id: config.clientId, nonce: config.nonce, callback: async ({ credential }) => {
-      if (!active || submitted) return;
-      submitted = true;
-      setBusy(true);
-      try {
-        const result = await verifyGoogle(credential);
-        if (!active) return;
-        if ("step" in result) onStep(result);
-        else await refreshSession();
-      } catch (failure) {
-        if (active) setError(failure instanceof AuthError ? failure.code : "google_unavailable");
-      } finally { if (active) setBusy(false); }
-    } });
     let renderedWidth = 0;
     const observer = new ResizeObserver(([entry]) => {
       const width = Math.ceil(entry.contentRect.width);
-      if (!width || width === renderedWidth || submitted) return;
+      if (!width || width === renderedWidth) return;
       renderedWidth = width;
       element.replaceChildren();
       // Google's medium button omits the returning user's name and photo.
-      id.renderButton(element, {
+      client.renderButton(element, {
         type: "standard", size: "medium", text: "signin_with", locale: language, width: String(width),
       });
       // The inline button uses the SDK's initial language until the localized iframe loads.
@@ -92,16 +147,14 @@ export default function GoogleButton({ onStep }: { onStep: (step: GoogleStep) =>
       observer.disconnect();
       element.replaceChildren();
     };
-  }, [ready, config, onStep, language, refreshSession, t]);
+  }, [client, busy, error, language, t]);
 
   if (error) return <div className="auth-error" role="alert">
     <p>{t.errors[error] || t.errors.google_unavailable}</p>
     <button type="button" className="text-link" onClick={() => window.location.reload()}>{t.retry}</button>
   </div>;
-  if (!config) return null;
+  if (!client) return null;
   return <div className="auth-google" aria-busy={busy}>
-    <Script id="topiq-google-identity" src={`https://accounts.google.com/gsi/client?hl=${language}`}
-      onReady={() => setReady(true)} onError={() => setError("google_unavailable")} />
     <div className="auth-google-button" hidden={busy}>
       <div key={language} className="auth-google-surface" ref={host} />
       {language === "ko" && <span className="auth-google-label" aria-hidden="true">{t.googleSignIn}</span>}

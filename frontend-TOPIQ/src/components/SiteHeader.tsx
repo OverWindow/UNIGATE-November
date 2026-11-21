@@ -16,8 +16,8 @@ const languages: { code: Language; name: string }[] = [
   { code: "id", name: "Bahasa Indonesia" },
 ];
 
-export function Logo({ className = "" }: { className?: string }) {
-  return <Image className={`topiq-logo ${className}`} src="/brand/topiq-logo.png" alt="TOPIQ" width={1945} height={808} sizes="112px" />;
+export function Logo({ className = "", loading = "lazy" }: { className?: string; loading?: "eager" | "lazy" }) {
+  return <Image className={`topiq-logo ${className}`} src="/brand/topiq-logo.png" alt="TOPIQ" width={1945} height={808} sizes="112px" loading={loading} />;
 }
 
 export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: string; onBeforeLogout?: (logout: () => void) => void }) {
@@ -83,7 +83,7 @@ export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: st
       }}>
         <div className="page-container header-inner">
           <Link className="brand-link" href="/#intro" aria-label={t.accessibility.home} onClick={() => setMenuOpen(false)}>
-            <Logo />
+            <Logo loading="eager" />
           </Link>
           <nav className="desktop-navigation" aria-label={t.accessibility.navigation}>{navigation}</nav>
           <div className="header-actions">
