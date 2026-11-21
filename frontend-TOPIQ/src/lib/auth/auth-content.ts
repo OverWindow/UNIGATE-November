@@ -8,11 +8,13 @@ interface AuthContent {
   show: string; hide: string; submitting: string; loading: string;
   noAccount: string; hasAccount: string; home: string;
   network: string; errors: Record<string, string>;
+  googleSignIn: string; opensInNewTab: string;
   googleLink: string; googleLinkHelp: string; googleEmailHelp: string;
 }
 
 export const authContent: Record<Language, AuthContent> = {
   ko: {
+    googleSignIn: "Google로 로그인", opensInNewTab: "새 탭에서 열립니다",
     settings: "설정", privacy: "개인정보 처리방침", terms: "서비스 이용약관",
     googleLink: "Google 계정 연결", googleLinkHelp: "이 이메일로 가입한 TOPIQ 계정이 있어요. 기존 TOPIQ 비밀번호를 입력하고 연결을 승인해 주세요.",
     googleEmailHelp: "이메일 소유를 확인한 뒤 가입을 이어갑니다. Google 로그인을 시작한 브라우저에서 인증 링크를 열어 주세요.",
@@ -48,6 +50,7 @@ export const authContent: Record<Language, AuthContent> = {
     },
   },
   en: {
+    googleSignIn: "Sign in with Google", opensInNewTab: "Opens in new tab",
     settings: "Settings", privacy: "Privacy Policy", terms: "Terms of Service",
     googleLink: "Link Google account", googleLinkHelp: "You have a TOPIQ account with this email. Enter your existing TOPIQ password to approve the link.",
     googleEmailHelp: "Verify your email to finish signing up. Open the email link in the browser where you started Google sign-in.",
@@ -83,6 +86,7 @@ export const authContent: Record<Language, AuthContent> = {
     },
   },
   id: {
+    googleSignIn: "Login dengan Google", opensInNewTab: "Dibuka di tab baru",
     settings: "Pengaturan", privacy: "Kebijakan Privasi", terms: "Ketentuan Layanan",
     googleLink: "Hubungkan akun Google", googleLinkHelp: "Email ini terdaftar di TOPIQ. Masukkan kata sandi TOPIQ untuk menyetujui penautan akun.",
     googleEmailHelp: "Verifikasi email untuk melanjutkan pendaftaran. Buka tautan email di browser tempat kamu memulai proses masuk dengan Google.",
