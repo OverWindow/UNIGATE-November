@@ -127,7 +127,7 @@ export default function WritingCatalog() {
                   </li>)}
                 </ul>
                 <span className="writing-set-action">{(!user || !set.unlocked) && <Lock size={16} aria-hidden="true" />}
-                  {!user ? t.loginToOpen : set.setCost === 0 ? t.open : set.unlocked ? t.reopen : t.unlock.replace("{credits}", String(set.setCost))}<ArrowRight size={17} aria-hidden="true" /></span>
+                  {!user ? t.loginToOpen : set.unlocked ? t.reopen : t.unlock.replace("{credits}", String(set.setCost))}<ArrowRight size={17} aria-hidden="true" /></span>
               </>;
               return user && set.unlocked
                 ? <Link className="writing-set-card catalog-card" href={`/writing/sets/${set.id}`} key={set.id}>{content}</Link>

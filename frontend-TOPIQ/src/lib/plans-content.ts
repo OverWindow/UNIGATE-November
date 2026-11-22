@@ -25,8 +25,8 @@ export const plansContent: Record<Language, PlanCopy> = {
     current: "내 플랜", until: "만료 일시",
     freeBenefits: ["PBT 읽기·듣기 첫 세트 각 1개", "IBT 읽기·듣기 첫 세트 각 1개", "공개된 첫 세트 반복 응시"],
     term: n => `Plus ${n}개월`, buy: "구독하기", unavailable: "구독 준비 중",
-    benefits: credits => ["공개된 PBT·IBT 모의고사 무료 응시", "모든 공개 쓰기 세트 무료 열람",
-      "쓰기 문항당 AI 첨삭 최대 20회", `매월 ${credits}크레딧 누적 지급`],
+    benefits: credits => ["공개된 PBT·IBT 읽기·듣기 모의고사 무료 응시", `매월 ${credits}크레딧 누적 지급`,
+      "쓰기 세트당 100크레딧으로 해제", "해제한 세트는 문항당 AI 첨삭 최대 20회"],
     checkout: {
       fulfilled: "이용권이 적용되고 400크레딧이 지급되었습니다.",
       cancelled: "결제창에서 돌아왔습니다. 이용권을 선택해 다시 결제할 수 있습니다.", expired: "이 결제는 종료되었습니다. 이용권을 다시 선택해 주세요.",
@@ -42,8 +42,8 @@ export const plansContent: Record<Language, PlanCopy> = {
     current: "My plan", until: "Expires",
     freeBenefits: ["First PBT reading and listening sets", "First IBT reading and listening sets", "Retake these four sets"],
     term: n => `Plus ${n} ${n === 1 ? "month" : "months"}`, buy: "Subscribe", unavailable: "Unavailable",
-    benefits: credits => ["Free access to all published PBT and IBT mock exams", "Free access to all published writing sets",
-      "Up to 20 AI reviews per writing question", `${credits} credits each month, with unused credits carried over`],
+    benefits: credits => ["Free access to all published PBT and IBT reading and listening exams", `${credits} credits each month, with unused credits carried over`,
+      "Unlock writing sets for 100 credits each", "Up to 20 AI reviews per question in each unlocked set"],
     checkout: {
       fulfilled: "Your pass was applied and 400 credits were added.",
       cancelled: "You left checkout. Select a pass to resume.", expired: "This checkout has ended. Select a pass to try again.",
@@ -59,8 +59,8 @@ export const plansContent: Record<Language, PlanCopy> = {
     current: "Paket saya", until: "Berakhir",
     freeBenefits: ["Set pertama membaca dan menyimak PBT", "Set pertama membaca dan menyimak IBT", "Ulangi keempat set tersebut"],
     term: n => `Plus ${n} bulan`, buy: "Berlangganan", unavailable: "Belum tersedia",
-    benefits: credits => ["Akses gratis ke semua simulasi ujian PBT dan IBT yang tersedia", "Akses gratis ke semua paket menulis yang tersedia",
-      "Hingga 20 ulasan AI per soal menulis", `${credits} kredit setiap bulan, sisa kredit tetap tersimpan`],
+    benefits: credits => ["Akses gratis ke semua simulasi ujian membaca dan menyimak PBT dan IBT yang tersedia", `${credits} kredit setiap bulan, sisa kredit tetap tersimpan`,
+      "Buka paket menulis dengan 100 kredit per paket", "Hingga 20 ulasan AI per soal dalam paket yang sudah dibuka"],
     checkout: {
       fulfilled: "Paket sudah diterapkan dan 400 kredit telah ditambahkan.",
       cancelled: "Anda keluar dari pembayaran. Pilih paket untuk melanjutkan.", expired: "Sesi pembayaran ini telah berakhir. Pilih paket untuk mencoba lagi.",

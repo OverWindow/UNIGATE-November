@@ -10,7 +10,6 @@ from django.utils.cache import patch_vary_headers
 
 from pbt.bank import media_url
 from accounts.models import CreditTransaction
-from accounts.plans import has_active_plan
 from writing.access import SET_COST, evaluation_usage, has_access
 from writing.models import Evaluation
 
@@ -143,13 +142,13 @@ def sets(request):
     if not groups:
         return response({"sets": []})
     user_id = request.user.pk if request.user.is_authenticated else None
-    history = submitted_slots(user_id, [group.pk for group in groups])
+    set_ids = [group.pk for group in groups]
+    history = submitted_slots(user_id, set_ids)
     unlocked = set()
-    paid = user_id is not None and has_active_plan(user_id)
-    if user_id is not None and not paid:
+    if user_id is not None:
         unlocked = set(CreditTransaction.objects.filter(account_id=user_id, kind="unlock",
-            set_id__in=[group.pk for group in groups]).values_list("set_id", flat=True))
-    return response({"sets": [summary(group, number, history, paid or group.pk in unlocked, 0 if paid else SET_COST)
+            set_id__in=set_ids).values_list("set_id", flat=True))
+    return response({"sets": [summary(group, number, history, group.pk in unlocked)
                               for number, group in enumerate(groups, 1)]})
 
 

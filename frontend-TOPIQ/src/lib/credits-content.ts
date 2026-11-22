@@ -16,7 +16,7 @@ export const creditsContent: Record<Language, Copy> = {
   ko: {
     title: "크레딧",
     available: "사용 가능", balance: "보유 크레딧", reserved: "보류", unit: "크레딧",
-    transactions: "크레딧 내역", transactionNote: "가입하면 100크레딧을 받습니다. 무료 계정은 쓰기 세트를 처음 열 때 100크레딧이 들며, 재열람과 문항당 평가 20회가 포함됩니다.",
+    transactions: "크레딧 내역", transactionNote: "가입하면 100크레딧을 받습니다. Free와 Plus 모두 쓰기 세트를 처음 열 때 100크레딧을 사용합니다. 한 번 연 세트는 다시 열 수 있고, 문항당 AI 첨삭을 최대 20회 받을 수 있습니다.",
     balanceAfter: "남은 크레딧", reservedAfter: "보류 크레딧", result: "평가 보기", history: "내 평가 이력",
     empty: "아직 크레딧 내역이 없습니다.", loading: "크레딧 정보를 불러오는 중입니다.",
     error: "크레딧 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.", retry: "다시 시도", refresh: "새로고침",
@@ -43,7 +43,7 @@ export const creditsContent: Record<Language, Copy> = {
   en: {
     title: "Credits",
     available: "Available", balance: "Total balance", reserved: "On hold", unit: "credits",
-    transactions: "Credit history", transactionNote: "Get 100 credits when you sign up. On a free account, each writing set costs 100 credits to open and includes repeat access and 20 evaluations per question.",
+    transactions: "Credit history", transactionNote: "Get 100 credits when you sign up. On both Free and Plus, 100 credits unlock a writing set. You can reopen it anytime and get up to 20 AI reviews per question.",
     balanceAfter: "Remaining credits", reservedAfter: "Credits on hold", result: "View evaluation", history: "My evaluations",
     empty: "No credit activity yet.", loading: "Loading your credits…",
     error: "Unable to load your credits. Please try again shortly.", retry: "Try again", refresh: "Refresh",
@@ -70,7 +70,7 @@ export const creditsContent: Record<Language, Copy> = {
   id: {
     title: "Kredit",
     available: "Tersedia", balance: "Total saldo", reserved: "Ditahan", unit: "kredit",
-    transactions: "Riwayat kredit", transactionNote: "Dapatkan 100 kredit saat mendaftar. Pada akun gratis, setiap paket menulis memerlukan 100 kredit saat pertama dibuka, termasuk akses ulang dan 20 penilaian per soal.",
+    transactions: "Riwayat kredit", transactionNote: "Dapatkan 100 kredit saat mendaftar. Pengguna Free dan Plus menggunakan 100 kredit untuk membuka satu paket menulis. Paket dapat dibuka kembali kapan saja dan mencakup hingga 20 ulasan AI per soal.",
     balanceAfter: "Sisa kredit", reservedAfter: "Kredit ditahan", result: "Lihat penilaian", history: "Riwayat penilaian saya",
     empty: "Belum ada riwayat kredit.", loading: "Memuat informasi kredit…",
     error: "Informasi kredit tidak dapat dimuat. Silakan coba lagi sebentar.", retry: "Coba lagi", refresh: "Muat ulang",

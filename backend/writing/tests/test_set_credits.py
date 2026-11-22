@@ -105,29 +105,42 @@ class SetCreditTests(TransactionTestCase):
         self.assertEqual((payment["chargedCredits"], payment["credits"]["available"]), (100, 750))
         self.assertEqual(self.purchase().json()["credits"]["available"], 750)
 
-    def test_plan_access_ends_without_charging_or_permanently_unlocking_sets(self):
-        self.assertEqual(self.purchase().status_code, 201)
-        permanent = self.set_id
-        self.set_id = uuid.uuid4()
-        self.path = f"/api/writing/sets/{self.set_id}/unlock/"
+    def test_plus_bonus_pays_for_four_sets_and_purchases_survive_expiry(self):
+        self.client.force_login(self.other)
         now = timezone.now()
-        account = CreditAccount.objects.get(user=self.user)
-        account.balance += 400
-        account.save()
-        bonus = CreditTransaction.objects.create(account=account, kind="plan_bonus", amount=400,
-                                                 balance_after=account.balance, reserved_after=0)
         end = now + timedelta(days=1)
-        CreditPurchase.objects.create(user=self.user, attempt_id=uuid.uuid4(), status="fulfilled", amount=9900,
-                                      stripe_session_id="cs_plan_access", credits=400, transaction=bonus, plan_months=1,
-                                      plan_starts_at=now - timedelta(days=1), plan_ends_at=end)
-        self.assertEqual(self.purchase().json()["chargedCredits"], 0)
-        self.assertFalse(CreditTransaction.objects.filter(set_id=self.set_id, kind="unlock").exists())
-        self.assertEqual(self.submit().json()["chargedCredits"], 0)
-        self.assertEqual(CreditAccount.objects.get(user=self.user).balance, 500)
-        with patch("accounts.plans.timezone.now", return_value=end):
-            self.assertFalse(has_access(self.user.pk, self.set_id))
-            self.assertTrue(has_access(self.user.pk, permanent))
-            self.assertEqual(self.submit().json()["error"], "set_locked")
+        CreditPurchase.objects.create(
+            user=self.other, attempt_id=uuid.uuid4(), status="fulfilled", amount=9900, credits=400,
+            plan_months=1, credited_months=0, stripe_invoice_id="in_writing_plus",
+            plan_starts_at=now - timedelta(days=1), plan_ends_at=end,
+        )
+        self.history(1, user=self.other)
+        previous = Evaluation.objects.get(user=self.other)
+        self.assertEqual(self.client.get(f"/api/writing/evaluations/{previous.pk}/").status_code, 200)
+        self.assertEqual(self.submit().json()["error"], "set_locked")
+        self.assertEqual(self.client.get("/api/credits/").json()["available"], 400)
+
+        first = self.purchase()
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual((first.json()["chargedCredits"], first.json()["credits"]["available"]), (100, 300))
+        again = self.purchase()
+        self.assertEqual(again.status_code, 200)
+        self.assertEqual((again.json()["chargedCredits"], again.json()["credits"]["available"]), (0, 300))
+
+        for remaining in (200, 100, 0):
+            result = self.client.post(f"/api/writing/sets/{uuid.uuid4()}/unlock/", {}, content_type="application/json")
+            self.assertEqual(result.status_code, 201)
+            self.assertEqual(result.json()["credits"]["available"], remaining)
+        locked = uuid.uuid4()
+        denied = self.client.post(f"/api/writing/sets/{locked}/unlock/", {}, content_type="application/json")
+        self.assertEqual(denied.status_code, 409)
+        self.assertEqual(denied.json()["error"], "insufficient_credits")
+        self.assertFalse(has_access(self.other.pk, locked))
+        self.assertEqual(CreditTransaction.objects.filter(account_id=self.other.pk, kind="unlock").count(), 4)
+        with patch("django.utils.timezone.now", return_value=end):
+            result = self.submit()
+            self.assertEqual(result.status_code, 201)
+            self.assertEqual((result.json()["chargedCredits"], result.json()["usage"]["used"]), (0, 2))
 
     def test_missing_set_authentication_csrf_and_client_prices(self):
         self.bank.return_value.filter.return_value.exists.return_value = False

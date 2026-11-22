@@ -173,8 +173,8 @@ test("each Plus card lists its benefits and starts the selected purchase without
     assert.ok(card.includes(amount.toLocaleString("ko")));
     assert.ok(card.includes(months === 1 ? "매월" : `${months}개월마다`));
     assert.ok(card.includes(`aria-label="Plus ${months}개월 · 구독하기"`));
-    for (const benefit of ["공개된 PBT·IBT 모의고사 무료 응시", "모든 공개 쓰기 세트 무료 열람",
-      "쓰기 문항당 AI 첨삭 최대 20회", "매월 400크레딧 누적 지급"]) assert.ok(card.includes(benefit));
+    for (const benefit of ["공개된 PBT·IBT 읽기·듣기 모의고사 무료 응시", "매월 400크레딧 누적 지급",
+      "쓰기 세트당 100크레딧으로 해제", "해제한 세트는 문항당 AI 첨삭 최대 20회"]) assert.ok(card.includes(benefit));
     assert.equal((card.match(/<li>/g) ?? []).length, 4);
   }
   assert.doesNotMatch(tree.html, /결제 내역/);

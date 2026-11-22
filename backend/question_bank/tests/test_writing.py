@@ -16,7 +16,7 @@ from django.utils import timezone
 from ..models import WritingQuestion, WritingSet
 from ..writing import WritingUnavailable, detail as set_detail, material, question, sets
 from writing.models import Evaluation
-from accounts.models import CreditAccount, CreditTransaction
+from accounts.models import CreditAccount, CreditPurchase, CreditTransaction
 
 
 def prompt(slot):
@@ -93,7 +93,7 @@ class WritingAPITests(SimpleTestCase):
         evaluations = patch("question_bank.writing.Evaluation.objects")
         evaluations.start().filter.return_value.order_by.return_value.values_list.return_value.distinct.return_value = []
         self.addCleanup(evaluations.stop)
-        for name, value in (("has_access", True), ("has_active_plan", False), ("evaluation_usage", {})):
+        for name, value in (("has_access", True), ("evaluation_usage", {})):
             mocked = patch(f"question_bank.writing.{name}", return_value=value)
             mocked.start()
             self.addCleanup(mocked.stop)
@@ -145,18 +145,6 @@ class WritingAPITests(SimpleTestCase):
         complete.assert_not_called()
         questions.filter.assert_not_called()
         history.assert_not_called()
-        self.ledger.filter.assert_not_called()
-
-    @patch("question_bank.writing.has_active_plan", return_value=True)
-    @patch("question_bank.writing.complete_sets")
-    def test_plan_members_can_open_the_catalog_without_purchasing_each_set(self, complete, active):
-        complete.return_value.only.return_value = [self.group]
-        result = self.client.get("/api/writing/sets/")
-        self.assertEqual(result.status_code, 200)
-        item, = result.json()["sets"]
-        self.assertTrue(item["unlocked"])
-        self.assertEqual(item["setCost"], 0)
-        active.assert_called_once_with(1)
         self.ledger.filter.assert_not_called()
 
     @patch("question_bank.writing.has_access", return_value=False)
@@ -251,12 +239,32 @@ class WritingSubmissionHistoryTests(TestCase):
     def read(self, *, user=None, detail=False):
         request = self.factory.get("/api/writing/sets/")
         request.user = user or self.user
-        with self.assertNumQueries(4 if detail else 3):
+        with self.assertNumQueries(3 if detail else 2):
             result = set_detail(request, self.group.pk) if detail else sets(request)
         self.assertEqual(result.status_code, 200)
         self.assertEqual(result["Cache-Control"], "private, no-store")
         self.assertIn("Cookie", result["Vary"])
         return json.loads(result.content)
+
+    def test_plus_catalog_and_detail_require_a_credit_unlock_even_with_previous_submissions(self):
+        now = timezone.now()
+        CreditPurchase.objects.create(
+            user=self.user, attempt_id=uuid.uuid4(), status="fulfilled", amount=9900, credits=400,
+            plan_months=1, credited_months=0, stripe_invoice_id="in_catalog_plus",
+            plan_starts_at=now - timedelta(days=1), plan_ends_at=now + timedelta(days=1),
+        )
+        self.record(51, group=self.second)
+        catalog = self.read()["sets"]
+        self.assertEqual([(row["unlocked"], row["setCost"]) for row in catalog],
+                         [(True, 100), (False, 100), (False, 100)])
+        self.assertEqual(catalog[1]["submittedSlots"], [51])
+        self.assertEqual(len(self.read(detail=True)["questions"]), 4)
+
+        self.groups.filter.return_value.first.return_value = self.second
+        self.client.force_login(self.user)
+        detail = self.client.get(f"/api/writing/sets/{self.second.pk}/")
+        self.assertEqual(detail.status_code, 403)
+        self.assertEqual(detail.json(), {"error": "set_locked"})
 
     def test_all_saved_statuses_and_old_submissions_count_once(self):
         self.record(53, status="processing")

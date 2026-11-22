@@ -1,7 +1,7 @@
 import type { Language } from "../landing-content";
 
 interface WritingCopy {
-  title: string; intro: string; set: string; questions: string; open: string; notice: string;
+  title: string; intro: string; set: string; questions: string; notice: string;
   loading: string; empty: string; error: string; notFound: string; retry: string; back: string;
   question: string; navigation: string; previous: string; next: string; data: string;
   source: string; unit: string; category: string; types: Record<number, string>;
@@ -22,7 +22,7 @@ export const writingContent: Record<Language, WritingCopy> = {
     viewQuestion: "{number}번 문제 보기", close: "닫기",
     title: "AI 쓰기 튜터",
     intro: "TOPIK II 쓰기를 연습하고, AI 평가와 첨삭으로 글을 다듬어 보세요.",
-    set: "쓰기 세트", questions: "4문항 · 51–54번", open: "문제 풀기",
+    set: "쓰기 세트", questions: "4문항 · 51–54번",
     submissionHistory: "제출 이력", submitted: "제출 이력 있음", notSubmitted: "제출 이력 없음",
     catalog: { history: "내 평가 기록" },
     notice: "AI 평가는 학습을 위한 참고 결과이며 공식 TOPIK 성적이 아닙니다. 평가 설명은 요청 시 선택한 화면 언어로, 수정 문장은 한국어로 제공됩니다.",
@@ -41,7 +41,7 @@ export const writingContent: Record<Language, WritingCopy> = {
     viewQuestion: "View question {number}", close: "Close",
     title: "AI Writing Tutor",
     intro: "Practice TOPIK II writing and refine your work with AI feedback and corrections.",
-    set: "Writing set", questions: "4 questions · 51–54", open: "Practice now",
+    set: "Writing set", questions: "4 questions · 51–54",
     submissionHistory: "Submissions", submitted: "Previously submitted", notSubmitted: "Not submitted yet",
     catalog: { history: "My evaluations" },
     notice: "AI evaluations support learning and are not official TOPIK scores. Feedback uses the page language selected when you submit. Corrected sentences remain in Korean.",
@@ -60,7 +60,7 @@ export const writingContent: Record<Language, WritingCopy> = {
     viewQuestion: "Lihat soal {number}", close: "Tutup",
     title: "Tutor Menulis AI",
     intro: "Berlatih menulis TOPIK II dan sempurnakan tulisan dengan penilaian serta koreksi AI.",
-    set: "Paket menulis", questions: "4 soal · 51–54", open: "Mulai latihan",
+    set: "Paket menulis", questions: "4 soal · 51–54",
     submissionHistory: "Riwayat kiriman", submitted: "Pernah dikirim", notSubmitted: "Belum dikirim",
     catalog: { history: "Penilaian saya" },
     notice: "Penilaian AI membantu belajar dan bukan nilai resmi TOPIK. Penjelasan menggunakan bahasa halaman saat jawaban dikirim. Kalimat perbaikan tetap dalam bahasa Korea.",
