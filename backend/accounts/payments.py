@@ -158,7 +158,7 @@ def checkout(purchase, client, *, retry):
         }
         customer_id = checkout_customer(purchase.user_id, client.v1.customers)
         options = {"idempotency_key": str(purchase.pk)}
-        billing = ({"subscription_data": {"metadata": params["metadata"]}, "payment_method_types": ["card"],
+        billing = ({"subscription_data": {"metadata": params["metadata"]},
                     "expires_at": int((purchase.created_at + timedelta(hours=24)).timestamp())}
                    if purchase.subscription_state else {"invoice_creation": {"enabled": True}})
         try:

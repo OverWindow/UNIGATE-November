@@ -144,6 +144,7 @@ class CreditPurchaseTests(TestCase):
             self.assertEqual((order.plan_months, order.amount, order.credits, order.plan_starts_at), (months, amount, 400, None))
             params = self.sessions.create.call_args.args[0]
             self.assertEqual(params["mode"], "subscription")
+            self.assertNotIn("payment_method_types", params)
             self.assertEqual(params["subscription_data"]["metadata"], {"credit_purchase_id": str(order.pk)})
             self.assertNotIn("invoice_creation", params)
             self.assertEqual(params["line_items"], [{"price": price_id, "quantity": 1}])
