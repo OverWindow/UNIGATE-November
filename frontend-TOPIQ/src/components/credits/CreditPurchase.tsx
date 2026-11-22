@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check } from "lucide-react";
 import { useApp } from "@/app/providers";
 import { creditsContent } from "@/lib/credits-content";
 import { plansContent } from "@/lib/plans-content";
 import { creditsRequest, openBillingPortal, startCreditPurchase, startPlanPurchase, WritingError, type CreditPrice, type CreditPurchaseStatus, type PlanAccount } from "@/lib/writing/writing-api";
+import PlanOffers from "./PlanOffers";
 
 type Notice = keyof typeof creditsContent.ko.checkout | "planInUse";
 type CheckoutPrice = CreditPrice & { months?: number };
@@ -173,45 +173,18 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
   const opening = notice === "opening" || portalNotice === "opening";
   const blocked = opening || notice === "checking" || retryCheck;
   const canSubscribe = planAccount && !planAccount.active && !planAccount.subscription;
-  const currentBadge = <span className="plan-current-badge">{p.current}</span>;
   return <div className="credits-purchase">
     {!isPlan && price && price !== "unavailable" && <p className="card-issuer-notice" id="credit-card-notice">{t.cardIssuerNotice}</p>}
-    {isPlan ? planAccount && <div className="plan-offers">
-      <article className="plan-offer plan-free" aria-current={!planAccount.active || undefined}>
-        <div className="plan-heading"><h2>Free</h2>{!planAccount.active && currentBadge}</div>
-        <p className="plan-price">{new Intl.NumberFormat(language, { style: "currency", currency: "KRW" }).format(0)}</p>
-        <ul className="plan-benefits" role="list">{p.freeBenefits.map(benefit =>
-          <li key={benefit}><Check size={16} aria-hidden="true" /><span>{benefit}</span></li>
-        )}</ul>
-      </article>
-      {planAccount.plans.map(offer => {
-      const { months, priceId, currency, amount, bonusCredits } = offer;
-      const term = p.term(months);
-      const current = planAccount.currentPlanMonths === months;
-      const subscription = planAccount.subscription?.months === months ? planAccount.subscription : null;
-      return <article className="plan-offer" key={months} aria-current={current || undefined}>
-        <div className="plan-heading"><h2>{term}</h2>{current && currentBadge}</div>
-        <p className="plan-price">{new Intl.NumberFormat(language, { style: "currency", currency }).format(amount)}
-          <small>{p.interval(months)}</small></p>
-        <ul className="plan-benefits" role="list">{p.benefits(bonusCredits).map(benefit =>
-          <li key={benefit}><Check size={16} aria-hidden="true" /><span>{benefit}</span></li>
-        )}</ul>
-        {current && planAccount.endsAt && <p className="plan-period">
-          {subscription?.state === "active" ? p.renewal : p.until}{" "}
-          <time dateTime={planAccount.endsAt}>{new Date(planAccount.endsAt).toLocaleString(language, { dateStyle: "long", timeStyle: "short" })}</time>
-        </p>}
-        {current && !planAccount.subscription && <p>{p.prepaid}</p>}
-        {subscription?.state === "ending" && <p>{p.ending}</p>}
-        {subscription?.state === "past_due" && <p>{p.pastDue}</p>}
-        {canSubscribe && <p className="card-issuer-notice" id={`plan-card-notice-${months}`}>{t.cardIssuerNotice}</p>}
-        {canSubscribe && <button type="button" className="button button-primary" disabled={blocked || !priceId}
-          aria-label={`${term} · ${priceId ? p.buy : p.unavailable}`}
+    {isPlan ? planAccount && <PlanOffers language={language} account={planAccount}
+      renderAction={({ months, priceId, currency, amount, bonusCredits }) => canSubscribe && <>
+        <p className="card-issuer-notice" id={`plan-card-notice-${months}`}>{t.cardIssuerNotice}</p>
+        <button type="button" className="button button-primary" disabled={blocked || !priceId}
+          aria-label={`${p.term(months)} · ${priceId ? p.buy : p.unavailable}`}
           aria-describedby={`plan-card-notice-${months}`}
           onClick={() => priceId && void buy({ priceId, currency, amount, credits: bonusCredits, months })}>
           {priceId ? p.buy : p.unavailable}
-        </button>}
-      </article>;
-    })}</div> : price === "unavailable" ? <>
+        </button>
+      </>} /> : price === "unavailable" ? <>
       <p role="status">{t.priceUnavailable}</p>
       <button type="button" className="button credits-secondary" onClick={reloadPrice}>{t.retry}</button>
     </> : price ? <button type="button" className="button button-primary" aria-describedby="credit-card-notice" disabled={blocked} onClick={() => void buy()}>

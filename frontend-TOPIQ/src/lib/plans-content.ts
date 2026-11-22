@@ -1,4 +1,12 @@
 import type { Language } from "./landing-content";
+import type { PlanOffer } from "./writing/writing-api";
+
+// Public offers mirror PLAN_AMOUNTS and PLAN_BONUS in backend/accounts/models.py.
+export const publicPlans = [
+  { months: 1, amount: 9900 },
+  { months: 3, amount: 23900 },
+  { months: 6, amount: 43900 },
+].map<PlanOffer>(offer => ({ ...offer, currency: "krw", bonusCredits: 400, priceId: null }));
 
 interface PlanCopy {
   login: string; billingNote: string; current: string; until: string; freeBenefits: string[];
@@ -9,7 +17,7 @@ interface PlanCopy {
 
 export const plansContent: Record<Language, PlanCopy> = {
   ko: {
-    login: "로그인하면 Plus 이용권을 구매하고 내 플랜을 확인할 수 있습니다.",
+    login: "로그인하기",
     billingNote: "Plus는 선택한 주기마다 자동 결제됩니다. 다음 결제일 전에 구독 관리에서 해지하면 이미 결제한 기간의 마지막 날까지 이용할 수 있습니다.",
     interval: n => n === 1 ? "매월" : `${n}개월마다`, manage: "구독 관리 및 해지", renewal: "다음 결제 예정", ending: "자동 갱신 해지 예정",
     pastDue: "결제 수단을 확인해 주세요.", prepaid: "현재 이용권이 만료되면 구독을 시작할 수 있습니다.",
@@ -26,7 +34,7 @@ export const plansContent: Record<Language, PlanCopy> = {
     },
   },
   en: {
-    login: "Sign in to buy a Plus pass and view your plan.",
+    login: "Log in",
     billingNote: "Plus renews automatically at your chosen interval. Cancel before your next charge in Manage subscription to keep access through the paid period.",
     interval: n => n === 1 ? "Every month" : `Every ${n} months`, manage: "Manage or cancel subscription", renewal: "Next billing date", ending: "Renewal cancelled",
     pastDue: "Please check your payment method.", prepaid: "You can subscribe when your current pass expires.",
@@ -43,7 +51,7 @@ export const plansContent: Record<Language, PlanCopy> = {
     },
   },
   id: {
-    login: "Masuk untuk membeli paket Plus dan melihat paket Anda.",
+    login: "Masuk",
     billingNote: "Plus diperpanjang otomatis sesuai periode pilihan Anda. Batalkan sebelum tagihan berikutnya melalui Kelola langganan untuk tetap menikmati akses hingga akhir periode yang sudah dibayar.",
     interval: n => n === 1 ? "Setiap bulan" : `Setiap ${n} bulan`, manage: "Kelola atau batalkan langganan", renewal: "Tagihan berikutnya", ending: "Perpanjangan dibatalkan",
     pastDue: "Periksa metode pembayaran Anda.", prepaid: "Anda dapat berlangganan setelah paket saat ini berakhir.",

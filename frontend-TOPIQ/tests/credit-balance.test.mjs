@@ -39,6 +39,7 @@ function load(relativePath) {
 const writingApi = load("lib/writing/writing-api.ts");
 imports["@/lib/writing/writing-api"] = writingApi;
 const { default: SiteHeader } = load("components/SiteHeader.tsx");
+imports["./PlanOffers"] = load("components/credits/PlanOffers.tsx");
 const { default: CreditPurchase } = load("components/credits/CreditPurchase.tsx");
 imports["./CreditPurchase"] = { default: CreditPurchase };
 const { default: CreditsAccount } = load("components/credits/CreditsAccount.tsx");
@@ -152,9 +153,9 @@ test("each Plus card lists its benefits and starts the selected purchase without
   let buy;
   const tree = mount(() => {
     const ui = CreditPurchase({ planAccount: { plans, active: false, currentPlanMonths: null }, userId: 1, returnId: null, onFulfilled() {} });
-    const [grid] = React.Children.toArray(ui.props.children);
-    const sixMonthCard = React.Children.toArray(grid.props.children)[3];
-    buy = React.Children.toArray(sixMonthCard.props.children).find(item => item.type === "button").props.onClick;
+    const [offers] = React.Children.toArray(ui.props.children);
+    const controls = offers.props.renderAction(plans[2]);
+    buy = React.Children.toArray(controls.props.children).find(item => item.type === "button").props.onClick;
     return ui;
   });
   const cards = tree.html.match(/<article\b[\s\S]*?<\/article>/g) ?? [];
@@ -171,7 +172,7 @@ test("each Plus card lists its benefits and starts the selected purchase without
     assert.ok(card.includes(`<h2>Plus ${months}개월</h2>`));
     assert.ok(card.includes(amount.toLocaleString("ko")));
     assert.ok(card.includes(months === 1 ? "매월" : `${months}개월마다`));
-    assert.ok(card.includes("구독하기"));
+    assert.ok(card.includes(`aria-label="Plus ${months}개월 · 구독하기"`));
     for (const benefit of ["공개된 PBT·IBT 모의고사 무료 응시", "모든 공개 쓰기 세트 무료 열람",
       "쓰기 문항당 AI 첨삭 최대 20회", "매월 400크레딧 누적 지급"]) assert.ok(card.includes(benefit));
     assert.equal((card.match(/<li>/g) ?? []).length, 4);
@@ -201,6 +202,29 @@ test("plans follow credits in the account menu and anonymous returns keep the pl
   assert.ok(page.html.includes(encodeURIComponent(`/plans?purchase=${id}&cancelled=1`)));
   assert.deepEqual(requests, []);
   page.unmount();
+});
+
+test("guests can browse all plans and each Plus card returns them to plans after login", () => {
+  session.user = null;
+  session.status = "anonymous";
+  for (const [language, login] of [["ko", "로그인하기"], ["en", "Log in"], ["id", "Masuk"]]) {
+    session.language = language;
+    const page = mount(PlansAccount);
+    const [free, ...offers] = page.html.match(/<article\b[\s\S]*?<\/article>/g) ?? [];
+    assert.ok(free?.includes("<h2>Free</h2>"));
+    assert.doesNotMatch(free, /<a\b|<button/);
+    assert.equal(offers.length, 3);
+    const amounts = [9900, 23900, 43900];
+    for (const [index, card] of offers.entries()) {
+      const price = new Intl.NumberFormat(language, { style: "currency", currency: "KRW" }).format(amounts[index]);
+      assert.ok(card.includes(price));
+      assert.equal((card.match(/<li>/g) ?? []).length, 4);
+      assert.ok(card.includes(`href="/login?next=%2Fplans">${login}</a>`));
+    }
+    assert.doesNotMatch(page.html, /aria-current="true"|<button/);
+    page.unmount();
+  }
+  assert.deepEqual(requests, []);
 });
 
 test("a subscriber can manage renewal in the portal and returns to Plus", async () => {

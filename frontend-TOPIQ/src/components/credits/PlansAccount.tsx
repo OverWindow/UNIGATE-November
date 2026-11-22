@@ -8,6 +8,7 @@ import { authContent } from "@/lib/auth/auth-content";
 import { plansContent } from "@/lib/plans-content";
 import { getPlans, WritingError, type PlanAccount } from "@/lib/writing/writing-api";
 import CreditPurchase from "./CreditPurchase";
+import PlanOffers from "./PlanOffers";
 
 export default function PlansAccount() {
   const { user, status, language, refreshSession } = useApp();
@@ -23,7 +24,12 @@ export default function PlansAccount() {
     <p className="plan-billing-note">{p.billingNote}</p>
     {status === "loading" ? <p className="catalog-status" role="status">{a.loading}</p>
       : status === "error" ? <div className="catalog-status" role="alert">{a.network} <button className="button credits-secondary" onClick={() => void refreshSession()}>{a.retry}</button></div>
-      : !user ? <div className="catalog-status"><p>{p.login}</p><Link className="button button-primary" href={`/login?next=${encodeURIComponent(next)}`}>{a.login}</Link></div>
+      : !user ? <div className="credits-purchase">
+        <PlanOffers language={language} renderAction={({ months }) =>
+          <Link className="button button-primary" href={`/login?next=${encodeURIComponent(next)}`}
+            aria-label={`${p.term(months)} · ${p.login}`}>{p.login}</Link>
+        } />
+      </div>
       : <MemberPlans key={user.id} userId={user.id} returnId={returnId} cancelled={cancelled} />}
   </div>;
 }
