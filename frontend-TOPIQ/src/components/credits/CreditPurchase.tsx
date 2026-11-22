@@ -3,7 +3,7 @@ import { Check } from "lucide-react";
 import { useApp } from "@/app/providers";
 import { creditsContent } from "@/lib/credits-content";
 import { plansContent } from "@/lib/plans-content";
-import { creditsRequest, openBillingPortal, startCreditPurchase, startPlanPurchase, WritingError, type CreditPrice, type CreditPurchaseStatus, type PlanOffer } from "@/lib/writing/writing-api";
+import { creditsRequest, openBillingPortal, startCreditPurchase, startPlanPurchase, WritingError, type CreditPrice, type CreditPurchaseStatus, type PlanAccount } from "@/lib/writing/writing-api";
 
 type Notice = keyof typeof creditsContent.ko.checkout | "planInUse";
 type CheckoutPrice = CreditPrice & { months?: number };
@@ -19,14 +19,14 @@ function savedAttempt(key: string): Attempt | null {
   return null;
 }
 
-export default function CreditPurchase({ userId, returnId, cancelled, onFulfilled, plans, hasPlan, manageSubscription, onPriceChanged }: {
+export default function CreditPurchase({ userId, returnId, cancelled, onFulfilled, planAccount, onPriceChanged }: {
   userId: number; returnId: string | null; cancelled: boolean; onFulfilled: (signal: AbortSignal) => void;
-  plans?: PlanOffer[]; hasPlan?: boolean; manageSubscription?: boolean; onPriceChanged?: () => void;
+  planAccount?: PlanAccount | null; onPriceChanged?: () => void;
 }) {
   const { language, refreshSession } = useApp();
   const t = creditsContent[language];
   const p = plansContent[language];
-  const isPlan = plans !== undefined;
+  const isPlan = planAccount !== undefined;
   const checkoutCopy = isPlan ? { ...t.checkout, ...p.checkout } : t.checkout;
   const storageKey = `topiq-${isPlan ? "plan" : "credit"}-purchase:${userId}`;
   const [initialAttempt] = useState(() => savedAttempt(storageKey));
@@ -172,28 +172,39 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
   const retryCheck = notice === "delayed" || notice === "checkError";
   const opening = notice === "opening" || portalNotice === "opening";
   const blocked = opening || notice === "checking" || retryCheck;
+  const canSubscribe = planAccount && !planAccount.active && !planAccount.subscription;
+  const currentBadge = <span className="plan-current-badge">{p.current}</span>;
   return <div className="credits-purchase">
     {!isPlan && price && price !== "unavailable" && <p className="card-issuer-notice" id="credit-card-notice">{t.cardIssuerNotice}</p>}
-    {plans ? <div className="plan-offers">
-      <article className="plan-offer plan-free">
-        <h2>Free</h2>
+    {isPlan ? planAccount && <div className="plan-offers">
+      <article className="plan-offer plan-free" aria-current={!planAccount.active || undefined}>
+        <div className="plan-heading"><h2>Free</h2>{!planAccount.active && currentBadge}</div>
         <p className="plan-price">{new Intl.NumberFormat(language, { style: "currency", currency: "KRW" }).format(0)}</p>
         <ul className="plan-benefits" role="list">{p.freeBenefits.map(benefit =>
           <li key={benefit}><Check size={16} aria-hidden="true" /><span>{benefit}</span></li>
         )}</ul>
       </article>
-      {plans.map(offer => {
+      {planAccount.plans.map(offer => {
       const { months, priceId, currency, amount, bonusCredits } = offer;
       const term = p.term(months);
-      return <article className="plan-offer" key={months}>
-        <h2>{term}</h2>
+      const current = planAccount.currentPlanMonths === months;
+      const subscription = planAccount.subscription?.months === months ? planAccount.subscription : null;
+      return <article className="plan-offer" key={months} aria-current={current || undefined}>
+        <div className="plan-heading"><h2>{term}</h2>{current && currentBadge}</div>
         <p className="plan-price">{new Intl.NumberFormat(language, { style: "currency", currency }).format(amount)}
           <small>{p.interval(months)}</small></p>
         <ul className="plan-benefits" role="list">{p.benefits(bonusCredits).map(benefit =>
           <li key={benefit}><Check size={16} aria-hidden="true" /><span>{benefit}</span></li>
         )}</ul>
-        {!hasPlan && <p className="card-issuer-notice" id={`plan-card-notice-${months}`}>{t.cardIssuerNotice}</p>}
-        {!hasPlan && <button type="button" className="button button-primary" disabled={blocked || !priceId}
+        {current && planAccount.endsAt && <p className="plan-period">
+          {subscription?.state === "active" ? p.renewal : p.until}{" "}
+          <time dateTime={planAccount.endsAt}>{new Date(planAccount.endsAt).toLocaleString(language, { dateStyle: "long", timeStyle: "short" })}</time>
+        </p>}
+        {current && !planAccount.subscription && <p>{p.prepaid}</p>}
+        {subscription?.state === "ending" && <p>{p.ending}</p>}
+        {subscription?.state === "past_due" && <p>{p.pastDue}</p>}
+        {canSubscribe && <p className="card-issuer-notice" id={`plan-card-notice-${months}`}>{t.cardIssuerNotice}</p>}
+        {canSubscribe && <button type="button" className="button button-primary" disabled={blocked || !priceId}
           aria-label={`${term} · ${priceId ? p.buy : p.unavailable}`}
           aria-describedby={`plan-card-notice-${months}`}
           onClick={() => priceId && void buy({ priceId, currency, amount, credits: bonusCredits, months })}>
@@ -206,7 +217,7 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
     </> : price ? <button type="button" className="button button-primary" aria-describedby="credit-card-notice" disabled={blocked} onClick={() => void buy()}>
       {t.buy(price.credits.toLocaleString(language), price.amount.toLocaleString(language))}
     </button> : <p role="status">{t.priceLoading}</p>}
-    {(!isPlan || manageSubscription) && <button type="button" className="button credits-secondary" disabled={opening} onClick={() => void viewPayments()}>
+    {(!isPlan || planAccount?.subscription) && <button type="button" className="button credits-secondary" disabled={opening} onClick={() => void viewPayments()}>
       {isPlan ? p.manage : t.paymentHistory}
     </button>}
     {portalNotice && <p role="status">{t.portal[portalNotice]}</p>}

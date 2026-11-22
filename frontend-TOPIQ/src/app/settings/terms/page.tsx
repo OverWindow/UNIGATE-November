@@ -16,7 +16,7 @@ const copy = {
     sections: [
       { title: "서비스와 계정", paragraphs: [
         "TOPIQ는 TOPIK 대비 PBT·IBT 모의시험, 단어장, 쓰기 연습을 제공합니다. 누구나 공개 회차를 볼 수 있으며 응시는 로그인 후 가능합니다. Free는 PBT·IBT 각각 읽기와 듣기의 첫 공개 세트를, Plus는 모든 공개 세트를 이용할 수 있습니다. 쓰기 평가 이력과 크레딧은 로그인한 계정에 연결됩니다.",
-        "Plus 구독은 선택한 1·3·6개월 주기로 자동 결제됩니다. 첫 결제와 갱신 결제마다 400크레딧을 지급합니다. Plus 페이지의 ‘구독 관리 및 해지’에서 다음 갱신을 취소할 수 있고, 결제한 기간이 끝날 때까지 이용할 수 있습니다.",
+        "Plus 구독은 선택한 1·3·6개월 주기로 자동 결제됩니다. 결제한 기간 동안 매월 400크레딧을 지급하며, 남은 크레딧은 이월됩니다. Plus 페이지의 ‘구독 관리 및 해지’에서 다음 갱신을 취소할 수 있고, 결제한 기간이 끝날 때까지 이용할 수 있습니다.",
         "본인이 사용할 수 있는 이메일로 가입하고 계정의 비밀번호와 인증 링크를 안전하게 관리해 주세요. 타인의 계정이나 결제 수단을 허락 없이 사용하거나 다른 이용자의 학습을 방해해서는 안 됩니다.",
       ] },
       { title: "모의시험과 AI 쓰기 평가", paragraphs: [
@@ -49,7 +49,7 @@ const copy = {
     sections: [
       { title: "Service and accounts", paragraphs: [
         "TOPIQ offers PBT and IBT mock exams, vocabulary sets and writing practice for TOPIK preparation. Everyone can browse published exams. Sign in to take an exam. Free includes the first published reading and listening sets in both PBT and IBT. Plus includes all published sets. Writing evaluation history and credits are linked to your signed-in account.",
-        "Plus renews automatically every 1, 3 or 6 months according to your selection. The first payment and each paid renewal add 400 credits. You can cancel the next renewal from the Plus page and keep access through the paid period.",
+        "Plus renews automatically every 1, 3 or 6 months according to your selection. You receive 400 credits each month of the paid period, and unused credits carry over. You can cancel the next renewal from the Plus page and keep access through the paid period.",
         "Register with an email address you control and keep your password and verification links secure. You must have permission to use another person’s account or payment method. Do not disrupt other users’ learning.",
       ] },
       { title: "Mock exams and AI writing feedback", paragraphs: [
@@ -82,7 +82,7 @@ const copy = {
     sections: [
       { title: "Layanan dan akun", paragraphs: [
         "TOPIQ menyediakan simulasi PBT dan IBT, set kosakata, dan latihan menulis untuk persiapan TOPIK. Siapa saja dapat melihat daftar ujian. Masuk untuk mengikuti ujian. Free mencakup set membaca dan menyimak pertama yang tersedia untuk PBT dan IBT. Plus mencakup semua set yang tersedia. Riwayat evaluasi tulisan dan kredit terhubung ke akun yang kamu gunakan untuk masuk.",
-        "Langganan Plus diperpanjang otomatis setiap 1, 3, atau 6 bulan sesuai pilihanmu. Pembayaran pertama dan setiap perpanjangan yang dibayar memberikan 400 kredit. Kamu dapat membatalkan perpanjangan berikutnya dari halaman Plus dan tetap menggunakan layanan sampai periode berbayar berakhir.",
+        "Langganan Plus diperpanjang otomatis setiap 1, 3, atau 6 bulan sesuai pilihanmu. Kamu mendapat 400 kredit setiap bulan selama periode berbayar. Sisa kredit tetap tersimpan. Kamu dapat membatalkan perpanjangan berikutnya dari halaman Plus dan tetap menggunakan layanan sampai periode berbayar berakhir.",
         "Daftar dengan email yang kamu kuasai dan jaga keamanan kata sandi serta tautan verifikasi. Kamu memerlukan izin untuk menggunakan akun atau metode pembayaran orang lain. Jangan mengganggu kegiatan belajar pengguna lain.",
       ] },
       { title: "Simulasi ujian dan evaluasi tulisan dengan AI", paragraphs: [

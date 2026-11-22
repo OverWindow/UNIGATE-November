@@ -27,22 +27,34 @@ def extend_plan_end(until, periods):
     return until
 
 
-def current_plan_end(user_id):
+def current_plan(user_id):
     now = timezone.now()
-    periods = paid_plans().filter(user_id=user_id, plan_ends_at__gt=now).order_by("plan_starts_at")
-    until = extend_plan_end(now, periods.values_list("plan_starts_at", "plan_ends_at"))
-    return until if until > now else None
+    periods = paid_plans().filter(user_id=user_id, plan_ends_at__gt=now).order_by("plan_starts_at", "pk")
+    rows = iter(periods.values_list("plan_starts_at", "plan_ends_at", "plan_months"))
+    first = next(rows, None)
+    if first is None or first[0] > now:
+        return None, None
+    _, first_end, months = first
+    return months, extend_plan_end(first_end, ((start, end) for start, end, _ in rows))
+
+
+def current_plan_end(user_id):
+    return current_plan(user_id)[1]
 
 
 def open_subscription(user_id):
     return CreditPurchase.objects.filter(user_id=user_id, subscription_state__in=OPEN_SUBSCRIPTION_STATES).first()
 
 
+def add_calendar_months(start, count):
+    year_offset, month_index = divmod(start.month - 1 + count, 12)
+    year, month = start.year + year_offset, month_index + 1
+    return start.replace(year=year, month=month, day=min(start.day, monthrange(year, month)[1]))
+
+
 def assign_plan_period(purchase, paid_at):
     # The caller holds the wallet lock, including when two different orders settle at once.
     last_end = paid_plans().filter(user_id=purchase.user_id).aggregate(end=Max("plan_ends_at"))["end"]
     start = timezone.localtime(max(paid_at, last_end) if last_end else paid_at)
-    year_offset, month_index = divmod(start.month - 1 + purchase.plan_months, 12)
-    year, month = start.year + year_offset, month_index + 1
     purchase.plan_starts_at = start
-    purchase.plan_ends_at = start.replace(year=year, month=month, day=min(start.day, monthrange(year, month)[1]))
+    purchase.plan_ends_at = add_calendar_months(start, purchase.plan_months)

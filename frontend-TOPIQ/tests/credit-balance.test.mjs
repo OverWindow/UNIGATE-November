@@ -129,7 +129,7 @@ test("all four purchase buttons display their localized card issuer notice", t =
     session.language = language;
     const tree = mount(
       () => React.createElement(CreditPurchase, { userId: 1 }),
-      () => React.createElement(CreditPurchase, { userId: 1, plans }),
+      () => React.createElement(CreditPurchase, { userId: 1, planAccount: { plans, active: false, currentPlanMonths: null } }),
     );
     const notices = [...tree.html.matchAll(/<p\b[^>]* id="([^"]+)"[^>]*>([^<]+)<\/p><button\b[^>]* aria-describedby="\1"/g)];
     assert.deepEqual(notices.map(([, id, message]) => [id, message]),
@@ -151,7 +151,7 @@ test("each Plus card lists its benefits and starts the selected purchase without
   };
   let buy;
   const tree = mount(() => {
-    const ui = CreditPurchase({ plans, userId: 1, returnId: null, onFulfilled() {} });
+    const ui = CreditPurchase({ planAccount: { plans, active: false, currentPlanMonths: null }, userId: 1, returnId: null, onFulfilled() {} });
     const [grid] = React.Children.toArray(ui.props.children);
     const sixMonthCard = React.Children.toArray(grid.props.children)[3];
     buy = React.Children.toArray(sixMonthCard.props.children).find(item => item.type === "button").props.onClick;
@@ -160,6 +160,8 @@ test("each Plus card lists its benefits and starts the selected purchase without
   const cards = tree.html.match(/<article\b[\s\S]*?<\/article>/g) ?? [];
   const free = cards.shift();
   assert.match(free, /<h2>Free<\/h2>/);
+  assert.match(free, /aria-current="true"[\s\S]*?내 플랜/);
+  assert.equal((tree.html.match(/내 플랜/g) ?? []).length, 1);
   assert.ok(free.includes("PBT 읽기·듣기 첫 세트 각 1개"));
   assert.ok(free.includes("IBT 읽기·듣기 첫 세트 각 1개"));
   assert.doesNotMatch(free, /<button/);
@@ -171,7 +173,7 @@ test("each Plus card lists its benefits and starts the selected purchase without
     assert.ok(card.includes(months === 1 ? "매월" : `${months}개월마다`));
     assert.ok(card.includes("구독하기"));
     for (const benefit of ["공개된 PBT·IBT 모의고사 무료 응시", "모든 공개 쓰기 세트 무료 열람",
-      "쓰기 문항당 AI 첨삭 최대 20회", "첫 결제와 갱신 때마다 400크레딧 지급"]) assert.ok(card.includes(benefit));
+      "쓰기 문항당 AI 첨삭 최대 20회", "매월 400크레딧 누적 지급"]) assert.ok(card.includes(benefit));
     assert.equal((card.match(/<li>/g) ?? []).length, 4);
   }
   assert.doesNotMatch(tree.html, /결제 내역/);
@@ -211,12 +213,17 @@ test("a subscriber can manage renewal in the portal and returns to Plus", async 
   };
   let manage;
   const page = mount(() => {
-    const ui = CreditPurchase({ userId: 1, returnId: null, plans: [{ months: 1, priceId: "price_one",
-      currency: "krw", amount: 9900, bonusCredits: 400 }], hasPlan: true, manageSubscription: true, onFulfilled() {} });
+    const ui = CreditPurchase({ userId: 1, returnId: null, planAccount: {
+      plans: [1, 3, 6].map(months => ({ months, currency: "krw", amount: 9900, bonusCredits: 400 })),
+      active: true, currentPlanMonths: 3, endsAt: "2026-12-15T12:00:00Z", subscription: { months: 3, state: "ending" },
+    }, onFulfilled() {} });
     manage = React.Children.toArray(ui.props.children).find(el => el.type === "button").props.onClick;
     return ui;
   });
   assert.doesNotMatch(page.html, /구독하기/);
+  const cards = page.html.match(/<article\b[\s\S]*?<\/article>/g);
+  assert.equal(cards.filter(card => card.includes("내 플랜")).length, 1);
+  assert.match(cards[2], /aria-current="true"[\s\S]*?Plus 3개월[\s\S]*?내 플랜[\s\S]*?만료 일시[\s\S]*?자동 갱신 해지 예정/);
   assert.match(page.html, /구독 관리 및 해지/);
   manage();
   await setImmediate();

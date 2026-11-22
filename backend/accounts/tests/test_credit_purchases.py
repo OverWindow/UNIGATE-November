@@ -13,6 +13,7 @@ from django.db import DatabaseError, close_old_connections, connection
 from django.test import Client, TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 
+from accounts.credits import account_with_monthly_credits
 from accounts.models import CreditAccount, CreditPurchase, CreditTransaction
 from accounts.payments import checkout_customer
 
@@ -67,6 +68,16 @@ def signed_event(client, event_type, data, *, created=None, signing_secret=SIGNI
                        HTTP_STRIPE_SIGNATURE=f"t={timestamp},v1={signature}")
 
 
+def plan_invoice(order, invoice_id, reason, start, end):
+    sub = "sub_fixture"
+    return {"id": invoice_id, "object": "invoice", "status": "paid", "amount_paid": order.amount,
+            "currency": "krw", "customer": "cus_fixture_owner", "billing_reason": reason,
+            "parent": {"subscription_details": {"metadata": {"credit_purchase_id": str(order.pk)}, "subscription": sub}},
+            "lines": {"data": [{"amount": order.amount, "quantity": 1, "period": {"start": start, "end": end},
+                "pricing": {"price_details": {"price": order.stripe_price_id}},
+                "parent": {"subscription_item_details": {"subscription": sub, "proration": False}}}]}}
+
+
 @override_settings(**TEST_SETTINGS)
 class CreditPurchaseTests(TestCase):
     def setUp(self):
@@ -113,6 +124,7 @@ class CreditPurchaseTests(TestCase):
         self.assertEqual(self.client.post("/api/plans/purchases/", {}, content_type="application/json").status_code, 403)
         catalog = self.client.get("/api/plans/").json()
         self.assertFalse(catalog["active"])
+        self.assertIsNone(catalog["currentPlanMonths"])
         self.assertIsNone(catalog["endsAt"])
         self.assertEqual([(p["months"], p["amount"], p["bonusCredits"]) for p in catalog["plans"]],
                          [(1, 9900, 400), (3, 23900, 400), (6, 43900, 400)])
@@ -170,25 +182,19 @@ class CreditPurchaseTests(TestCase):
         metadata = {"credit_purchase_id": order_id}
         sub = {"id": "sub_fixture", "object": "subscription", "metadata": metadata, "customer": "cus_fixture_owner"}
         now = int(time.time())
-        def invoice(invoice_id, reason, start, end):
-            return {"id": invoice_id, "object": "invoice", "status": "paid", "amount_paid": 9900,
-                    "currency": "krw", "customer": sub["customer"], "billing_reason": reason,
-                    "parent": {"subscription_details": {"metadata": metadata, "subscription": sub["id"]}},
-                    "lines": {"data": [{"amount": 9900, "quantity": 1, "period": {"start": start, "end": end},
-                        "pricing": {"price_details": {"price": "price_one"}},
-                        "parent": {"subscription_item_details": {"subscription": sub["id"], "proration": False}}}]}}
-        first = invoice("in_initial", "subscription_create", now - 10, now + 100)
-        renewal = invoice("in_renewal", "subscription_cycle", now + 100, now + 200)
+        first = plan_invoice(order, "in_initial", "subscription_create", now - 10, now + 100)
+        renewal = plan_invoice(order, "in_renewal", "subscription_cycle", now + 100, now + 200)
         self.assertEqual(signed_event(self.client, "invoice.paid", first | {"customer": "cus_other"}).status_code, 400)
         self.assertEqual(signed_event(self.client, "invoice.paid", first | {"amount_paid": 1}).status_code, 400)
         # A renewal may arrive before both the original invoice and Checkout.
         self.assertEqual(signed_event(self.client, "invoice.paid", renewal).status_code, 200)
         self.assertFalse(self.client.get("/api/plans/").json()["active"])
+        self.assertEqual(self.client.get("/api/credits/").json()["balance"], 150)
         for bill in (first, renewal, first):
             self.assertEqual(signed_event(self.client, "invoice.paid", bill).status_code, 200)
         self.assertEqual(post_webhook(self.client, order, mode="subscription", customer=sub["customer"],
                                      amount_total=9900).status_code, 200)
-        self.assert_wallet(950, 0)
+        self.assertEqual(self.client.get("/api/credits/").json()["balance"], 550)
         self.assertEqual(CreditPurchase.objects.filter(stripe_invoice_id__isnull=False).count(), 2)
         self.assertEqual(self.client.get("/api/plans/").json()["subscription"], {"state": "active", "months": 1})
         self.assertEqual(self.post_plan(1, "price_one").status_code, 409)
@@ -204,9 +210,39 @@ class CreditPurchaseTests(TestCase):
         data = self.client.get("/api/plans/").json()
         self.assertIsNone(data["subscription"])
         self.assertTrue(data["active"])
+        self.assertEqual(data["currentPlanMonths"], 1)
         with patch("accounts.plans.timezone.now", return_value=datetime.fromtimestamp(now + 200, UTC)):
             self.assertFalse(self.client.get("/api/plans/").json()["active"])
+            self.assertEqual(self.client.get("/api/credits/").json()["balance"], 950)
+            self.assertEqual(CreditPurchase.objects.get(stripe_invoice_id="in_renewal").credited_months, 1)
         self.assert_wallet(950, 0)
+
+    def test_quarterly_credits_follow_local_month_ends_and_survive_missed_visits_and_renewal(self):
+        self.prices.retrieve.return_value = plan_price(3, 23900, "price_three")
+        order = CreditPurchase.objects.get(pk=self.post_plan(3, "price_three").json()["id"])
+        # Local Jan 31, 00:30. February clamps to leap day; March returns to the 31st.
+        start = datetime(2024, 1, 30, 15, 30, tzinfo=UTC)
+        second = datetime(2024, 2, 28, 15, 30, tzinfo=UTC)
+        third = datetime(2024, 3, 30, 15, 30, tzinfo=UTC)
+        end = datetime(2024, 4, 29, 15, 30, tzinfo=UTC)
+        bill = plan_invoice(order, "in_first", "subscription_create", int(start.timestamp()), int(end.timestamp()))
+        self.assertEqual(signed_event(self.client, "invoice.paid", bill).status_code, 200)
+        self.assert_wallet(550, 0)
+        for at, expected in [(second - timedelta(seconds=1), 550), (second, 950), (second, 950),
+                             (third - timedelta(seconds=1), 950)]:
+            with patch("accounts.credits.timezone.now", return_value=at):
+                self.assertEqual(self.client.get("/api/credits/").json()["balance"], expected)
+                self.assertEqual(self.client.get("/api/plans/").json()["currentPlanMonths"], 3)
+        renewal_end = datetime(2024, 7, 30, 15, 30, tzinfo=UTC)
+        renewal = plan_invoice(order, "in_second", "subscription_cycle", int(end.timestamp()), int(renewal_end.timestamp()))
+        for invoice in (renewal, bill, renewal):
+            self.assertEqual(signed_event(self.client, "invoice.paid", invoice).status_code, 200)
+        with patch("accounts.credits.timezone.now", return_value=renewal_end + timedelta(days=1)):
+            entries = self.client.get("/api/credits/transactions/").json()["transactions"]
+            self.assertEqual([row["amount"] for row in entries], [400] * 6)
+            self.assertEqual(self.client.get("/api/credits/").json(), {"balance": 2550, "reserved": 20, "available": 2530})
+            self.assertIsNone(self.client.get("/api/plans/").json()["currentPlanMonths"])
+        self.assertEqual(list(CreditPurchase.objects.values_list("credited_months", flat=True)), [3, 3])
 
     def test_subscription_recovers_completed_checkout_after_lost_creation_response(self):
         self.prices.retrieve.return_value = plan_price(1, 9900, "price_one")
@@ -533,6 +569,30 @@ class CreditPurchaseTests(TestCase):
 
 @override_settings(**TEST_SETTINGS)
 class ConcurrentCreditPurchaseTests(TransactionTestCase):
+    def test_simultaneous_wallet_reads_catch_up_a_six_month_plan_only_once(self):
+        user = get_user_model().objects.create_user(username="monthly-credit-owner")
+        account = CreditAccount.objects.create(user=user, balance=100)
+        first = CreditTransaction.objects.create(account=account, kind="plan_bonus", amount=400, balance_after=400, reserved_after=0)
+        now = timezone.now()
+        receipt = CreditPurchase.objects.create(user=user, attempt_id=uuid.uuid4(), amount=43900, credits=400,
+            plan_months=6, credited_months=1, status="fulfilled", stripe_invoice_id="in_six_months", transaction=first,
+            plan_starts_at=now - timedelta(days=200), plan_ends_at=now - timedelta(days=18))
+        ready = Barrier(2, timeout=10)
+
+        def read_balance(_):
+            close_old_connections()
+            try:
+                ready.wait()
+                return account_with_monthly_credits(user.pk).balance
+            finally:
+                connection.close()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            self.assertEqual(list(pool.map(read_balance, range(2))), [2100, 2100])
+        receipt.refresh_from_db()
+        self.assertEqual(receipt.credited_months, 6)
+        self.assertEqual(CreditTransaction.objects.filter(account=account, kind="plan_bonus").count(), 6)
+
     def test_separate_simultaneous_plan_payments_extend_and_credit_once_each(self):
         user = get_user_model().objects.create_user(username="concurrent-plan-owner")
         orders = [CreditPurchase.objects.create(user=user, attempt_id=uuid.uuid4(), amount=9900, credits=400,

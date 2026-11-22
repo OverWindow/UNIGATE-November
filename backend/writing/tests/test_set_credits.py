@@ -92,6 +92,19 @@ class SetCreditTests(TransactionTestCase):
         self.assertFalse(CreditTransaction.objects.filter(kind="unlock").exists())
         self.provider.assert_not_called()
 
+    def test_spending_applies_earned_months_without_a_balance_read(self):
+        account = CreditAccount.objects.get(user=self.user)
+        account.balance = 50
+        account.save(update_fields=["balance"])
+        first = CreditTransaction.objects.create(account=account, kind="plan_bonus", amount=400, balance_after=400, reserved_after=0)
+        now = timezone.now()
+        CreditPurchase.objects.create(user=self.user, attempt_id=uuid.uuid4(), amount=23900, credits=400,
+            plan_months=3, credited_months=1, status="fulfilled", stripe_invoice_id="in_expired_plan", transaction=first,
+            plan_starts_at=now - timedelta(days=100), plan_ends_at=now - timedelta(days=8))
+        payment = self.purchase().json()
+        self.assertEqual((payment["chargedCredits"], payment["credits"]["available"]), (100, 750))
+        self.assertEqual(self.purchase().json()["credits"]["available"], 750)
+
     def test_plan_access_ends_without_charging_or_permanently_unlocking_sets(self):
         self.assertEqual(self.purchase().status_code, 201)
         permanent = self.set_id

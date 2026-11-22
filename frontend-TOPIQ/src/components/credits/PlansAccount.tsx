@@ -30,7 +30,6 @@ export default function PlansAccount() {
 
 function MemberPlans({ userId, returnId, cancelled }: { userId: number; returnId: string | null; cancelled: boolean }) {
   const { language, refreshSession, refreshCredits, updatePlan } = useApp();
-  const p = plansContent[language];
   const a = authContent[language];
   const [data, setData] = useState<PlanAccount | null>(null);
   const [error, setError] = useState(false);
@@ -68,16 +67,7 @@ function MemberPlans({ userId, returnId, cancelled }: { userId: number; returnId
   return <>
     {error ? <div className="catalog-status" role="alert">{a.network} <button className="button credits-secondary" onClick={reload}>{a.retry}</button></div>
       : !data ? <p className="catalog-status" role="status">{a.loading}</p> : null}
-    {data && <section className="plan-status" aria-label={p.current}>
-      <div><span>{p.current}</span><strong>{data.active ? "Plus" : p.free}</strong></div>
-      {data.subscription && <div><strong>{p.term(data.subscription.months)}</strong>
-        {data.subscription.state === "ending" && <span>{p.ending}</span>}
-        {data.subscription.state === "past_due" && <span>{p.pastDue}</span>}</div>}
-      {data.endsAt && <div><span>{data.subscription?.state === "active" ? p.renewal : p.until}</span><time dateTime={data.endsAt}>{new Date(data.endsAt).toLocaleString(language, { dateStyle: "long", timeStyle: "short" })}</time></div>}
-      {data.active && !data.subscription && <p>{p.prepaid}</p>}
-    </section>}
-    <CreditPurchase userId={userId} returnId={returnId} cancelled={cancelled} plans={data?.plans ?? []}
-      hasPlan={Boolean(data?.active || data?.subscription)} manageSubscription={Boolean(data?.subscription)}
+    <CreditPurchase userId={userId} returnId={returnId} cancelled={cancelled} planAccount={data}
       onFulfilled={onFulfilled} onPriceChanged={reload} />
   </>;
 }

@@ -81,6 +81,7 @@ class CreditPurchase(models.Model):
     currency = models.CharField(max_length=3, default="krw")
     credits = models.PositiveIntegerField(default=CREDIT_PURCHASE_QUANTITY)
     plan_months = models.PositiveSmallIntegerField(null=True)
+    credited_months = models.PositiveSmallIntegerField(null=True)
     plan_starts_at = models.DateTimeField(null=True)
     plan_ends_at = models.DateTimeField(null=True)
     status = models.CharField(max_length=10, default="pending", choices=[
@@ -110,6 +111,8 @@ class CreditPurchase(models.Model):
             models.CheckConstraint(condition=(
                 (models.Q(status="fulfilled", transaction__isnull=False) &
                  (models.Q(stripe_session_id__isnull=False) | models.Q(stripe_invoice_id__isnull=False, plan_months__isnull=False)))
+                | models.Q(status="fulfilled", stripe_invoice_id__isnull=False, plan_months__isnull=False,
+                           transaction__isnull=True, credited_months__isnull=False, credited_months=0)
                 | models.Q(status__in=["pending", "expired"], transaction__isnull=True)
             ), name="credit_purchase_fulfillment"),
         ]

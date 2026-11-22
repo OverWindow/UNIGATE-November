@@ -7,8 +7,8 @@ from django.db import DatabaseError
 from django.views.decorators.debug import sensitive_variables
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
-from accounts.credits import balance_data
-from accounts.models import CreditAccount, CreditTransaction
+from accounts.credits import account_with_monthly_credits, balance_data
+from accounts.models import CreditTransaction
 from accounts.rate_limits import RateLimitUnavailable, record_attempt
 from accounts.views import api_response
 from question_bank.writing import WritingUnavailable
@@ -128,7 +128,7 @@ def evaluation_detail(request, evaluation_id):
 @authenticated
 def credits(request):
     expire_for_user(request.user.pk)
-    account, _ = CreditAccount.objects.get_or_create(user_id=request.user.pk)
+    account = account_with_monthly_credits(request.user.pk)
     return api_response(balance_data(account))
 
 
@@ -137,6 +137,7 @@ def credits(request):
 def transactions(request):
     page = page_number(request)
     expire_for_user(request.user.pk)
+    account_with_monthly_credits(request.user.pk)
     query = CreditTransaction.objects.filter(account_id=request.user.pk).order_by("-created_at", "-id")
     rows, next_page = page_rows(query, page)
     return api_response({"transactions": [

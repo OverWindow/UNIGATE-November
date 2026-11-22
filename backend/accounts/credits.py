@@ -1,8 +1,11 @@
 from contextlib import contextmanager
 
 from django.db import connection, transaction
+from django.db.models import F
+from django.utils import timezone
 
 from .models import CreditAccount, CreditTransaction
+from .plans import add_calendar_months, paid_plans
 
 
 class CreditError(Exception):
@@ -33,6 +36,40 @@ def record(account, kind, amount, *, evaluation=None, actor=None, reason="", ent
     )
 
 
+def due_plan_months(user_id, now):
+    # Include expired receipts so earned credits survive a long absence.
+    receipts = paid_plans().filter(user_id=user_id, plan_starts_at__lte=now,
+                                   credited_months__lt=F("plan_months")).order_by("plan_starts_at", "pk")
+    for receipt in receipts:
+        start = timezone.localtime(receipt.plan_starts_at)
+        credited = receipt.credited_months
+        while credited < receipt.plan_months:
+            due = add_calendar_months(start, credited)
+            if due > now or due >= receipt.plan_ends_at:
+                break
+            credited += 1
+        if credited > receipt.credited_months:
+            yield receipt, credited
+
+
+@transaction.atomic
+def account_with_monthly_credits(user_id, *, for_update=False):
+    if not for_update and not any(due_plan_months(user_id, timezone.now())):
+        account, _ = CreditAccount.objects.get_or_create(user_id=user_id)
+        return account
+    account = locked_account(user_id)
+    # Another reader may have posted the installments while we waited for the wallet.
+    for receipt, months_due in due_plan_months(user_id, timezone.now()):
+        for month_index in range(receipt.credited_months, months_due):
+            account.balance += receipt.credits
+            entry = record(account, "plan_bonus", receipt.credits)
+            if month_index == 0:
+                receipt.transaction = entry
+        receipt.credited_months = months_due
+        receipt.save(update_fields=["credited_months", "transaction"])
+    return account
+
+
 def welcome(user_id):
     # Only the successful signup transaction calls this; existing accounts get no bonus.
     with evaluation_lock():
@@ -47,7 +84,7 @@ def settle(evaluation, *, success):
     amount = evaluation.credit_cost
     if not amount:
         return
-    account = locked_account(evaluation.user_id)
+    account = account_with_monthly_credits(evaluation.user_id, for_update=True)
     account.reserved -= amount
     if success:
         account.balance -= amount

@@ -2,7 +2,8 @@ import type { Language } from "./landing-content";
 
 interface HomeContent {
   hero: { title: string; description: string };
-  tests: { title: string; description: string; round: string; section: string; mode: string; timed: string; practice: string; start: string };
+  learning: { title: string; pbt: string; ibt: string; vocabulary: string; writing: string };
+  pricing: { title: string; renewal: (months: number) => string };
   guide: { title: string; organizations: string; ministry: string; institute: string; points: string[]; action: string };
   uses: { title: string; description: string; cards: { title: string; description: string }[] };
   faq: { title: string; items: { question: string; answer: string }[] };
@@ -14,7 +15,11 @@ export const homeContent: Record<Language, HomeContent> = {
       title: "TOPIK II 실력을\n확인해보세요.",
       description: "TOPIK II 읽기와 듣기 50문항을 실전 또는 연습 모드로 풀고,\n정확한 응답 분석과 오답 해설을 확인할 수 있습니다.",
     },
-    tests: { title: "PBT 모의고사 선택", description: "읽기 또는 듣기 모의고사를 선택하세요.\n각 회차는 50문항, 총 100점입니다.", round: "회차", section: "영역", mode: "모드", timed: "실전 모드", practice: "연습 모드", start: "모의고사 시작" },
+    learning: {
+      title: "학습하기", pbt: "PBT 모의고사 풀어보기", ibt: "IBT 모의고사 풀어보기",
+      vocabulary: "단어 퀴즈 풀어보기", writing: "쓰기 AI 써보기",
+    },
+    pricing: { title: "Plus 요금제", renewal: n => n === 1 ? "매월 자동 결제" : `${n}개월마다 자동 결제` },
     guide: {
       title: "TOPIK 시험이란 무엇인가요?", organizations: "TOPIK 주관 기관", ministry: "대한민국 교육부", institute: "국립국제교육원",
       points: ["한국어가 모국어가 아닌 외국인과 재외동포를 위한 시험", "TOPIK I은 1급과 2급, TOPIK II는 3급부터 6급까지 평가", "공식 성적은 성적 발표일부터 2년 동안 유효", "대한민국 교육부 국립국제교육원이 주관"],
@@ -45,7 +50,11 @@ export const homeContent: Record<Language, HomeContent> = {
       title: "Find out where you stand in TOPIK II.",
       description: "Take 50-question TOPIK II reading and listening tests in timed or practice mode,\nthen review detailed response analysis and explanations.",
     },
-    tests: { title: "Choose a PBT Mock Test", description: "Choose a TOPIK II reading or listening test.\nEach set has 50 questions and a maximum score of 100.", round: "Set", section: "Section", mode: "Mode", timed: "Timed Mode", practice: "Practice Mode", start: "Start Mock Test" },
+    learning: {
+      title: "Practice your Korean", pbt: "Take a PBT mock test", ibt: "Take an IBT mock test",
+      vocabulary: "Take a vocabulary quiz", writing: "Try AI writing feedback",
+    },
+    pricing: { title: "Plus plans", renewal: n => n === 1 ? "Renews automatically every month" : `Renews automatically every ${n} months` },
     guide: {
       title: "What is the TOPIK test?", organizations: "TOPIK organizers", ministry: "Ministry of Education, Republic of Korea", institute: "National Institute for International Education",
       points: ["For overseas Koreans and international learners whose first language is not Korean", "TOPIK I awards Levels 1 and 2. TOPIK II awards Levels 3 to 6", "Official scores are valid for two years from the result date", "Administered by the National Institute for International Education in Korea"],
@@ -76,7 +85,11 @@ export const homeContent: Record<Language, HomeContent> = {
       title: "Ketahui kemampuan TOPIK II Anda.",
       description: "Kerjakan 50 soal membaca dan menyimak TOPIK II dalam mode simulasi atau latihan,\nlalu tinjau analisis jawaban dan pembahasannya.",
     },
-    tests: { title: "Pilih Simulasi PBT", description: "Pilih simulasi membaca atau menyimak TOPIK II.\nSetiap set berisi 50 soal dengan nilai maksimal 100.", round: "Set", section: "Bidang", mode: "Mode", timed: "Mode Simulasi", practice: "Mode Latihan", start: "Mulai Simulasi" },
+    learning: {
+      title: "Latihan bahasa Korea", pbt: "Kerjakan simulasi PBT", ibt: "Kerjakan simulasi IBT",
+      vocabulary: "Kerjakan kuis kosakata", writing: "Coba koreksi tulisan dengan AI",
+    },
+    pricing: { title: "Paket Plus", renewal: n => n === 1 ? "Diperpanjang otomatis setiap bulan" : `Diperpanjang otomatis setiap ${n} bulan` },
     guide: {
       title: "Apa itu ujian TOPIK?", organizations: "Penyelenggara TOPIK", ministry: "Kementerian Pendidikan Republik Korea", institute: "National Institute for International Education",
       points: ["Untuk warga Korea di luar negeri dan pelajar yang bahasa ibunya bukan bahasa Korea", "TOPIK I menilai level 1 dan 2. TOPIK II menilai level 3 hingga 6", "Nilai resmi berlaku selama dua tahun sejak pengumuman hasil", "Diselenggarakan oleh National Institute for International Education di Korea"],

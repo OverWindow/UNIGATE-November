@@ -50,7 +50,7 @@ export interface CreditPurchaseStatus { id: string; status: "pending" | "fulfill
 export interface CreditPrice { priceId: string; amount: number; currency: "krw"; credits: number }
 export interface PlanOffer { months: number; priceId: string | null; amount: number; currency: "krw"; bonusCredits: number }
 export interface PlanAccount {
-  plans: PlanOffer[]; active: boolean; endsAt: string | null;
+  plans: PlanOffer[]; active: boolean; endsAt: string | null; currentPlanMonths: number | null;
   subscription: { state: "active" | "ending" | "past_due"; months: number } | null;
 }
 export interface Evaluation {

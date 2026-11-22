@@ -38,22 +38,25 @@
 .orbitDot { position: absolute; top: 29%; left: 15%; width: 9px; height: 9px; border-radius: 50%; background: #eaffff; box-shadow: 0 0 25px #fff; animation: characterFloat 6s ease-in-out infinite; }
 .characterShadow { position: absolute; bottom: 18px; width: 50%; height: 25px; border-radius: 50%; background: #58517e26; filter: blur(16px); animation: characterShadow 7s ease-in-out infinite; }
 .flow { background: radial-gradient(circle at 12% 20%, #2d5ec50e, transparent 544px), radial-gradient(circle at 88% 68%, #2d5ec50f, transparent 608px), radial-gradient(circle at 55% 92%, #ea66410d, transparent 512px), linear-gradient(#f3f4f6 0%, #f7f8fb 28%, #fff 55%, #f5f7fb 78%, #fff 100%); }
-.tests { position: relative; isolation: isolate; overflow: hidden; padding-block: 56px; }
-.tests > :not(canvas) { position: relative; z-index: 1; }
+.cardsArea { position: relative; isolation: isolate; padding-block: 56px; }
+.cardsArea > .container { position: relative; z-index: 1; }
 .interactiveDots { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; pointer-events: none; mask-image: linear-gradient(transparent, #000 14% 86%, transparent); }
-.tests .description { margin-top: 12px; font-size: 14px; line-height: 24px; }
-.testForm { display: grid; gap: 16px; margin-top: 32px; padding: 20px; border: 1px solid #1118271f; border-radius: 20px; background: #ffffffd1; backdrop-filter: blur(14px); box-shadow: 0 16px 44px #1118270f; }
-.testLogin { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; }
-.testForm label { display: flex; flex-direction: column; gap: 6px; min-width: 0; color: #374151; font-size: 14px; font-weight: 500; line-height: 20px; }
-.testForm select { width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 12px; background: #fff; color: #111827; font-size: 14px; font-weight: 400; }
-.testForm select:disabled { background: #f3f4f6; color: #9ca3af; }
-.testForm select:hover:not(:disabled) { border-color: #2d5ec56b; }
-.startButton { display: flex; align-items: center; justify-content: center; align-self: end; gap: 8px; min-height: 48px; padding: 10px 24px; border-radius: 12px; background: #2d5ec5; color: #fff; font-size: 14px; font-weight: 600; line-height: 20px; transition: transform .18s, background-color .18s, box-shadow .18s; }
-.startButton:hover:not(:disabled) { background: #244ba0; box-shadow: 0 12px 28px #162f7f2e; transform: translateY(-2px); }
-.startButton:disabled { opacity: .6; }
-.testStatus { margin: 16px 0 0; color: #4b5563; font-size: 14px; line-height: 24px; }
-.testError { margin: 16px 0 0; padding: 14px 18px; border: 1px solid #efd7d0; border-radius: 12px; background: #fff8f5; color: #914332; font-size: 14px; line-height: 24px; }
-.testError button { margin-left: 12px; color: #2d5ec5; text-decoration: underline; text-underline-offset: 3px; }
+.learningCards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin-top: 24px; }
+.learningCard, .planCard { border: 1px solid #d9e1ee; border-radius: 16px; background: #fff; color: #172944; transition: border-color .18s, background-color .18s; }
+.learningCard:hover, .planCard:hover { border-color: #91aad9; background: #f7faff; }
+.learningCard { display: flex; align-items: center; gap: 16px; padding: 16px 20px; font-size: 18px; font-weight: 600; line-height: 1.4; }
+.cardIcon { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 12px; background: #edf2fc; color: #2d5ec5; }
+.learningCard > svg { flex: none; margin-left: auto; color: #526b95; }
+.pricing { margin-top: 48px; }
+.planRow { display: grid; grid-template-columns: repeat(3, minmax(12rem, 1fr)); gap: 12px; margin-top: 24px; overflow-x: auto; scroll-snap-type: x proximity; }
+.planCard { display: flex; flex-direction: column; padding: 20px; scroll-snap-align: start; }
+.planCard:focus-visible { outline-offset: -4px; }
+.planTerm { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: #315ba9; font-size: 15px; font-weight: 600; }
+.planPrice { margin-top: 18px; font-size: clamp(24px, 3vw, 32px); font-weight: 650; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.planRenewal { margin-top: 6px; color: #526078; font-size: 14px; line-height: 1.5; }
+.planBenefits { display: grid; gap: 8px; margin: 16px 0 0; padding: 16px 0 0; border-top: 1px solid #d9e1ee; list-style: none; color: #405370; font-size: 14px; line-height: 1.5; }
+.planBenefits li { display: flex; align-items: flex-start; gap: 8px; overflow-wrap: anywhere; }
+.planBenefits svg { flex: none; margin-top: 3px; color: #286143; }
 .guideGrid { display: grid; gap: 40px; }
 .guideIntro { text-align: center; }
 .organizations { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 20px 28px; margin-top: 32px; }
@@ -93,11 +96,9 @@
   .container { padding-inline: 32px; }
   .section { padding-block: 96px; }
   .heading { font-size: 36px; line-height: 40px; }
-  .heroGrid, .tests { padding-block: 80px; }
+  .heroGrid, .cardsArea { padding-block: 80px; }
   .heroCopy h1 { font-size: 48px; line-height: 1.18; }
   .heroCopy .description { font-size: 18px; }
-  .tests .description { font-size: 16px; }
-  .testForm { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 24px; }
   .organizationDivider { display: block; }
 }
 
@@ -117,7 +118,6 @@
   .characterStage { height: 440px; }
   .characterFloat { width: min(100%, 420px); }
   .sectionIntro { margin-inline: 0; text-align: left; }
-  .testForm { grid-template-columns: repeat(3, minmax(0, 1fr)) auto; align-items: end; }
   .guideGrid { grid-template-columns: .8fr 1.2fr; gap: 64px; }
   .guideIntro, .faq .heading { text-align: left; }
   .organizations { justify-content: flex-start; }

@@ -14,7 +14,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from .credits import locked_account, record
 from .models import CREDIT_PURCHASE_QUANTITY, PLAN_AMOUNTS, PLAN_BONUS, CreditAccount, CreditPurchase
-from .plans import assign_plan_period, current_plan_end, open_subscription
+from .plans import assign_plan_period, current_plan, current_plan_end, open_subscription
 from .subscriptions import apply_paid_invoice, sync_subscription
 from .views import api_response, read_payload
 
@@ -68,14 +68,14 @@ def plans(request):
     if not request.user.is_authenticated:
         return api_response({"error": "authentication_required"}, 401)
     try:
-        end = current_plan_end(request.user.pk)
+        current_months, end = current_plan(request.user.pk)
         subscription = open_subscription(request.user.pk)
     except DatabaseError:
         return api_response({"error": "plans_unavailable"}, 503)
     return api_response({
         "plans": [{"months": months, "priceId": price_id_for(months) or None, "amount": amount,
                    "currency": "krw", "bonusCredits": PLAN_BONUS} for months, amount in PLAN_AMOUNTS.items()],
-        "active": end is not None, "endsAt": end,
+        "active": end is not None, "endsAt": end, "currentPlanMonths": current_months,
         "subscription": {"state": subscription.subscription_state, "months": subscription.plan_months}
                         if subscription and subscription.subscription_state != "checkout" else None,
     })
@@ -340,10 +340,11 @@ def apply_checkout_event(event_type, session, event_created=None):
         account = locked_account(purchase.user_id)
         if purchase.plan_months:
             assign_plan_period(purchase, datetime.fromtimestamp(event_created, UTC))
+            purchase.credited_months = 1
         account.balance += purchase.credits
         purchase.transaction = record(account, "plan_bonus" if purchase.plan_months else "purchase", purchase.credits)
         purchase.status = "fulfilled"
-        purchase.save(update_fields=["transaction", "status", "plan_starts_at", "plan_ends_at"])
+        purchase.save(update_fields=["transaction", "status", "plan_starts_at", "plan_ends_at", "credited_months"])
     return 200
 
 

@@ -7,7 +7,7 @@ import { useApp } from "@/app/providers";
 import { homeContent } from "@/lib/home-content";
 import SiteHeader from "../SiteHeader";
 import SiteFooter from "../SiteFooter";
-import HomeTestSelector from "./HomeTestSelector";
+import HomeCards from "./HomeCards";
 import LandingCharacter from "./LandingCharacter";
 import instituteLogo from "../../../public/brand/niied-logo.png";
 import styles from "./LandingPage.module.css";
@@ -32,7 +32,7 @@ export default function LandingPage() {
         </section>
 
         <div className={styles.flow}>
-          <HomeTestSelector />
+          <HomeCards language={language} />
 
           <section id="topik-guide" className={`${styles.container} ${styles.section}`} aria-labelledby="guide-title">
             <div className={styles.guideGrid}>

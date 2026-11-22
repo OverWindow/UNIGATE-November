@@ -49,15 +49,17 @@ def apply_paid_invoice(invoice):
         if order.stripe_invoice_id:
             raise ValueError("Order already has an initial invoice")
         receipt = order
+        account.balance += order.credits
+        receipt.transaction = record(account, "plan_bonus", order.credits)
+        receipt.credited_months = 1
     else:
+        # A renewal can arrive early. Its first month is due when the new period starts.
         receipt = CreditPurchase(user_id=order.user_id, attempt_id=uuid4(), plan_months=order.plan_months,
                                  stripe_price_id=order.stripe_price_id, currency=order.currency,
-                                 amount=order.amount, credits=order.credits)
+                                 amount=order.amount, credits=order.credits, credited_months=0)
     if order.subscription_state == "checkout":
         order.subscription_state = "active"
         order.save(update_fields=["subscription_state"])
-    account.balance += order.credits
-    receipt.transaction = record(account, "plan_bonus", order.credits)
     receipt.stripe_invoice_id = invoice["id"]
     receipt.plan_starts_at, receipt.plan_ends_at = start, end
     receipt.status = "fulfilled"

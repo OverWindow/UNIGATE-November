@@ -3,7 +3,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.utils import timezone
 
-from accounts.credits import balance_data, evaluation_lock, locked_account, record, settle
+from accounts.credits import account_with_monthly_credits, balance_data, evaluation_lock, record, settle
 from question_bank.models import WritingQuestion
 from question_bank.writing import complete_sets, question as public_question
 
@@ -77,7 +77,7 @@ def prepare_question(set_id, item, answer, feedback_language="ko"):
 def unlock(*, user_id, set_id):
     with evaluation_lock():
         expire_locked()
-        account = locked_account(user_id)
+        account = account_with_monthly_credits(user_id, for_update=True)
         if not complete_sets().filter(pk=set_id).exists():
             raise EvaluationError("not_found", 404)
         if has_access(user_id, set_id):
