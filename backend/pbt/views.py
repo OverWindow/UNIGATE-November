@@ -55,11 +55,13 @@ def require_exam_access(user_id, exam):
         raise PlusRequired
 
 
-def available(view):
+def available(view=None, *, public=False):
+    if view is None:
+        return lambda handler: available(handler, public=public)
     @wraps(view)
     def wrapped(request, *args, **kwargs):
         try:
-            if not request.user.is_authenticated:
+            if not public and not request.user.is_authenticated:
                 return response({"error": "login_required"}, 401)
             return view(request, *args, **kwargs)
         except PlusRequired:
@@ -86,7 +88,7 @@ def payload(request, fields, optional_fields=(), max_size=4096):
 
 
 @require_GET
-@available
+@available(public=True)
 def exams(request, exam_format="pbt"):
     config = EXAM_FORMATS[exam_format]
     rows = list(published_exams(exam_format))
@@ -96,11 +98,22 @@ def exams(request, exam_format="pbt"):
     for exam in rows:
         first_by_section.setdefault(exam.section, exam.pk)
     free_ids = set(first_by_section.values())
-    plus = has_active_plan(request.user.pk)
+    member = request.user.is_authenticated
+    plus = member and has_active_plan(request.user.pk)
+    progress = exam_progress(request.user, exam_format, rows) if member else {}
+    return response({"exams": [{"id": str(e.pk), "title": e.title, "section": e.section,
+        "examFormat": e.exam_format, "round": e.display_order, "questionCount": config["question_count"],
+        "durationSeconds": config["duration"][e.section], "maxScore": 100,
+        "guestAvailable": False, "freeAvailable": e.pk in free_ids, "accessible": member and (plus or e.pk in free_ids),
+        "myProgress": progress.get(e.pk)}
+        for e in rows]})
+
+
+def exam_progress(user, exam_format, rows):
     progress = {e.pk: {mode: {"latestResult": None, "inProgressId": None}
                       for mode in ("practice", "timed")} for e in rows}
     with transaction.atomic():
-        owned = Attempt.objects.filter(user=request.user, exam_format=exam_format, exam_id__in=progress)
+        owned = Attempt.objects.filter(user=user, exam_format=exam_format, exam_id__in=progress)
         # Finalize expired tests before selecting results, including older history.
         for attempt in owned.filter(status="in_progress", expires_at__lte=timezone.now()).select_for_update().order_by("-started_at"):
             finalize(attempt)
@@ -112,12 +125,7 @@ def exams(request, exam_format="pbt"):
             }
         for attempt in owned.filter(status="in_progress"):
             progress[attempt.exam_id][attempt.mode]["inProgressId"] = str(attempt.pk)
-    return response({"exams": [{"id": str(e.pk), "title": e.title, "section": e.section,
-        "examFormat": e.exam_format, "round": e.display_order, "questionCount": config["question_count"],
-        "durationSeconds": config["duration"][e.section], "maxScore": 100,
-        "guestAvailable": False, "freeAvailable": e.pk in free_ids, "accessible": plus or e.pk in free_ids,
-        "myProgress": progress.get(e.pk)}
-        for e in rows]})
+    return progress
 
 
 @require_http_methods(["GET", "POST"])

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import useRouter from "@/lib/use-navigation-router";
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, CreditCard, Globe, LogOut, Menu, Settings, UserRound, X } from "lucide-react";
+import { Check, ChevronDown, CreditCard, Globe, Layers, LogOut, Menu, Settings, UserRound, X } from "lucide-react";
 import { useApp } from "@/app/providers";
 import { authContent } from "@/lib/auth/auth-content";
 import { landingContent, type Language } from "@/lib/landing-content";
@@ -122,6 +122,7 @@ export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: st
                     setAccountOpen(!accountOpen); setLanguageOpen(false); setMenuOpen(false);
                   }}>
                   <span>{user.nickname}</span>
+                  <span className={`account-tier${user.plusEndsAt ? " is-plus" : ""}`}>{user.plusEndsAt ? "Plus" : "Free"}</span>
                   <ChevronDown className="account-chevron" size={16} strokeWidth={1.7} aria-hidden="true" />
                 </button>
                 <div className="account-menu" id="account-menu" role="group" aria-labelledby="account-trigger" hidden={!accountOpen}>
@@ -136,6 +137,10 @@ export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: st
                     <Link href="/credits" aria-current={pathname === "/credits" ? "page" : undefined} onClick={() => setAccountOpen(false)}>
                       <CreditCard size={19} strokeWidth={1.7} aria-hidden="true" />
                       <span>{a.credits}</span>
+                    </Link>
+                    <Link href="/plans" aria-current={pathname === "/plans" ? "page" : undefined} onClick={() => setAccountOpen(false)}>
+                      <Layers size={19} strokeWidth={1.7} aria-hidden="true" />
+                      <span>Plus</span>
                     </Link>
                     <Link href="/settings" aria-current={pathname === "/settings" ? "page" : undefined} onClick={() => setAccountOpen(false)}>
                       <Settings size={19} strokeWidth={1.7} aria-hidden="true" />

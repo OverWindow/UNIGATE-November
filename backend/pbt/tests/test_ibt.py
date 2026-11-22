@@ -129,8 +129,11 @@ class IbtTests(BankFixtures, TransactionTestCase):
                 title=exam.title, guest_id=guest_id, mode="practice", started_at=timezone.now())
             base = f"/api/{exam.exam_format}/"
             path = base + f"attempts/{attempt.pk}/"
+            rows = client.get(base + "exams/").json()["exams"]
+            self.assertTrue(any(row["id"] == str(exam.pk) for row in rows))
+            self.assertTrue(all(row["myProgress"] is None and not row["accessible"] for row in rows))
             for method, route in (
-                ("get", base + "exams/"), ("get", base + "attempts/"), ("post", base + "attempts/"),
+                ("get", base + "attempts/"), ("post", base + "attempts/"),
                 ("get", path), ("post", path + "enter/"), ("put", path + "answers/1/"),
                 ("post", path + "submit/"), ("get", path + "result/"), ("post", path + "result-email/"),
                 ("post", base + "result-access/"),

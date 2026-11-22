@@ -22,6 +22,22 @@ TOPIQ는 Google Identity Services 팝업에서 받은 ID 토큰을 Django에서 
 
 인증 회귀 테스트는 `backend/`에서 `.\.venv\Scripts\python.exe manage.py test accounts --noinput`으로 실행합니다. Django가 별도 PostgreSQL 테스트 DB를 생성·삭제하며, Google 토큰 검증에는 테스트용 서명과 공개키를 사용합니다. 프론트엔드 검증은 `frontend-TOPIQ/`에서 `npm test`, `npm run lint`, `npm run typecheck`, `npm run build`를 실행합니다.
 
+## TOPIQ Plus
+
+헤더의 닉네임 옆에서 Free 또는 Plus 상태를 확인합니다. **아이디 → Plus**에서 1·3·6개월 구독을 선택합니다. Stripe가 선택한 주기마다 자동 결제하며, 첫 결제와 갱신 결제가 완료될 때마다 400크레딧을 지급합니다. 결제한 기간에는 공개된 PBT·IBT 모의고사와 쓰기 세트를 이용하고 문항당 AI 첨삭을 최대 20회 받을 수 있습니다.
+
+| Plus 결제 주기 | 주기당 결제액 | 백엔드 환경변수 |
+| --- | --- | --- |
+| 매월 | 9,900원 | `STRIPE_PLAN_PRICE_ID_1M` |
+| 3개월마다 | 23,900원 | `STRIPE_PLAN_PRICE_ID_3M` |
+| 6개월마다 | 43,900원 | `STRIPE_PLAN_PRICE_ID_6M` |
+
+- **Stripe 설정.** 샌드박스와 라이브 모드에서 각각 KRW 정액 반복 가격 3개를 생성합니다. 월 단위 간격을 각각 1·3·6으로 설정하고 새 Price ID를 위 환경변수에 지정합니다. 1,000크레딧 충전용 `STRIPE_PRICE_ID`는 일회성 가격을 사용합니다. 기본 고객 포털에서 결제 수단 변경, 청구서 조회, **현재 결제 기간 종료 시 구독 취소**를 활성화합니다. 포털의 상품·수량 변경은 끕니다. [Stripe 고객 포털 설정](https://docs.stripe.com/customer-management/configure-portal)
+- **웹훅.** 아래 로컬 CLI 명령과 운영 Workbench 엔드포인트에 동일한 다섯 이벤트를 등록합니다. Checkout 완료·만료는 결제창 상태를, `invoice.paid`는 해당 청구 기간의 권한과 400크레딧을, 구독 변경·삭제는 갱신 상태를 반영합니다. 다음 결제가 실패하면 마지막으로 결제한 기간까지만 이용할 수 있습니다.
+- **API와 DB.** 기존 `GET /api/plans/`, `POST /api/plans/purchases/`, 청구 포털 및 웹훅 경로를 사용합니다. `accounts.0010_recurring_plus`가 `credit_purchases`에 구독 원주문의 Stripe ID(`stripe_subscription_id`), 갱신 상태(`subscription_state`), 결제 회차의 고유 청구서 ID(`stripe_invoice_id`)를 추가합니다. 이미 결제한 일회성 이용권은 기존 만료일까지 유효하며 만료 후 직접 구독할 수 있습니다.
+- **적용.** 개발에서는 사용자가 백엔드 설정 후 서버를 시작하기 전에 `backend/`에서 `.\.venv\Scripts\python.exe manage.py migrate`를 수동 실행합니다. 운영에서는 세 가격·포털·웹훅 설정을 마치고 백엔드와 TOPIQ를 배포합니다. 기존 `deploy/start.sh`가 Gunicorn 시작 전에 마이그레이션을 자동 적용합니다.
+- **확인.** Stripe 샌드박스에서 첫 결제와 갱신 후 각각 청구 기간과 **플랜 지급 +400**을 확인합니다. 같은 청구서 이벤트를 다시 전송해 지급 횟수를 확인합니다. **Plus → 구독 관리 및 해지**에서 해지한 뒤 기간 종료 시 Free로 돌아가는지 확인합니다.
+
 ## TOPIQ 크레딧 충전
 
 TOPIQ 회원은 `/credits`에서 Stripe Checkout 카드 결제로 1,000크레딧을 충전합니다. 버튼에 표시하는 원화 금액과 결제창의 가격은 백엔드 환경변수 `STRIPE_PRICE_ID`로 지정합니다. Django가 결제를 확인하면 잔액과 거래 내역에 `유료 충전 +1,000`을 함께 기록합니다. 브라우저를 닫아도 Stripe 웹훅이 적립을 처리합니다. [수정 가능한 결제 흐름도](docs/stripe-credit-payment-flow.md)
@@ -49,7 +65,7 @@ Checkout에 표시할 결제수단은 Stripe Dashboard에서 관리합니다. �
 
    ```powershell
    stripe login
-   stripe listen --events checkout.session.completed,checkout.session.expired --forward-to http://localhost:8000/api/payments/stripe/webhook/
+   stripe listen --events checkout.session.completed,checkout.session.expired,invoice.paid,customer.subscription.updated,customer.subscription.deleted --forward-to http://localhost:8000/api/payments/stripe/webhook/
    ```
 
 3. **패키지와 DB 적용.** 사용자가 `backend/`에서 개발 서버 시작 전에 아래 명령을 차례로 실행합니다. 첫 명령은 기존 의존성을 설치합니다. 두 번째 명령은 회원의 Stripe 고객 ID 컬럼을 추가하는 `accounts.0007_credit_account_stripe_customer`를 포함하여 미적용 DB 마이그레이션을 적용합니다.
@@ -67,7 +83,7 @@ Checkout에 표시할 결제수단은 Stripe Dashboard에서 관리합니다. �
 
 ### 운영 적용
 
-사업자 국가·상품에 대한 Stripe 실결제 지원 여부와 환불 시 크레딧 회수 기준을 확인한 뒤 적용합니다. Stripe Workbench에서 **자체 계정의 스냅샷 웹훅**을 공개 Django HTTPS 주소의 `/api/payments/stripe/webhook/`로 등록하고 `checkout.session.completed`, `checkout.session.expired` 이벤트를 선택합니다. 백엔드에 운영용 `STRIPE_SECRET_KEY`, 운영 상품의 `STRIPE_PRICE_ID`, 해당 엔드포인트의 `STRIPE_WEBHOOK_SECRET`, 운영 TOPIQ 주소인 `TOPIQ_PUBLIC_URL`을 설정한 후 백엔드와 TOPIQ를 재배포합니다. 운영에서는 기존 `deploy/start.sh`가 migration 적용 후 Gunicorn을 실행합니다. 이후 금액만 변경할 때는 같은 상품에 새 KRW 가격을 만들고 백엔드의 `STRIPE_PRICE_ID`를 교체한 후 백엔드를 재시작합니다. [Stripe 웹훅 등록](https://docs.stripe.com/webhooks)
+사업자 국가·상품에 대한 Stripe 실결제 지원 여부와 환불 시 크레딧 회수 기준을 확인한 뒤 적용합니다. Stripe Workbench에서 **자체 계정의 스냅샷 웹훅**을 공개 Django HTTPS 주소의 `/api/payments/stripe/webhook/`로 등록하고 `checkout.session.completed`, `checkout.session.expired`, `invoice.paid`, `customer.subscription.updated`, `customer.subscription.deleted` 이벤트를 선택합니다. 백엔드에 운영용 `STRIPE_SECRET_KEY`, 운영 상품의 `STRIPE_PRICE_ID`, 해당 엔드포인트의 `STRIPE_WEBHOOK_SECRET`, 운영 TOPIQ 주소인 `TOPIQ_PUBLIC_URL`을 설정한 후 백엔드와 TOPIQ를 재배포합니다. 운영에서는 기존 `deploy/start.sh`가 migration 적용 후 Gunicorn을 실행합니다. 이후 금액만 변경할 때는 같은 상품에 새 KRW 가격을 만들고 백엔드의 `STRIPE_PRICE_ID`를 교체한 후 백엔드를 재시작합니다. [Stripe 웹훅 등록](https://docs.stripe.com/webhooks)
 
 Stripe에서 결제는 성공했지만 적립 대기가 계속되면 Workbench에서 해당 세션의 `checkout.session.completed` 전달 결과를 확인합니다. 전송 실패 원인을 해결한 후 해당 이벤트를 재전송하면 Django가 같은 주문의 적립 여부를 확인하고 처리합니다.
 
@@ -786,8 +802,8 @@ TOPIQ 이메일 인증에는 백엔드 런타임에 `BREVO_API_KEY`, `BREVO_SEND
 | 기능 | 요청자별 한도 | 함께 적용되는 기존 한도 |
 |---|---|---|
 | 가입 인증 메일 | 비회원 세션별 100회/시간 | 이메일별 60초 재발송 간격, 5회/10분 |
-| 시험 결과 메일 | 비회원 세션별 100회/시간 | 응시별 60초 재발송 간격, 응시·수신 이메일별 각각 5회/시간 |
-| 결과 링크 인증 | 계정 또는 세션별 100회/10분 | 토큰 검증·만료·접근 권한 검사 |
+| 기존 비회원 시험 결과 메일 | 로그인 계정별 100회/시간 | 응시별 60초 재발송 간격, 응시·수신 이메일별 각각 5회/시간 |
+| 결과 링크 인증 | 로그인 계정별 100회/10분 | 토큰 검증·만료·접근 권한 검사 |
 
 요청자 한도를 먼저 확인하므로 이미 차단된 요청이 다른 이메일·응시의 발송 한도를 소모하지 않습니다.
 같은 계정은 여러 브라우저에서 한도를 공유하며, 비회원의 여러 탭은 같은 세션을 사용하면 한도를 공유합니다.
@@ -983,11 +999,13 @@ IBT 듣기 1~2번은 그림 선택지, 읽기 4~7번은 자료 이미지를 표�
 듣기 15~30번과 읽기 23~30번은 두 문항씩 공통 음원·지문을 사용합니다.
 새 응시는 답안 저장 시 묶음 정보를 문항 스냅샷에 저장하며, 이전 PBT 응시의 기존 묶음 표시도 지원합니다.
 
-회원은 공개된 모든 세트, 비회원은 **시험 방식·영역별 최대 3세트**에 접근합니다.
-실제 공개 수는 등록된 완성 세트 수에 따라 달라집니다. `exam_format + section + guest_slot` 고유 제약으로 슬롯 충돌을 막습니다.
-목록뿐 아니라 응시 시작과 조회·저장·제출·결과에서도 시험 방식과 소유권을 검사합니다.
+방문자는 PBT·IBT의 공개 세트 목록을 볼 수 있습니다. 카드 하단의 **로그인 후 열기**에서 로그인하면 선택한 영역과 모드로 돌아옵니다. Free는 시험 방식별 읽기·듣기의 첫 공개 세트를 반복 응시할 수 있고, Plus는 모든 공개 세트를 이용합니다.
+Free 세트는 공개 목록의 회차 순서(동률이면 UUID 순)로 정합니다. 기존 비회원 슬롯은 Free 권한 판정에 사용하지 않습니다.
+로그인·세션 응답의 `user.plusEndsAt`은 활성 Plus의 만료 시각이며 Free이면 `null`입니다.
+비로그인 응시·이력·결과 요청은 `401 login_required`, Free 계정의 Plus 전용 세트 응시 요청은 `403 plus_required`를 반환합니다. 만료 전에 제출한 본인 결과는 로그인 후 다시 볼 수 있습니다.
+응시 시작과 조회·저장·제출·결과에서도 시험 방식과 소유권을 검사합니다.
 PBT 경로로 IBT 시험·응시를 요청하거나 반대로 요청하면 접근할 수 없습니다.
-비회원 기록은 기존 Django 세션의 무작위 소유자 UUID를 공유하되 각 시험 목록에는 해당 방식의 기록만 표시합니다.
+기존 비회원 기록은 Django 세션의 무작위 소유자 UUID에 연결되어 있습니다. 응시 API와 결과 조회에는 로그인이 필요합니다.
 로그인하면 같은 세션의 비회원 기록을 계속 볼 수 있지만 계정으로 자동 이관되지는 않습니다.
 쿠키 삭제·만료·로그아웃 시 비회원 기록에 대한 접근이 사라집니다.
 
@@ -1171,7 +1189,7 @@ PBT는 위 경로에서 `ibt`를 `pbt`로 바꾼 동일한 API를 사용합니�
 `restartAttemptId`를 생략하면 기존처럼 진행 중 응시를 재개하거나 새 응시를 생성합니다. DB 구조 변경이나 별도 실행 명령은 필요 없습니다.
 목록·응시 응답의 `examFormat`은 `pbt` 또는 `ibt`, `maxScore`는 100입니다.
 목록의 `questionCount`·`durationSeconds`와 응시 문항 수를 이용해 화면을 표시합니다.
-목록의 `myProgress`는 비회원에게 `null`, 회원에게 모드별 `latestResult`와 `inProgressId`를 제공합니다.
+목록의 `freeAvailable`은 Free 대상 세트를, `accessible`은 현재 계정의 응시 권한을 표시합니다. `myProgress`는 회원에게 모드별 `latestResult`와 `inProgressId`를 제공합니다.
 문제의 `groupId`가 같으면 공통 지문·음원 묶음입니다. 기존 PBT 스냅샷에는 이 필드가 없을 수 있습니다.
 IBT 문항의 `points=1`은 정답 수 집계용 원점수이며 최종 `score`는 100점 환산값입니다.
 
@@ -1228,12 +1246,11 @@ $env:DJANGO_ENV = 'development'
 답 변경·취소·중복 저장·동시 요청, 순서형 부분 입력·완성, 제출·시간 초과·재시작,
 기존 기록의 배치 집계와 원본 보존, API·CSV의 숫자 및 0 출력을 검증합니다.
 
-### 비회원 결과 이메일·별점·사후 설문
+### 기존 비회원 응시 기록의 결과 이메일·별점·사후 설문
 
-PBT·IBT의 읽기·듣기, 연습·실전에 공통 적용합니다. 비회원 응시는 제출(자동 제출 포함) 후
+이전에 비회원으로 응시한 PBT·IBT의 읽기·듣기, 연습·실전에 공통 적용합니다. 시험 제출 후 당시 브라우저에서 로그인하고
 `/<format>/attempts/<id>/feedback`에서 이메일, 1~5점 별점, 설문과 수집·이용 동의를 입력합니다.
 결과 메일의 링크를 열어야 점수·정답·정오답·해설·듣기 대본을 확인할 수 있습니다.
-기존 비회원 기록에도 적용하며, 비회원으로 시작한 응시는 이후 로그인해도 이메일 인증이 필요합니다.
 회원 계정으로 시작한 응시는 기존처럼 조회합니다. 회원가입 설문은 아래의 별도 가입 흐름에서 수집합니다.
 
 설문은 국적, 출생연도(1950~KST 올해), TOPIK 응시 목적(복수 선택), 기타 목적(선택 시 필수, 500자),

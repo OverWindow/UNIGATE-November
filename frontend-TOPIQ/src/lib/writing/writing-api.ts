@@ -45,9 +45,14 @@ async function requestJson<T>(path: string, signal: AbortSignal, options: Reques
 export interface LearnerAnswer { a?: string; b?: string; text?: string }
 export interface EvaluationConfig { questionPrices: Record<number, number>; setCost: number; evaluationLimit: number; enabled: boolean; priceVersion: string; timeoutSeconds: number }
 export interface CreditBalance { balance: number; reserved: number; available: number }
-export interface CreditEntry { id: string; kind: "grant" | "reserve" | "capture" | "release" | "welcome" | "unlock" | "purchase"; amount: number; evaluationId: string | null; setId: string | null; balanceAfter: number; reservedAfter: number; createdAt: string }
+export interface CreditEntry { id: string; kind: "grant" | "reserve" | "capture" | "release" | "welcome" | "unlock" | "purchase" | "plan_bonus"; amount: number; evaluationId: string | null; setId: string | null; balanceAfter: number; reservedAfter: number; createdAt: string }
 export interface CreditPurchaseStatus { id: string; status: "pending" | "fulfilled" | "expired" }
 export interface CreditPrice { priceId: string; amount: number; currency: "krw"; credits: number }
+export interface PlanOffer { months: number; priceId: string | null; amount: number; currency: "krw"; bonusCredits: number }
+export interface PlanAccount {
+  plans: PlanOffer[]; active: boolean; endsAt: string | null;
+  subscription: { state: "active" | "ending" | "past_due"; months: number } | null;
+}
 export interface Evaluation {
   id: string; setId: string; typeSlot: number; status: "processing" | "succeeded" | "failed";
   totalScore: number | null; maxScore: number; creditCost: number; chargedCredits: number;
@@ -92,8 +97,16 @@ export function startCreditPurchase(attemptId: string, priceId: string, signal: 
   return postJson<CreditPurchaseStatus & { checkoutUrl: string | null }>("/api/credits/purchases/", { attemptId, priceId }, signal);
 }
 
-export function openBillingPortal(signal: AbortSignal) {
-  return postJson<{ portalUrl: string | null }>("/api/credits/billing-portal/", {}, signal);
+export function getPlans(signal: AbortSignal) {
+  return requestJson<PlanAccount>("/api/plans/", signal);
+}
+
+export function startPlanPurchase(attemptId: string, priceId: string, months: number, signal: AbortSignal) {
+  return postJson<CreditPurchaseStatus & { checkoutUrl: string | null }>("/api/plans/purchases/", { attemptId, priceId, months }, signal);
+}
+
+export function openBillingPortal(signal: AbortSignal, from: "credits" | "plans" = "credits") {
+  return postJson<{ portalUrl: string | null }>("/api/credits/billing-portal/", from === "plans" ? { from } : {}, signal);
 }
 
 export function creditsRequest<T>(path: string, signal: AbortSignal): Promise<T> {

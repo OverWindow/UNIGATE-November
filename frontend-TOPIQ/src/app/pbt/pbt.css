@@ -23,6 +23,9 @@
 .pbt-badge-score:focus-visible { outline: 2px solid #2d5ec5; outline-offset: 3px; }
 .pbt-exam-card h2 { font-size: 21px; font-weight: 650; margin: 25px 0 26px; }
 .pbt-exam-card .button { width: 100%; justify-content: space-between; }
+.pbt-exam-card:has(.pbt-login-action) { display: flex; flex-direction: column; }
+.pbt-login-action { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; margin-top: auto; padding-top: 12px; border-top: 1px solid #e0e6ef; color: #2d5ec5; font-size: 14px; font-weight: 650; }
+.pbt-login-action svg:last-child { margin-left: auto; }
 .pbt-card-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .pbt-card-actions .button { min-width: 0; padding-inline: 8px; justify-content: center; }
 .pbt-card-actions .button:only-child { grid-column: 1 / -1; }

@@ -19,15 +19,19 @@ sequenceDiagram
     U->>B: Google로 계속하기 클릭
     B->>G: TOPIQ 클라이언트 ID와 nonce로 로그인 창 열기
     U->>G: 계정 선택 및 필요한 인증
+    G->>G: 요청의 nonce를 담은 ID 토큰에 Google의 개인키로 서명
     G-->>B: 서명된 ID 토큰 반환
 
     B->>N: POST /api/auth/google/ (ID 토큰, CSRF 헤더)
     N->>D: 요청과 세션 쿠키 전달
+    D->>D: 현재 세션에서 일회용 nonce를 꺼내 재사용 차단
     opt 검증용 공개키 캐시를 갱신할 때
         D->>G: 공개키 요청
         G-->>D: Google 공개키 반환
     end
-    D->>D: 서명, 발급자, 대상 앱, 만료 시간, nonce 검증
+    D->>D: Google 공개키로 ID 토큰의 서명 검증
+    D->>D: 발급자, 대상 앱, 만료 시간 확인
+    D->>D: 토큰 속 nonce와 현재 세션에서 꺼낸 nonce가 일치하는지 확인
     D->>DB: Google 계정 ID(sub)로 연결된 활성 회원 조회
     DB-->>D: TOPIQ 회원 ID
     D-->>N: 로그인 세션 쿠키, 회원 정보, 새 CSRF 토큰

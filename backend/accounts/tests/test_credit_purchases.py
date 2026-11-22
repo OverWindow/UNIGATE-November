@@ -43,14 +43,23 @@ def stripe_price(**changes):
     }, None)
 
 
+def plan_price(months, amount, price_id):
+    return stripe_price(id=price_id, unit_amount=amount, unit_amount_decimal=str(amount), type="recurring",
+                        recurring={"interval": "month", "interval_count": months, "usage_type": "licensed"})
+
+
 def post_webhook(client, order, event_type="checkout.session.completed", *, signing_secret=SIGNING_SECRET, created=None, **changes):
     session = {
         "object": "checkout.session", "id": SESSION_ID, "mode": "payment",
         "metadata": {"credit_purchase_id": str(order.pk)}, "payment_status": "paid",
         "amount_total": AMOUNT, "currency": "krw", "status": "complete", **changes,
     }
+    return signed_event(client, event_type, session, created=created, signing_secret=signing_secret)
+
+
+def signed_event(client, event_type, data, *, created=None, signing_secret=SIGNING_SECRET):
     event = {"id": f"evt_{uuid.uuid4().hex}", "object": "event", "type": event_type,
-             "created": int(time.time()) if created is None else created, "data": {"object": session}}
+             "created": int(time.time()) if created is None else created, "data": {"object": data}}
     payload = json.dumps(event, separators=(",", ":")).encode()
     timestamp = str(int(time.time()))
     signature = hmac.digest(signing_secret.encode(), timestamp.encode() + b"." + payload, "sha256").hex()
@@ -75,6 +84,7 @@ class CreditPurchaseTests(TestCase):
         self.prices = stripe_client.return_value.v1.prices
         self.prices.retrieve.return_value = stripe_price()
         self.sessions = stripe_client.return_value.v1.checkout.sessions
+        self.subscriptions = stripe_client.return_value.v1.subscriptions
         session = stripe.checkout.Session.construct_from({"id": SESSION_ID, "url": CHECKOUT_URL, "status": "open"}, None)
         self.sessions.create.return_value = session
         self.sessions.retrieve.return_value = session
@@ -109,20 +119,27 @@ class CreditPurchaseTests(TestCase):
         for offer in catalog["plans"]:
             months, amount, price_id = offer["months"], offer["amount"], offer["priceId"]
             self.attempt_id = str(uuid.uuid4())
-            self.prices.retrieve.return_value = stripe_price(id=price_id, unit_amount=amount, unit_amount_decimal=str(amount))
+            self.prices.retrieve.return_value = plan_price(months, amount, price_id)
             self.sessions.create.return_value = stripe.checkout.Session.construct_from({
                 "id": f"cs_plan_{months}", "url": CHECKOUT_URL, "status": "open",
+            }, None)
+            self.sessions.retrieve.side_effect = lambda session_id: stripe.checkout.Session.construct_from({
+                "id": session_id, "url": CHECKOUT_URL, "status": "open",
             }, None)
             result = self.post_plan(months, price_id)
             self.assertEqual(result.status_code, 201)
             order = CreditPurchase.objects.get(pk=result.json()["id"])
             self.assertEqual((order.plan_months, order.amount, order.credits, order.plan_starts_at), (months, amount, 400, None))
             params = self.sessions.create.call_args.args[0]
+            self.assertEqual(params["mode"], "subscription")
+            self.assertEqual(params["subscription_data"]["metadata"], {"credit_purchase_id": str(order.pk)})
+            self.assertNotIn("invoice_creation", params)
             self.assertEqual(params["line_items"], [{"price": price_id, "quantity": 1}])
             self.assertEqual(params["success_url"], f"https://topiq.example.invalid/plans?purchase={order.pk}")
             self.assertEqual(self.post_plan(months, price_id).status_code, 200)
             self.assertEqual(self.post_attempt(price_id).status_code, 409)
         self.assertEqual(self.sessions.create.call_count, 3)
+        self.assertEqual(self.sessions.expire.call_count, 2)
         self.customers.create.assert_called_once()
         result = self.client.post(PORTAL, {"from": "plans"}, content_type="application/json", HTTP_X_CSRFTOKEN=self.csrf)
         self.assertEqual(result.status_code, 200)
@@ -131,11 +148,11 @@ class CreditPurchaseTests(TestCase):
     def test_plan_rejects_wrong_amount_type_and_stale_or_missing_prices(self):
         for months in (True, "1", 2):
             self.assertEqual(self.post_plan(months, "price_one").status_code, 400)
-        for change in ({"unit_amount": 7500}, {"type": "recurring"}):
-            self.prices.retrieve.return_value = stripe_price(**({"id": "price_one", "unit_amount": 9900,
-                                                               "unit_amount_decimal": "9900"} | change))
+        for change in ({"unit_amount": 7500}, {"type": "one_time"}, {"recurring": {"interval": "year"}},
+                       {"recurring": {"interval": "month", "interval_count": 3, "usage_type": "licensed"}}):
+            self.prices.retrieve.return_value = stripe_price(**(plan_price(1, 9900, "price_one").to_dict() | change))
             self.assertEqual(self.post_plan(1, "price_one").status_code, 503)
-        self.prices.retrieve.return_value = stripe_price(id="price_one", unit_amount=9900, unit_amount_decimal="9900")
+        self.prices.retrieve.return_value = plan_price(1, 9900, "price_one")
         self.assertEqual(self.post_plan(1, "price_six").status_code, 409)
         with self.settings(STRIPE_PLAN_PRICE_IDS={}):
             self.assertEqual(self.post_plan(1, "price_one").status_code, 503)
@@ -143,7 +160,85 @@ class CreditPurchaseTests(TestCase):
         self.sessions.create.assert_not_called()
         self.assertFalse(CreditPurchase.objects.exists())
 
-    def test_plan_webhooks_calendar_renewal_and_expiry(self):
+    def test_subscription_renewals_and_cancellation_with_reordered_webhooks(self):
+        self.prices.retrieve.return_value = plan_price(1, 9900, "price_one")
+        order_id = self.post_plan(1, "price_one").json()["id"]
+        self.attempt_id = str(uuid.uuid4())
+        self.assertEqual(self.post_plan(1, "price_one").json()["id"], order_id)
+        self.sessions.create.assert_called_once()
+        order = CreditPurchase.objects.get(pk=order_id)
+        metadata = {"credit_purchase_id": order_id}
+        sub = {"id": "sub_fixture", "object": "subscription", "metadata": metadata, "customer": "cus_fixture_owner"}
+        now = int(time.time())
+        def invoice(invoice_id, reason, start, end):
+            return {"id": invoice_id, "object": "invoice", "status": "paid", "amount_paid": 9900,
+                    "currency": "krw", "customer": sub["customer"], "billing_reason": reason,
+                    "parent": {"subscription_details": {"metadata": metadata, "subscription": sub["id"]}},
+                    "lines": {"data": [{"amount": 9900, "quantity": 1, "period": {"start": start, "end": end},
+                        "pricing": {"price_details": {"price": "price_one"}},
+                        "parent": {"subscription_item_details": {"subscription": sub["id"], "proration": False}}}]}}
+        first = invoice("in_initial", "subscription_create", now - 10, now + 100)
+        renewal = invoice("in_renewal", "subscription_cycle", now + 100, now + 200)
+        self.assertEqual(signed_event(self.client, "invoice.paid", first | {"customer": "cus_other"}).status_code, 400)
+        self.assertEqual(signed_event(self.client, "invoice.paid", first | {"amount_paid": 1}).status_code, 400)
+        # A renewal may arrive before both the original invoice and Checkout.
+        self.assertEqual(signed_event(self.client, "invoice.paid", renewal).status_code, 200)
+        self.assertFalse(self.client.get("/api/plans/").json()["active"])
+        for bill in (first, renewal, first):
+            self.assertEqual(signed_event(self.client, "invoice.paid", bill).status_code, 200)
+        self.assertEqual(post_webhook(self.client, order, mode="subscription", customer=sub["customer"],
+                                     amount_total=9900).status_code, 200)
+        self.assert_wallet(950, 0)
+        self.assertEqual(CreditPurchase.objects.filter(stripe_invoice_id__isnull=False).count(), 2)
+        self.assertEqual(self.client.get("/api/plans/").json()["subscription"], {"state": "active", "months": 1})
+        self.assertEqual(self.post_plan(1, "price_one").status_code, 409)
+        # Stripe delivers the latest subscription state even for an old notification.
+        for latest, state in [({"status": "past_due"}, "past_due"),
+                              ({"status": "active", "cancel_at_period_end": True}, "ending")]:
+            self.subscriptions.retrieve.return_value = stripe.Subscription.construct_from(sub | latest, None)
+            self.assertEqual(signed_event(self.client, "customer.subscription.updated", sub).status_code, 200)
+            self.assertEqual(self.client.get("/api/plans/").json()["subscription"]["state"], state)
+        self.assertEqual(signed_event(self.client, "invoice.payment_failed", first).status_code, 200)
+        self.assertEqual(signed_event(self.client, "customer.subscription.deleted", sub | {"status": "canceled"}).status_code, 200)
+        self.assertEqual(signed_event(self.client, "customer.subscription.updated", sub).status_code, 200)
+        data = self.client.get("/api/plans/").json()
+        self.assertIsNone(data["subscription"])
+        self.assertTrue(data["active"])
+        with patch("accounts.plans.timezone.now", return_value=datetime.fromtimestamp(now + 200, UTC)):
+            self.assertFalse(self.client.get("/api/plans/").json()["active"])
+        self.assert_wallet(950, 0)
+
+    def test_subscription_recovers_completed_checkout_after_lost_creation_response(self):
+        self.prices.retrieve.return_value = plan_price(1, 9900, "price_one")
+        self.wallet.stripe_customer_id = "cus_fixture_owner"
+        self.wallet.save(update_fields=["stripe_customer_id"])
+        order = CreditPurchase.objects.create(user=self.user, attempt_id=self.attempt_id, amount=9900, credits=400,
+            plan_months=1, stripe_price_id="price_one", subscription_state="checkout")
+        CreditPurchase.objects.filter(pk=order.pk).update(created_at=timezone.now() - timedelta(days=2))
+        recovered = stripe.checkout.Session.construct_from({"id": SESSION_ID, "status": "complete",
+            "metadata": {"credit_purchase_id": str(order.pk)}}, None)
+        self.sessions.list.return_value.auto_paging_iter.return_value = [recovered]
+        response = self.post_plan(1, "price_one")
+        self.assertEqual(response.json(), {"id": str(order.pk), "status": "pending", "checkoutUrl": None})
+        order.refresh_from_db()
+        self.assertEqual(order.stripe_session_id, SESSION_ID)
+        self.attempt_id = str(uuid.uuid4())
+        self.prices.retrieve.return_value = plan_price(3, 23900, "price_three")
+        self.sessions.retrieve.return_value = recovered
+        self.assertEqual(self.post_plan(3, "price_three").json()["error"], "plan_in_use")
+        self.sessions.create.assert_not_called()
+
+    def test_subscription_closes_open_legacy_checkout(self):
+        self.prices.retrieve.return_value = plan_price(1, 9900, "price_one")
+        legacy = CreditPurchase.objects.create(user=self.user, attempt_id=uuid.uuid4(), amount=9900, credits=400,
+            plan_months=1, stripe_session_id="cs_legacy")
+        self.sessions.retrieve.return_value = stripe.checkout.Session.construct_from({"id": "cs_legacy", "status": "open"}, None)
+        self.assertEqual(self.post_plan(1, "price_one").status_code, 201)
+        self.sessions.expire.assert_called_once_with("cs_legacy")
+        legacy.refresh_from_db()
+        self.assertEqual(legacy.status, "expired")
+
+    def test_legacy_plan_webhooks_calendar_renewal_and_expiry(self):
         # Jan 31, 00:30 in Seoul is still Jan 30 in UTC.
         paid_at = datetime(2026, 1, 30, 15, 30, tzinfo=UTC)
         first_end = datetime(2026, 2, 27, 15, 30, tzinfo=UTC)
@@ -163,6 +258,9 @@ class CreditPurchaseTests(TestCase):
         for date, active in [(paid_at - timedelta(seconds=1), False), (paid_at, True), (first_end, True), (final_end, False)]:
             with patch("accounts.plans.timezone.now", return_value=date):
                 data = self.client.get("/api/plans/").json()
+                if active:
+                    self.prices.retrieve.return_value = plan_price(1, 9900, "price_one")
+                    self.assertEqual(self.post_plan(1, "price_one").json()["error"], "plan_in_use")
             self.assertEqual(data["active"], active)
             self.assertEqual(data["endsAt"], final_end.isoformat().replace("+00:00", "Z") if active else None)
         self.assert_wallet(950, 0)

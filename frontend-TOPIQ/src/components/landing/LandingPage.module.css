@@ -43,6 +43,7 @@
 .interactiveDots { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; pointer-events: none; mask-image: linear-gradient(transparent, #000 14% 86%, transparent); }
 .tests .description { margin-top: 12px; font-size: 14px; line-height: 24px; }
 .testForm { display: grid; gap: 16px; margin-top: 32px; padding: 20px; border: 1px solid #1118271f; border-radius: 20px; background: #ffffffd1; backdrop-filter: blur(14px); box-shadow: 0 16px 44px #1118270f; }
+.testLogin { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; }
 .testForm label { display: flex; flex-direction: column; gap: 6px; min-width: 0; color: #374151; font-size: 14px; font-weight: 500; line-height: 20px; }
 .testForm select { width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 12px; background: #fff; color: #111827; font-size: 14px; font-weight: 400; }
 .testForm select:disabled { background: #f3f4f6; color: #9ca3af; }

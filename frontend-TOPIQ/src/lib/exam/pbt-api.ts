@@ -10,7 +10,7 @@ export interface ExamProgress {
 export interface Exam {
   examFormat: ExamFormat; maxScore: number;
   id: string; title: string; section: Section; round: number; questionCount: number;
-  durationSeconds: number | null; guestAvailable: boolean; accessible: boolean;
+  durationSeconds: number | null; freeAvailable: boolean; accessible: boolean;
   myProgress: Record<Mode, ExamProgress> | null;
 }
 export interface Question {

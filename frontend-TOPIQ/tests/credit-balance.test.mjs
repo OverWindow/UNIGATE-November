@@ -42,6 +42,7 @@ const { default: SiteHeader } = load("components/SiteHeader.tsx");
 const { default: CreditPurchase } = load("components/credits/CreditPurchase.tsx");
 imports["./CreditPurchase"] = { default: CreditPurchase };
 const { default: CreditsAccount } = load("components/credits/CreditsAccount.tsx");
+const { default: PlansAccount } = load("components/credits/PlansAccount.tsx");
 const { default: WritingCreditBadge } = load("components/writing/WritingCreditBadge.tsx");
 
 function mount(...components) {
@@ -98,7 +99,7 @@ test("a return from Checkout checks the order before refreshing the wallet, even
       userId: 1, returnId: id, cancelled: true, onFulfilled: () => refreshes++,
     }));
     await setImmediate();
-    assert.deepEqual(calls, [["GET", `/api/credits/purchases/${id}/`]]);
+    assert.deepEqual(calls, [["GET", `/api/credits/purchases/${id}/?product=credit`]]);
     assert.equal(refreshes, status === "fulfilled" ? 1 : 0);
     tree.unmount();
   }
@@ -120,12 +121,115 @@ function savedCheckout(t, attemptId) {
   return storage;
 }
 
+test("all four purchase buttons display their localized card issuer notice", t => {
+  savedCheckout(t, crypto.randomUUID());
+  const plans = [1, 3, 6].map(months => ({ months, amount: 9900, currency: "krw", priceId: `price_${months}`, bonusCredits: 400 }));
+  const { creditsContent } = require("../src/lib/credits-content.ts");
+  for (const [language, { cardIssuerNotice }] of Object.entries(creditsContent)) {
+    session.language = language;
+    const tree = mount(
+      () => React.createElement(CreditPurchase, { userId: 1 }),
+      () => React.createElement(CreditPurchase, { userId: 1, plans }),
+    );
+    const notices = [...tree.html.matchAll(/<p\b[^>]* id="([^"]+)"[^>]*>([^<]+)<\/p><button\b[^>]* aria-describedby="\1"/g)];
+    assert.deepEqual(notices.map(([, id, message]) => [id, message]),
+      ["credit-card-notice", ...plans.map(({ months }) => `plan-card-notice-${months}`)].map(id => [id, cardIssuerNotice]));
+    tree.unmount();
+  }
+});
+
+test("each Plus card lists its benefits and starts the selected purchase without a history button", async () => {
+  const plans = [[1, 9900], [3, 23900], [6, 43900]].map(([months, amount]) => ({
+    months, amount, currency: "krw", priceId: `price_plan_${months}`, bonusCredits: 400,
+  }));
+  const posts = [];
+  window.location = { assign() {} };
+  globalThis.fetch = async (url, options) => {
+    if (url === "/api/csrf/") return Response.json({ csrfToken: "synthetic" });
+    posts.push([url, JSON.parse(options.body)]);
+    return Response.json({ id: "order", status: "pending", checkoutUrl: "https://checkout.stripe.com/example" });
+  };
+  let buy;
+  const tree = mount(() => {
+    const ui = CreditPurchase({ plans, userId: 1, returnId: null, onFulfilled() {} });
+    const [grid] = React.Children.toArray(ui.props.children);
+    const sixMonthCard = React.Children.toArray(grid.props.children)[3];
+    buy = React.Children.toArray(sixMonthCard.props.children).find(item => item.type === "button").props.onClick;
+    return ui;
+  });
+  const cards = tree.html.match(/<article\b[\s\S]*?<\/article>/g) ?? [];
+  const free = cards.shift();
+  assert.match(free, /<h2>Free<\/h2>/);
+  assert.ok(free.includes("PBT 읽기·듣기 첫 세트 각 1개"));
+  assert.ok(free.includes("IBT 읽기·듣기 첫 세트 각 1개"));
+  assert.doesNotMatch(free, /<button/);
+  assert.equal(cards.length, plans.length);
+  for (const [index, { months, amount }] of plans.entries()) {
+    const card = cards[index];
+    assert.ok(card.includes(`<h2>Plus ${months}개월</h2>`));
+    assert.ok(card.includes(amount.toLocaleString("ko")));
+    assert.ok(card.includes(months === 1 ? "매월" : `${months}개월마다`));
+    assert.ok(card.includes("구독하기"));
+    for (const benefit of ["공개된 PBT·IBT 모의고사 무료 응시", "모든 공개 쓰기 세트 무료 열람",
+      "쓰기 문항당 AI 첨삭 최대 20회", "첫 결제와 갱신 때마다 400크레딧 지급"]) assert.ok(card.includes(benefit));
+    assert.equal((card.match(/<li>/g) ?? []).length, 4);
+  }
+  assert.doesNotMatch(tree.html, /결제 내역/);
+  buy();
+  buy();
+  await setImmediate();
+  assert.equal(posts.length, 1);
+  assert.equal(posts[0][0], "/api/plans/purchases/");
+  assert.deepEqual(posts[0][1], { attemptId: posts[0][1].attemptId, months: 6, priceId: "price_plan_6" });
+  assert.match(posts[0][1].attemptId, /^[\da-f-]{36}$/);
+  tree.unmount();
+});
+
+test("plans follow credits in the account menu and anonymous returns keep the plan order", () => {
+  path = "/plans";
+  const header = mount(SiteHeader);
+  assert.match(header.html, /href="\/credits"[\s\S]*?href="\/plans"[\s\S]*?<span>Plus<\/span>[\s\S]*?href="\/settings"/);
+  header.unmount();
+  session.user = null;
+  session.status = "anonymous";
+  const id = crypto.randomUUID();
+  search = new URLSearchParams({ purchase: id, cancelled: "1" });
+  const page = mount(PlansAccount);
+  assert.match(page.html, /<h1[^>]*>Plus<\/h1>/);
+  assert.ok(page.html.includes(encodeURIComponent(`/plans?purchase=${id}&cancelled=1`)));
+  assert.deepEqual(requests, []);
+  page.unmount();
+});
+
+test("a subscriber can manage renewal in the portal and returns to Plus", async () => {
+  const posts = [];
+  window.location = { assign() {} };
+  globalThis.fetch = async (url, options) => {
+    if (url === "/api/csrf/") return Response.json({ csrfToken: "synthetic" });
+    posts.push([url, JSON.parse(options.body)]);
+    return Response.json({ portalUrl: "https://billing.stripe.com/p/session/fixture" });
+  };
+  let manage;
+  const page = mount(() => {
+    const ui = CreditPurchase({ userId: 1, returnId: null, plans: [{ months: 1, priceId: "price_one",
+      currency: "krw", amount: 9900, bonusCredits: 400 }], hasPlan: true, manageSubscription: true, onFulfilled() {} });
+    manage = React.Children.toArray(ui.props.children).find(el => el.type === "button").props.onClick;
+    return ui;
+  });
+  assert.doesNotMatch(page.html, /구독하기/);
+  assert.match(page.html, /구독 관리 및 해지/);
+  manage();
+  await setImmediate();
+  assert.deepEqual(posts, [["/api/credits/billing-portal/", { from: "plans" }]]);
+  page.unmount();
+});
+
 function mountPurchaseButton() {
   let click, viewPayments;
   function Purchase() {
     const tree = CreditPurchase({ userId: 1, returnId: null, cancelled: false, onFulfilled: () => {} });
     const controls = React.Children.toArray(tree.props.children);
-    click = controls[0].props.onClick;
+    click = controls.find(control => control.type === "button" && control.props.className === "button button-primary")?.props.onClick;
     viewPayments = controls.find(control => control.props.children === "결제 내역").props.onClick;
     return tree;
   }

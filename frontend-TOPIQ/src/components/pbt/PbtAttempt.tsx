@@ -18,7 +18,7 @@ import { listeningCopy } from "@/lib/exam/listening";
 
 export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: { id: string; review?: boolean; examFormat?: ExamFormat }) {
   const basePath = `/${examFormat}`;
-  const { language, user, status } = useApp();
+  const { language, user, status, refreshSession } = useApp();
   const t = examCopy(language, examFormat);
   const router = useRouter();
   const [attempt, setAttempt] = useState<Attempt | null>(null);
@@ -63,9 +63,24 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
   const paperRef = useRef<HTMLElement>(null);
   const retry = () => setRevision(n => n + 1);
 
+  const handleAccessError = useCallback((cause: unknown) => {
+    if (!(cause instanceof PbtError)) return false;
+    if (cause.status === 401) {
+      void refreshSession();
+      return true;
+    }
+    if (cause.code !== "plus_required") return false;
+    attemptActive.current = false;
+    timedSessionActive.current = false;
+    setDialog(null); setAttempt(null); setError(cause);
+    return true;
+  }, [refreshSession]);
+
   useEffect(() => {
     if (status === "loading") return;
     let active = true;
+    attemptActive.current = false;
+    timedSessionActive.current = false;
     setAttempt(null); setError(null);
     if (!pageSession.current) pageSession.current = crypto.randomUUID();
     const request = review
@@ -83,14 +98,14 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
       setPosition(1);
       setRemaining(listening ? null : remainingSeconds(data, 0)); setAttempt(data);
     }).catch(cause => {
-      if (!active) return;
+      if (!active || handleAccessError(cause)) return;
       if (review && cause instanceof PbtError && cause.code === "result_email_required") {
         router.replace(`${basePath}/attempts/${id}/feedback`); return;
       }
       setError(cause);
     });
     return () => { active = false; };
-  }, [id, review, revision, status, user?.id, router, basePath, examFormat]);
+  }, [id, review, revision, status, user?.id, user?.plusEndsAt, router, basePath, examFormat, handleAccessError]);
 
   const requestExit = useCallback((leave: () => void) => {
     if (!attemptActive.current) { leave(); return; }
@@ -158,8 +173,11 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
       timedSessionActive.current = false;
       if (leave) leave();
       else router.replace(`${basePath}/attempts/${id}/result`);
-    } catch { setSubmitError(true); submittingRef.current = false; setSubmitting(false); }
-  }, [id, router, basePath, examFormat]);
+    } catch (cause) {
+      if (!handleAccessError(cause)) setSubmitError(true);
+      submittingRef.current = false; setSubmitting(false);
+    }
+  }, [id, router, basePath, examFormat, handleAccessError]);
 
   useEffect(() => {
     if (remaining !== 0 || review || !attempt || busy || autoSubmitted.current) return;
@@ -176,6 +194,7 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
     try {
       await pbtRequest(`attempts/${id}/answers/${itemPosition}/`, "PUT", value, examFormat, pageSession.current);
     } catch (cause) {
+      if (handleAccessError(cause)) return;
       if (cause instanceof PbtError && ["attempt_closed", "attempt_session_required"].includes(cause.code)) {
         attemptActive.current = false;
         timedSessionActive.current = false;
@@ -236,7 +255,8 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
     <div className={review ? "page-container" : "pbt-exam-content"}>
       {(review || !attempt) && <div className={review ? undefined : "pbt-exam-width pbt-exam-loading"}>
         <Link className="text-link pbt-back" href={basePath}><ArrowLeft size={14} aria-hidden="true" /> {t.back}</Link>
-        {error ? <div className="pbt-alert" role="alert">{pbtErrorMessage(error, t)} <button onClick={retry}>{t.retry}</button></div> : !attempt && <p role="status">{t.loading}</p>}
+        {error ? <div className="pbt-alert" role="alert">{pbtErrorMessage(error, t)} {error instanceof PbtError && error.code === "plus_required"
+          ? <Link href="/plans">{t.viewPlus}</Link> : <button onClick={retry}>{t.retry}</button>}</div> : !attempt && <p role="status">{t.loading}</p>}
       </div>}
       {attempt && <>
         {review ? <section className="pbt-result-summary">

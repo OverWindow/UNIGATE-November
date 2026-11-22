@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -6,9 +7,59 @@ from django.contrib.auth.models import Permission
 from django.db import DatabaseError
 from django.test import Client, TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.credits import grant
-from accounts.models import CreditAccount, CreditTransaction
+from accounts.models import PLAN_BONUS, CreditAccount, CreditPurchase, CreditTransaction
+
+
+class CreditPlanAdminTests(TestCase):
+    def test_list_and_filter_use_current_paid_periods_and_show_seoul_time(self):
+        now = datetime(2026, 3, 1, 15, 10, 20, tzinfo=UTC)
+        day = timedelta(days=1)
+        self.enterContext(patch("accounts.admin.timezone.now", return_value=now))
+        self.enterContext(timezone.override("UTC"))
+        users = get_user_model().objects
+        viewer = users.create_user(username="plan-viewer", is_staff=True)
+        viewer.user_permissions.add(Permission.objects.get(codename="view_creditaccount"))
+        self.client.force_login(viewer)
+        url = reverse("admin:accounts_creditaccount_changelist")
+        wallets = {name: CreditAccount.objects.create(user=users.create_user(username=name)) for name in
+                   ("ending", "prepaid", "expired", "future", "unpaid", "free")}
+
+        def paid_period(name, start, end, state=None):
+            account = wallets[name]
+            bonus = CreditTransaction.objects.create(account=account, kind="plan_bonus", amount=PLAN_BONUS,
+                                                     balance_after=PLAN_BONUS, reserved_after=0)
+            return CreditPurchase.objects.create(user_id=account.user_id, attempt_id=uuid.uuid4(), amount=9900,
+                credits=PLAN_BONUS, plan_months=1, plan_starts_at=start, plan_ends_at=end, subscription_state=state,
+                status="fulfilled", stripe_session_id=f"cs_{uuid.uuid4()}", transaction=bonus)
+
+        paid_period("ending", now, now + day, "ending")
+        paid_period("prepaid", now - day, now + day)
+        paid_period("prepaid", now + day, now + 2 * day)
+        paid_period("prepaid", now + 3 * day, now + 4 * day)
+        paid_period("expired", now - day, now)
+        paid_period("future", now + day, now + 2 * day)
+        CreditPurchase.objects.create(user_id=wallets["unpaid"].user_id, attempt_id=uuid.uuid4(), amount=9900,
+                                      credits=PLAN_BONUS, plan_months=1, subscription_state="checkout")
+
+        listing = self.client.get(url)
+        self.assertContains(listing, "현재 플랜")
+        self.assertContains(listing, "이용 만료 일시 (한국시간)")
+        self.assertContains(listing, "현재 Plus만 보기")
+        self.assertContains(listing, '<td class="field-current_plan">Plus</td>', count=2)
+        self.assertContains(listing, '<td class="field-current_plan">Free</td>', count=4)
+        self.assertContains(listing, '<td class="field-plan_expiry">—</td>', count=4)
+
+        filtered = self.client.get(url, {"plan": "plus"})
+        changelist = filtered.context["cl"]
+        self.assertEqual(changelist.result_count, 2)
+        with self.assertNumQueries(0):
+            expiries = {row.user_id: changelist.model_admin.plan_expiry(row) for row in changelist.result_list}
+        self.assertEqual(expiries, {wallets["ending"].user_id: "2026-03-03 00:10:20",
+                                    wallets["prepaid"].user_id: "2026-03-04 00:10:20"})
+        self.assertContains(filtered, "2026-03-04 00:10:20")
 
 
 class BulkCreditAdminTests(TestCase):

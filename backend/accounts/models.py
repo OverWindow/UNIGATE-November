@@ -7,6 +7,7 @@ from django.db import models
 CREDIT_PURCHASE_QUANTITY = 1000
 PLAN_BONUS = 400
 PLAN_AMOUNTS = {1: 9900, 3: 23900, 6: 43900}
+OPEN_SUBSCRIPTION_STATES = ("checkout", "active", "ending", "past_due")
 
 
 class GoogleIdentity(models.Model):
@@ -86,6 +87,9 @@ class CreditPurchase(models.Model):
         ("pending", "결제 대기"), ("fulfilled", "적립 완료"), ("expired", "만료"),
     ])
     stripe_session_id = models.CharField(max_length=255, unique=True, null=True)
+    stripe_subscription_id = models.CharField(max_length=255, unique=True, null=True)
+    subscription_state = models.CharField(max_length=12, null=True)
+    stripe_invoice_id = models.CharField(max_length=255, unique=True, null=True)
     transaction = models.OneToOneField(CreditTransaction, models.PROTECT, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -93,6 +97,8 @@ class CreditPurchase(models.Model):
         db_table = "credit_purchases"
         constraints = [
             models.UniqueConstraint(fields=["user", "attempt_id"], name="credit_purchase_attempt_unique"),
+            models.UniqueConstraint(fields=["user"], condition=models.Q(subscription_state__in=OPEN_SUBSCRIPTION_STATES),
+                                    name="one_open_plus_subscription"),
             models.CheckConstraint(condition=(
                 models.Q(plan_months__isnull=True, plan_starts_at__isnull=True, plan_ends_at__isnull=True)
                 | (models.Q(plan_months__isnull=False, plan_months__in=list(PLAN_AMOUNTS), credits=PLAN_BONUS) & (
@@ -102,7 +108,8 @@ class CreditPurchase(models.Model):
                 ))
             ), name="credit_purchase_plan_period"),
             models.CheckConstraint(condition=(
-                models.Q(status="fulfilled", transaction__isnull=False, stripe_session_id__isnull=False)
+                (models.Q(status="fulfilled", transaction__isnull=False) &
+                 (models.Q(stripe_session_id__isnull=False) | models.Q(stripe_invoice_id__isnull=False, plan_months__isnull=False)))
                 | models.Q(status__in=["pending", "expired"], transaction__isnull=True)
             ), name="credit_purchase_fulfillment"),
         ]

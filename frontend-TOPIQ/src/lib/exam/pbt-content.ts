@@ -5,11 +5,9 @@ const ko = {
   title: "PBT 모의고사", intro: "영역과 응시 방식을 선택하세요. 한 세트는 50문항, 100점 만점입니다.",
   reading: "읽기", listening: "듣기", practice: "연습", timed: "실전", unlimited: "시간 제한 없음",
   practiceHint: "충분히 생각하고 자유롭게 풀어보세요.", timedHint: "읽기 제한 시간 70분. 시간이 끝나면 자동 제출됩니다.",
-  guestNote: "비회원도 읽기 3세트 + 듣기 3세트, 총 300문제를 풀 수 있어요. 로그인하면 공개된 모든 세트를 이용할 수 있습니다.",
-  guestHistory: "비회원 응시 기록은 이 브라우저 세션에서만 확인할 수 있습니다. 쿠키 삭제·만료 또는 로그아웃 시 접근할 수 없게 됩니다.",
-  memberNote: "공개된 모든 모의고사를 이용할 수 있습니다.", free: "비회원 공개", round: "세트", questions: "문항", minutes: "분",
-  start: "풀기 시작", login: "로그인하고 응시", loading: "불러오는 중…", retry: "다시 시도", empty: "아직 공개된 모의고사가 없습니다.",
-  history: "최근 응시 기록", historyLoginRequired: "최근 응시 기록은 로그인 후 확인할 수 있습니다.", noHistory: "최근 응시 기록이 없습니다.", resume: "이어풀기", result: "결과 보기", inProgress: "진행 중", submitted: "제출 완료",
+  viewPlus: "Plus 보기", plusRequired: "이 세트는 Plus 이용 기간에 응시할 수 있습니다.", round: "세트", questions: "문항", minutes: "분",
+  start: "풀기 시작", loading: "불러오는 중…", retry: "다시 시도", empty: "아직 공개된 모의고사가 없습니다.",
+  history: "최근 응시 기록", noHistory: "최근 응시 기록이 없습니다.", resume: "이어풀기", result: "결과 보기", inProgress: "진행 중", submitted: "제출 완료",
   latestScore: "내 최근 점수", submittedOn: "제출일", retake: "다시 풀기",
   back: "모의고사 목록", answered: "답한 문항", navigator: "답안표", previous: "이전", next: "다음", submit: "답안 제출", submitting: "제출 중…",
   allQuestions: "전체 문제", currentQuestion: "현재 문항", questionNavigation: "문항 이동", remainingTime: "남은 시간", close: "닫기",
@@ -27,7 +25,7 @@ const ko = {
   complete: "모의고사를 마쳤습니다", score: "점수", correct: "정답", incorrect: "오답", review: "문항별 해설", all: "전체 문항", wrongOnly: "오답·미응답", noWrong: "모든 문항을 맞혔습니다!",
   yourAnswer: "내 답안", noAnswer: "미응답", explanation: "해설", transcript: "듣기 대본", clear: "선택 해제", group: "공통 지문", choice: "선택지", material: "문제 자료", timedOut: "시간 종료로 제출되었습니다.",
   error: "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.", unavailable: "모의고사를 준비 중입니다. 잠시 후 다시 확인해 주세요.",
-  notFound: "이 응시 기록에 접근할 수 없습니다. 응시한 계정 또는 브라우저 세션을 확인해 주세요.", loginRequired: "이 세트는 로그인 후 이용할 수 있습니다.", notReady: "이 세트의 문제 또는 미디어를 준비 중입니다. 다른 세트를 선택해 주세요.", rateLimited: "응시 시작 요청이 많습니다. 잠시 후 다시 시도해 주세요.",
+  notFound: "이 응시 기록에 접근할 수 없습니다. 응시한 계정 또는 브라우저 세션을 확인해 주세요.", loginRequired: "모의고사는 로그인 후 이용할 수 있습니다.", notReady: "이 세트의 문제 또는 미디어를 준비 중입니다. 다른 세트를 선택해 주세요.", rateLimited: "응시 시작 요청이 많습니다. 잠시 후 다시 시도해 주세요.",
 };
 type Copy = { [K in keyof typeof ko]: string };
 export const pbtContent: Record<Language, Copy> = {
@@ -36,10 +34,8 @@ export const pbtContent: Record<Language, Copy> = {
     title: "Practice at your pace. Prepare for test day.", intro: "Choose a section and mode. Each set has 50 questions worth 100 points.",
     reading: "Reading", listening: "Listening", practice: "Practice", timed: "Timed", unlimited: "No time limit",
     practiceHint: "Take your time and work at your own pace.", timedHint: "Reading: 70 min. Answers submit when time runs out.",
-    guestNote: "Try 3 reading and 3 listening sets without an account — 300 questions. Sign in to access all published sets.",
-    guestHistory: "Guest attempts belong to this browser session. Clearing cookies, session expiry or signing out removes access.", memberNote: "You have access to all published mock tests.",
-    free: "Guest access", round: "Set", questions: "questions", minutes: "min", start: "Start test", login: "Sign in to start", loading: "Loading…", retry: "Try again", empty: "No mock tests are published yet.",
-    history: "Recent attempts", historyLoginRequired: "Sign in to view your recent attempts.", noHistory: "Start your first mock test.", resume: "Continue", result: "View results", inProgress: "In progress", submitted: "Submitted",
+    viewPlus: "View Plus", plusRequired: "This set requires an active Plus pass.", round: "Set", questions: "questions", minutes: "min", start: "Start test", loading: "Loading…", retry: "Try again", empty: "No mock tests are published yet.",
+    history: "Recent attempts", noHistory: "Start your first mock test.", resume: "Continue", result: "View results", inProgress: "In progress", submitted: "Submitted",
     latestScore: "My latest score", submittedOn: "Submitted on", retake: "Retake test",
     back: "All mock tests", answered: "Answered", navigator: "Answer sheet", previous: "Previous", next: "Next", submit: "Submit answers", submitting: "Submitting…",
     allQuestions: "All questions", currentQuestion: "Current question", questionNavigation: "Question navigation", remainingTime: "Time left", close: "Close",
@@ -60,10 +56,8 @@ export const pbtContent: Record<Language, Copy> = {
     title: "Berlatih sesuai ritmemu. Bersiap untuk ujian.", intro: "Pilih bidang dan mode. Setiap set berisi 50 soal dengan nilai maksimal 100.",
     reading: "Membaca", listening: "Menyimak", practice: "Latihan", timed: "Simulasi", unlimited: "Tanpa batas waktu",
     practiceHint: "Pahami dan kerjakan soal dengan tenang.", timedHint: "Membaca: 70 menit. Jawaban dikirim saat waktu habis.",
-    guestNote: "Tanpa akun, tersedia 3 set membaca dan 3 set menyimak — total 300 soal. Masuk untuk mengakses semua set yang dipublikasikan.",
-    guestHistory: "Riwayat tamu hanya tersedia dalam sesi browser ini. Menghapus cookie, sesi berakhir, atau keluar akan menghilangkan akses.", memberNote: "Anda dapat mengakses semua simulasi yang dipublikasikan.",
-    free: "Akses tamu", round: "Set", questions: "soal", minutes: "menit", start: "Mulai ujian", login: "Masuk untuk mulai", loading: "Memuat…", retry: "Coba lagi", empty: "Belum ada simulasi yang dipublikasikan.",
-    history: "Riwayat terbaru", historyLoginRequired: "Masuk untuk melihat riwayat terbaru Anda.", noHistory: "Mulai simulasi pertama Anda.", resume: "Lanjutkan", result: "Lihat hasil", inProgress: "Sedang berlangsung", submitted: "Terkirim",
+    viewPlus: "Lihat Plus", plusRequired: "Set ini memerlukan paket Plus yang aktif.", round: "Set", questions: "soal", minutes: "menit", start: "Mulai ujian", loading: "Memuat…", retry: "Coba lagi", empty: "Belum ada simulasi yang dipublikasikan.",
+    history: "Riwayat terbaru", noHistory: "Mulai simulasi pertama Anda.", resume: "Lanjutkan", result: "Lihat hasil", inProgress: "Sedang berlangsung", submitted: "Terkirim",
     latestScore: "Nilai terakhir saya", submittedOn: "Tanggal pengiriman", retake: "Kerjakan lagi",
     back: "Daftar simulasi", answered: "Terjawab", navigator: "Lembar jawaban", previous: "Sebelumnya", next: "Berikutnya", submit: "Kirim jawaban", submitting: "Mengirim…",
     allQuestions: "Semua soal", currentQuestion: "Soal saat ini", questionNavigation: "Navigasi soal", remainingTime: "Sisa waktu", close: "Tutup",
@@ -97,26 +91,23 @@ export const ibtTimedHints: Record<Language, Record<"reading" | "listening", str
   },
 };
 
-const ibtCopy: Record<Language, Pick<Copy, "title" | "intro" | "timedHint" | "guestNote" | "score">> = {
+const ibtCopy: Record<Language, Pick<Copy, "title" | "intro" | "timedHint" | "score">> = {
   ko: {
     title: "IBT 모의고사",
     intro: "영역과 응시 방식을 선택하세요. 한 세트는 30문항이며, 모의고사 점수는 정답률을 100점으로 환산합니다.",
     timedHint: ibtTimedHints.ko.reading,
-    guestNote: "비회원 공개 세트는 영역별 최대 3세트입니다. 로그인하면 공개된 모든 세트를 이용할 수 있습니다.",
     score: "모의고사 환산 점수",
   },
   en: {
     title: "IBT Mock Test",
     intro: "Choose a section and mode. Each set has 30 questions. Mock scores convert your accuracy to a 100-point scale.",
     timedHint: ibtTimedHints.en.reading,
-    guestNote: "Up to 3 sets per section are available to guests. Sign in to access all published sets.",
     score: "Converted mock score",
   },
   id: {
     title: "Simulasi IBT",
     intro: "Pilih bidang dan mode. Setiap set berisi 30 soal. Nilai simulasi dikonversi dari persentase jawaban benar ke skala 100.",
     timedHint: ibtTimedHints.id.reading,
-    guestNote: "Tamu dapat mengakses hingga 3 set per bidang. Masuk untuk mengakses semua set yang dipublikasikan.",
     score: "Nilai konversi simulasi",
   },
 };
@@ -127,6 +118,7 @@ export function examCopy(language: Language, examFormat: ExamFormat): Copy {
 
 export function pbtErrorMessage(error: unknown, t: Copy) {
   const code = error && typeof error === "object" && "code" in error ? error.code : "";
+  if (code === "plus_required") return t.plusRequired;
   if (code === "login_required") return t.loginRequired;
   if (code === "not_found") return t.notFound;
   if (code === "exam_not_ready") return t.notReady;

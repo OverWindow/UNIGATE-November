@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import Link from "next/link";
 import useRouter from "@/lib/use-navigation-router";
 import { ArrowRight } from "lucide-react";
 import { useApp } from "@/app/providers";
+import { authContent } from "@/lib/auth/auth-content";
 import { homeContent } from "@/lib/home-content";
-import { pbtRequest, type Attempt, type Exam, type Mode, type Section } from "@/lib/exam/pbt-api";
+import { PbtError, pbtRequest, type Attempt, type Exam, type Mode, type Section } from "@/lib/exam/pbt-api";
 import { pbtContent, pbtErrorMessage } from "@/lib/exam/pbt-content";
 import InteractiveDots from "./InteractiveDots";
 import styles from "./LandingPage.module.css";
@@ -26,17 +28,21 @@ export default function HomeTestSelector() {
   const startingRef = useRef(false);
 
   useEffect(() => {
-    if (status === "loading" || status === "error") return;
+    if (status !== "authenticated") return;
     let active = true;
     setLoading(true);
     setError(null);
     setExams([]);
     void pbtRequest<{ exams: Exam[] }>("exams/")
       .then(catalog => { if (active) setExams(catalog.exams); })
-      .catch(cause => { if (active) setError(cause); })
+      .catch(cause => {
+        if (!active) return;
+        if (cause instanceof PbtError && cause.status === 401) void refreshSession();
+        else setError(cause);
+      })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [status, user?.id, revision]);
+  }, [status, user?.id, user?.plusEndsAt, revision, refreshSession]);
 
   const rounds = [...new Set(exams.map(exam => exam.round))].sort((a, b) => a - b);
   const selectedRound = round !== null && rounds.includes(round) ? round : rounds[0];
@@ -49,7 +55,7 @@ export default function HomeTestSelector() {
     event.preventDefault();
     if (unavailable || !selectedExam || startingRef.current) return;
     if (!selectedExam.accessible) {
-      router.push(`/login?next=${encodeURIComponent("/#tests")}`);
+      router.push("/plans");
       return;
     }
     startingRef.current = true;
@@ -60,7 +66,8 @@ export default function HomeTestSelector() {
       const attempt = await pbtRequest<Attempt>("attempts/", "POST", { examId: selectedExam.id, mode });
       router.push(`/pbt/attempts/${attempt.id}`);
     } catch (cause) {
-      setError(cause);
+      if (cause instanceof PbtError && cause.status === 401) void refreshSession();
+      else setError(cause);
       setStarting(false);
       startingRef.current = false;
     }
@@ -70,7 +77,9 @@ export default function HomeTestSelector() {
     <InteractiveDots />
     <div className={styles.container}>
       <div className={styles.sectionIntro}><h2 id="tests-title" className={styles.heading}>{t.title}</h2><p className={styles.description}>{t.description}</p></div>
-      <form className={styles.testForm} onSubmit={event => void start(event)} aria-busy={waiting || starting}>
+      {status === "anonymous" ? <div className={`${styles.testForm} ${styles.testLogin}`}>
+        <p>{p.loginRequired}</p><Link className={styles.startButton} href={`/login?next=${encodeURIComponent("/#tests")}`}>{authContent[language].login}<ArrowRight size={16} aria-hidden="true" /></Link>
+      </div> : <form className={styles.testForm} onSubmit={event => void start(event)} aria-busy={waiting || starting}>
         <label><span>{t.round}</span><select value={selectedRound ?? ""} disabled={unavailable} onChange={event => setRound(Number(event.target.value))}>
           {!rounds.length && <option value="">—</option>}
           {rounds.map(value => <option key={value} value={value}>{language === "ko" ? `${value}회` : `${t.round} ${value}`}</option>)}
@@ -81,12 +90,12 @@ export default function HomeTestSelector() {
         </select></label>
         <label><span>{t.mode}</span><select value={mode} disabled={unavailable} onChange={event => setMode(event.target.value as Mode)}><option value="timed">{t.timed}</option><option value="practice">{t.practice}</option></select></label>
         <button type="submit" className={styles.startButton} disabled={unavailable}>
-          {waiting || starting ? p.loading : selectedExam && !selectedExam.accessible ? p.login : t.start}
+          {waiting || starting ? p.loading : selectedExam && !selectedExam.accessible ? p.viewPlus : t.start}
           <ArrowRight size={16} aria-hidden="true" />
         </button>
-      </form>
-      {(error || status === "error") ? <p className={styles.testError} role="alert">{pbtErrorMessage(error, p)}<button type="button" onClick={() => { if (status === "error") void refreshSession(); else setRevision(value => value + 1); }}>{p.retry}</button></p>
-        : !waiting && !exams.length ? <p className={styles.testStatus} role="status">{p.empty}</p> : null}
+      </form>}
+      {status !== "anonymous" && ((error || status === "error") ? <p className={styles.testError} role="alert">{pbtErrorMessage(error, p)}<button type="button" onClick={() => { if (status === "error") void refreshSession(); else setRevision(value => value + 1); }}>{p.retry}</button></p>
+        : !waiting && !exams.length ? <p className={styles.testStatus} role="status">{p.empty}</p> : null)}
     </div>
   </section>;
 }

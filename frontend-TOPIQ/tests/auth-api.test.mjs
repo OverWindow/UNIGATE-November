@@ -16,7 +16,7 @@ async function loadApi(file) {
 const api = await loadApi("../src/lib/auth/auth-api.ts");
 const { pbtRequest, submitOnPageExit } = await loadApi("../src/lib/exam/pbt-api.ts");
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
-const user = { id: 1, email: "synthetic@example.invalid", nickname: "Learner" };
+const user = { id: 1, email: "synthetic@example.invalid", nickname: "Learner", plusEndsAt: null };
 
 test("Google posts use same-origin CSRF, bind the pending flow and rotate CSRF after linking", async () => {
   const step = { step: "link", email: user.email, flow: "pending", expiresAt: 12345, needsEmail: false };

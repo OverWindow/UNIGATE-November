@@ -24,6 +24,11 @@ export default function ExamResult({ id, examFormat }: { id: string; examFormat:
     if (status === "loading") return;
     let active = true;
     token.current ||= new URLSearchParams(window.location.hash.slice(1)).get("token");
+    const key = `exam-result:${window.location.pathname.replace(/\/$/, "")}`;
+    try {
+      token.current ||= sessionStorage.getItem(key);
+      sessionStorage.removeItem(key);
+    } catch { /* The URL fragment can still be used when storage is unavailable. */ }
     if (!token.current) { setReady(true); return; }
     // Remove the credential from the address bar while retaining it in memory for a network retry.
     window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);

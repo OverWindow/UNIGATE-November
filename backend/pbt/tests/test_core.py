@@ -300,7 +300,9 @@ class PbtTests(BankFixtures, TransactionTestCase):
         for client, expected in ((self.client, own), (other, foreign)):
             progress = next(e for e in client.get("/api/pbt/exams/").json()["exams"] if e["id"] == str(self.exam.pk))["myProgress"]
             self.assertEqual(progress["practice"]["latestResult"]["id"], expected["id"])
-        self.assertEqual(Client().get("/api/pbt/exams/").status_code, 401)
+        public = Client().get("/api/pbt/exams/").json()["exams"]
+        self.assertTrue(public)
+        self.assertTrue(all(e["myProgress"] is None and not e["accessible"] for e in public))
 
     def test_catalog_progress_includes_attempts_beyond_recent_hundred(self):
         self.client.force_login(self.user)

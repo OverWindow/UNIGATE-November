@@ -11,6 +11,7 @@ interface AppContextValue {
   user: AuthUser | null;
   status: "loading" | "anonymous" | "authenticated" | "error";
   refreshSession: () => Promise<void>;
+  updatePlan: (userId: number, endsAt: string | null) => void;
   creditBalance: CreditBalance | null;
   refreshCredits: (signal: AbortSignal) => Promise<CreditBalance>;
   login: (email: string, password: string) => Promise<void>;
@@ -26,6 +27,22 @@ export default function Providers({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState<AppContextValue["status"]>("loading");
   const [creditBalance, setCreditBalance] = useState<CreditBalance | null>(null);
+  const updatePlan = useCallback((userId: number, endsAt: string | null) => {
+    setUser(current => current?.id === userId && current.plusEndsAt !== endsAt ? { ...current, plusEndsAt: endsAt } : current);
+  }, []);
+
+  useEffect(() => {
+    if (!user?.plusEndsAt) return;
+    const end = Date.parse(user.plusEndsAt);
+    let timer: ReturnType<typeof setTimeout>;
+    function checkExpiry() {
+      const remaining = end - Date.now();
+      if (remaining > 0) timer = setTimeout(checkExpiry, Math.min(remaining, 2_147_483_647));
+      else setUser(current => current && current === user ? { ...current, plusEndsAt: null } : current);
+    }
+    checkExpiry();
+    return () => clearTimeout(timer);
+  }, [user]);
   const generation = useRef(0);
   const creditRequest = useRef(0);
 
@@ -92,8 +109,8 @@ export default function Providers({ children }: { children: ReactNode }) {
     setStatus("anonymous");
   }, []);
 
-  const value = useMemo(() => ({ language, setLanguage, user, status, refreshSession, creditBalance, refreshCredits, login, signup, logout }),
-    [language, setLanguage, user, status, refreshSession, creditBalance, refreshCredits, login, signup, logout]);
+  const value = useMemo(() => ({ language, setLanguage, user, status, refreshSession, updatePlan, creditBalance, refreshCredits, login, signup, logout }),
+    [language, setLanguage, user, status, refreshSession, updatePlan, creditBalance, refreshCredits, login, signup, logout]);
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 

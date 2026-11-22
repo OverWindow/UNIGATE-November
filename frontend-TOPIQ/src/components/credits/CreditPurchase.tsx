@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Check } from "lucide-react";
 import { useApp } from "@/app/providers";
 import { creditsContent } from "@/lib/credits-content";
-import { creditsRequest, openBillingPortal, startCreditPurchase, WritingError, type CreditPrice, type CreditPurchaseStatus } from "@/lib/writing/writing-api";
+import { plansContent } from "@/lib/plans-content";
+import { creditsRequest, openBillingPortal, startCreditPurchase, startPlanPurchase, WritingError, type CreditPrice, type CreditPurchaseStatus, type PlanOffer } from "@/lib/writing/writing-api";
 
-type Notice = keyof typeof creditsContent.ko.checkout;
-interface Attempt { attemptId: string; price: CreditPrice; orderId?: string }
+type Notice = keyof typeof creditsContent.ko.checkout | "planInUse";
+type CheckoutPrice = CreditPrice & { months?: number };
+interface Attempt { attemptId: string; price: CheckoutPrice; orderId?: string }
 
 function savedAttempt(key: string): Attempt | null {
   try {
@@ -16,12 +19,16 @@ function savedAttempt(key: string): Attempt | null {
   return null;
 }
 
-export default function CreditPurchase({ userId, returnId, cancelled, onFulfilled }: {
-  userId: number; returnId: string | null; cancelled: boolean; onFulfilled: () => void;
+export default function CreditPurchase({ userId, returnId, cancelled, onFulfilled, plans, hasPlan, manageSubscription, onPriceChanged }: {
+  userId: number; returnId: string | null; cancelled: boolean; onFulfilled: (signal: AbortSignal) => void;
+  plans?: PlanOffer[]; hasPlan?: boolean; manageSubscription?: boolean; onPriceChanged?: () => void;
 }) {
   const { language, refreshSession } = useApp();
   const t = creditsContent[language];
-  const storageKey = `topiq-credit-purchase:${userId}`;
+  const p = plansContent[language];
+  const isPlan = plans !== undefined;
+  const checkoutCopy = isPlan ? { ...t.checkout, ...p.checkout } : t.checkout;
+  const storageKey = `topiq-${isPlan ? "plan" : "credit"}-purchase:${userId}`;
   const [initialAttempt] = useState(() => savedAttempt(storageKey));
   const attempt = useRef<Attempt | null>(initialAttempt);
   const [notice, setNotice] = useState<Notice | null>(returnId ? "checking" : null);
@@ -42,7 +49,7 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
   useEffect(() => () => operation.current?.abort(), []);
 
   useEffect(() => {
-    if (attempt.current) return;
+    if (isPlan || attempt.current) return;
     const controller = new AbortController();
     creditsRequest<CreditPrice>("price/", controller.signal).then(value => {
       if (!controller.signal.aborted) setPrice(value);
@@ -52,19 +59,19 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
       if (cause instanceof WritingError && cause.status === 401) void refreshSession();
     });
     return () => controller.abort();
-  }, [priceRevision, refreshSession]);
+  }, [isPlan, priceRevision, refreshSession]);
 
   const reloadPrice = useCallback(() => {
     setPrice(null);
     setPriceRevision(value => value + 1);
   }, []);
 
-  const finish = useCallback((order: CreditPurchaseStatus) => {
+  const finish = useCallback((order: CreditPurchaseStatus, signal: AbortSignal) => {
     if (attempt.current?.orderId === order.id) {
       remember(null);
       reloadPrice();
     }
-    if (order.status === "fulfilled") onFulfilled();
+    if (order.status === "fulfilled") onFulfilled(signal);
     setNotice(order.status === "fulfilled" ? "fulfilled" : "expired");
   }, [remember, reloadPrice, onFulfilled]);
 
@@ -76,9 +83,9 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
     setNotice("checking");
     async function check() {
       try {
-        const order = await creditsRequest<CreditPurchaseStatus>(`purchases/${returnId}/`, controller.signal);
+        const order = await creditsRequest<CreditPurchaseStatus>(`purchases/${returnId}/?product=${isPlan ? "plan" : "credit"}`, controller.signal);
         if (controller.signal.aborted) return;
-        if (order.status !== "pending") finish(order);
+        if (order.status !== "pending") finish(order, controller.signal);
         else if (cancelled) setNotice("cancelled");
         else if (++polls < 12) timer = setTimeout(check, 2500);
         else setNotice("delayed");
@@ -90,24 +97,28 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
     }
     void check();
     return () => { controller.abort(); clearTimeout(timer); };
-  }, [returnId, cancelled, checkCount, finish, refreshSession]);
+  }, [returnId, cancelled, checkCount, finish, refreshSession, isPlan]);
 
-  async function buy() {
+  async function buy(offer?: CheckoutPrice) {
     if (operation.current) return;
-    const selected = attempt.current?.price ?? price;
+    const selected = offer ?? attempt.current?.price ?? price;
     if (!selected || selected === "unavailable") return;
     const controller = new AbortController();
     operation.current = controller;
     setPortalNotice(null);
     setNotice("opening");
     try {
-      const current = attempt.current ?? { attemptId: crypto.randomUUID(), price: selected };
+      const prior = attempt.current;
+      const current = prior && prior.price.priceId === selected.priceId && prior.price.months === offer?.months
+        ? prior : { attemptId: crypto.randomUUID(), price: selected };
       // Persist before sending the request so a lost response can be retried.
       remember(current);
-      const order = await startCreditPurchase(current.attemptId, current.price.priceId, controller.signal);
+      const order = offer?.months
+        ? await startPlanPurchase(current.attemptId, selected.priceId, offer.months, controller.signal)
+        : await startCreditPurchase(current.attemptId, selected.priceId, controller.signal);
       if (controller.signal.aborted) return;
       remember({ ...current, orderId: order.id });
-      if (order.status !== "pending") finish(order);
+      if (order.status !== "pending") finish(order, controller.signal);
       else if (order.checkoutUrl) {
         window.location.assign(order.checkoutUrl);
         setNotice(null);
@@ -125,6 +136,11 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
         remember(null);
         setNotice("priceChanged");
         reloadPrice();
+        onPriceChanged?.();
+      } else if (cause instanceof WritingError && cause.code === "plan_in_use") {
+        remember(null);
+        setNotice("planInUse");
+        onPriceChanged?.();
       } else {
         setNotice("startError");
         if (cause instanceof WritingError && cause.status === 401) void refreshSession();
@@ -140,7 +156,7 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
     operation.current = controller;
     setPortalNotice("opening");
     try {
-      const { portalUrl } = await openBillingPortal(controller.signal);
+      const { portalUrl } = await openBillingPortal(controller.signal, isPlan ? "plans" : "credits");
       if (controller.signal.aborted) return;
       if (portalUrl) window.location.assign(portalUrl);
       setPortalNotice(portalUrl ? null : "empty");
@@ -157,17 +173,44 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
   const opening = notice === "opening" || portalNotice === "opening";
   const blocked = opening || notice === "checking" || retryCheck;
   return <div className="credits-purchase">
-    {price === "unavailable" ? <>
+    {!isPlan && price && price !== "unavailable" && <p className="card-issuer-notice" id="credit-card-notice">{t.cardIssuerNotice}</p>}
+    {plans ? <div className="plan-offers">
+      <article className="plan-offer plan-free">
+        <h2>Free</h2>
+        <p className="plan-price">{new Intl.NumberFormat(language, { style: "currency", currency: "KRW" }).format(0)}</p>
+        <ul className="plan-benefits" role="list">{p.freeBenefits.map(benefit =>
+          <li key={benefit}><Check size={16} aria-hidden="true" /><span>{benefit}</span></li>
+        )}</ul>
+      </article>
+      {plans.map(offer => {
+      const { months, priceId, currency, amount, bonusCredits } = offer;
+      const term = p.term(months);
+      return <article className="plan-offer" key={months}>
+        <h2>{term}</h2>
+        <p className="plan-price">{new Intl.NumberFormat(language, { style: "currency", currency }).format(amount)}
+          <small>{p.interval(months)}</small></p>
+        <ul className="plan-benefits" role="list">{p.benefits(bonusCredits).map(benefit =>
+          <li key={benefit}><Check size={16} aria-hidden="true" /><span>{benefit}</span></li>
+        )}</ul>
+        {!hasPlan && <p className="card-issuer-notice" id={`plan-card-notice-${months}`}>{t.cardIssuerNotice}</p>}
+        {!hasPlan && <button type="button" className="button button-primary" disabled={blocked || !priceId}
+          aria-label={`${term} · ${priceId ? p.buy : p.unavailable}`}
+          aria-describedby={`plan-card-notice-${months}`}
+          onClick={() => priceId && void buy({ priceId, currency, amount, credits: bonusCredits, months })}>
+          {priceId ? p.buy : p.unavailable}
+        </button>}
+      </article>;
+    })}</div> : price === "unavailable" ? <>
       <p role="status">{t.priceUnavailable}</p>
       <button type="button" className="button credits-secondary" onClick={reloadPrice}>{t.retry}</button>
-    </> : price ? <button type="button" className="button button-primary" disabled={blocked} onClick={() => void buy()}>
+    </> : price ? <button type="button" className="button button-primary" aria-describedby="credit-card-notice" disabled={blocked} onClick={() => void buy()}>
       {t.buy(price.credits.toLocaleString(language), price.amount.toLocaleString(language))}
     </button> : <p role="status">{t.priceLoading}</p>}
-    <button type="button" className="button credits-secondary" disabled={opening} onClick={() => void viewPayments()}>
-      {t.paymentHistory}
-    </button>
+    {(!isPlan || manageSubscription) && <button type="button" className="button credits-secondary" disabled={opening} onClick={() => void viewPayments()}>
+      {isPlan ? p.manage : t.paymentHistory}
+    </button>}
     {portalNotice && <p role="status">{t.portal[portalNotice]}</p>}
-    {notice && <p role="status">{t.checkout[notice]}</p>}
+    {notice && <p role="status">{notice === "planInUse" ? p.inUse : checkoutCopy[notice]}</p>}
     {retryCheck && <button type="button" className="button credits-secondary" onClick={() => setCheckCount(count => count + 1)}>{t.checkAgain}</button>}
   </div>;
 }

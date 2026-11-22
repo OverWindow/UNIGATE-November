@@ -108,6 +108,8 @@ main:focus { outline: none; }
 .account-actions { position: relative; display: grid; justify-items: end; }
 .account-name { display: inline-flex; align-items: center; gap: 10px; max-width: 180px; min-height: 44px; padding: 10px 16px; border: 1px solid #d8e0ed; border-radius: 8px; background: transparent; color: #253450; font-size: 13px; font-weight: 600; white-space: nowrap; transition: background-color .2s, color .2s; }
 .account-name > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.account-tier { flex: none; padding: 2px 7px; border-radius: 5px; background: #eef2f8; color: #47576c; font-size: 11px; line-height: 1.5; }
+.account-tier.is-plus { background: #e4edff; color: #244e9e; }
 .account-name:hover, .account-name[aria-expanded="true"] { background: #f0f4fc; color: var(--color-primary); }
 .account-chevron { flex-shrink: 0; color: #748198; transition: transform .2s ease; }
 .account-name[aria-expanded="true"] .account-chevron { transform: rotate(180deg); }
@@ -364,7 +366,7 @@ details[open] .faq-indicator::after { transform: rotate(0); }
 .auth-connection-error .button { width: 100%; margin-top: 15px; }
 
 @media (max-width: 767px) {
-  .account-name { gap: 8px; max-width: 128px; min-height: 40px; padding: 9px 12px; font-size: 12px; }
+  .account-name { gap: 5px; max-width: 140px; min-height: 40px; padding: 8px; font-size: 12px; }
   .account-menu { max-width: calc(100vw - 64px); }
   .auth-main { justify-content: flex-start; padding: 32px 16px; }
   .auth-card { padding: 28px 24px; border-radius: 20px; }

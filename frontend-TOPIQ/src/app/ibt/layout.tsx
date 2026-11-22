@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
+import ExamAccess from "@/components/pbt/ExamAccess";
 import "../pbt/pbt.css";
 
 export default function Layout({ children }: { children: ReactNode }) {
-  return children;
+  return <ExamAccess examFormat="ibt">{children}</ExamAccess>;
 }

@@ -6,6 +6,7 @@ export interface AuthUser {
   id: number;
   email: string;
   nickname: string;
+  plusEndsAt: string | null;
 }
 
 export interface SignupInput {
@@ -69,7 +70,9 @@ function parseUser(value: unknown): AuthUser {
       !("nickname" in value) || typeof value.nickname !== "string") {
     throw new AuthError("server_error");
   }
-  return { id: value.id, email: value.email, nickname: value.nickname };
+  const end = "plusEndsAt" in value ? value.plusEndsAt : null;
+  return { id: value.id, email: value.email, nickname: value.nickname,
+    plusEndsAt: typeof end === "string" && Number.isFinite(Date.parse(end)) ? end : null };
 }
 
 async function post(path: string, body: object): Promise<Record<string, unknown> | null> {

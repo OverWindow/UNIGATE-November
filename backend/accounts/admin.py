@@ -1,4 +1,5 @@
 import uuid
+from zoneinfo import ZoneInfo
 
 from django import forms
 from django.contrib import admin, messages
@@ -6,12 +7,15 @@ from django.contrib.auth import get_user_model
 from django.core import signing
 from django.core.exceptions import PermissionDenied
 from django.db import DatabaseError, transaction
+from django.db.models import OuterRef, Prefetch, Subquery
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.urls import path
+from django.utils import timezone
 
 from .credits import CreditError, grant
 from .models import CreditAccount, CreditTransaction
+from .plans import active_plans, extend_plan_end, paid_plans
 
 
 class GrantForm(forms.Form):
@@ -47,14 +51,49 @@ class ReadOnlyAdmin(admin.ModelAdmin):
         return False
 
 
+class CurrentPlanFilter(admin.SimpleListFilter):
+    title = "현재 플랜"
+    parameter_name = "plan"
+
+    def lookups(self, request, model_admin):
+        return [("plus", "현재 Plus만 보기")]
+
+    def queryset(self, request, queryset):
+        if self.value() == "plus":
+            return queryset.filter(active_until__isnull=False)
+        return queryset
+
+
 @admin.register(CreditAccount)
 class CreditAccountAdmin(ReadOnlyAdmin):
-    list_display = ["user_id", "email", "nickname", "balance", "reserved", "updated_at"]
+    list_display = ["user_id", "email", "nickname", "current_plan", "plan_expiry", "balance", "reserved", "updated_at"]
+    list_filter = [CurrentPlanFilter]
     search_fields = ["=user__id", "user__email", "user__first_name"]
     search_help_text = "이메일, 닉네임 또는 사용자 번호로 검색합니다."
     list_select_related = ["user"]
     change_list_template = "admin/accounts/credits_list.html"
     actions = ["grant_selected"]
+
+    def get_queryset(self, request):
+        now = timezone.now()
+        active = active_plans(OuterRef("user_id"), now).order_by("-plan_ends_at")
+        extensions = (paid_plans().filter(plan_starts_at__gt=now).order_by("plan_starts_at")
+                      .only("user_id", "plan_starts_at", "plan_ends_at"))
+        return super().get_queryset(request).annotate(
+            active_until=Subquery(active.values("plan_ends_at")[:1]),
+        ).prefetch_related(Prefetch("user__creditpurchase_set", queryset=extensions, to_attr="paid_extensions"))
+
+    @admin.display(description="현재 플랜")
+    def current_plan(self, obj):
+        return "Plus" if obj.active_until is not None else "Free"
+
+    @admin.display(description="이용 만료 일시 (한국시간)", empty_value="—")
+    def plan_expiry(self, obj):
+        if obj.active_until is None:
+            return None
+        periods = ((p.plan_starts_at, p.plan_ends_at) for p in obj.user.paid_extensions)
+        end = extend_plan_end(obj.active_until, periods)
+        return timezone.localtime(end, ZoneInfo("Asia/Seoul")).strftime("%Y-%m-%d %H:%M:%S")
 
     @admin.display(description="이메일", ordering="user__email")
     def email(self, obj):

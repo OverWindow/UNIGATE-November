@@ -20,7 +20,7 @@ const copy = {
       ] },
       { title: "학습 설문과 모의시험", paragraphs: [
         "가입 설문에서는 동의를 받아 국적, 출생연도, TOPIK 응시 목적, 한국어 학습 기간, 응시 경험, 현재·목표 급수를 계정에 연결합니다. 학습자의 배경과 설문 응답을 분석하며 동의한 시점과 문구의 버전도 기록합니다.",
-        "PBT·IBT 모의시험에서는 응시한 시험, 답안, 응시 시각과 점수를 기록해 결과와 이력을 보여줍니다. 비회원의 응시 이력은 브라우저 세션에 연결됩니다. 결과 설문을 제출하면 동의를 받아 이메일, 별점과 학습 설문 응답을 처리합니다. 결과 메일 발송 시 Brevo에 수신 주소와 시험명, 결과 링크가 전달됩니다.",
+        "PBT·IBT 모의시험에서는 응시한 시험, 답안, 응시 시각과 점수를 기록해 결과와 이력을 보여줍니다. 이전에 비회원으로 응시한 기록은 당시 브라우저 세션에 연결됩니다. 결과 설문을 제출하면 동의를 받아 이메일, 별점과 학습 설문 응답을 처리합니다. 결과 메일 발송 시 Brevo에 수신 주소와 시험명, 결과 링크가 전달됩니다.",
       ] },
       { title: "AI 쓰기 평가", paragraphs: [
         "평가를 요청하면 제출한 답안과 평가 결과를 계정의 쓰기 이력에 저장합니다. AI 평가에 필요한 문제와 답안, 평가 지침, 피드백 언어 및 요청 식별자를 BizRouter를 통해 전달합니다. 답안에 이름이나 연락처를 적으면 해당 내용도 함께 전송됩니다.",
@@ -29,10 +29,10 @@ const copy = {
         "TOPIQ는 설문 응답과 제출한 답안을 수집 목적과 동의 범위에서 내부 통계와 학습 기능 개선에 활용합니다. 운영자는 학습 기록과 결제 기록을 조회할 수 있습니다. 설문과 답안은 광고·마케팅에 사용하지 않으며 학교나 제휴사에 제공하지 않습니다.",
       ] },
       { title: "크레딧과 결제", paragraphs: [
-        "TOPIQ는 잔액을 계산하고 결제 내역을 확인할 수 있도록 크레딧 지급·예약·사용 내역, 구매 금액과 통화, 결제 상태, Stripe 고객·결제 식별자를 기록합니다. 구매 시 결제 수단 정보는 Stripe 결제 화면에 입력합니다.",
+        "TOPIQ는 잔액을 계산하고 결제 내역을 확인할 수 있도록 크레딧 지급·예약·사용 내역, 구매 금액과 통화, 구독·결제 상태, Stripe 고객·결제·구독·청구서 식별자를 기록합니다. 구매 시 결제 수단 정보는 Stripe 결제 화면에 입력합니다.",
       ] },
       { title: "쿠키와 브라우저 저장소", paragraphs: [
-        "TOPIQ는 로그인 상태와 비회원 응시를 유지하는 세션 쿠키, 요청 위조를 방지하는 보안 쿠키를 사용합니다. 선택한 언어는 브라우저에 저장하고, 듣기 재생 상태 등 일부 진행 정보는 현재 탭에 보관합니다. 페이지를 열면 Google 태그 스크립트를 불러오며 이 과정에서 접속 IP 주소 등 요청 정보가 Google에 전달될 수 있습니다.",
+        "TOPIQ는 로그인 상태를 유지하고 기존 비회원 응시 기록을 식별하는 세션 쿠키, 요청 위조를 방지하는 보안 쿠키를 사용합니다. 선택한 언어는 브라우저에 저장하고, 듣기 재생 상태 등 일부 진행 정보는 현재 탭에 보관합니다. 페이지를 열면 Google 태그 스크립트를 불러오며 이 과정에서 접속 IP 주소 등 요청 정보가 Google에 전달될 수 있습니다.",
         "브라우저 설정에서 쿠키를 차단하거나 사이트 데이터를 삭제할 수 있습니다. 삭제하면 비회원 응시 이력에 접근하기 어려울 수 있고, 필수 쿠키를 차단하면 로그인 등 일부 기능이 제한됩니다.",
       ] },
       { title: "보유기간과 파기", paragraphs: [
@@ -55,7 +55,7 @@ const copy = {
       ] },
       { title: "Learner surveys and mock exams", paragraphs: [
         "With your consent, the sign-up survey links your nationality, year of birth, reasons for taking TOPIK, length of Korean study, exam experience, and current and target levels to your account. TOPIQ uses these responses to understand learners and records when you agreed and which consent text you saw.",
-        "For PBT and IBT mock exams, TOPIQ records the exam, answers, attempt times and scores to display your results and history. Guest attempts are linked to your browser session. If you submit the results survey, TOPIQ processes your email, rating and learner responses with your consent. To email results, Brevo receives your address, the exam title and the results link.",
+        "For PBT and IBT mock exams, TOPIQ records the exam, answers, attempt times and scores to display your results and history. Past guest attempts are linked to the browser session used for the exam. If you submit the results survey, TOPIQ processes your email, rating and learner responses with your consent. To email results, Brevo receives your address, the exam title and the results link.",
       ] },
       { title: "AI writing feedback", paragraphs: [
         "When you request feedback, TOPIQ saves the submitted answer and evaluation in your writing history. For AI evaluation, TOPIQ sends the question, answer, grading instructions, feedback language and request identifier through BizRouter. A name or contact detail you include in an answer is sent with it.",
@@ -64,10 +64,10 @@ const copy = {
         "TOPIQ uses survey responses and submitted answers for internal statistics and to improve learning features within the purposes of collection and the scope of consent. TOPIQ operators can access learning and payment records. TOPIQ does not use survey responses or answers for advertising or marketing, or share them with schools or business partners.",
       ] },
       { title: "Credits and payments", paragraphs: [
-        "To calculate your balance and show your payment history, TOPIQ records credit grants, reservations and spending, purchase amounts, currencies, payment status, and Stripe customer and checkout identifiers. You enter payment method details on Stripe’s checkout page.",
+        "To calculate your balance and show your payment history, TOPIQ records credit grants, reservations and spending, purchase amounts, currencies, subscription and payment status, and Stripe customer, checkout, subscription and invoice identifiers. You enter payment method details on Stripe’s checkout page.",
       ] },
       { title: "Cookies and browser storage", paragraphs: [
-        "TOPIQ uses session cookies for sign-in and guest exams, and a security cookie to protect requests. Your browser stores your language preference. Some progress, such as listening playback, is stored in the current tab. Pages load a Google tag script, which may send request information such as your IP address to Google.",
+        "TOPIQ uses session cookies for sign-in and access to past guest attempts, and a security cookie to protect requests. Your browser stores your language preference. Some progress, such as listening playback, is stored in the current tab. Pages load a Google tag script, which may send request information such as your IP address to Google.",
         "You can block cookies or clear site data in your browser settings. Clearing data can remove access to guest exam history. Blocking essential cookies can prevent sign-in and other features from working.",
       ] },
       { title: "Retention and deletion", paragraphs: [
@@ -90,7 +90,7 @@ const copy = {
       ] },
       { title: "Survei pelajar dan simulasi ujian", paragraphs: [
         "Dengan persetujuanmu, survei pendaftaran mengaitkan kewarganegaraan, tahun lahir, tujuan mengikuti TOPIK, lama belajar bahasa Korea, pengalaman ujian, serta level saat ini dan target dengan akunmu. TOPIQ menganalisis jawaban untuk memahami latar belakang pelajar serta mencatat waktu dan versi persetujuan.",
-        "Dalam simulasi PBT dan IBT, TOPIQ mencatat ujian, jawaban, waktu pengerjaan, dan nilai untuk menampilkan hasil dan riwayat. Riwayat tamu terhubung ke sesi browser. Jika kamu mengirim survei hasil, TOPIQ memproses email, penilaian, dan jawaban survei dengan persetujuanmu. Untuk mengirim hasil melalui email, Brevo menerima alamat penerima, judul ujian, dan tautan hasil.",
+        "Dalam simulasi PBT dan IBT, TOPIQ mencatat ujian, jawaban, waktu pengerjaan, dan nilai untuk menampilkan hasil dan riwayat. Riwayat ujian tamu sebelumnya terhubung ke sesi browser yang digunakan saat ujian. Jika kamu mengirim survei hasil, TOPIQ memproses email, penilaian, dan jawaban survei dengan persetujuanmu. Untuk mengirim hasil melalui email, Brevo menerima alamat penerima, judul ujian, dan tautan hasil.",
       ] },
       { title: "Evaluasi tulisan dengan AI", paragraphs: [
         "Saat kamu meminta evaluasi, TOPIQ menyimpan jawaban dan hasil evaluasi di riwayat tulisanmu. Untuk evaluasi AI, TOPIQ mengirim soal, jawaban, panduan penilaian, bahasa umpan balik, dan pengenal permintaan melalui BizRouter. Nama atau informasi kontak yang kamu tulis di dalam jawaban akan ikut terkirim.",
@@ -99,10 +99,10 @@ const copy = {
         "TOPIQ menggunakan jawaban survei dan jawaban yang dikirim untuk statistik internal serta perbaikan fitur belajar sesuai tujuan pengumpulan dan lingkup persetujuan. Pengelola TOPIQ dapat mengakses riwayat belajar dan pembayaran. Jawaban survei dan jawaban latihan tidak digunakan untuk iklan atau pemasaran dan tidak dibagikan kepada sekolah atau mitra bisnis.",
       ] },
       { title: "Kredit dan pembayaran", paragraphs: [
-        "Untuk menghitung saldo dan menampilkan riwayat pembayaran, TOPIQ mencatat pemberian, pencadangan dan penggunaan kredit, jumlah dan mata uang pembelian, status pembayaran, serta pengenal pelanggan dan sesi pembayaran Stripe. Kamu memasukkan informasi metode pembayaran di halaman pembayaran Stripe.",
+        "Untuk menghitung saldo dan menampilkan riwayat pembayaran, TOPIQ mencatat pemberian, pencadangan dan penggunaan kredit, jumlah dan mata uang pembelian, status langganan dan pembayaran, serta pengenal pelanggan, sesi pembayaran, langganan, dan faktur Stripe. Kamu memasukkan informasi metode pembayaran di halaman pembayaran Stripe.",
       ] },
       { title: "Cookie dan penyimpanan browser", paragraphs: [
-        "TOPIQ menggunakan cookie sesi untuk login dan ujian tamu serta cookie keamanan untuk melindungi permintaan. Browser menyimpan pilihan bahasa. Sebagian progres, seperti pemutaran audio, tersimpan di tab yang sedang digunakan. Halaman memuat skrip tag Google sehingga informasi permintaan, seperti alamat IP, dapat terkirim ke Google.",
+        "TOPIQ menggunakan cookie sesi untuk login dan akses ke riwayat ujian tamu sebelumnya serta cookie keamanan untuk melindungi permintaan. Browser menyimpan pilihan bahasa. Sebagian progres, seperti pemutaran audio, tersimpan di tab yang sedang digunakan. Halaman memuat skrip tag Google sehingga informasi permintaan, seperti alamat IP, dapat terkirim ke Google.",
         "Kamu dapat memblokir cookie atau menghapus data situs melalui pengaturan browser. Jika data dihapus, akses ke riwayat ujian tamu bisa hilang. Memblokir cookie yang diperlukan dapat mengganggu login dan fungsi lain.",
       ] },
       { title: "Masa penyimpanan dan penghapusan", paragraphs: [

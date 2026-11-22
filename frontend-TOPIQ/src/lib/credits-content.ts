@@ -7,7 +7,7 @@ interface Copy {
   result: string; history: string; empty: string; loading: string; error: string; retry: string; refresh: string;
   loginRequired: string; previous: string; next: string; page: string;
   buy: (credits: string, amount: string) => string; checkAgain: string; priceLoading: string; priceUnavailable: string;
-  paymentHistory: string; portal: Record<"opening" | "empty" | "error", string>;
+  cardIssuerNotice: string; paymentHistory: string; portal: Record<"opening" | "empty" | "error", string>;
   checkout: Record<"opening" | "checking" | "delayed" | "cancelled" | "fulfilled" | "expired" | "startError" | "checkError" | "unavailable" | "priceChanged", string>;
   kinds: Record<CreditEntry["kind"], string>;
 }
@@ -16,12 +16,13 @@ export const creditsContent: Record<Language, Copy> = {
   ko: {
     title: "크레딧",
     available: "사용 가능", balance: "보유 크레딧", reserved: "보류", unit: "크레딧",
-    transactions: "크레딧 내역", transactionNote: "가입하면 100크레딧을 받습니다. 쓰기 세트는 처음 열 때 100크레딧이 들며, 재열람과 문항당 평가 20회가 포함됩니다.",
+    transactions: "크레딧 내역", transactionNote: "가입하면 100크레딧을 받습니다. 무료 계정은 쓰기 세트를 처음 열 때 100크레딧이 들며, 재열람과 문항당 평가 20회가 포함됩니다.",
     balanceAfter: "남은 크레딧", reservedAfter: "보류 크레딧", result: "평가 보기", history: "내 평가 이력",
     empty: "아직 크레딧 내역이 없습니다.", loading: "크레딧 정보를 불러오는 중입니다.",
     error: "크레딧 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.", retry: "다시 시도", refresh: "새로고침",
     loginRequired: "로그인하면 내 크레딧 내역을 확인할 수 있습니다.", previous: "이전", next: "다음", page: "페이지",
     buy: (credits, amount) => `${credits}크레딧 충전 · ${amount}원`, checkAgain: "결제 상태 다시 확인",
+    cardIssuerNotice: "결제 시 한국 밖에서 발급된 카드를 사용해 주세요.",
     priceLoading: "충전 가격을 불러오는 중입니다.", priceUnavailable: "충전 가격을 불러올 수 없습니다.",
     paymentHistory: "결제 내역", portal: {
       opening: "Stripe 결제 내역을 여는 중입니다.",
@@ -37,17 +38,18 @@ export const creditsContent: Record<Language, Copy> = {
       checkError: "결제 상태를 불러오지 못했습니다.", unavailable: "이 주문을 찾을 수 없습니다.",
       priceChanged: "충전 가격이 변경되었습니다. 새 가격을 확인한 뒤 결제를 진행해 주세요.",
     },
-    kinds: { grant: "지급", reserve: "보류", capture: "평가 사용", release: "보류 해제", welcome: "신규 가입 지급", unlock: "세트 열람", purchase: "유료 충전" },
+    kinds: { grant: "지급", reserve: "보류", capture: "평가 사용", release: "보류 해제", welcome: "신규 가입 지급", unlock: "세트 열람", purchase: "유료 충전", plan_bonus: "플랜 지급" },
   },
   en: {
     title: "Credits",
     available: "Available", balance: "Total balance", reserved: "On hold", unit: "credits",
-    transactions: "Credit history", transactionNote: "Get 100 credits when you sign up. Each writing set costs 100 credits to open and includes repeat access and 20 evaluations per question.",
+    transactions: "Credit history", transactionNote: "Get 100 credits when you sign up. On a free account, each writing set costs 100 credits to open and includes repeat access and 20 evaluations per question.",
     balanceAfter: "Remaining credits", reservedAfter: "Credits on hold", result: "View evaluation", history: "My evaluations",
     empty: "No credit activity yet.", loading: "Loading your credits…",
     error: "Unable to load your credits. Please try again shortly.", retry: "Try again", refresh: "Refresh",
     loginRequired: "Sign in to view your credit history.", previous: "Previous", next: "Next", page: "Page",
     buy: (credits, amount) => `Buy ${credits} credits · ₩${amount}`, checkAgain: "Check payment status",
+    cardIssuerNotice: "Please use a card issued outside South Korea.",
     priceLoading: "Loading the purchase price…", priceUnavailable: "Couldn’t load the purchase price.",
     paymentHistory: "Payment history", portal: {
       opening: "Opening your Stripe payment history…",
@@ -63,17 +65,18 @@ export const creditsContent: Record<Language, Copy> = {
       checkError: "Couldn’t load the payment status.", unavailable: "Order not found.",
       priceChanged: "The price has changed. Review the new price before continuing.",
     },
-    kinds: { grant: "Granted", reserve: "On hold", capture: "Charged", release: "Released", welcome: "Signup bonus", unlock: "Set access", purchase: "Credit purchase" },
+    kinds: { grant: "Granted", reserve: "On hold", capture: "Charged", release: "Released", welcome: "Signup bonus", unlock: "Set access", purchase: "Credit purchase", plan_bonus: "Plan bonus" },
   },
   id: {
     title: "Kredit",
     available: "Tersedia", balance: "Total saldo", reserved: "Ditahan", unit: "kredit",
-    transactions: "Riwayat kredit", transactionNote: "Dapatkan 100 kredit saat mendaftar. Setiap paket menulis memerlukan 100 kredit saat pertama dibuka, termasuk akses ulang dan 20 penilaian per soal.",
+    transactions: "Riwayat kredit", transactionNote: "Dapatkan 100 kredit saat mendaftar. Pada akun gratis, setiap paket menulis memerlukan 100 kredit saat pertama dibuka, termasuk akses ulang dan 20 penilaian per soal.",
     balanceAfter: "Sisa kredit", reservedAfter: "Kredit ditahan", result: "Lihat penilaian", history: "Riwayat penilaian saya",
     empty: "Belum ada riwayat kredit.", loading: "Memuat informasi kredit…",
     error: "Informasi kredit tidak dapat dimuat. Silakan coba lagi sebentar.", retry: "Coba lagi", refresh: "Muat ulang",
     loginRequired: "Masuk untuk melihat riwayat kredit Anda.", previous: "Sebelumnya", next: "Berikutnya", page: "Halaman",
     buy: (credits, amount) => `Beli ${credits} kredit · ₩${amount}`, checkAgain: "Periksa status pembayaran",
+    cardIssuerNotice: "Gunakan kartu yang diterbitkan di luar Korea Selatan.",
     priceLoading: "Memuat harga kredit…", priceUnavailable: "Harga kredit tidak dapat dimuat.",
     paymentHistory: "Riwayat pembayaran", portal: {
       opening: "Membuka riwayat pembayaran Stripe…",
@@ -89,6 +92,6 @@ export const creditsContent: Record<Language, Copy> = {
       checkError: "Status pembayaran tidak dapat dimuat.", unavailable: "Pesanan tidak ditemukan.",
       priceChanged: "Harga telah berubah. Periksa harga baru sebelum melanjutkan pembayaran.",
     },
-    kinds: { grant: "Diberikan", reserve: "Ditahan", capture: "Dipotong", release: "Dilepas", welcome: "Bonus pendaftaran", unlock: "Akses paket", purchase: "Pembelian kredit" },
+    kinds: { grant: "Diberikan", reserve: "Ditahan", capture: "Dipotong", release: "Dilepas", welcome: "Bonus pendaftaran", unlock: "Akses paket", purchase: "Pembelian kredit", plan_bonus: "Bonus paket" },
   },
 };
