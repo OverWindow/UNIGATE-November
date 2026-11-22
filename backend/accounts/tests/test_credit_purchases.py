@@ -15,7 +15,7 @@ from django.utils import timezone
 
 from accounts.credits import account_with_monthly_credits
 from accounts.models import CreditAccount, CreditPurchase, CreditTransaction
-from accounts.payments import checkout_customer
+from accounts.payments import checkout, checkout_customer
 
 
 PURCHASES = "/api/credits/purchases/"
@@ -245,12 +245,70 @@ class CreditPurchaseTests(TestCase):
             self.assertIsNone(self.client.get("/api/plans/").json()["currentPlanMonths"])
         self.assertEqual(list(CreditPurchase.objects.values_list("credited_months", flat=True)), [3, 3])
 
+    def pending_subscription(self):
+        return CreditPurchase.objects.create(user=self.user, attempt_id=self.attempt_id, amount=9900, credits=400,
+            plan_months=1, stripe_price_id="price_one", subscription_state="checkout")
+
+    def test_subscription_key_conflict_recovers_matching_open_complete_or_expired_session(self):
+        order = self.pending_subscription()
+        self.sessions.create.side_effect = stripe.IdempotencyError("fixture parameter mismatch", http_status=400)
+        other = stripe.checkout.Session.construct_from({"metadata": {"credit_purchase_id": str(uuid.uuid4())}}, None)
+        for status, expected_url in (("open", CHECKOUT_URL), ("complete", None), ("expired", None)):
+            with self.subTest(status=status):
+                CreditPurchase.objects.filter(pk=order.pk).update(stripe_session_id=None)
+                session = stripe.checkout.Session.construct_from({"id": SESSION_ID, "status": status, "url": CHECKOUT_URL,
+                    "metadata": {"credit_purchase_id": str(order.pk)}}, None)
+                self.sessions.list.return_value.auto_paging_iter.return_value = [other, session]
+                self.sessions.create.reset_mock()
+                response = self.post_plan(1, "price_one")
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()["checkoutUrl"], expected_url)
+                self.assertEqual(self.sessions.list.call_args.args[0]["customer"], "cus_fixture_owner")
+                self.sessions.create.assert_called_once()
+                order.refresh_from_db()
+                self.assertEqual(order.stripe_session_id, SESSION_ID)
+                self.assertEqual(order.status, "expired" if status == "expired" else "pending")
+
+    def test_missing_subscription_session_reuses_replacement_key_after_lost_response(self):
+        order = self.pending_subscription()
+        mismatch = stripe.APIError("fixture parameter mismatch", http_status=409,
+                                   json_body={"error": {"type": "idempotency_error"}})
+        self.sessions.list.return_value.auto_paging_iter.return_value = []
+        self.sessions.create.side_effect = [mismatch, stripe.APIConnectionError("fixture lost response"),
+                                            mismatch, self.sessions.create.return_value]
+        self.assertEqual(self.post_plan(1, "price_one").status_code, 503)
+        self.assertEqual(self.post_plan(1, "price_one").json()["checkoutUrl"], CHECKOUT_URL)
+        original, replacement, original_retry, replacement_retry = self.sessions.create.call_args_list
+        self.assertEqual(original.kwargs["options"]["idempotency_key"], str(order.pk))
+        self.assertNotEqual(original.kwargs, replacement.kwargs)
+        self.assertEqual(original.args, replacement.args)
+        self.assertEqual((original, replacement), (original_retry, replacement_retry))
+        self.assertEqual(self.post_plan(1, "price_one").json()["checkoutUrl"], CHECKOUT_URL)
+        self.sessions.retrieve.assert_called_once_with(SESSION_ID)
+        self.assertEqual(self.sessions.create.call_count, 4)
+        self.assertEqual(CreditPurchase.objects.count(), 1)
+
+    def test_subscription_lookup_failure_or_busy_key_never_creates_a_replacement(self):
+        order = self.pending_subscription()
+        self.sessions.create.side_effect = stripe.IdempotencyError("fixture parameter mismatch", http_status=400)
+        self.sessions.list.side_effect = stripe.APIConnectionError("fixture lookup unavailable")
+        self.assertEqual(self.post_plan(1, "price_one").status_code, 503)
+        self.sessions.list.assert_called_once()
+        self.sessions.create.assert_called_once()
+        self.sessions.list.reset_mock()
+        self.sessions.create.side_effect = stripe.IdempotencyError("fixture concurrent request", http_status=400,
+            json_body={"error": {"type": "idempotency_error", "code": "idempotency_key_in_use"}})
+        self.assertEqual(self.post_plan(1, "price_one").status_code, 503)
+        self.sessions.list.assert_not_called()
+        self.assertEqual(self.sessions.create.call_count, 2)
+        order.refresh_from_db()
+        self.assertEqual((order.status, order.stripe_session_id), ("pending", None))
+
     def test_subscription_recovers_completed_checkout_after_lost_creation_response(self):
         self.prices.retrieve.return_value = plan_price(1, 9900, "price_one")
         self.wallet.stripe_customer_id = "cus_fixture_owner"
         self.wallet.save(update_fields=["stripe_customer_id"])
-        order = CreditPurchase.objects.create(user=self.user, attempt_id=self.attempt_id, amount=9900, credits=400,
-            plan_months=1, stripe_price_id="price_one", subscription_state="checkout")
+        order = self.pending_subscription()
         CreditPurchase.objects.filter(pk=order.pk).update(created_at=timezone.now() - timedelta(days=2))
         recovered = stripe.checkout.Session.construct_from({"id": SESSION_ID, "status": "complete",
             "metadata": {"credit_purchase_id": str(order.pk)}}, None)
@@ -570,6 +628,44 @@ class CreditPurchaseTests(TestCase):
 
 @override_settings(**TEST_SETTINGS)
 class ConcurrentCreditPurchaseTests(TransactionTestCase):
+    def test_simultaneous_subscription_retries_share_one_replacement_session(self):
+        user = get_user_model().objects.create_user(username="retry-plan-owner")
+        CreditAccount.objects.create(user=user, stripe_customer_id="cus_fixture_owner")
+        order = CreditPurchase.objects.create(user=user, attempt_id=uuid.uuid4(), amount=9900, credits=400,
+            plan_months=1, stripe_price_id="price_one", subscription_state="checkout")
+        client = Mock()
+        sessions = client.v1.checkout.sessions
+        sessions.list.return_value.auto_paging_iter.return_value = []
+        ready = Barrier(2, timeout=10)
+
+        def session_for(session_id):
+            return stripe.checkout.Session.construct_from({"id": session_id, "url": CHECKOUT_URL, "status": "open"}, None)
+
+        def create(params, *, options):
+            key = options["idempotency_key"]
+            if key == str(order.pk):
+                ready.wait()
+                raise stripe.IdempotencyError("fixture parameter mismatch", http_status=400)
+            return session_for(f"cs_{key}")
+
+        sessions.create.side_effect = create
+        sessions.retrieve.side_effect = session_for
+
+        def retry(_):
+            close_old_connections()
+            try:
+                return checkout(CreditPurchase.objects.get(pk=order.pk), client, retry=True)
+            finally:
+                connection.close()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            self.assertEqual(list(pool.map(retry, range(2))), [CHECKOUT_URL, CHECKOUT_URL])
+        keys = {call.kwargs["options"]["idempotency_key"] for call in sessions.create.call_args_list}
+        keys.remove(str(order.pk))
+        self.assertEqual(len(keys), 1)
+        order.refresh_from_db()
+        self.assertEqual(order.stripe_session_id, f"cs_{keys.pop()}")
+
     def test_simultaneous_wallet_reads_catch_up_a_six_month_plan_only_once(self):
         user = get_user_model().objects.create_user(username="monthly-credit-owner")
         account = CreditAccount.objects.create(user=user, balance=100)

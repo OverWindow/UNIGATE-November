@@ -115,12 +115,12 @@ def expire_checkout(purchase, *, missing_session=False):
     pending.update(**fields)
 
 
-def recover_plan_session(purchase, sessions):
-    customer = CreditAccount.objects.filter(user_id=purchase.user_id).values_list("stripe_customer_id", flat=True).first()
-    if not customer:
-        return None
-    # Recover a lost create response before releasing the single-subscription reservation.
-    rows = sessions.list({"customer": customer, "created": {
+def recover_plan_session(purchase, sessions, *, customer_id=None):
+    if customer_id is None:
+        customer_id = CreditAccount.objects.filter(user_id=purchase.user_id).values_list("stripe_customer_id", flat=True).first()
+        if not customer_id:
+            return None
+    rows = sessions.list({"customer": customer_id, "created": {
         "gte": int(purchase.created_at.timestamp()) - 60,
         "lte": int((purchase.created_at + timedelta(days=1)).timestamp()),
     }})
@@ -129,6 +129,28 @@ def recover_plan_session(purchase, sessions):
             CreditPurchase.objects.filter(pk=purchase.pk, stripe_session_id__isnull=True).update(stripe_session_id=session.id)
             return session
     return None
+
+
+def create_subscription_session(purchase, sessions, params, *, retry):
+    try:
+        return sessions.create(params, options={"idempotency_key": str(purchase.pk)})
+    except (stripe.IdempotencyError, stripe.APIError) as exc:
+        # The SDK exposes a 409 as APIError and can leave the Stripe code on its nested error.
+        code = exc.code or getattr(exc.error, "code", None)
+        key_mismatch = isinstance(exc, stripe.IdempotencyError) or getattr(exc.error, "type", None) == "idempotency_error"
+        if not retry or exc.http_status not in (400, 409) or not key_mismatch or code == "idempotency_key_in_use":
+            raise
+
+    session = recover_plan_session(purchase, sessions, customer_id=params["customer"])
+    if session is not None:
+        return session
+    purchase.refresh_from_db()
+    if purchase.stripe_session_id:
+        return sessions.retrieve(purchase.stripe_session_id)
+    if purchase.status != "pending":
+        return None
+    # All retries of this order share one replacement key, including after a lost response.
+    return sessions.create(params, options={"idempotency_key": f"{purchase.pk}-subscription-v2"})
 
 
 def checkout(purchase, client, *, retry):
@@ -157,17 +179,22 @@ def checkout(purchase, client, *, retry):
             "cancel_url": f"{return_url}&cancelled=1",
         }
         customer_id = checkout_customer(purchase.user_id, client.v1.customers)
-        options = {"idempotency_key": str(purchase.pk)}
-        billing = ({"subscription_data": {"metadata": params["metadata"]},
-                    "expires_at": int((purchase.created_at + timedelta(hours=24)).timestamp())}
-                   if purchase.subscription_state else {"invoice_creation": {"enabled": True}})
-        try:
-            session = sessions.create({**params, "customer": customer_id, **billing}, options=options)
-        except stripe.IdempotencyError as exc:
-            if purchase.plan_months or not retry or exc.http_status != 400 or exc.code == "idempotency_key_in_use":
-                raise
-            # Recover a pre-portal Checkout whose response was lost, using its original parameters and key.
-            session = sessions.create(params, options=options)
+        if purchase.subscription_state:
+            session = create_subscription_session(purchase, sessions, {
+                **params, "customer": customer_id, "subscription_data": {"metadata": params["metadata"]},
+                "expires_at": int((purchase.created_at + timedelta(hours=24)).timestamp()),
+            }, retry=retry)
+            if session is None:
+                return None
+        else:
+            options = {"idempotency_key": str(purchase.pk)}
+            try:
+                session = sessions.create({**params, "customer": customer_id, "invoice_creation": {"enabled": True}}, options=options)
+            except stripe.IdempotencyError as exc:
+                if purchase.plan_months or not retry or exc.http_status != 400 or exc.code == "idempotency_key_in_use":
+                    raise
+                # Recover a pre-portal Checkout using its original parameters and key.
+                session = sessions.create(params, options=options)
         CreditPurchase.objects.filter(pk=purchase.pk, stripe_session_id__isnull=True).update(stripe_session_id=session.id)
 
     if session.status == "expired":
