@@ -11,9 +11,9 @@ from django.test import Client, TransactionTestCase, override_settings
 from django.utils import timezone
 
 from accounts.credits import grant
-from accounts.models import CreditAccount, CreditTransaction
+from accounts.models import CreditAccount, CreditPurchase, CreditTransaction
 from writing import services
-from writing.access import evaluation_usage
+from writing.access import evaluation_usage, has_access
 from writing.models import Evaluation
 from writing.tests.test_evaluation import fixture, model_result
 
@@ -91,6 +91,30 @@ class SetCreditTests(TransactionTestCase):
         self.assertEqual(CreditAccount.objects.get(user=self.user).balance, 200)
         self.assertFalse(CreditTransaction.objects.filter(kind="unlock").exists())
         self.provider.assert_not_called()
+
+    def test_plan_access_ends_without_charging_or_permanently_unlocking_sets(self):
+        self.assertEqual(self.purchase().status_code, 201)
+        permanent = self.set_id
+        self.set_id = uuid.uuid4()
+        self.path = f"/api/writing/sets/{self.set_id}/unlock/"
+        now = timezone.now()
+        account = CreditAccount.objects.get(user=self.user)
+        account.balance += 400
+        account.save()
+        bonus = CreditTransaction.objects.create(account=account, kind="plan_bonus", amount=400,
+                                                 balance_after=account.balance, reserved_after=0)
+        end = now + timedelta(days=1)
+        CreditPurchase.objects.create(user=self.user, attempt_id=uuid.uuid4(), status="fulfilled", amount=9900,
+                                      stripe_session_id="cs_plan_access", credits=400, transaction=bonus, plan_months=1,
+                                      plan_starts_at=now - timedelta(days=1), plan_ends_at=end)
+        self.assertEqual(self.purchase().json()["chargedCredits"], 0)
+        self.assertFalse(CreditTransaction.objects.filter(set_id=self.set_id, kind="unlock").exists())
+        self.assertEqual(self.submit().json()["chargedCredits"], 0)
+        self.assertEqual(CreditAccount.objects.get(user=self.user).balance, 500)
+        with patch("accounts.plans.timezone.now", return_value=end):
+            self.assertFalse(has_access(self.user.pk, self.set_id))
+            self.assertTrue(has_access(self.user.pk, permanent))
+            self.assertEqual(self.submit().json()["error"], "set_locked")
 
     def test_missing_set_authentication_csrf_and_client_prices(self):
         self.bank.return_value.filter.return_value.exists.return_value = False

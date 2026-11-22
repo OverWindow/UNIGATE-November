@@ -11,12 +11,30 @@ from django.db import connection, connections, DatabaseError, IntegrityError, tr
 from django.test import Client, TransactionTestCase
 from django.utils import timezone
 
+from accounts.models import CreditAccount, CreditPurchase, CreditTransaction
 from question_bank.models import AudioAsset, Item, ItemAudioBinding, QuestionSet, VisualAsset
 from ..bank import BankNotReady, load_set
 from ..models import Attempt, AttemptItem, Exam
 
 
 class BankFixtures:
+    def activate_plus(self, user):
+        now = timezone.now()
+        wallet, _ = CreditAccount.objects.get_or_create(user=user)
+        bonus = CreditTransaction.objects.create(account=wallet, kind="plan_bonus", amount=400,
+                                                 balance_after=400, reserved_after=0)
+        return CreditPurchase.objects.create(user=user, attempt_id=uuid.uuid4(), amount=9900, credits=400,
+            plan_months=1, plan_starts_at=now - timedelta(days=1), plan_ends_at=now + timedelta(days=10),
+            status="fulfilled", stripe_session_id=f"cs_{uuid.uuid4()}", transaction=bonus)
+
+    def member_client(self, plus):
+        user = get_user_model().objects.create_user(username=f"exam-member-{uuid.uuid4()}")
+        if plus:
+            self.activate_plus(user)
+        client = Client()
+        client.force_login(user)
+        return client
+
     def enter_timed(self, data, client):
         if data["mode"] != "timed" or data["status"] != "in_progress":
             return
@@ -41,6 +59,7 @@ class BankFixtures:
         self.exam = Exam.objects.create(source_set_id=self.reading.pk, title="Synthetic reading", section="reading", display_order=1, guest_slot=1, is_published=True)
         self.listen_exam = Exam.objects.create(source_set_id=self.listening.pk, title="Synthetic listening", section="listening", display_order=1, guest_slot=1, is_published=True)
         self.user = get_user_model().objects.create_user(username="pbt-fixture", password="synthetic-test-only")
+        self.client.force_login(self.user)
 
     def tearDown(self):
         with connection.schema_editor() as editor:
@@ -97,12 +116,10 @@ class PbtTests(BankFixtures, TransactionTestCase):
         return result.json()
 
     def test_answered_count_tracks_changes_clears_resume_and_submission(self):
-        for member in (False, True):
-            client = Client()
-            if member:
-                client.force_login(self.user)
+        for plus in (False, True):
+            client = self.member_client(plus)
             for mode in ("practice", "timed"):
-                with self.subTest(member=member, mode=mode):
+                with self.subTest(plus=plus, mode=mode):
                     data = self.start(mode=mode, client=client)
                     self.assertEqual(data["answeredCount"], 0)
                     path = f"/api/pbt/attempts/{data['id']}/"
@@ -125,10 +142,7 @@ class PbtTests(BankFixtures, TransactionTestCase):
                     self.assertEqual(submitted["answeredCount"], 1)
                     self.assertEqual(client.post(path + "submit/").json()["answeredCount"], 1)
                     result = client.get(path + "result/")
-                    if member:
-                        self.assertEqual((result.json()["answeredCount"], result.json()["score"]), (1, 0))
-                    else:
-                        self.assertEqual(result.status_code, 403)
+                    self.assertEqual((result.json()["answeredCount"], result.json()["score"]), (1, 0))
                     closed = client.put(path + "answers/50/", {"selectedOption": None}, content_type="application/json")
                     self.assertEqual(closed.status_code, 409)
                     self.assertEqual(closed.json()["attempt"]["answeredCount"], 1)
@@ -177,7 +191,7 @@ class PbtTests(BankFixtures, TransactionTestCase):
         self.assertEqual(attempt.answered_count, 3 if statuses[0] == 200 else 2)
         self.assertEqual(attempt.answered_count, attempt.items.filter(selected_option__isnull=False).count())
 
-    def test_guest_catalog_and_direct_member_access(self):
+    def test_free_catalog_and_direct_plus_access(self):
         for n in (2, 3, 4):
             for section in ("reading", "listening"):
                 source = self.make_set(section)
@@ -185,12 +199,12 @@ class PbtTests(BankFixtures, TransactionTestCase):
         catalog = self.client.get("/api/pbt/exams/")
         self.assertIn("no-store", catalog.headers["Cache-Control"])
         rows = catalog.json()["exams"]
-        self.assertEqual(sum(e["accessible"] for e in rows), 6)
-        self.assertEqual(sum(e["questionCount"] for e in rows if e["accessible"]), 300)
+        self.assertEqual(sum(e["accessible"] for e in rows), 2)
+        self.assertEqual(sum(e["questionCount"] for e in rows if e["accessible"]), 100)
         locked = next(e for e in rows if not e["accessible"])
         response = self.client.post("/api/pbt/attempts/", {"examId": locked["id"], "mode": "practice"}, content_type="application/json")
         self.assertEqual(response.status_code, 403)
-        self.client.force_login(self.user)
+        self.activate_plus(self.user)
         self.assertTrue(all(e["accessible"] for e in self.client.get("/api/pbt/exams/").json()["exams"]))
         with self.assertRaises(IntegrityError), transaction.atomic():
             Exam.objects.create(source_set_id=uuid.uuid4(), title="Fourth slot", section="reading", display_order=5, guest_slot=4)
@@ -268,10 +282,8 @@ class PbtTests(BankFixtures, TransactionTestCase):
         self.assertIsNone(progress["timed"]["inProgressId"])
 
     def test_catalog_progress_excludes_guests_and_other_accounts(self):
-        guest = self.start()
-        self.client.post(f"/api/pbt/attempts/{guest['id']}/submit/")
-        self.assertTrue(all(e["myProgress"] is None for e in self.client.get("/api/pbt/exams/").json()["exams"]))
-        self.client.force_login(self.user)
+        Attempt.objects.create(exam=self.exam, guest_id=uuid.uuid4(), section="reading", title="Legacy guest",
+                               mode="practice", status="submitted", started_at=timezone.now(), submitted_at=timezone.now())
         other = Client()
         other.force_login(get_user_model().objects.create_user(username="catalog-other", password="synthetic-test-only"))
         foreign = self.start(client=other)
@@ -288,7 +300,7 @@ class PbtTests(BankFixtures, TransactionTestCase):
         for client, expected in ((self.client, own), (other, foreign)):
             progress = next(e for e in client.get("/api/pbt/exams/").json()["exams"] if e["id"] == str(self.exam.pk))["myProgress"]
             self.assertEqual(progress["practice"]["latestResult"]["id"], expected["id"])
-        self.assertTrue(all(e["myProgress"] is None for e in Client().get("/api/pbt/exams/").json()["exams"]))
+        self.assertEqual(Client().get("/api/pbt/exams/").status_code, 401)
 
     def test_catalog_progress_includes_attempts_beyond_recent_hundred(self):
         self.client.force_login(self.user)
@@ -329,8 +341,8 @@ class PbtTests(BankFixtures, TransactionTestCase):
     def test_members_can_start_restricted_sets_and_other_accounts_cannot_read_them(self):
         self.exam.guest_slot = None
         self.exam.save()
-        denied = self.client.post("/api/pbt/attempts/", {"examId": str(self.exam.pk), "mode": "practice"}, content_type="application/json")
-        self.assertEqual(denied.status_code, 403)
+        denied = Client().post("/api/pbt/attempts/", {"examId": str(self.exam.pk), "mode": "practice"}, content_type="application/json")
+        self.assertEqual(denied.status_code, 401)
         self.client.force_login(self.user)
         data = self.start()
         other = Client()
@@ -372,12 +384,10 @@ class PbtTests(BankFixtures, TransactionTestCase):
         self.assertEqual(self.client.put(path + "answers/2/", {"selectedOption": 2}, content_type="application/json").status_code, 409)
 
     def test_restart_preserves_results_and_starts_with_empty_answers(self):
-        for member in (False, True):
-            client = Client()
-            if member:
-                client.force_login(self.user)
+        for plus in (False, True):
+            client = self.member_client(plus)
             for mode in ("practice", "timed"):
-                with self.subTest(member=member, mode=mode):
+                with self.subTest(plus=plus, mode=mode):
                     data = self.start(mode=mode, client=client)
                     old = Attempt.objects.get(pk=data["id"])
                     for position, option in ((1, 2), (2, 1)):
@@ -412,17 +422,13 @@ class PbtTests(BankFixtures, TransactionTestCase):
                         self.assertIsNone(new.expires_at)
                     self.assertEqual(self.start(mode=mode, client=client)["id"], str(new.pk))
                     response = client.get(f"/api/pbt/attempts/{old.pk}/result/")
-                    if member:
-                        self.assertEqual(response.json()["score"], 2)
-                        self.assertEqual(response.json()["items"][0]["selectedOption"], 2)
-                    else:
-                        self.assertEqual(response.status_code, 403)
+                    self.assertEqual(response.json()["score"], 2)
+                    self.assertEqual(response.json()["items"][0]["selectedOption"], 2)
                     self.assertEqual(client.put(f"/api/pbt/attempts/{old.pk}/answers/2/",
                         {"selectedOption": 2}, content_type="application/json").status_code, 409)
-                    if member:
-                        row = next(e for e in client.get("/api/pbt/exams/").json()["exams"] if e["id"] == str(self.exam.pk))
-                        self.assertEqual(row["myProgress"][mode]["latestResult"]["id"], str(old.pk))
-                        self.assertEqual(row["myProgress"][mode]["inProgressId"], str(new.pk))
+                    row = next(e for e in client.get("/api/pbt/exams/").json()["exams"] if e["id"] == str(self.exam.pk))
+                    self.assertEqual(row["myProgress"][mode]["latestResult"]["id"], str(old.pk))
+                    self.assertEqual(row["myProgress"][mode]["inProgressId"], str(new.pk))
 
     def test_restart_retries_do_not_close_the_replacement(self):
         original = self.start()
@@ -501,8 +507,8 @@ class PbtTests(BankFixtures, TransactionTestCase):
         other = Client()
         for member in (False, True):
             if member:
-                other.force_login(self.user)
-            self.assertEqual(other.post("/api/pbt/attempts/", payload, content_type="application/json").status_code, 404)
+                other.force_login(get_user_model().objects.create_user(username="different-member"))
+            self.assertEqual(other.post("/api/pbt/attempts/", payload, content_type="application/json").status_code, 404 if member else 401)
         strict = Client(enforce_csrf_checks=True)
         strict.cookies.update(self.client.cookies)
         self.assertEqual(strict.post("/api/pbt/attempts/", payload, content_type="application/json").status_code, 403)
@@ -510,8 +516,13 @@ class PbtTests(BankFixtures, TransactionTestCase):
         self.assertEqual(Attempt.objects.get(pk=original["id"]).status, "in_progress")
 
     def test_restart_guest_attempt_after_login_creates_member_attempt(self):
-        original = self.start()
-        self.client.force_login(self.user)
+        legacy = uuid.uuid4()
+        session = self.client.session
+        session["pbt_guest_id"] = str(legacy)
+        session.save()
+        order = Attempt.objects.create(exam=self.exam, section="reading", title="Legacy", guest_id=legacy,
+                                       mode="practice", status="in_progress", started_at=timezone.now())
+        original = {"id": str(order.pk)}
         payload = {"examId": str(self.exam.pk), "mode": "practice", "restartAttemptId": original["id"]}
         first = self.client.post("/api/pbt/attempts/", payload, content_type="application/json")
         self.assertEqual(first.status_code, 201)
@@ -558,24 +569,24 @@ class PbtTests(BankFixtures, TransactionTestCase):
         Attempt.objects.filter(pk=data["id"]).update(expires_at=timezone.now() - timedelta(seconds=1))
         row = self.client.get("/api/pbt/attempts/").json()["attempts"][0]
         self.assertEqual(row["status"], "submitted")
-        self.assertIsNone(row["score"])
+        self.assertEqual(row["score"], 0)
         self.assertEqual(row["answeredCount"], 0)
         self.assertEqual(Attempt.objects.get(pk=data["id"]).score, 0)
 
-    def test_ownership_survives_login_but_not_another_guest(self):
+    def test_attempt_access_requires_signed_in_owner(self):
         data = self.start()
         path = f"/api/pbt/attempts/{data['id']}/"
         other = Client()
         for suffix in ("", "result/"):
-            self.assertEqual(other.get(path + suffix).status_code, 404)
-        self.assertEqual(other.post(path + "submit/").status_code, 404)
-        self.assertEqual(other.put(path + "answers/1/", {"selectedOption": 2}, content_type="application/json").status_code, 404)
+            self.assertEqual(other.get(path + suffix).status_code, 401)
+        self.assertEqual(other.post(path + "submit/").status_code, 401)
+        self.assertEqual(other.put(path + "answers/1/", {"selectedOption": 2}, content_type="application/json").status_code, 401)
         self.client.force_login(self.user)
         self.assertEqual(self.client.get(path).status_code, 200)
         member = self.start(self.listen_exam)
         self.assertEqual(Attempt.objects.get(pk=member["id"]).user, self.user)
         self.client.logout()
-        self.assertEqual(self.client.get(f"/api/pbt/attempts/{member['id']}/").status_code, 404)
+        self.assertEqual(self.client.get(f"/api/pbt/attempts/{member['id']}/").status_code, 401)
 
     def test_invalid_answers_and_csrf(self):
         data = self.start()

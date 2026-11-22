@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
@@ -13,7 +13,8 @@ from django.views.decorators.debug import sensitive_variables
 from django.views.decorators.http import require_GET, require_POST
 
 from .credits import locked_account, record
-from .models import CREDIT_PURCHASE_QUANTITY, CreditAccount, CreditPurchase
+from .models import CREDIT_PURCHASE_QUANTITY, PLAN_AMOUNTS, PLAN_BONUS, CreditAccount, CreditPurchase
+from .plans import assign_plan_period, current_plan_end
 from .views import api_response, read_payload
 
 
@@ -29,14 +30,20 @@ def stripe_client(*, require_webhook=True):
     )
 
 
-def configured_price(client):
-    if not settings.STRIPE_PRICE_ID:
+def price_id_for(months):
+    return settings.STRIPE_PLAN_PRICE_IDS.get(months) if months else settings.STRIPE_PRICE_ID
+
+
+def configured_price(client, months=None):
+    price_id = price_id_for(months)
+    if not price_id:
         raise PaymentsUnavailable
-    price = client.v1.prices.retrieve(settings.STRIPE_PRICE_ID).to_dict()
+    price = client.v1.prices.retrieve(price_id).to_dict()
     amount = price.get("unit_amount")
-    if (price.get("id") != settings.STRIPE_PRICE_ID or price.get("active") is not True
+    if (price.get("id") != price_id or price.get("active") is not True
             or price.get("type") != "one_time" or price.get("billing_scheme") != "per_unit"
             or price.get("currency") != "krw" or type(amount) is not int or amount <= 0
+            or (months is not None and amount != PLAN_AMOUNTS[months])
             or price.get("custom_unit_amount") is not None or price.get("transform_quantity") is not None):
         raise PaymentsUnavailable
     # KRW is a whole-unit currency, including when Stripe supplies a decimal price.
@@ -46,7 +53,23 @@ def configured_price(client):
             raise PaymentsUnavailable
     except InvalidOperation:
         raise PaymentsUnavailable from None
-    return {"priceId": price["id"], "amount": amount, "currency": price["currency"], "credits": CREDIT_PURCHASE_QUANTITY}
+    return {"priceId": price["id"], "amount": amount, "currency": price["currency"],
+            "credits": PLAN_BONUS if months else CREDIT_PURCHASE_QUANTITY}
+
+
+@require_GET
+def plans(request):
+    if not request.user.is_authenticated:
+        return api_response({"error": "authentication_required"}, 401)
+    try:
+        end = current_plan_end(request.user.pk)
+    except DatabaseError:
+        return api_response({"error": "plans_unavailable"}, 503)
+    return api_response({
+        "plans": [{"months": months, "priceId": price_id_for(months) or None, "amount": amount,
+                   "currency": "krw", "bonusCredits": PLAN_BONUS} for months, amount in PLAN_AMOUNTS.items()],
+        "active": end is not None, "endsAt": end,
+    })
 
 
 @require_GET
@@ -84,7 +107,8 @@ def checkout(purchase, client, *, retry):
             CreditPurchase.objects.filter(pk=purchase.pk, status="pending", stripe_session_id__isnull=True).update(status="expired")
             purchase.refresh_from_db()
             return None
-        return_url = f"{settings.TOPIQ_PUBLIC_URL}/credits?purchase={purchase.pk}"
+        page = "plans" if purchase.plan_months else "credits"
+        return_url = f"{settings.TOPIQ_PUBLIC_URL}/{page}?purchase={purchase.pk}"
         params = {
             "mode": "payment",
             "currency": purchase.currency,
@@ -101,7 +125,7 @@ def checkout(purchase, client, *, retry):
                 **params, "customer": customer_id, "invoice_creation": {"enabled": True},
             }, options=options)
         except stripe.IdempotencyError as exc:
-            if not retry or exc.http_status != 400 or exc.code == "idempotency_key_in_use":
+            if purchase.plan_months or not retry or exc.http_status != 400 or exc.code == "idempotency_key_in_use":
                 raise
             # Recover a pre-portal Checkout whose response was lost, using its original parameters and key.
             session = sessions.create(params, options=options)
@@ -117,12 +141,16 @@ def checkout(purchase, client, *, retry):
 
 @require_POST
 @sensitive_variables()
-def create_purchase(request):
+def create_purchase(request, plan=False):
     if not request.user.is_authenticated:
         return api_response({"error": "authentication_required"}, 401)
-    data, error = read_payload(request, {"attemptId", "priceId"})
+    fields = {"attemptId", "priceId", "months"} if plan else {"attemptId", "priceId"}
+    data, error = read_payload(request, fields, integer_fields={"months"})
     if error is not None:
         return error
+    months = data.get("months")
+    if plan and months not in PLAN_AMOUNTS:
+        return api_response({"error": "invalid_plan"}, 400)
     try:
         attempt_id = UUID(data.get("attemptId", ""))
         if attempt_id.version != 4:
@@ -138,22 +166,23 @@ def create_purchase(request):
         purchase = CreditPurchase.objects.filter(user=request.user, attempt_id=attempt_id).first()
         created = False
         if purchase is None:
-            price = configured_price(client)
+            price = configured_price(client, months)
             if expected_price != price["priceId"]:
                 return api_response({"error": "price_changed"}, 409)
             purchase, created = CreditPurchase.objects.get_or_create(
                 user=request.user, attempt_id=attempt_id, defaults={
                     "stripe_price_id": price["priceId"], "amount": price["amount"], "currency": price["currency"],
+                    "credits": price["credits"], "plan_months": months,
                 },
             )
-        if purchase.stripe_price_id != expected_price:
+        if purchase.stripe_price_id != expected_price or purchase.plan_months != months:
             return api_response({"error": "price_changed"}, 409)
         try:
             url = checkout(purchase, client, retry=not created)
         except stripe.InvalidRequestError as exc:
             # A rejected, superseded Price cannot open a new Checkout Session.
-            if (not purchase.stripe_session_id and settings.STRIPE_PRICE_ID
-                    and purchase.stripe_price_id != settings.STRIPE_PRICE_ID
+            if (not purchase.stripe_session_id and price_id_for(months)
+                    and purchase.stripe_price_id != price_id_for(months)
                     and exc.http_status in (400, 404) and exc.param == "line_items[0][price]"):
                 return api_response({"error": "price_changed"}, 409)
             raise
@@ -167,16 +196,19 @@ def create_purchase(request):
 def billing_portal(request):
     if not request.user.is_authenticated:
         return api_response({"error": "authentication_required"}, 401)
-    _, error = read_payload(request, set())
+    data, error = read_payload(request, {"from"})
     if error is not None:
         return error
+    page = data.get("from", "credits")
+    if page not in {"plans", "credits"}:
+        return api_response({"error": "invalid_return_page"}, 400)
     try:
         customer_id = (CreditAccount.objects.filter(user_id=request.user.pk)
                        .values_list("stripe_customer_id", flat=True).first())
         if not customer_id:
             return api_response({"portalUrl": None})
         session = stripe_client(require_webhook=False).v1.billing_portal.sessions.create({
-            "customer": customer_id, "return_url": f"{settings.TOPIQ_PUBLIC_URL}/credits",
+            "customer": customer_id, "return_url": f"{settings.TOPIQ_PUBLIC_URL}/{page}",
         })
     except (PaymentsUnavailable, stripe.StripeError, DatabaseError):
         return api_response({"error": "payments_unavailable"}, 503)
@@ -188,14 +220,17 @@ def purchase_status(request, purchase_id):
     if not request.user.is_authenticated:
         return api_response({"error": "authentication_required"}, 401)
     try:
-        purchase = CreditPurchase.objects.values("id", "status").get(pk=purchase_id, user=request.user)
+        orders = CreditPurchase.objects.filter(user=request.user)
+        if request.GET.get("product") in {"plan", "credit"}:
+            orders = orders.filter(plan_months__isnull=request.GET["product"] == "credit")
+        purchase = orders.values("id", "status").get(pk=purchase_id)
     except CreditPurchase.DoesNotExist:
         return api_response({"error": "not_found"}, 404)
     return api_response(purchase)
 
 
 @transaction.atomic
-def apply_checkout_event(event_type, session):
+def apply_checkout_event(event_type, session, event_created=None):
     purchase_id = (session.get("metadata") or {}).get("credit_purchase_id")
     if purchase_id is None:
         return 200  # Other products can share this Stripe account.
@@ -213,10 +248,12 @@ def apply_checkout_event(event_type, session):
             purchase.save(update_fields=["status"])
     elif session["payment_status"] == "paid" and session["status"] == "complete":
         account = locked_account(purchase.user_id)
+        if purchase.plan_months:
+            assign_plan_period(purchase, datetime.fromtimestamp(event_created, UTC))
         account.balance += purchase.credits
-        purchase.transaction = record(account, "purchase", purchase.credits)
+        purchase.transaction = record(account, "plan_bonus" if purchase.plan_months else "purchase", purchase.credits)
         purchase.status = "fulfilled"
-        purchase.save(update_fields=["transaction", "status"])
+        purchase.save(update_fields=["transaction", "status", "plan_starts_at", "plan_ends_at"])
     return 200
 
 
@@ -232,7 +269,7 @@ def stripe_webhook(request):
         )
         if event.type not in {"checkout.session.completed", "checkout.session.expired"}:
             return HttpResponse(status=200)
-        status = apply_checkout_event(event.type, event.data.object.to_dict())
+        status = apply_checkout_event(event.type, event.data.object.to_dict(), getattr(event, "created", None))
     except (ValueError, TypeError, AttributeError, KeyError, stripe.SignatureVerificationError,
             CreditPurchase.DoesNotExist, RequestDataTooBig):
         return HttpResponse(status=400)

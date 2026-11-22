@@ -74,7 +74,7 @@ class AccountApiTests(AuthClientMixin, TestCase):
         self.assertNotEqual(user.password, PASSWORD)
         self.assertFalse(user.is_staff)
         self.assertFalse(user.is_superuser)
-        self.assertEqual(set(response.json()["user"]), {"id", "email", "nickname"})
+        self.assertEqual(set(response.json()["user"]), {"id", "email", "nickname", "plusEndsAt"})
         self.assertEqual(self.client.get("/api/auth/me/").json()["user"]["id"], user.pk)
         self.assertIn("private", response["Cache-Control"])
         self.assertIn("no-store", response["Cache-Control"])

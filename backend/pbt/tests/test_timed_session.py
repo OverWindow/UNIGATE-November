@@ -33,11 +33,9 @@ class TimedSessionTests(BankFixtures, TransactionTestCase):
 
     def test_reentry_ends_timed_attempt_and_keeps_saved_answers(self):
         for exam in self.exams:
-            for member in (False, True):
-                client = Client()
-                if member:
-                    client.force_login(self.user)
-                with self.subTest(format=exam.exam_format, section=exam.section, member=member):
+            for plus in (False, True):
+                client = self.member_client(plus)
+                with self.subTest(format=exam.exam_format, section=exam.section, plus=plus):
                     attempt, path = self.start(exam, client)
                     token = str(uuid.uuid4())
                     for _ in range(2):
@@ -111,7 +109,7 @@ class TimedSessionTests(BankFixtures, TransactionTestCase):
     def test_enter_validates_owner_format_csrf_and_payload_before_claiming(self):
         attempt, path = self.start(self.exam)
         token = str(uuid.uuid4())
-        self.assertEqual(self.enter(path, token, Client()).status_code, 404)
+        self.assertEqual(self.enter(path, token, Client()).status_code, 401)
         self.assertEqual(self.enter(path.replace("/pbt/", "/ibt/"), token).status_code, 404)
         strict = Client(enforce_csrf_checks=True)
         strict.cookies.update(self.client.cookies)

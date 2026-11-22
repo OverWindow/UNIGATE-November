@@ -75,12 +75,10 @@ class AnswerStorageTests(BankFixtures, TransactionTestCase):
     def test_only_answers_are_stored_and_all_questions_are_returned(self):
         for exam in self.exams:
             count = 50 if exam.exam_format == "pbt" else 30
-            for member in (False, True):
-                client = Client()
-                if member:
-                    client.force_login(self.user)
+            for plus in (False, True):
+                client = self.member_client(plus)
                 for mode in ("practice", "timed"):
-                    with self.subTest(format=exam.exam_format, section=exam.section, member=member, mode=mode):
+                    with self.subTest(format=exam.exam_format, section=exam.section, plus=plus, mode=mode):
                         attempt, path = self.start(exam, client, mode)
                         self.assertFalse(attempt.items.exists())
                         detail = client.get(path).json()
@@ -110,15 +108,12 @@ class AnswerStorageTests(BankFixtures, TransactionTestCase):
                         self.assertEqual(submitted["answeredCount"], 1)
                         self.assertEqual(attempt.items.count(), 1)
                         result = client.get(path + "result/")
-                        if member:
-                            self.assertEqual(submitted["score"], 2 if count == 50 else 3)
-                            questions = result.json()["items"]
-                            self.assertEqual(len(questions), count)
-                            self.assertFalse(questions[0]["isCorrect"])
-                            self.assertTrue(questions[-1]["isCorrect"])
-                            self.assertNotIn("_answerOnly", questions[-1])
-                        else:
-                            self.assertEqual(result.status_code, 403)
+                        self.assertEqual(submitted["score"], 2 if count == 50 else 3)
+                        questions = result.json()["items"]
+                        self.assertEqual(len(questions), count)
+                        self.assertFalse(questions[0]["isCorrect"])
+                        self.assertTrue(questions[-1]["isCorrect"])
+                        self.assertNotIn("_answerOnly", questions[-1])
                         self.assertEqual(attempt.items.count(), 1)
 
     def test_empty_submission_does_not_create_items(self):

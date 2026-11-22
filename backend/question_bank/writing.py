@@ -10,6 +10,7 @@ from django.utils.cache import patch_vary_headers
 
 from pbt.bank import media_url
 from accounts.models import CreditTransaction
+from accounts.plans import has_active_plan
 from writing.access import SET_COST, evaluation_usage, has_access
 from writing.models import Evaluation
 
@@ -60,9 +61,9 @@ def submitted_slots(user_id, set_ids):
     return history
 
 
-def summary(group, number, history, unlocked):
+def summary(group, number, history, unlocked, set_cost=SET_COST):
     return {"id": str(group.pk), "number": number, "questionCount": len(SLOTS),
-            "submittedSlots": history.get(group.pk, []), "unlocked": unlocked, "setCost": SET_COST}
+            "submittedSlots": history.get(group.pk, []), "unlocked": unlocked, "setCost": set_cost}
 
 
 def text(value):
@@ -139,13 +140,17 @@ def question(item):
 @available
 def sets(request):
     groups = list(complete_sets().only("set_id", "created_at"))
+    if not groups:
+        return response({"sets": []})
     user_id = request.user.pk if request.user.is_authenticated else None
     history = submitted_slots(user_id, [group.pk for group in groups])
     unlocked = set()
-    if user_id is not None:
+    paid = user_id is not None and has_active_plan(user_id)
+    if user_id is not None and not paid:
         unlocked = set(CreditTransaction.objects.filter(account_id=user_id, kind="unlock",
             set_id__in=[group.pk for group in groups]).values_list("set_id", flat=True))
-    return response({"sets": [summary(group, number, history, group.pk in unlocked) for number, group in enumerate(groups, 1)]})
+    return response({"sets": [summary(group, number, history, paid or group.pk in unlocked, 0 if paid else SET_COST)
+                              for number, group in enumerate(groups, 1)]})
 
 
 @require_GET
@@ -166,5 +171,5 @@ def detail(request, set_id):
         created_at=group.created_at, set_id__lt=group.pk,
     )).count() + 1
     history = submitted_slots(request.user.pk, [set_id])
-    return response({**summary(group, number, history, True), "questions": [question(item) for item in items],
+    return response({**summary(group, number, history, True, 0), "questions": [question(item) for item in items],
                      "evaluationUsage": evaluation_usage(request.user.pk, set_id)})

@@ -33,7 +33,13 @@ class FeedbackFixture:
         session["pbt_guest_id"] = str(self.guest_id)
         session.save()
         self.user = get_user_model().objects.create_user(username="feedback-member")
+        self.client.force_login(self.user)
         self.attempt = self.make_attempt()
+
+    def signed_in_reader(self, client=None):
+        client = client or Client()
+        client.force_login(get_user_model().objects.create_user(username=f"reader-{uuid.uuid4()}"))
+        return client
 
     def make_attempt(self, exam_format="pbt", user=None, status="submitted"):
         exam = Exam.objects.create(source_set_id=uuid.uuid4(), title="Synthetic exam", section="reading",
@@ -70,8 +76,8 @@ class FeedbackTests(FeedbackFixture, TestCase):
         for attempt in (self.attempt, self.make_attempt("ibt")):
             self.assertEqual(self.send(attempt).status_code, 202)
             token = send.call_args.args[2]
-            a = Client(enforce_csrf_checks=True, REMOTE_ADDR="192.0.2.10")
-            b = Client(enforce_csrf_checks=True, REMOTE_ADDR="192.0.2.10")
+            a = self.signed_in_reader(Client(enforce_csrf_checks=True, REMOTE_ADDR="192.0.2.10"))
+            b = self.signed_in_reader(Client(enforce_csrf_checks=True, REMOTE_ADDR="192.0.2.10"))
             a.defaults["HTTP_X_CSRFTOKEN"] = a.get("/api/csrf/").json()["csrfToken"]
             b.defaults["HTTP_X_CSRFTOKEN"] = b.get("/api/csrf/").json()["csrfToken"]
             self.assertEqual(self.verify("x" * 43, attempt, a).status_code, 400)
@@ -94,7 +100,7 @@ class FeedbackTests(FeedbackFixture, TestCase):
             another = self.make_attempt(attempt.exam_format)
             self.assertEqual(self.send(another, email="other@example.invalid").status_code, 429)
             self.assertFalse(ExamAttemptFeedback.objects.filter(attempt=another).exists())
-            b = Client(REMOTE_ADDR="192.0.2.10")
+            b = self.signed_in_reader(Client(REMOTE_ADDR="192.0.2.10"))
             other = self.make_attempt(attempt.exam_format)
             other.guest_id = uuid.uuid4()
             other.save(update_fields=["guest_id"])
@@ -124,7 +130,7 @@ class FeedbackTests(FeedbackFixture, TestCase):
             record_attempt(scope, "127.0.0.1", 100, 3600)
             RateLimit.objects.filter(scope=scope).update(attempts=100)
         self.assertEqual(self.send().status_code, 202)
-        self.assertEqual(self.verify(send.call_args.args[2], client=Client()).status_code, 200)
+        self.assertEqual(self.verify(send.call_args.args[2], client=self.signed_in_reader()).status_code, 200)
         self.assertEqual(list(RateLimit.objects.filter(scope__in=("result-peer", "result-access-peer"))
                               .values_list("attempts", flat=True)), [100, 100])
 
@@ -138,7 +144,8 @@ class FeedbackTests(FeedbackFixture, TestCase):
             self.assertNotIn(token, result.content.decode())
             self.assertEqual(ExamAttemptFeedback.objects.get(attempt=attempt).result_token_hash, token_hash(token))
             self.assertEqual(self.client.get(self.path(attempt) + "result/").status_code, 403)
-            reader = Client()
+            self.assertEqual(self.verify(token, attempt, Client()).status_code, 401)
+            reader = self.signed_in_reader()
             self.assertEqual(self.verify(token, attempt, reader).status_code, 200)
             body = reader.get(self.path(attempt) + "result/").json()
             self.assertEqual(body["score"], 2)
@@ -152,27 +159,23 @@ class FeedbackTests(FeedbackFixture, TestCase):
             wrong_format = "ibt" if attempt.exam_format == "pbt" else "pbt"
             self.assertEqual(reader.get(f"/api/{wrong_format}/attempts/{attempt.pk}/result/").status_code, 404)
 
-    def test_all_guest_payloads_hide_scores_and_answers_including_after_login(self):
-        for logged_in in (False, True):
-            if logged_in:
-                self.client.force_login(self.user)
-            bodies = [self.client.get(self.path()).json(),
-                      self.client.get("/api/pbt/attempts/").json()["attempts"][0],
-                      self.client.post(self.path() + "submit/").json(),
-                      self.client.put(self.path() + "answers/1/", {"selectedOption": 1}, content_type="application/json").json()["attempt"]]
-            for body in bodies:
-                self.assertIsNone(body["score"])
-                for secret in ("correctAnswer", "isCorrect", "SECRET EXPLANATION", "SECRET TRANSCRIPT"):
-                    self.assertNotIn(secret, json.dumps(body))
-            self.assertEqual(self.client.get(self.path() + "result/").status_code, 403)
+    def test_legacy_guest_payloads_hide_scores_and_answers_after_login(self):
+        bodies = [self.client.get(self.path()).json(),
+                  self.client.get("/api/pbt/attempts/").json()["attempts"][0],
+                  self.client.post(self.path() + "submit/").json(),
+                  self.client.put(self.path() + "answers/1/", {"selectedOption": 1}, content_type="application/json").json()["attempt"]]
+        for body in bodies:
+            self.assertIsNone(body["score"])
+            for secret in ("correctAnswer", "isCorrect", "SECRET EXPLANATION", "SECRET TRANSCRIPT"):
+                self.assertNotIn(secret, json.dumps(body))
+        self.assertEqual(self.client.get(self.path() + "result/").status_code, 403)
 
     def test_members_retain_results_and_other_owners_cannot_access(self):
         member = self.make_attempt(user=self.user)
-        self.assertEqual(self.client.get(self.path(member) + "result/").status_code, 404)
-        self.client.force_login(self.user)
+        self.assertEqual(self.signed_in_reader().get(self.path(member) + "result/").status_code, 404)
         self.assertEqual(self.client.get(self.path(member) + "result/").json()["score"], 2)
         self.assertEqual(self.send(member).status_code, 409)
-        self.assertEqual(Client().get(self.path() + "result/").status_code, 404)
+        self.assertEqual(Client().get(self.path() + "result/").status_code, 401)
 
     @patch("pbt.views.send_result_email")
     def test_required_inputs_invalid_types_and_conditional_fields_are_rejected(self, send):
@@ -235,7 +238,7 @@ class FeedbackTests(FeedbackFixture, TestCase):
         self.assertEqual(self.send().status_code, 429)
         another = self.make_attempt()
         self.assertEqual(self.send(another).status_code, 429)
-        other = Client()
+        other = self.signed_in_reader()
         session = other.session
         session["pbt_guest_id"] = str(uuid.uuid4())
         session.save()
@@ -259,7 +262,7 @@ class FeedbackTests(FeedbackFixture, TestCase):
         self.assertEqual(self.send(client=client).status_code, 403)
         self.assertEqual(self.verify("x" * 43, client=client).status_code, 403)
         self.assertEqual(self.client.get(self.path() + "result-email/").status_code, 405)
-        self.assertEqual(self.send(client=Client()).status_code, 404)
+        self.assertEqual(self.send(client=Client()).status_code, 401)
         self.assertEqual(self.send(self.make_attempt(status="in_progress")).status_code, 409)
         send.assert_not_called()
 

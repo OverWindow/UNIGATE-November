@@ -131,7 +131,6 @@ class SentenceOrderTests(BankFixtures, TransactionTestCase):
         self.assertEqual(self.client.post(path + "submit/").json()["submittedAt"], result["submittedAt"])
 
     def test_non_choice_order_is_wrong_and_guest_cannot_see_result(self):
-        self.client.logout()
         path = self.start("ibt")
         order = ["다", "가", "나", "라"]
         self.save(path, {"selectedOrder": order})
@@ -140,7 +139,7 @@ class SentenceOrderTests(BankFixtures, TransactionTestCase):
         self.assertEqual(item["selectedOrder"], order)
         self.assertNotIn("correctOrder", item)
         self.assertNotIn("isCorrect", item)
-        self.assertEqual(self.client.get(path + "result/").status_code, 403)
+        self.assertEqual(Client().get(path + "result/").status_code, 401)
         stored = Attempt.objects.get(pk=path.split("/")[-2]).items.get(position=13)
         self.assertFalse(stored.is_correct)
         self.assertEqual(stored.attempt.answered_count, 1)
@@ -155,7 +154,7 @@ class SentenceOrderTests(BankFixtures, TransactionTestCase):
             self.assertEqual(self.save(path, value).status_code, 400)
         self.assertEqual(self.save(path, {"selectedOrder": CORRECT}, position=1).status_code, 400)
         self.assertEqual(self.save(path, {"selectedOption": 2}, position=1).status_code, 200)
-        self.assertEqual(self.save(path, {"selectedOrder": CORRECT}, client=Client()).status_code, 404)
+        self.assertEqual(self.save(path, {"selectedOrder": CORRECT}, client=self.member_client(False)).status_code, 404)
         self.assertEqual(self.client.get(path).json()["items"][12]["selectedOrder"], CORRECT)
 
     def test_expiry_grades_last_saved_order_and_legacy_stays_multiple_choice(self):

@@ -5,6 +5,8 @@ from django.db import models
 
 
 CREDIT_PURCHASE_QUANTITY = 1000
+PLAN_BONUS = 400
+PLAN_AMOUNTS = {1: 9900, 3: 23900, 6: 43900}
 
 
 class GoogleIdentity(models.Model):
@@ -43,7 +45,7 @@ class CreditTransaction(models.Model):
     account = models.ForeignKey(CreditAccount, models.PROTECT)
     evaluation = models.ForeignKey("writing.Evaluation", models.PROTECT, null=True)
     set_id = models.UUIDField(null=True)
-    kind = models.CharField(max_length=10, choices=[("grant", "지급"), ("reserve", "예약"), ("capture", "차감"), ("release", "예약 해제"), ("welcome", "신규 가입 지급"), ("unlock", "세트 열람"), ("purchase", "유료 충전")])
+    kind = models.CharField(max_length=10, choices=[("grant", "지급"), ("reserve", "예약"), ("capture", "차감"), ("release", "예약 해제"), ("welcome", "신규 가입 지급"), ("unlock", "세트 열람"), ("purchase", "유료 충전"), ("plan_bonus", "플랜 지급")])
     amount = models.PositiveIntegerField()
     balance_after = models.PositiveBigIntegerField()
     reserved_after = models.PositiveBigIntegerField()
@@ -64,6 +66,7 @@ class CreditTransaction(models.Model):
                 | models.Q(kind="welcome", evaluation__isnull=True, actor__isnull=True, set_id__isnull=True, amount=100)
                 | models.Q(kind="unlock", evaluation__isnull=True, actor__isnull=True, set_id__isnull=False, amount=100)
                 | models.Q(kind="purchase", evaluation__isnull=True, actor__isnull=True, set_id__isnull=True, amount=CREDIT_PURCHASE_QUANTITY)
+                | models.Q(kind="plan_bonus", evaluation__isnull=True, actor__isnull=True, set_id__isnull=True, amount=PLAN_BONUS)
             ), name="credit_transaction_source"),
         ]
 
@@ -76,6 +79,9 @@ class CreditPurchase(models.Model):
     amount = models.PositiveIntegerField()
     currency = models.CharField(max_length=3, default="krw")
     credits = models.PositiveIntegerField(default=CREDIT_PURCHASE_QUANTITY)
+    plan_months = models.PositiveSmallIntegerField(null=True)
+    plan_starts_at = models.DateTimeField(null=True)
+    plan_ends_at = models.DateTimeField(null=True)
     status = models.CharField(max_length=10, default="pending", choices=[
         ("pending", "결제 대기"), ("fulfilled", "적립 완료"), ("expired", "만료"),
     ])
@@ -87,6 +93,14 @@ class CreditPurchase(models.Model):
         db_table = "credit_purchases"
         constraints = [
             models.UniqueConstraint(fields=["user", "attempt_id"], name="credit_purchase_attempt_unique"),
+            models.CheckConstraint(condition=(
+                models.Q(plan_months__isnull=True, plan_starts_at__isnull=True, plan_ends_at__isnull=True)
+                | (models.Q(plan_months__isnull=False, plan_months__in=list(PLAN_AMOUNTS), credits=PLAN_BONUS) & (
+                    models.Q(status="fulfilled", plan_starts_at__isnull=False, plan_ends_at__isnull=False,
+                             plan_ends_at__gt=models.F("plan_starts_at"))
+                    | models.Q(status__in=["pending", "expired"], plan_starts_at__isnull=True, plan_ends_at__isnull=True)
+                ))
+            ), name="credit_purchase_plan_period"),
             models.CheckConstraint(condition=(
                 models.Q(status="fulfilled", transaction__isnull=False, stripe_session_id__isnull=False)
                 | models.Q(status__in=["pending", "expired"], transaction__isnull=True)

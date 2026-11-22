@@ -14,6 +14,7 @@ from django.views.decorators.http import require_GET, require_POST, require_http
 
 from accounts.rate_limits import record_attempt, request_subject, RateLimitUnavailable
 from accounts.email_delivery import EmailDeliveryError
+from accounts.plans import has_active_plan
 from question_bank.models import QuestionSet
 from .bank import BankNotReady, load_question, load_set
 from .models import Attempt, AttemptItem, Exam, ExamAttemptFeedback
@@ -32,11 +33,37 @@ def response(data, status=200):
     return result
 
 
+class PlusRequired(Exception):
+    pass
+
+
+def published_exams(exam_format):
+    sources = QuestionSet.objects.filter(exam_format=exam_format).values("set_id")
+    return Exam.objects.filter(exam_format=exam_format, is_published=True, source_set_id__in=sources)
+
+
+def require_exam_access(user_id, exam):
+    if not exam.is_published:
+        raise Http404
+    section = Exam.objects.filter(exam_format=exam.exam_format, section=exam.section, is_published=True)
+    # With a single published set, saved answers need no bank lookup.
+    if not section.exclude(pk=exam.pk).exists() or has_active_plan(user_id):
+        return
+    # Removed sources and gaps in round numbers follow the same order as the catalog.
+    first_visible = published_exams(exam.exam_format).filter(section=exam.section).values_list("pk", flat=True).first()
+    if first_visible != exam.pk:
+        raise PlusRequired
+
+
 def available(view):
     @wraps(view)
-    def wrapped(*args, **kwargs):
+    def wrapped(request, *args, **kwargs):
         try:
-            return view(*args, **kwargs)
+            if not request.user.is_authenticated:
+                return response({"error": "login_required"}, 401)
+            return view(request, *args, **kwargs)
+        except PlusRequired:
+            return response({"error": "plus_required"}, 403)
         except BankNotReady:
             return response({"error": "exam_not_ready"}, 409)
         except (DatabaseError, RateLimitUnavailable):
@@ -62,30 +89,33 @@ def payload(request, fields, optional_fields=(), max_size=4096):
 @available
 def exams(request, exam_format="pbt"):
     config = EXAM_FORMATS[exam_format]
-    if not request.user.is_authenticated and not request.session.get("pbt_guest_id"):
-        request.session["pbt_guest_id"] = str(uuid.uuid4())
-    rows = list(Exam.objects.filter(exam_format=exam_format, is_published=True, source_set_id__in=QuestionSet.objects.filter(exam_format=exam_format).values("set_id")))
-    progress = {}
-    if request.user.is_authenticated:
-        progress = {e.pk: {mode: {"latestResult": None, "inProgressId": None}
-                          for mode in ("practice", "timed")} for e in rows}
-        with transaction.atomic():
-            owned = Attempt.objects.filter(user=request.user, exam_format=exam_format, exam_id__in=progress)
-            # Finalize expired tests before selecting results, including older history.
-            for attempt in owned.filter(status="in_progress", expires_at__lte=timezone.now()).select_for_update().order_by("-started_at"):
-                finalize(attempt)
-            latest = owned.filter(status="submitted").order_by("exam_id", "mode", "-submitted_at", "-started_at", "-id").distinct("exam_id", "mode")
-            for attempt in latest:
-                progress[attempt.exam_id][attempt.mode]["latestResult"] = {
-                    "id": str(attempt.pk), "score": attempt.score, "maxScore": 100,
-                    "submittedAt": attempt.submitted_at.isoformat(),
-                }
-            for attempt in owned.filter(status="in_progress"):
-                progress[attempt.exam_id][attempt.mode]["inProgressId"] = str(attempt.pk)
+    rows = list(published_exams(exam_format))
+    if not rows:
+        return response({"exams": []})
+    first_by_section = {}
+    for exam in rows:
+        first_by_section.setdefault(exam.section, exam.pk)
+    free_ids = set(first_by_section.values())
+    plus = has_active_plan(request.user.pk)
+    progress = {e.pk: {mode: {"latestResult": None, "inProgressId": None}
+                      for mode in ("practice", "timed")} for e in rows}
+    with transaction.atomic():
+        owned = Attempt.objects.filter(user=request.user, exam_format=exam_format, exam_id__in=progress)
+        # Finalize expired tests before selecting results, including older history.
+        for attempt in owned.filter(status="in_progress", expires_at__lte=timezone.now()).select_for_update().order_by("-started_at"):
+            finalize(attempt)
+        latest = owned.filter(status="submitted").order_by("exam_id", "mode", "-submitted_at", "-started_at", "-id").distinct("exam_id", "mode")
+        for attempt in latest:
+            progress[attempt.exam_id][attempt.mode]["latestResult"] = {
+                "id": str(attempt.pk), "score": attempt.score, "maxScore": 100,
+                "submittedAt": attempt.submitted_at.isoformat(),
+            }
+        for attempt in owned.filter(status="in_progress"):
+            progress[attempt.exam_id][attempt.mode]["inProgressId"] = str(attempt.pk)
     return response({"exams": [{"id": str(e.pk), "title": e.title, "section": e.section,
         "examFormat": e.exam_format, "round": e.display_order, "questionCount": config["question_count"],
         "durationSeconds": config["duration"][e.section], "maxScore": 100,
-        "guestAvailable": e.guest_slot is not None, "accessible": request.user.is_authenticated or e.guest_slot is not None,
+        "guestAvailable": False, "freeAvailable": e.pk in free_ids, "accessible": plus or e.pk in free_ids,
         "myProgress": progress.get(e.pk)}
         for e in rows]})
 
@@ -107,13 +137,10 @@ def attempts(request, exam_format="pbt"):
             raise ValueError
     except (ValueError, TypeError, AttributeError):
         return response({"error": "invalid_request"}, 400)
-    if not request.user.is_authenticated and not request.session.get("pbt_guest_id"):
-        request.session["pbt_guest_id"] = str(uuid.uuid4())
     with transaction.atomic():
         exam = get_object_or_404(Exam.objects.select_for_update(), pk=exam_id, exam_format=exam_format, is_published=True)
-        if not request.user.is_authenticated and exam.guest_slot is None:
-            return response({"error": "login_required"}, 403)
-        owner = {"user": request.user} if request.user.is_authenticated else {"guest_id": request.session["pbt_guest_id"], "user": None}
+        require_exam_access(request.user.pk, exam)
+        owner = {"user": request.user}
         active = Attempt.objects.filter(exam=exam, mode=data["mode"], status="in_progress", **owner)
         restart = None
         if restart_id is not None:
@@ -131,7 +158,7 @@ def attempts(request, exam_format="pbt"):
                 finalize(existing)
                 if existing.status == "in_progress":
                     return response(attempt_data(existing, request=request))
-        wait = record_attempt(f"{exam_format}_start", str(request.user.pk) if request.user.is_authenticated else request.session["pbt_guest_id"], limit=30, window=3600)
+        wait = record_attempt(f"{exam_format}_start", str(request.user.pk), limit=30, window=3600)
         if wait:
             result = response({"error": "rate_limited"}, 429)
             result["Retry-After"] = str(wait)
@@ -150,7 +177,11 @@ def attempts(request, exam_format="pbt"):
 
 
 def owned_attempt(request, attempt_id, exam_format):
-    return get_object_or_404(Attempt.objects.select_for_update().filter(owner_filter(request), exam_format=exam_format), pk=attempt_id)
+    attempt = get_object_or_404(Attempt.objects.select_for_update().filter(owner_filter(request), exam_format=exam_format), pk=attempt_id)
+    finalize(attempt)
+    if attempt.status == "in_progress":
+        require_exam_access(request.user.pk, attempt.exam)
+    return attempt
 
 
 @sensitive_variables("token")
@@ -174,7 +205,6 @@ def enter(request, attempt_id, exam_format="pbt"):
         return response({"error": "invalid_request"}, 400)
     with transaction.atomic():
         attempt = owned_attempt(request, attempt_id, exam_format)
-        finalize(attempt)
         if attempt.mode == "timed" and attempt.status == "in_progress":
             session_hash = token_hash(token)
             if attempt.timed_session_token_hash and not constant_time_compare(attempt.timed_session_token_hash, session_hash):
@@ -191,7 +221,6 @@ def enter(request, attempt_id, exam_format="pbt"):
 def detail(request, attempt_id, exam_format="pbt"):
     with transaction.atomic():
         attempt = owned_attempt(request, attempt_id, exam_format)
-        finalize(attempt)
         if attempt.mode == "timed" and attempt.status == "in_progress" and not same_timed_session(request, attempt):
             return response({"error": "attempt_session_required"}, 409)
         return response(attempt_data(attempt, include_items=True, request=request))
@@ -215,7 +244,6 @@ def answer(request, attempt_id, position, exam_format="pbt"):
         return response({"error": "invalid_request"}, 400)
     with transaction.atomic():
         attempt = owned_attempt(request, attempt_id, exam_format)
-        finalize(attempt)
         if attempt.status != "in_progress":
             return response({"error": "attempt_closed", "attempt": attempt_data(attempt, request=request)}, 409)
         if attempt.mode == "timed" and not same_timed_session(request, attempt):
@@ -293,7 +321,7 @@ def result_email(request, attempt_id, exam_format="pbt"):
     except ValidationError as exc:
         return response({"error": "validation_error", "fields": list(exc.message_dict)}, 400)
     with transaction.atomic():
-        attempt = owned_attempt(request, attempt_id, exam_format)
+        attempt = get_object_or_404(Attempt.objects.select_for_update().filter(owner_filter(request)), pk=attempt_id, exam_format=exam_format)
         finalize(attempt)
         if attempt.user_id is not None or attempt.status != "submitted":
             return response({"error": "feedback_not_available"}, 409)

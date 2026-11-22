@@ -78,11 +78,11 @@ def unlock(*, user_id, set_id):
     with evaluation_lock():
         expire_locked()
         account = locked_account(user_id)
+        if not complete_sets().filter(pk=set_id).exists():
+            raise EvaluationError("not_found", 404)
         if has_access(user_id, set_id):
             return {"setId": str(set_id), "unlocked": True, "chargedCredits": 0,
                     "credits": balance_data(account)}, False
-        if not complete_sets().filter(pk=set_id).exists():
-            raise EvaluationError("not_found", 404)
         items = list(WritingQuestion.objects.filter(set_id=set_id).order_by("type_slot"))
         if [item.type_slot for item in items] != list(QUESTION_PRICES):
             raise EvaluationError("question_unavailable", 503)

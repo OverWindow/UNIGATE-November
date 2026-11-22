@@ -40,7 +40,8 @@ class IbtTests(BankFixtures, TransactionTestCase):
                 self.assertEqual(row["examFormat"], exam_format)
                 self.assertEqual(row["questionCount"], count)
                 self.assertEqual(row["durationSeconds"], durations[row["section"]])
-                self.assertTrue(row["guestAvailable"])
+                self.assertFalse(row["guestAvailable"])
+                self.assertTrue(row["freeAvailable"])
         self.assertEqual(self.ibt_exam.guest_slot, self.exam.guest_slot)
 
     def test_cross_format_start_and_all_attempt_endpoints_are_rejected(self):
@@ -62,6 +63,80 @@ class IbtTests(BankFixtures, TransactionTestCase):
             history = self.client.get(f"/api/{exam_format}/attempts/").json()["attempts"]
             self.assertEqual(len(history), 1)
             self.assertEqual(history[0]["examFormat"], exam_format)
+
+    def test_free_uses_first_visible_set_and_plus_expiry_blocks_active_attempts(self):
+        paid_attempts = []
+        for exam_format in ("pbt", "ibt"):
+            base = f"/api/{exam_format}/"
+            first = list(Exam.objects.filter(exam_format=exam_format))
+            for exam in first:
+                exam.display_order = 4
+                exam.save(update_fields=["display_order"])
+                Exam.objects.create(source_set_id=uuid.uuid4(), exam_format=exam_format, section=exam.section,
+                                    display_order=1, title="Removed bank set", is_published=True)
+                later = Exam.objects.create(source_set_id=self.make_set(exam.section, exam_format).pk,
+                                            exam_format=exam_format, section=exam.section, display_order=5,
+                                            title="Plus set", is_published=True)
+                payload = {"examId": str(later.pk), "mode": "practice"}
+                blocked = self.client.post(base + "attempts/", payload, content_type="application/json")
+                self.assertEqual((blocked.status_code, blocked.json()["error"]), (403, "plus_required"))
+                paid_attempts.append((base, payload))
+                for _ in range(2):
+                    opened = self.client.post(base + "attempts/", {"examId": str(exam.pk), "mode": "practice"},
+                                              content_type="application/json")
+                    self.assertEqual(opened.status_code, 201)
+                    self.assertEqual(self.client.post(base + f"attempts/{opened.json()['id']}/submit/").status_code, 200)
+            rows = self.client.get(base + "exams/").json()["exams"]
+            self.assertEqual({r["id"] for r in rows if r["freeAvailable"]}, {str(e.pk) for e in first})
+            self.assertEqual([r["accessible"] for r in rows], [r["freeAvailable"] for r in rows])
+
+        purchase = self.activate_plus(self.user)
+        self.assertTrue(self.client.get("/api/auth/me/").json()["user"]["plusEndsAt"])
+        base, payload = paid_attempts[0]
+        completed = self.client.post(base + "attempts/", payload, content_type="application/json").json()["id"]
+        completed_path = base + f"attempts/{completed}/"
+        self.assertEqual(self.client.post(completed_path + "submit/").status_code, 200)
+        active = []
+        for base, payload in paid_attempts:
+            self.assertTrue(all(row["accessible"] for row in self.client.get(base + "exams/").json()["exams"]))
+            opened = self.client.post(base + "attempts/", payload, content_type="application/json")
+            self.assertEqual(opened.status_code, 201)
+            active.append((base, payload, opened.json()["id"]))
+
+        purchase.plan_ends_at = timezone.now() - timedelta(seconds=1)
+        purchase.save(update_fields=["plan_ends_at"])
+        self.assertIsNone(self.client.get("/api/auth/me/").json()["user"]["plusEndsAt"])
+        self.assertEqual(self.client.get(completed_path + "result/").status_code, 200)
+        for base, payload, attempt_id in active:
+            path = base + f"attempts/{attempt_id}/"
+            for method, route, data in (
+                ("post", base + "attempts/", {**payload, "restartAttemptId": attempt_id}),
+                ("post", path + "enter/", {"sessionToken": str(uuid.uuid4())}), ("get", path, {}),
+                ("put", path + "answers/1/", {"selectedOption": 2}), ("post", path + "submit/", {}),
+            ):
+                denied = getattr(self.client, method)(route, data, content_type="application/json")
+                self.assertEqual((denied.status_code, denied.json()["error"]), (403, "plus_required"))
+            self.assertEqual(Attempt.objects.get(pk=attempt_id).status, "in_progress")
+
+    def test_legacy_guest_cookie_never_grants_anonymous_exam_access(self):
+        client = Client()
+        session = client.session
+        guest_id = uuid.uuid4()
+        session["pbt_guest_id"] = str(guest_id)
+        session.save()
+        for exam in (self.exam, self.ibt_exam):
+            attempt = Attempt.objects.create(exam=exam, exam_format=exam.exam_format, section=exam.section,
+                title=exam.title, guest_id=guest_id, mode="practice", started_at=timezone.now())
+            base = f"/api/{exam.exam_format}/"
+            path = base + f"attempts/{attempt.pk}/"
+            for method, route in (
+                ("get", base + "exams/"), ("get", base + "attempts/"), ("post", base + "attempts/"),
+                ("get", path), ("post", path + "enter/"), ("put", path + "answers/1/"),
+                ("post", path + "submit/"), ("get", path + "result/"), ("post", path + "result-email/"),
+                ("post", base + "result-access/"),
+            ):
+                denied = getattr(client, method)(route, {}, content_type="application/json")
+                self.assertEqual((denied.status_code, denied.json()["error"]), (401, "login_required"))
 
     def test_ibt_snapshot_groups_images_and_private_answers(self):
         for exam, pair_start in ((self.ibt_exam, 23), (self.ibt_listen_exam, 15)):
@@ -131,12 +206,10 @@ class IbtTests(BankFixtures, TransactionTestCase):
             self.assertIsNone(row["myProgress"]["practice"]["latestResult"])
 
     def test_restart_keeps_ibt_score_and_creates_empty_attempt_for_each_mode(self):
-        for member in (False, True):
-            client = Client()
-            if member:
-                client.force_login(self.user)
+        for plus in (False, True):
+            client = self.member_client(plus)
             for mode in ("practice", "timed"):
-                with self.subTest(member=member, mode=mode):
+                with self.subTest(plus=plus, mode=mode):
                     original = self.start(mode=mode, client=client)
                     old = Attempt.objects.get(pk=original["id"])
                     for position in (1, 2):
@@ -150,10 +223,7 @@ class IbtTests(BankFixtures, TransactionTestCase):
                     self.assertEqual(old.answered_count, 2)
                     self.assertEqual(response.json()["answeredCount"], 0)
                     result = client.get(f"/api/ibt/attempts/{old.pk}/result/")
-                    if member:
-                        self.assertEqual(result.json()["score"], 7)
-                    else:
-                        self.assertEqual(result.status_code, 403)
+                    self.assertEqual(result.json()["score"], 7)
                     new = Attempt.objects.get(pk=response.json()["id"])
                     self.assertEqual(new.exam_format, "ibt")
                     self.assertEqual(new.items.count(), 0)
@@ -226,14 +296,14 @@ class IbtTests(BankFixtures, TransactionTestCase):
         self.ibt_exam.guest_slot = None
         self.ibt_exam.save()
         payload = {"examId": str(self.ibt_exam.pk), "mode": "practice"}
-        self.assertEqual(self.client.post("/api/ibt/attempts/", payload, content_type="application/json").status_code, 403)
+        self.assertEqual(Client().post("/api/ibt/attempts/", payload, content_type="application/json").status_code, 401)
         self.client.force_login(self.user)
         data = self.start()
         path = f"/api/ibt/attempts/{data['id']}/"
         other = Client()
         for method, suffix, body in (("get", "", None), ("get", "result/", None),
                                      ("post", "submit/", {}), ("put", "answers/1/", {"selectedOption": 2})):
-            self.assertEqual(getattr(other, method)(path + suffix, body, content_type="application/json").status_code, 404)
+            self.assertEqual(getattr(other, method)(path + suffix, body, content_type="application/json").status_code, 401)
         strict = Client(enforce_csrf_checks=True)
         for method, url in (("post", "/api/ibt/attempts/"), ("put", path + "answers/1/"), ("post", path + "submit/")):
             response = getattr(strict, method)(url, {}, content_type="application/json")

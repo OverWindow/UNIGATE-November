@@ -16,6 +16,8 @@ class FeedbackLanguageMigrationTests(TransactionTestCase):
         before = [("writing", "0001_initial")]
         after = [("writing", "0002_evaluation_feedback_language")]
         executor = MigrationExecutor(connection)
+        latest = executor.loader.graph.leaf_nodes()
+        self.addCleanup(lambda: MigrationExecutor(connection).migrate(latest))
         executor.migrate(before)
         try:
             LegacyEvaluation = executor.loader.project_state(before).apps.get_model("writing", "Evaluation")

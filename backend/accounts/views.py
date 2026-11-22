@@ -21,6 +21,7 @@ from surveys.models import SignupSurveyResponse
 from .forms import LoginForm, SignupForm, normalize_email, users_for_email
 from .google_identity import pending_flow
 from .models import GoogleIdentity
+from .plans import current_plan_end
 from .credits import welcome
 from .rate_limits import RateLimitUnavailable, check_limit, clear_login_failures, login_rate_limit_lock, record_attempt, request_subject
 from .email_delivery import EmailDeliveryError, send_verification_email
@@ -39,12 +40,12 @@ def api_response(data=None, status=200):
 
 
 def csrf_failure(request, reason=""):
-    if request.path.startswith(("/api/auth/", "/api/pbt/", "/api/ibt/", "/api/writing/", "/api/credits/")):
+    if request.path.startswith(("/api/auth/", "/api/pbt/", "/api/ibt/", "/api/writing/", "/api/credits/", "/api/plans/")):
         return api_response({"error": "csrf_failed"}, status=403)
     return default_csrf_failure(request, reason=reason)
 
 
-def read_payload(request, allowed_fields, *, object_fields=()):
+def read_payload(request, allowed_fields, *, object_fields=(), integer_fields=()):
     if request.content_type != "application/json":
         return None, api_response({"error": "unsupported_media_type"}, status=415)
     try:
@@ -57,7 +58,8 @@ def read_payload(request, allowed_fields, *, object_fields=()):
         return None, api_response({"error": "invalid_json"}, status=400)
     if not isinstance(data, dict) or set(data) - allowed_fields:
         return None, api_response({"error": "invalid_json"}, status=400)
-    if any(not isinstance(value, dict if key in object_fields else str) for key, value in data.items()):
+    field_types = dict.fromkeys(object_fields, dict) | dict.fromkeys(integer_fields, int)
+    if any(type(value) is not field_types.get(key, str) for key, value in data.items()):
         return None, api_response({"error": "invalid_json"}, status=400)
     return data, None
 
@@ -87,7 +89,7 @@ def rate_limit_errors(view):
 
 
 def user_data(user):
-    return {"id": user.pk, "email": user.email,
+    return {"id": user.pk, "email": user.email, "plusEndsAt": current_plan_end(user.pk),
             "nickname": user.first_name or user.get_username()}
 
 

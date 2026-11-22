@@ -2,6 +2,7 @@ from django.db.models import Count, Q
 from django.utils import timezone
 
 from accounts.models import CreditTransaction
+from accounts.plans import has_active_plan
 
 from .models import Evaluation
 
@@ -12,7 +13,8 @@ EVALUATION_LIMIT = 20
 
 
 def has_access(user_id, set_id):
-    return CreditTransaction.objects.filter(account_id=user_id, set_id=set_id, kind="unlock").exists()
+    return (has_active_plan(user_id)
+            or CreditTransaction.objects.filter(account_id=user_id, set_id=set_id, kind="unlock").exists())
 
 
 def evaluation_usage(user_id, set_id):
