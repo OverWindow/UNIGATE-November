@@ -1,8 +1,34 @@
 import type { Language } from "./landing-content";
 import type { CreditEntry } from "./writing/writing-api";
 
+export const billingEmail = "billing@unigate.kr";
+export const paymentHistoryContent = {
+  ko: {
+    back: "크레딧으로 돌아가기", receipts: "Stripe 영수증", empty: "아직 일회성 충전 결제가 없습니다.", refund: "전액 환불", contact: "고객 문의",
+    remaining: "잔여", held: "크레딧 보류 중", processing: "환불 처리 중", refunded: "전액 환불 완료",
+    confirming: "환불 접수 확인", error: "환불 상태를 확인하지 못했습니다. 내역을 다시 확인해 주세요.",
+    failed: "환불이 완료되지 않았습니다. 다시 시도하거나 결제 문의를 이용해 주세요.", subject: "TOPIQ 결제 문의",
+    confirm: (amount: string, credits: string) => `${amount} 전액을 환불하고 ${credits}크레딧을 회수할까요?`,
+  },
+  en: {
+    back: "Back to credits", receipts: "Stripe receipts", empty: "No one-time top-ups yet.", refund: "Full refund", contact: "Contact billing",
+    remaining: "Remaining", held: "Credits on hold", processing: "Refund processing", refunded: "Fully refunded",
+    confirming: "Check refund request", error: "Couldn’t confirm the refund status. Refresh your payment history.",
+    failed: "The refund did not complete. Try again or contact billing.", subject: "TOPIQ billing enquiry",
+    confirm: (amount: string, credits: string) => `Refund ${amount} in full and return ${credits} credits?`,
+  },
+  id: {
+    back: "Kembali ke kredit", receipts: "Kuitansi Stripe", empty: "Belum ada pembayaran isi ulang satu kali.", refund: "Pengembalian dana penuh", contact: "Hubungi layanan pembayaran",
+    remaining: "Sisa", held: "Kredit ditahan", processing: "Pengembalian dana diproses", refunded: "Dana dikembalikan penuh",
+    confirming: "Periksa permintaan", error: "Status pengembalian dana belum terkonfirmasi. Muat ulang riwayat pembayaran.",
+    failed: "Pengembalian dana belum selesai. Coba lagi atau hubungi layanan pembayaran.", subject: "Pertanyaan pembayaran TOPIQ",
+    confirm: (amount: string, credits: string) => `Kembalikan dana penuh ${amount} dan tarik ${credits} kredit?`,
+  },
+};
+
 interface Copy {
   title: string; available: string; balance: string; reserved: string; unit: string;
+  pendingRefund: (amount: string) => string;
   transactions: string; transactionNote: string; balanceAfter: string; reservedAfter: string;
   result: string; history: string; empty: string; loading: string; error: string; retry: string; refresh: string;
   loginRequired: string; previous: string; next: string; page: string;
@@ -16,6 +42,7 @@ export const creditsContent: Record<Language, Copy> = {
   ko: {
     title: "크레딧",
     available: "사용 가능", balance: "보유 크레딧", reserved: "보류", unit: "크레딧",
+    pendingRefund: amount => `환불로 차감할 크레딧이 ${amount}개 남았습니다. 새로 적립되거나 보류가 해제될 때 자동으로 차감됩니다.`,
     transactions: "크레딧 내역", transactionNote: "가입하면 100크레딧을 받습니다. Free와 Plus 모두 쓰기 세트를 처음 열 때 100크레딧을 사용합니다. 한 번 연 세트는 다시 열 수 있고, 문항당 AI 첨삭을 최대 20회 받을 수 있습니다.",
     balanceAfter: "남은 크레딧", reservedAfter: "보류 크레딧", result: "평가 보기", history: "내 평가 이력",
     empty: "아직 크레딧 내역이 없습니다.", loading: "크레딧 정보를 불러오는 중입니다.",
@@ -38,11 +65,12 @@ export const creditsContent: Record<Language, Copy> = {
       checkError: "결제 상태를 불러오지 못했습니다.", unavailable: "이 주문을 찾을 수 없습니다.",
       priceChanged: "충전 가격이 변경되었습니다. 새 가격을 확인한 뒤 결제를 진행해 주세요.",
     },
-    kinds: { grant: "지급", reserve: "보류", capture: "평가 사용", release: "보류 해제", welcome: "신규 가입 지급", unlock: "세트 열람", purchase: "유료 충전", plan_bonus: "플랜 지급" },
+    kinds: { grant: "지급", reserve: "보류", capture: "평가 사용", release: "보류 해제", welcome: "신규 가입 지급", unlock: "세트 열람", purchase: "유료 충전", plan_bonus: "플랜 지급", refund: "환불 차감", restore: "환불 복원" },
   },
   en: {
     title: "Credits",
     available: "Available", balance: "Total balance", reserved: "On hold", unit: "credits",
+    pendingRefund: amount => `${amount} credits are still due for a refund. They will be deducted as credits are added or released from hold.`,
     transactions: "Credit history", transactionNote: "Get 100 credits when you sign up. On both Free and Plus, 100 credits unlock a writing set. You can reopen it anytime and get up to 20 AI reviews per question.",
     balanceAfter: "Remaining credits", reservedAfter: "Credits on hold", result: "View evaluation", history: "My evaluations",
     empty: "No credit activity yet.", loading: "Loading your credits…",
@@ -65,11 +93,12 @@ export const creditsContent: Record<Language, Copy> = {
       checkError: "Couldn’t load the payment status.", unavailable: "Order not found.",
       priceChanged: "The price has changed. Review the new price before continuing.",
     },
-    kinds: { grant: "Granted", reserve: "On hold", capture: "Charged", release: "Released", welcome: "Signup bonus", unlock: "Set access", purchase: "Credit purchase", plan_bonus: "Plan bonus" },
+    kinds: { grant: "Granted", reserve: "On hold", capture: "Charged", release: "Released", welcome: "Signup bonus", unlock: "Set access", purchase: "Credit purchase", plan_bonus: "Plan bonus", refund: "Refund deduction", restore: "Refund reversal" },
   },
   id: {
     title: "Kredit",
     available: "Tersedia", balance: "Total saldo", reserved: "Ditahan", unit: "kredit",
+    pendingRefund: amount => `Masih ada ${amount} kredit yang perlu dipotong karena pengembalian dana. Kredit akan dipotong saat saldo bertambah atau kredit yang ditahan dilepas.`,
     transactions: "Riwayat kredit", transactionNote: "Dapatkan 100 kredit saat mendaftar. Pengguna Free dan Plus menggunakan 100 kredit untuk membuka satu paket menulis. Paket dapat dibuka kembali kapan saja dan mencakup hingga 20 ulasan AI per soal.",
     balanceAfter: "Sisa kredit", reservedAfter: "Kredit ditahan", result: "Lihat penilaian", history: "Riwayat penilaian saya",
     empty: "Belum ada riwayat kredit.", loading: "Memuat informasi kredit…",
@@ -92,6 +121,6 @@ export const creditsContent: Record<Language, Copy> = {
       checkError: "Status pembayaran tidak dapat dimuat.", unavailable: "Pesanan tidak ditemukan.",
       priceChanged: "Harga telah berubah. Periksa harga baru sebelum melanjutkan pembayaran.",
     },
-    kinds: { grant: "Diberikan", reserve: "Ditahan", capture: "Dipotong", release: "Dilepas", welcome: "Bonus pendaftaran", unlock: "Akses paket", purchase: "Pembelian kredit", plan_bonus: "Bonus paket" },
+    kinds: { grant: "Diberikan", reserve: "Ditahan", capture: "Dipotong", release: "Dilepas", welcome: "Bonus pendaftaran", unlock: "Akses paket", purchase: "Pembelian kredit", plan_bonus: "Bonus paket", refund: "Potongan pengembalian dana", restore: "Pemulihan kredit" },
   },
 };

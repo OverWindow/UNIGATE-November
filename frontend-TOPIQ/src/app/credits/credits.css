@@ -22,6 +22,11 @@
 .credits-purchase .card-issuer-notice { color: #854509; font-weight: 600; line-height: 1.5; }
 .credits-purchase > .card-issuer-notice { flex-basis: 100%; }
 .credits-history { margin-top: 40px; }
+.credits-order-list { margin: 0; padding: 0; list-style: none; border: 1px solid #dfe6f1; border-radius: 12px; background: #fff; }
+.credits-order-list li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 24px; }
+.credits-order-list li + li { border-top: 1px solid #e7ecf3; }
+.credits-order-list li > div { display: grid; gap: 4px; color: #52647e; font-size: 14px; }
+.credits-order-list strong { color: #233651; font-size: 20px; }
 .credits-history-heading { position: relative; display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
 .credits-history h2 { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -.02em; }
 .credits-info { display: inline-flex; }
@@ -35,13 +40,13 @@
 .credits-transactions li + li { border-top: 1px solid #e7ecf3; }
 .credits-transaction-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
 .credits-kind { padding: 5px 10px; border-radius: 6px; background: #eef2f8; color: #52647e; font-size: 13px; font-weight: 600; }
-.credits-kind-grant, .credits-kind-welcome, .credits-kind-purchase, .credits-kind-plan_bonus { background: #eaf5ef; color: #286143; }
-.credits-kind-capture, .credits-kind-unlock { background: #edf2fc; color: #315eb7; }
+.credits-kind-grant, .credits-kind-welcome, .credits-kind-purchase, .credits-kind-plan_bonus, .credits-kind-restore { background: #eaf5ef; color: #286143; }
+.credits-kind-capture, .credits-kind-unlock, .credits-kind-refund { background: #edf2fc; color: #315eb7; }
 .credits-transaction-heading time { color: #65728a; font-size: 13px; }
 .credits-amount { justify-self: end; font-size: 20px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .credits-amount span { font-size: 12px; font-weight: 500; }
-.credits-amount-grant, .credits-amount-welcome, .credits-amount-purchase, .credits-amount-plan_bonus { color: #286143; }
-.credits-amount-capture, .credits-amount-unlock { color: #315eb7; }
+.credits-amount-grant, .credits-amount-welcome, .credits-amount-purchase, .credits-amount-plan_bonus, .credits-amount-restore { color: #286143; }
+.credits-amount-capture, .credits-amount-unlock, .credits-amount-refund { color: #315eb7; }
 .credits-transaction-details { display: flex; flex-wrap: wrap; justify-self: center; gap: 4px 24px; margin: 0; font-size: 13px; color: #596a81; }
 .credits-transaction-details > div { display: flex; align-items: baseline; gap: 8px; }
 .credits-transaction-details dd { font-weight: 600; color: #334760; font-variant-numeric: tabular-nums; }

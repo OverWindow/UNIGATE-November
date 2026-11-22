@@ -33,7 +33,7 @@ TOPIQ는 Google Identity Services 팝업에서 받은 ID 토큰을 Django에서 
 | 6개월마다 | 43,900원 | `STRIPE_PLAN_PRICE_ID_6M` |
 
 - **Stripe 설정.** 샌드박스와 라이브 모드에서 각각 KRW 정액 반복 가격 3개를 생성합니다. 월 단위 간격을 각각 1·3·6으로 설정하고 새 Price ID를 위 환경변수에 지정합니다. 1,000크레딧 충전용 `STRIPE_PRICE_ID`는 일회성 가격을 사용합니다. 기본 고객 포털에서 결제 수단 변경, 청구서 조회, **현재 결제 기간 종료 시 구독 취소**를 활성화합니다. 포털의 상품·수량 변경은 끕니다. [Stripe 고객 포털 설정](https://docs.stripe.com/customer-management/configure-portal)
-- **웹훅.** 아래 로컬 CLI 명령과 운영 Workbench 엔드포인트에 동일한 다섯 이벤트를 등록합니다. Checkout 완료·만료는 결제창 상태를, `invoice.paid`는 해당 청구 기간의 권한을, 구독 변경·삭제는 갱신 상태를 반영합니다. 구독 첫 결제가 확인되면 첫 달 400크레딧을 즉시 지급합니다. 다음 결제가 실패하면 마지막으로 결제한 기간까지만 이용할 수 있습니다.
+- **웹훅.** 아래 로컬 CLI 명령과 운영 Workbench 엔드포인트에 동일한 이벤트를 등록합니다. Checkout 완료·만료는 결제창 상태를, `invoice.paid`는 해당 청구 기간의 권한을, 구독 변경·삭제는 갱신 상태를 반영합니다. 구독 첫 결제가 확인되면 첫 달 400크레딧을 즉시 지급합니다. 환불 이벤트는 해당 청구 회차의 크레딧을 정산합니다. 다음 결제가 실패하면 마지막으로 결제한 기간까지만 이용할 수 있습니다.
 - **월별 적립.** 이후 지급일은 각 결제 기간의 시작 일시를 한국 시간으로 보고 한 달씩 더해 계산합니다. 해당 날짜가 없는 달에는 말일을 적용합니다. 잔액·내역 조회 또는 크레딧 사용 시 지급일이 지난 달마다 400개를 한 번씩 기록합니다. 만료 후 돌아와도 이미 결제한 기간의 미지급분과 남은 잔액을 사용할 수 있습니다. 별도 워커나 정기 실행 명령은 필요하지 않습니다.
 - **API와 DB.** 기존 `GET /api/plans/`, `POST /api/plans/purchases/`, 청구 포털 및 웹훅 경로를 사용합니다. `accounts.0010_recurring_plus`가 `credit_purchases`에 구독 원주문의 Stripe ID(`stripe_subscription_id`), 갱신 상태(`subscription_state`), 결제 회차의 고유 청구서 ID(`stripe_invoice_id`)를 추가합니다. 이미 결제한 일회성 이용권은 기존 만료일까지 유효하며 만료 후 직접 구독할 수 있습니다.
 - **적용.** 개발에서는 사용자가 백엔드 설정 후 서버를 시작하기 전에 `backend/`에서 `.\.venv\Scripts\python.exe manage.py migrate`를 수동 실행합니다. 운영에서는 세 가격·포털·웹훅 설정을 마치고 백엔드와 TOPIQ를 배포합니다. 기존 `deploy/start.sh`가 Gunicorn 시작 전에 마이그레이션을 자동 적용합니다.
@@ -50,13 +50,15 @@ Checkout에 표시할 결제수단은 Stripe Dashboard에서 관리합니다. �
 | --- | --- | --- |
 | GET | `/api/credits/price/` | 로그인한 회원에게 현재 충전 가격(Price ID·금액·통화)과 적립량 제공 |
 | POST | `/api/credits/purchases/` | 로그인·CSRF 인증 후 구매 시도 ID와 화면에서 확인한 Price ID로 주문·결제 세션 생성 |
+| GET | `/api/credits/purchases/?page=1` | 본인의 적립 완료 일회성 충전 주문, 잔여 크레딧 및 환불 가능 상태 조회 |
+| POST | `/api/credits/purchases/<id>/refund/` | 로그인·CSRF 인증 후 해당 미사용 주문의 실결제액 전액 환불 또는 접수 확인 |
 | GET | `/api/credits/purchases/<id>/` | 로그인한 사용자의 주문 상태 조회 |
 | POST | `/api/credits/billing-portal/` | 로그인·CSRF 인증 후 본인 전용 Stripe 고객 포털 주소 발급. 고객 연결 전에는 `portalUrl: null` 반환 |
-| POST | `/api/payments/stripe/webhook/` | Django가 Stripe 서명을 확인하고 세션 완료·만료 처리 |
+| POST | `/api/payments/stripe/webhook/` | Django가 Stripe 서명을 확인하고 결제·구독·환불 이벤트 처리 |
 
 `backend/migration/accounts/`의 Django 마이그레이션이 결제 스키마를 관리합니다. `credit_purchases`에는 주문·회원·구매 시도(`id`, `user_id`, `attempt_id`), 주문 당시의 가격과 지급량(`stripe_price_id`, `amount`, `currency`, `credits`), 처리 상태와 생성 시각(`status`, `created_at`), Stripe 세션과 적립 내역(`stripe_session_id`, `transaction_id`)을 기록합니다. Django가 주문을 생성할 때 Stripe에서 읽은 금액을 저장하고, 적립 시 `credit_transactions.kind`에 유료 충전(`purchase`)을 기록합니다.
 
-**결제 내역.** Django는 첫 충전 시도에서 회원 전용 Stripe 고객을 만들고 기존 `credit_accounts` 테이블의 `stripe_customer_id`에 저장합니다(빈 값 허용, 고유). 새 Checkout에 같은 고객 ID를 지정하고 일회성 청구서 생성을 활성화합니다. 회원은 `/credits`의 **결제 내역** 버튼으로 본인 청구서를 열고 다시 TOPIQ로 돌아올 수 있습니다. 도입 전에 생성한 결제창의 충전은 기존 크레딧 내역에서 확인합니다. 일회성 결제 청구서에는 별도 발행 수수료가 적용됩니다. [Stripe 청구서 발행 요금](https://support.stripe.com/questions/pricing-for-post-payment-invoices-for-one-time-purchases-via-checkout-and-payment-links)
+**결제 내역.** `/credits`의 **결제 내역**에서 주문별 결제액과 남은 크레딧을 확인합니다. 유료 충전분을 실제 적립 시각이 빠른 주문부터 사용합니다. 한 주문의 크레딧이 모두 남아 있으면 **전액 환불**을 선택해 금액을 확인합니다. 일부 사용했거나 이전 기록만으로 사용량을 확인하기 어려우면 **고객 문의**로 주문번호가 포함된 메일을 `billing@unigate.kr`에 보낼 수 있습니다. **Stripe 영수증** 버튼은 기존 고객 포털의 청구서를 엽니다. 일회성 청구서에는 별도 발행 수수료가 적용됩니다. [Stripe 청구서 발행 요금](https://support.stripe.com/questions/pricing-for-post-payment-invoices-for-one-time-purchases-via-checkout-and-payment-links)
 
 **Stripe 포털 설정.** 테스트 전에 샌드박스에서, 배포 전에 라이브 모드에서 각각 기본 고객 포털의 **Invoice history**를 켜고 설정을 저장합니다. API가 회원별로 임시 포털 세션을 생성하므로 공개 로그인 링크를 만들 필요는 없습니다. 테스트와 운영은 각 Stripe 환경에 대응하는 별도 DB를 사용합니다. [고객 포털 설정](https://dashboard.stripe.com/settings/billing/portal)
 
@@ -67,7 +69,7 @@ Checkout에 표시할 결제수단은 Stripe Dashboard에서 관리합니다. �
 
    ```powershell
    stripe login
-   stripe listen --events checkout.session.completed,checkout.session.expired,invoice.paid,customer.subscription.updated,customer.subscription.deleted --forward-to http://localhost:8000/api/payments/stripe/webhook/
+   stripe listen --events checkout.session.completed,checkout.session.expired,invoice.paid,customer.subscription.updated,customer.subscription.deleted,refund.created,refund.updated,refund.failed --forward-to http://localhost:8000/api/payments/stripe/webhook/
    ```
 
 3. **패키지와 DB 적용.** 사용자가 `backend/`에서 개발 서버 시작 전에 아래 명령을 차례로 실행합니다. 첫 명령은 기존 의존성을 설치합니다. 두 번째 명령은 회원의 Stripe 고객 ID 컬럼을 추가하는 `accounts.0007_credit_account_stripe_customer`를 포함하여 미적용 DB 마이그레이션을 적용합니다.
@@ -79,13 +81,27 @@ Checkout에 표시할 결제수단은 Stripe Dashboard에서 관리합니다. �
    ```
 
 4. **확인.** 다른 터미널의 `frontend-TOPIQ/`에서 `npm run dev`를 실행합니다. `http://localhost:3001/credits`에서 로그인해 버튼과 Checkout에 같은 원화 금액이 표시되는지 확인합니다. 테스트 카드로 결제한 뒤 잔액과 거래 내역에 1,000크레딧이 한 번 반영되는지 확인합니다. [Stripe 테스트 카드](https://docs.stripe.com/testing)
-5. **결제 내역 확인.** 서로 다른 테스트 회원 두 명으로 각각 결제합니다. 각 회원의 **결제 내역** 버튼을 눌러 포털의 청구서 번호와 금액을 대조하고 TOPIQ로 돌아가는 링크가 `/credits`를 여는지 확인합니다. Stripe 고객 연결 전인 회원에게는 페이지 안에 안내가 표시됩니다.
+5. **결제 내역 확인.** 샌드박스에서 한 회원으로 두 번 충전한 뒤 쓰기 세트 하나를 처음 엽니다. 첫 주문은 **고객 문의**, 두 번째 주문은 **전액 환불**이 표시됩니다. 두 번째 주문을 환불하고 결제 금액과 회수한 수량을 대조합니다. 다른 회원으로 로그인해 첫 회원의 주문이 보이지 않는지 확인합니다.
 
-결제 회귀 테스트는 서비스 DB와 분리된 PostgreSQL 연결 설정에서 `backend/`의 `.\.venv\Scripts\python.exe manage.py test accounts.tests.test_credit_purchases --noinput`으로 실행합니다. Django가 테스트 DB를 만들고 삭제하며, 테스트용 Stripe 응답과 서명된 웹훅으로 주문 중복·동시 적립·실패 롤백을 검증합니다.
+로컬에서는 개발 서버를 다시 시작하기 전에 사용자가 `backend/`에서 `.\.venv\Scripts\python.exe manage.py migrate`를 수동 실행합니다. 운영에서는 기존 `deploy/start.sh`가 Gunicorn 시작 전에 자동 적용합니다. `accounts.0013_paid_credit_allocation`은 `credit_purchases`에 주문 잔여량(`remaining_credits`), 진행 중인 환불의 재시도 식별자(`refund_attempt_id`), 운영 확인 필요 여부(`refund_review_required`), 환불 실패 시 원래 지급처에 돌려줄 차감 내역(`refund_sources`)을 추가합니다. 기존 지갑·원장·Stripe 결제 금액은 보존하며, 원장과 잔액을 대조할 수 있는 주문의 잔여량을 복원합니다.
+
+환불을 접수하면 해당 주문의 크레딧을 보류합니다. 통신이 끊기면 결제 내역의 **환불 접수 확인**으로 같은 요청을 이어갑니다. Stripe가 처리를 확인한 주문은 **환불 처리 중**으로 표시하고, 결제 내역을 열어 두면 상태를 갱신합니다. 성공하면 크레딧을 회수하고, 실패·취소하면 보류를 해제합니다.
+
+결제 회귀 테스트는 서비스 DB와 분리된 PostgreSQL 연결 설정에서 `backend/`의 `.\.venv\Scripts\python.exe manage.py test accounts.tests.test_credit_purchases accounts.tests.test_credit_refunds --noinput`으로 실행합니다. Django가 테스트 DB를 만들고 삭제하며, 테스트용 Stripe 응답과 서명된 웹훅으로 중복 지급·차감, 동시 처리, 실패 복원과 월별 정산을 검증합니다.
+
+### Stripe 대시보드 환불
+
+운영자는 Stripe의 **Payments → 해당 결제 → Refund payment**에서 전액 또는 부분 환불합니다. TOPIQ는 성공한 환불액을 주문별로 합산하고, `지금까지 지급한 크레딧 × 누적 성공 환불액 ÷ 주문 당시 실결제액`의 정수 부분만큼 회수합니다. 여러 번 나눠 환불해도 누적 차감량은 같습니다. Plus는 해당 청구 회차의 월별 400크레딧에 적용하며, 이후 월 지급 시점에도 같은 비율을 반영합니다. 구독 해지·이용 기간은 기존 절차로 관리합니다. [Stripe 환불 안내](https://docs.stripe.com/refunds)
+
+예약 중인 크레딧은 보호합니다. 가용 잔액이 부족하면 나머지는 **차감 예정**으로 표시하고, 다음 적립 또는 예약 해제 시 오래된 주문부터 차감합니다. 성공 처리된 환불이 나중에 실패하면 실제로 초과 차감한 크레딧을 복원하고 예정분을 정정합니다. 회원은 `/credits`에서 **환불 차감**과 **환불 복원** 내역을 조회합니다. 기존 `GET /api/credits/`의 `pendingRefundCredits`는 예정 수량, `GET /api/credits/transactions/`의 `refund`와 `restore`는 실제 차감·복원 내역입니다.
+
+로컬에서는 개발 서버 시작 전에 사용자가 `backend/`에서 `.\.venv\Scripts\python.exe manage.py migrate`를 수동 실행합니다. `accounts.0012_credit_refunds`는 `credit_purchase_refunds`에 환불 ID·원주문·금액·통화·상태를 기록하고, `credit_purchases`에 결제 ID와 차감 예정 수량, `credit_transactions`에 환불 원주문 연결과 차감·복원 유형을 추가합니다. 이 마이그레이션 적용 시각부터 생성된 Stripe 환불이 대상입니다. 기존 주문은 Checkout 세션 또는 청구서로 대조합니다.
+
+샌드박스와 운영 각각에서 위 웹훅 수신 이벤트에 `refund.created`, `refund.updated`, `refund.failed`를 추가합니다. 샌드박스에서 1,000크레딧을 충전한 뒤 30%와 나머지 금액을 차례로 환불하고, 각 성공 알림 후 `/credits`를 새로고침해 **−300**, **−700**을 확인합니다. 웹훅 전달에 실패하면 원인을 해결하고 Workbench에서 재전송합니다. [Stripe 웹훅 재전송](https://docs.stripe.com/webhooks#manual-retries)
 
 ### 운영 적용
 
-사업자 국가·상품에 대한 Stripe 실결제 지원 여부와 환불 시 크레딧 회수 기준을 확인한 뒤 적용합니다. Stripe Workbench에서 **자체 계정의 스냅샷 웹훅**을 공개 Django HTTPS 주소의 `/api/payments/stripe/webhook/`로 등록하고 `checkout.session.completed`, `checkout.session.expired`, `invoice.paid`, `customer.subscription.updated`, `customer.subscription.deleted` 이벤트를 선택합니다. 백엔드에 운영용 `STRIPE_SECRET_KEY`, 운영 상품의 `STRIPE_PRICE_ID`, 해당 엔드포인트의 `STRIPE_WEBHOOK_SECRET`, 운영 TOPIQ 주소인 `TOPIQ_PUBLIC_URL`을 설정한 후 백엔드와 TOPIQ를 재배포합니다. 운영에서는 기존 `deploy/start.sh`가 migration 적용 후 Gunicorn을 실행합니다. 이후 금액만 변경할 때는 같은 상품에 새 KRW 가격을 만들고 백엔드의 `STRIPE_PRICE_ID`를 교체한 후 백엔드를 재시작합니다. [Stripe 웹훅 등록](https://docs.stripe.com/webhooks)
+사업자 국가·상품에 대한 Stripe 실결제 지원 여부를 확인한 뒤 적용합니다. Stripe Workbench에서 **자체 계정의 스냅샷 웹훅**을 공개 Django HTTPS 주소의 `/api/payments/stripe/webhook/`로 등록하고 위 로컬 CLI 명령의 결제·구독·환불 이벤트 8개를 선택합니다. 백엔드에 운영용 `STRIPE_SECRET_KEY`, 운영 상품의 `STRIPE_PRICE_ID`, 해당 엔드포인트의 `STRIPE_WEBHOOK_SECRET`, 운영 TOPIQ 주소인 `TOPIQ_PUBLIC_URL`을 설정한 후 백엔드와 TOPIQ를 재배포합니다. 운영에서는 기존 `deploy/start.sh`가 migration 적용 후 Gunicorn을 실행합니다. 이후 금액만 변경할 때는 같은 상품에 새 KRW 가격을 만들고 백엔드의 `STRIPE_PRICE_ID`를 교체한 후 백엔드를 재시작합니다. [Stripe 웹훅 등록](https://docs.stripe.com/webhooks)
 
 Stripe에서 결제는 성공했지만 적립 대기가 계속되면 Workbench에서 해당 세션의 `checkout.session.completed` 전달 결과를 확인합니다. 전송 실패 원인을 해결한 후 해당 이벤트를 재전송하면 Django가 같은 주문의 적립 여부를 확인하고 처리합니다.
 

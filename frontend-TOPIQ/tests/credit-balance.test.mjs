@@ -42,6 +42,7 @@ const { default: SiteHeader } = load("components/SiteHeader.tsx");
 imports["./PlanOffers"] = load("components/credits/PlanOffers.tsx");
 const { default: CreditPurchase } = load("components/credits/CreditPurchase.tsx");
 imports["./CreditPurchase"] = { default: CreditPurchase };
+imports["./PaymentHistory"] = load("components/credits/PaymentHistory.tsx");
 const { default: CreditsAccount } = load("components/credits/CreditsAccount.tsx");
 const { default: PlansAccount } = load("components/credits/PlansAccount.tsx");
 const { default: WritingCreditBadge } = load("components/writing/WritingCreditBadge.tsx");
@@ -261,14 +262,14 @@ function mountPurchaseButton() {
     const tree = CreditPurchase({ userId: 1, returnId: null, cancelled: false, onFulfilled: () => {} });
     const controls = React.Children.toArray(tree.props.children);
     click = controls.find(control => control.type === "button" && control.props.className === "button button-primary")?.props.onClick;
-    viewPayments = controls.find(control => control.props.children === "결제 내역").props.onClick;
+    viewPayments = controls.find(control => control.props.children === "Stripe 영수증").props.onClick;
     return tree;
   }
   const tree = mount(Purchase);
   return { ...tree, click, viewPayments };
 }
 
-test("payment history opens one portal from a double click even when pricing is unavailable", async () => {
+test("Stripe receipts open one portal from a double click even when pricing is unavailable", async () => {
   const redirects = [], posts = [];
   const portalUrl = "https://billing.stripe.com/p/session/test-portal";
   window.location = { assign: url => redirects.push(url) };
@@ -285,6 +286,36 @@ test("payment history opens one portal from a double click even when pricing is 
   assert.deepEqual(posts, [["/api/credits/billing-portal/", "POST", "synthetic", {}]]);
   assert.deepEqual(redirects, [portalUrl]);
   tree.unmount();
+});
+
+test("payment history opens the member's top-up orders even when pricing is unavailable", async () => {
+  const wallet = mount(CreditsAccount);
+  assert.match(wallet.html, /href="\/credits\?history=payments">결제 내역/);
+  wallet.unmount();
+  requests.length = 0;
+  search = new URLSearchParams({ history: "payments" });
+  const history = mount(CreditsAccount);
+  await setImmediate();
+  assert.deepEqual(requests, [{ url: "/api/credits/purchases/?page=1", method: "GET" }]);
+  history.unmount();
+});
+
+test("unused orders offer a full refund and used orders address billing with their order ID", () => {
+  const { PaymentRow } = imports["./PaymentHistory"];
+  const order = { id: crypto.randomUUID(), paidAt: "2026-11-21T12:00:00Z", credits: 1000, remainingCredits: 1000 };
+  function row(refundState, remainingCredits) {
+    return renderToStaticMarkup(React.createElement(PaymentRow, {
+      order: { ...order, refundState, remainingCredits }, amount: "₩4,900", disabled: false, onRefund() {},
+    }));
+  }
+  assert.match(row("eligible", 1000), /<button[^>]*>전액 환불<\/button>/);
+  const used = row("contact", 900);
+  assert.match(used, /mailto:billing@unigate\.kr\?subject=/);
+  assert.ok(used.includes(order.id));
+  assert.match(used, /고객 문의/);
+  assert.doesNotMatch(used, /<button/);
+  assert.match(row("processing", 1000), /환불 처리 중/);
+  assert.doesNotMatch(row("refunded", 0), /<button/);
 });
 
 test("resumed checkout displays the original amount and double clicks or retries keep its attempt and Price ID", async t => {

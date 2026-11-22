@@ -44,9 +44,18 @@ async function requestJson<T>(path: string, signal: AbortSignal, options: Reques
 
 export interface LearnerAnswer { a?: string; b?: string; text?: string }
 export interface EvaluationConfig { questionPrices: Record<number, number>; setCost: number; evaluationLimit: number; enabled: boolean; priceVersion: string; timeoutSeconds: number }
-export interface CreditBalance { balance: number; reserved: number; available: number }
-export interface CreditEntry { id: string; kind: "grant" | "reserve" | "capture" | "release" | "welcome" | "unlock" | "purchase" | "plan_bonus"; amount: number; evaluationId: string | null; setId: string | null; balanceAfter: number; reservedAfter: number; createdAt: string }
+export interface CreditBalance { balance: number; reserved: number; available: number; pendingRefundCredits?: number }
+export interface CreditEntry { id: string; kind: "grant" | "reserve" | "capture" | "release" | "welcome" | "unlock" | "purchase" | "plan_bonus" | "refund" | "restore"; amount: number; evaluationId: string | null; setId: string | null; balanceAfter: number; reservedAfter: number; createdAt: string }
 export interface CreditPurchaseStatus { id: string; status: "pending" | "fulfilled" | "expired" }
+export type RefundState = "eligible" | "contact" | "held" | "confirming" | "processing" | "refunded";
+export interface TopupOrder {
+  id: string; paidAt: string; amount: number; currency: string; credits: number;
+  remainingCredits: number | null; refundState: RefundState;
+}
+
+export function refundTopup(id: string, signal: AbortSignal) {
+  return postJson<{ refundState: RefundState }>(`/api/credits/purchases/${id}/refund/`, {}, signal);
+}
 export interface CreditPrice { priceId: string; amount: number; currency: "krw"; credits: number }
 export interface PlanOffer { months: number; priceId: string | null; amount: number; currency: "krw"; bonusCredits: number }
 export interface PlanAccount {

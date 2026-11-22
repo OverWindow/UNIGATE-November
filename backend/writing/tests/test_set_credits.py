@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from accounts.credits import grant
 from accounts.models import CreditAccount, CreditPurchase, CreditTransaction
+from accounts.tests.test_credit_purchases import AMOUNT, SESSION_ID, TEST_SETTINGS, post_webhook
 from writing import services
 from writing.access import evaluation_usage, has_access
 from writing.models import Evaluation
@@ -91,6 +92,43 @@ class SetCreditTests(TransactionTestCase):
         self.assertEqual(CreditAccount.objects.get(user=self.user).balance, 200)
         self.assertFalse(CreditTransaction.objects.filter(kind="unlock").exists())
         self.provider.assert_not_called()
+
+    @override_settings(**TEST_SETTINGS)
+    def test_simultaneous_set_unlock_and_refund_charge_each_credit_only_once(self):
+        order = CreditPurchase.objects.create(user=self.user, attempt_id=uuid.uuid4(), amount=AMOUNT, stripe_session_id=SESSION_ID)
+        self.assertEqual(post_webhook(self.client, order, payment_intent="pi_race").status_code, 200)
+        gate = Barrier(2, timeout=10)
+        clients = [Client(), Client()]
+        for client in clients:
+            client.force_login(self.user)
+
+        def post(client, path):
+            try:
+                gate.wait()
+                return client.post(path, {}, content_type="application/json")
+            finally:
+                connections.close_all()
+
+        def refund(params, options):
+            return SimpleNamespace(to_dict=lambda: dict(params, id="re_race", currency="krw", status="succeeded"))
+
+        with patch("accounts.payments.stripe.StripeClient") as stripe_client, ThreadPoolExecutor(max_workers=2) as pool:
+            api = stripe_client.return_value.v1
+            api.refunds.list.return_value.auto_paging_iter.return_value = []
+            api.refunds.create.side_effect = refund
+            spend = pool.submit(post, clients[0], self.path)
+            request = pool.submit(post, clients[1], f"/api/credits/purchases/{order.pk}/refund/")
+            self.assertEqual(spend.result().status_code, 201)
+            state = request.result().json()["refundState"]
+        order.refresh_from_db()
+        account = CreditAccount.objects.get(user=self.user)
+        self.assertEqual(account.reserved, 0)
+        if state == "refunded":
+            self.assertEqual((order.remaining_credits, account.balance), (0, 100))
+            api.refunds.create.assert_called_once()
+        else:
+            self.assertEqual((state, order.remaining_credits, account.balance), ("contact", 900, 1100))
+            api.refunds.create.assert_not_called()
 
     def test_spending_applies_earned_months_without_a_balance_read(self):
         account = CreditAccount.objects.get(user=self.user)

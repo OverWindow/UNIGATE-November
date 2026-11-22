@@ -241,7 +241,7 @@ class CreditPurchaseTests(TestCase):
         with patch("accounts.credits.timezone.now", return_value=renewal_end + timedelta(days=1)):
             entries = self.client.get("/api/credits/transactions/").json()["transactions"]
             self.assertEqual([row["amount"] for row in entries], [400] * 6)
-            self.assertEqual(self.client.get("/api/credits/").json(), {"balance": 2550, "reserved": 20, "available": 2530})
+            self.assertEqual(self.client.get("/api/credits/").json(), {"balance": 2550, "reserved": 20, "available": 2530, "pendingRefundCredits": 0})
             self.assertIsNone(self.client.get("/api/plans/").json()["currentPlanMonths"])
         self.assertEqual(list(CreditPurchase.objects.values_list("credited_months", flat=True)), [3, 3])
 

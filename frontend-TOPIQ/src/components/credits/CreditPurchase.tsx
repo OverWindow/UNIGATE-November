@@ -1,6 +1,7 @@
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
-import { creditsContent } from "@/lib/credits-content";
+import { creditsContent, paymentHistoryContent } from "@/lib/credits-content";
 import { plansContent } from "@/lib/plans-content";
 import { creditsRequest, openBillingPortal, startCreditPurchase, startPlanPurchase, WritingError, type CreditPrice, type CreditPurchaseStatus, type PlanAccount } from "@/lib/writing/writing-api";
 import PlanOffers from "./PlanOffers";
@@ -190,8 +191,9 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
     </> : price ? <button type="button" className="button button-primary" aria-describedby="credit-card-notice" disabled={blocked} onClick={() => void buy()}>
       {t.buy(price.credits.toLocaleString(language), price.amount.toLocaleString(language))}
     </button> : <p role="status">{t.priceLoading}</p>}
+    {!isPlan && <Link className="button credits-secondary" href="/credits?history=payments">{t.paymentHistory}</Link>}
     {(!isPlan || planAccount?.subscription) && <button type="button" className="button credits-secondary" disabled={opening} onClick={() => void viewPayments()}>
-      {isPlan ? p.manage : t.paymentHistory}
+      {isPlan ? p.manage : paymentHistoryContent[language].receipts}
     </button>}
     {portalNotice && <p role="status">{t.portal[portalNotice]}</p>}
     {notice && <p role="status">{notice === "planInUse" ? p.inUse : checkoutCopy[notice]}</p>}

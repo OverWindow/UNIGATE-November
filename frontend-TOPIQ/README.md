@@ -59,8 +59,7 @@ Next.js rewrite 제한은 180초입니다. 평가 요청은 서버가 알려 준
 예약과 예약 해제는 실제 차감과 구분하며, 새로고침 버튼으로 최신 상태를 조회합니다.
 로그아웃하거나 계정이 바뀌면 이전 계정의 화면 상태를 제거합니다. 로그인 전에는 로그인 안내를 표시합니다.
 
-기존 `GET /api/credits/`, `GET /api/credits/transactions/?page=1`을 재사용합니다.
-이 페이지 추가에 따른 신규 API·테이블·컬럼 변경·의존성·환경변수·추가 migration은 없습니다.
+잔액과 거래는 `GET /api/credits/`, `GET /api/credits/transactions/?page=1`로 조회합니다. **결제 내역**은 `GET /api/credits/purchases/?page=1`에서 주문별 결제액, 잔여량, 환불 상태를 불러옵니다. 미사용 주문은 확인 후 `POST /api/credits/purchases/<id>/refund/`로 전액 환불을 접수하고, 일부 사용한 주문은 주문번호를 담아 `billing@unigate.kr`로 문의합니다. 로컬 DB 적용 방법은 [루트 README](../README.md#stripe-대시보드-환불)를 참고하세요.
 프론트엔드 반영은 **frontend-TOPIQ/**에서 `npm run build` 후 운영 재배포하거나 개발 서버에서 확인합니다. DB를 변경하지 않는 수동 명령입니다.
 크레딧 API를 처음 설치하는 환경의 기존 migration과 관리자 지급 절차는 [루트 README](../README.md#평가와-크레딧)를 따릅니다.
 

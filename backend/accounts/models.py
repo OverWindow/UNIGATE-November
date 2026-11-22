@@ -46,7 +46,8 @@ class CreditTransaction(models.Model):
     account = models.ForeignKey(CreditAccount, models.PROTECT)
     evaluation = models.ForeignKey("writing.Evaluation", models.PROTECT, null=True)
     set_id = models.UUIDField(null=True)
-    kind = models.CharField(max_length=10, choices=[("grant", "지급"), ("reserve", "예약"), ("capture", "차감"), ("release", "예약 해제"), ("welcome", "신규 가입 지급"), ("unlock", "세트 열람"), ("purchase", "유료 충전"), ("plan_bonus", "플랜 지급")])
+    refund_purchase = models.ForeignKey("CreditPurchase", models.PROTECT, null=True, related_name="refund_entries")
+    kind = models.CharField(max_length=10, choices=[("grant", "지급"), ("reserve", "예약"), ("capture", "차감"), ("release", "예약 해제"), ("welcome", "신규 가입 지급"), ("unlock", "세트 열람"), ("purchase", "유료 충전"), ("plan_bonus", "플랜 지급"), ("refund", "환불 차감"), ("restore", "환불 복원")])
     amount = models.PositiveIntegerField()
     balance_after = models.PositiveBigIntegerField()
     reserved_after = models.PositiveBigIntegerField()
@@ -61,14 +62,16 @@ class CreditTransaction(models.Model):
             models.UniqueConstraint(fields=["evaluation", "kind"], name="credit_evaluation_event_unique"),
             models.UniqueConstraint(fields=["account", "set_id"], condition=models.Q(kind="unlock"), name="credit_set_unlock_unique"),
             models.UniqueConstraint(fields=["account"], condition=models.Q(kind="welcome"), name="credit_welcome_unique"),
-            models.CheckConstraint(condition=(
+            models.CheckConstraint(condition=(models.Q(refund_purchase__isnull=True) & (
                 models.Q(kind="grant", evaluation__isnull=True, actor__isnull=False, set_id__isnull=True)
                 | models.Q(kind__in=["reserve", "capture", "release"], evaluation__isnull=False, actor__isnull=True, set_id__isnull=True)
                 | models.Q(kind="welcome", evaluation__isnull=True, actor__isnull=True, set_id__isnull=True, amount=100)
                 | models.Q(kind="unlock", evaluation__isnull=True, actor__isnull=True, set_id__isnull=False, amount=100)
                 | models.Q(kind="purchase", evaluation__isnull=True, actor__isnull=True, set_id__isnull=True, amount=CREDIT_PURCHASE_QUANTITY)
                 | models.Q(kind="plan_bonus", evaluation__isnull=True, actor__isnull=True, set_id__isnull=True, amount=PLAN_BONUS)
-            ), name="credit_transaction_source"),
+            )) | models.Q(kind__in=["refund", "restore"], refund_purchase__isnull=False, amount__gt=0,
+                          evaluation__isnull=True, actor__isnull=True, set_id__isnull=True),
+                name="credit_transaction_source"),
         ]
 
 
@@ -88,6 +91,12 @@ class CreditPurchase(models.Model):
         ("pending", "결제 대기"), ("fulfilled", "적립 완료"), ("expired", "만료"),
     ])
     stripe_session_id = models.CharField(max_length=255, unique=True, null=True)
+    stripe_payment_intent_id = models.CharField(max_length=255, unique=True, null=True)
+    pending_refund_credits = models.PositiveIntegerField(default=0)
+    remaining_credits = models.PositiveIntegerField(null=True)
+    refund_attempt_id = models.UUIDField(null=True, editable=False)
+    refund_review_required = models.BooleanField(default=False)
+    refund_sources = models.JSONField(default=list, editable=False)
     stripe_subscription_id = models.CharField(max_length=255, unique=True, null=True)
     subscription_state = models.CharField(max_length=12, null=True)
     stripe_invoice_id = models.CharField(max_length=255, unique=True, null=True)
@@ -116,3 +125,14 @@ class CreditPurchase(models.Model):
                 | models.Q(status__in=["pending", "expired"], transaction__isnull=True)
             ), name="credit_purchase_fulfillment"),
         ]
+
+
+class CreditPurchaseRefund(models.Model):
+    stripe_refund_id = models.CharField(max_length=255, primary_key=True)
+    purchase = models.ForeignKey(CreditPurchase, models.PROTECT, related_name="refunds")
+    amount = models.PositiveIntegerField()
+    currency = models.CharField(max_length=3)
+    status = models.CharField(max_length=32)
+
+    class Meta:
+        db_table = "credit_purchase_refunds"

@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 
 from django.db import transaction
 
-from .credits import locked_account, record
+from .credits import locked_account, reconcile_purchase_refunds, record
 from .models import CreditPurchase
 
 
@@ -64,6 +64,7 @@ def apply_paid_invoice(invoice):
     receipt.plan_starts_at, receipt.plan_ends_at = start, end
     receipt.status = "fulfilled"
     receipt.save()
+    reconcile_purchase_refunds(account, receipt)
 
 
 @transaction.atomic

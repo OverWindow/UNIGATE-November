@@ -1,10 +1,11 @@
 from contextlib import contextmanager
 
 from django.db import connection, transaction
-from django.db.models import F
+from django.db.models import F, Q, Sum
 from django.utils import timezone
 
-from .models import CreditAccount, CreditTransaction
+from .credit_allocation import debit_sources, exclude_reservations, restore_sources
+from .models import CreditAccount, CreditPurchase, CreditTransaction
 from .plans import add_calendar_months, paid_plans
 
 
@@ -27,13 +28,88 @@ def locked_account(user_id):
     return CreditAccount.objects.select_for_update().get(user_id=user_id)
 
 
-def record(account, kind, amount, *, evaluation=None, actor=None, reason="", entry_id=None, set_id=None):
+def record(account, kind, amount, *, evaluation=None, actor=None, reason="", entry_id=None, set_id=None,
+           refund_purchase=None):
+    if kind in {"capture", "unlock", "refund", "restore"}:
+        allocate_transaction(account, kind, amount, refund_purchase)
     account.save(update_fields=["balance", "reserved", "updated_at"])
     fields = {"id": entry_id} if entry_id else {}
     return CreditTransaction.objects.create(
         **fields, account=account, evaluation=evaluation, kind=kind, amount=amount,
         balance_after=account.balance, reserved_after=account.reserved, actor=actor, reason=reason, set_id=set_id,
+        refund_purchase=refund_purchase,
     )
+
+
+def allocate_transaction(account, kind, amount, purchase):
+    if kind == "restore":
+        parts = restore_sources(amount, purchase.refund_sources)
+    else:
+        lots = CreditPurchase.objects.filter(user_id=account.pk, remaining_credits__gt=0).order_by(
+            "transaction__created_at", "pk").values_list("pk", "remaining_credits", "refund_attempt_id")
+        paid = {}
+        other_balance = account.balance + amount  # record() receives the post-debit wallet.
+        reserved = account.reserved
+        for order_id, remaining, hold in lots:
+            other_balance -= remaining
+            if hold is None:
+                paid[str(order_id)] = remaining
+            else:
+                reserved -= remaining
+        if kind != "capture":
+            other_balance -= exclude_reservations(paid, reserved)
+        parts = debit_sources(amount, paid, refund_order=str(purchase.pk) if purchase else None,
+                              other_balance=other_balance)
+        if purchase:
+            purchase.refund_sources.extend(parts)
+    for order_id, quantity in parts:
+        if order_id:
+            change = quantity if kind == "restore" else -quantity
+            CreditPurchase.objects.filter(pk=order_id).update(remaining_credits=F("remaining_credits") + change)
+    if purchase:
+        purchase.save(update_fields=["refund_sources"])
+
+
+def collect_pending_refunds(account, *, held_purchase=None):
+    # All wallet writers hold the same account lock. Never spend an evaluation reservation.
+    available = account.balance - account.reserved
+    if not available:
+        return
+    pending = CreditPurchase.objects.filter(user_id=account.pk, pending_refund_credits__gt=0).order_by("created_at", "pk")
+    if held_purchase:
+        pending = pending.alias(held=Q(pk=held_purchase)).order_by("-held", "created_at", "pk")
+    for purchase in pending:
+        amount = min(available, purchase.pending_refund_credits)
+        purchase.pending_refund_credits -= amount
+        purchase.save(update_fields=["pending_refund_credits"])
+        account.balance -= amount
+        record(account, "refund", amount, refund_purchase=purchase)
+        available -= amount
+        if not available:
+            break
+
+
+def reconcile_purchase_refunds(account, purchase, *, from_hold=False):
+    if purchase.status != "fulfilled":
+        return
+    if purchase.refunds.exists():
+        refunded = purchase.refunds.filter(status="succeeded").aggregate(total=Sum("amount", default=0))["total"]
+        if refunded > purchase.amount:
+            raise ValueError("Refunds exceed purchase amount")
+        # Legacy plans with no installment counter received a single bonus.
+        installments = purchase.credited_months if purchase.credited_months is not None else 1
+        target = purchase.credits * installments * refunded // purchase.amount
+        entries = purchase.refund_entries.aggregate(
+            debited=Sum("amount", filter=Q(kind="refund"), default=0),
+            restored=Sum("amount", filter=Q(kind="restore"), default=0),
+        )
+        difference = target - (entries["debited"] - entries["restored"])
+        purchase.pending_refund_credits = max(0, difference)
+        purchase.save(update_fields=["pending_refund_credits"])
+        if difference < 0:
+            account.balance -= difference
+            record(account, "restore", -difference, refund_purchase=purchase)
+    collect_pending_refunds(account, held_purchase=purchase.pk if from_hold else None)
 
 
 def due_plan_months(user_id, now):
@@ -67,6 +143,7 @@ def account_with_monthly_credits(user_id, *, for_update=False):
                 receipt.transaction = entry
         receipt.credited_months = months_due
         receipt.save(update_fields=["credited_months", "transaction"])
+        reconcile_purchase_refunds(account, receipt)
     return account
 
 
@@ -78,6 +155,7 @@ def welcome(user_id):
             return
         account.balance += 100
         record(account, "welcome", 100)
+        collect_pending_refunds(account)
 
 
 def settle(evaluation, *, success):
@@ -89,6 +167,8 @@ def settle(evaluation, *, success):
     if success:
         account.balance -= amount
     record(account, "capture" if success else "release", amount, evaluation=evaluation)
+    if not success:
+        collect_pending_refunds(account)
 
 
 def grant(*, user_id, amount, actor, reason, entry_id):
@@ -106,7 +186,9 @@ def grant(*, user_id, amount, actor, reason, entry_id):
         if account.balance + amount > 9_000_000_000_000:
             raise CreditError("balance_limit")
         account.balance += amount
-        return record(account, "grant", amount, actor=actor, reason=reason.strip(), entry_id=entry_id)
+        entry = record(account, "grant", amount, actor=actor, reason=reason.strip(), entry_id=entry_id)
+        collect_pending_refunds(account)
+        return entry
 
 
 def balance_data(account):

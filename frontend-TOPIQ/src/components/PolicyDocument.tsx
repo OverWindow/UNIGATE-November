@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { useApp } from "@/app/providers";
 import { authContent } from "@/lib/auth/auth-content";
+import { billingEmail } from "@/lib/credits-content";
 import type { Language } from "@/lib/landing-content";
 
 type PolicyCopy = {
@@ -13,7 +14,8 @@ type PolicyCopy = {
 };
 
 const draftLabel = { ko: "검토 중인 초안", en: "Draft for review", id: "Draf untuk ditinjau" };
-const contactLabel = { ko: "개인정보·탈퇴·결제·환불 문의", en: "Privacy, account closure, payments and refunds", id: "Kontak privasi, penutupan akun, pembayaran, dan pengembalian dana" };
+const contactLabel = { ko: "개인정보·탈퇴 문의", en: "Privacy and account closure", id: "Privasi dan penutupan akun" };
+const billingLabel = { ko: "결제·환불 문의", en: "Payments and refunds", id: "Pembayaran dan pengembalian dana" };
 const contactEmail = "overwindow@unigate.kr";
 
 export default function PolicyDocument({ kind, copy }: {
@@ -32,6 +34,7 @@ export default function PolicyDocument({ kind, copy }: {
       <div className="licenses-intro">
         <p>{document.intro}</p>
         <p>{contactLabel[language]} · <a href={`mailto:${contactEmail}`}>{contactEmail}</a></p>
+        <p>{billingLabel[language]} · <a href={`mailto:${billingEmail}`}>{billingEmail}</a></p>
       </div>
       <aside className="licenses-data" aria-labelledby="draft-title">
         <h2 id="draft-title">{draftLabel[language]}</h2>

@@ -4,11 +4,12 @@ from uuid import UUID
 
 from django.core.exceptions import RequestDataTooBig
 from django.db import DatabaseError
+from django.db.models import Sum
 from django.views.decorators.debug import sensitive_variables
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
 from accounts.credits import account_with_monthly_credits, balance_data
-from accounts.models import CreditTransaction
+from accounts.models import CreditAccount, CreditTransaction
 from accounts.rate_limits import RateLimitUnavailable, record_attempt
 from accounts.views import api_response
 from question_bank.writing import WritingUnavailable
@@ -128,8 +129,12 @@ def evaluation_detail(request, evaluation_id):
 @authenticated
 def credits(request):
     expire_for_user(request.user.pk)
-    account = account_with_monthly_credits(request.user.pk)
-    return api_response(balance_data(account))
+    account_with_monthly_credits(request.user.pk)
+    # One snapshot keeps the displayed balance and outstanding deductions consistent.
+    account = CreditAccount.objects.annotate(
+        pending=Sum("user__creditpurchase__pending_refund_credits", default=0),
+    ).get(pk=request.user.pk)
+    return api_response({**balance_data(account), "pendingRefundCredits": account.pending})
 
 
 @require_GET

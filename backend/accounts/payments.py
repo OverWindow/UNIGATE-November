@@ -10,11 +10,14 @@ from django.http import HttpResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.debug import sensitive_variables
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
-from .credits import locked_account, record
+from writing.services import expire_for_user
+
+from .credits import locked_account, reconcile_purchase_refunds, record
 from .models import CREDIT_PURCHASE_QUANTITY, PLAN_AMOUNTS, PLAN_BONUS, CreditAccount, CreditPurchase
 from .plans import assign_plan_period, current_plan, current_plan_end, open_subscription
+from .refunds import RefundOrderNotReady, apply_refund, refund_state, reserve_refund, reserved_orders, submit_refund, topups
 from .subscriptions import apply_paid_invoice, sync_subscription
 from .views import api_response, read_payload
 
@@ -248,6 +251,55 @@ def new_order(user_id, attempt_id, price, months, client):
     })
 
 
+@require_http_methods(["GET", "POST"])
+def credit_purchases(request):
+    if request.method == "POST":
+        return create_purchase(request)
+    if not request.user.is_authenticated:
+        return api_response({"error": "authentication_required"}, 401)
+    try:
+        page = int(request.GET.get("page", 1))
+        if not 1 <= page <= 10000:
+            raise ValueError
+    except ValueError:
+        return api_response({"error": "invalid_page"}, 400)
+    try:
+        expire_for_user(request.user.pk)
+        with transaction.atomic():
+            account = locked_account(request.user.pk)
+            reserved = reserved_orders(account)
+            query = topups(account.pk).select_related("transaction").prefetch_related("refunds").order_by("-transaction__created_at", "-pk")
+            rows = list(query[(page - 1) * 20:page * 20 + 1])
+            return api_response({"purchases": [{
+                "id": order.pk, "paidAt": order.transaction.created_at, "amount": order.amount,
+                "currency": order.currency, "credits": order.credits, "remainingCredits": order.remaining_credits,
+                "refundState": refund_state(order, account, reserved),
+            } for order in rows[:20]], "nextPage": page + 1 if len(rows) > 20 else None})
+    except DatabaseError:
+        return api_response({"error": "payments_unavailable"}, 503)
+
+
+@require_POST
+@sensitive_variables()
+def refund_purchase(request, purchase_id):
+    if not request.user.is_authenticated:
+        return api_response({"error": "authentication_required"}, 401)
+    _, error = read_payload(request, set())
+    if error is not None:
+        return error
+    try:
+        expire_for_user(request.user.pk)
+        api = stripe_client().v1
+        state, attempt = reserve_refund(request.user.pk, purchase_id, api)
+        if state == "confirming":
+            state = submit_refund(request.user.pk, purchase_id, attempt, api)
+    except CreditPurchase.DoesNotExist:
+        return api_response({"error": "not_found"}, 404)
+    except (PaymentsUnavailable, stripe.StripeError, DatabaseError, ValueError):
+        return api_response({"error": "refund_unavailable"}, 503)
+    return api_response({"refundState": state}, 202 if state == "processing" else 200)
+
+
 @require_POST
 @sensitive_variables()
 def create_purchase(request, plan=False):
@@ -341,7 +393,9 @@ def apply_checkout_event(event_type, session, event_created=None):
     purchase_id = (session.get("metadata") or {}).get("credit_purchase_id")
     if purchase_id is None:
         return 200  # Other products can share this Stripe account.
-    purchase = CreditPurchase.objects.select_for_update().get(pk=UUID(purchase_id))
+    purchase = CreditPurchase.objects.get(pk=UUID(purchase_id))
+    account = locked_account(purchase.user_id)
+    purchase = CreditPurchase.objects.select_for_update().get(pk=purchase.pk)
     if purchase.subscription_state:
         if (session["mode"] != "subscription" or not session.get("customer") or purchase.stripe_session_id not in (None, session["id"])
                 or not CreditAccount.objects.filter(user_id=purchase.user_id, stripe_customer_id=session["customer"]).exists()):
@@ -364,14 +418,21 @@ def apply_checkout_event(event_type, session, event_created=None):
             purchase.status = "expired"
             purchase.save(update_fields=["status"])
     elif session["payment_status"] == "paid" and session["status"] == "complete":
-        account = locked_account(purchase.user_id)
+        intent_id = session.get("payment_intent")
+        if purchase.stripe_payment_intent_id and purchase.stripe_payment_intent_id != intent_id:
+            return 400
+        purchase.stripe_payment_intent_id = intent_id
         if purchase.plan_months:
             assign_plan_period(purchase, datetime.fromtimestamp(event_created, UTC))
             purchase.credited_months = 1
         account.balance += purchase.credits
         purchase.transaction = record(account, "plan_bonus" if purchase.plan_months else "purchase", purchase.credits)
+        if purchase.plan_months is None:
+            purchase.remaining_credits = purchase.credits
         purchase.status = "fulfilled"
-        purchase.save(update_fields=["transaction", "status", "plan_starts_at", "plan_ends_at", "credited_months"])
+        purchase.save(update_fields=["transaction", "status", "plan_starts_at", "plan_ends_at", "credited_months",
+                                     "stripe_payment_intent_id", "remaining_credits"])
+        reconcile_purchase_refunds(account, purchase)
     return 200
 
 
@@ -390,11 +451,13 @@ def stripe_webhook(request):
             status = apply_checkout_event(event.type, event.data.object.to_dict(), getattr(event, "created", None))
         elif event.type == "invoice.paid":
             apply_paid_invoice(event.data.object.to_dict())
+        elif event.type in {"refund.created", "refund.updated", "refund.failed"}:
+            apply_refund(event.data.object.to_dict(), stripe_client().v1)
         elif event.type in {"customer.subscription.updated", "customer.subscription.deleted"}:
             sync_subscription(event.type, event.data.object.to_dict(), stripe_client)
     except (ValueError, TypeError, AttributeError, KeyError, stripe.SignatureVerificationError,
             CreditPurchase.DoesNotExist, RequestDataTooBig):
         return HttpResponse(status=400)
-    except (DatabaseError, PaymentsUnavailable, stripe.StripeError):
+    except (DatabaseError, PaymentsUnavailable, RefundOrderNotReady, stripe.StripeError):
         return HttpResponse(status=503)
     return HttpResponse(status=status)

@@ -1,6 +1,6 @@
 # TOPIQ 크레딧 충전과 Plus 구독 네트워크 흐름
 
-[크레딧 충전](#크레딧-충전) · [Plus 구독](#plus-구독) · [결제창 재시도와 키 충돌 복구](#결제창-재시도와-키-충돌-복구)
+[크레딧 충전](#크레딧-충전) · [Plus 구독](#plus-구독) · [결제창 재시도와 키 충돌 복구](#결제창-재시도와-키-충돌-복구) · [결제 유형별 환불·크레딧 차감 사례](stripe-credit-refund-cases.md) · [Stripe 환불 네트워크 흐름](stripe-credit-refund-flow.md)
 
 ## 크레딧 충전
 
@@ -51,6 +51,10 @@ sequenceDiagram
     end
 
     B->>N: 결제 내역 버튼 클릭
+    N->>D: GET /api/credits/purchases/?page=1
+    D-->>N: 회원의 일회성 주문과 환불 가능 상태
+    N-->>B: 미사용 주문 전액 환불 또는 고객 문의 표시
+    B->>N: Stripe 영수증 버튼 클릭
     N->>D: POST /api/credits/billing-portal/ (로그인 쿠키와 CSRF 토큰)
     D->>DB: 로그인한 회원의 Stripe 고객 ID 조회
     alt 고객 연결 완료

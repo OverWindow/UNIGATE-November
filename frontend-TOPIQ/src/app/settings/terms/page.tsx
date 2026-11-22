@@ -24,11 +24,11 @@ const copy = {
       ] },
       { title: "크레딧 구매와 사용", paragraphs: [
         "유료 크레딧 충전은 사업자등록 후 재개할 예정입니다. 충전 가능 여부, 보유량과 거래 내역은 계정 메뉴의 ‘크레딧’에서 확인할 수 있습니다. 충전을 중지한 기간에도 보유한 크레딧은 학습에 사용할 수 있습니다.",
-        "유료·무료 크레딧은 계정 탈퇴 시까지 사용할 수 있습니다. 유료 충전 재개 후 두 종류를 함께 보유하면 유료 크레딧부터 사용한다는 운영 방침입니다.",
+        "유료·무료 크레딧은 계정 탈퇴 시까지 사용할 수 있습니다. 일회성 유료 충전분을 먼저 사용하며, 여러 번 충전한 경우 먼저 적립된 주문부터 차감합니다.",
         "Free와 Plus 회원 모두 쓰기 세트를 처음 열 때 100크레딧을 사용합니다. 해제한 세트는 같은 계정에서 다시 열 수 있으며, 문항당 최대 20회의 쓰기 평가는 추가 차감 없이 이용할 수 있습니다.",
       ] },
       { title: "청약철회와 환불", paragraphs: [
-        "구매한 유료 크레딧을 전혀 사용하지 않았다면 전액 환불하며, 일부를 사용했다면 남은 유료분이 부분 환불 대상입니다. 무료로 지급한 크레딧은 현금 환불 대상에서 제외됩니다. 환불, 중복 결제, 결제 후 미적립 문의는 위 문의 이메일로 접수합니다.",
+        "일회성 충전 주문의 크레딧이 모두 남아 있으면 크레딧 페이지의 결제 내역에서 해당 주문을 전액 환불할 수 있습니다. 일부를 사용했다면 남은 유료분의 부분 환불은 해당 주문의 고객 문의로 신청해 주세요. 중복 결제와 미적립은 결제·환불 문의 이메일로 접수합니다. 무료 크레딧은 현금 환불 대상에서 제외됩니다.",
         "국내 전자상거래법이 적용되는 구매는 원칙적으로 계약 내용을 서면으로 받은 날부터 7일 이내에 청약철회를 요청할 수 있습니다. 서비스 공급이 더 늦게 시작된 경우에는 그 시작일부터 계산합니다.",
         "디지털콘텐츠 제공이 시작되고 법정 고지 등 요건을 갖춘 경우 철회가 제한될 수 있습니다. 나누어 제공할 수 있는 콘텐츠 중 아직 공급하지 않은 부분에는 철회권이 적용됩니다. 결제가 중복되거나 구매 내용과 다른 서비스를 받은 경우 결제 내역을 근거로 정정 또는 환불을 요청할 수 있습니다.",
       ], link: { href: withdrawalLaw, label: "전자상거래법 제17조의 청약철회 기준" } },
@@ -57,11 +57,11 @@ const copy = {
       ] },
       { title: "Buying and using credits", paragraphs: [
         "TOPIQ plans to reopen paid credit top-ups after business registration. Open Credits in the account menu to check top-up availability, balances and transaction history. You can use your existing credits for learning while top-ups are paused.",
-        "Purchased and free credits can be used until account closure. TOPIQ’s policy when top-ups reopen is to spend paid credits first when both types are available.",
+        "Purchased and free credits can be used until account closure. Credits from one-time top-ups are spent first, starting with the oldest credited order.",
         "On both Free and Plus, it costs 100 credits to unlock a writing set. You can reopen it with the same account and get up to 20 evaluations per question at no additional credit cost.",
       ] },
       { title: "Withdrawal and refunds", paragraphs: [
-        "A purchase of entirely unused paid credits is eligible for a full refund. If some have been used, the remaining paid credits are eligible for a partial refund. Free credits have no cash refund value. Use the contact email above to request a refund or report a duplicate charge or a purchase that was not credited.",
+        "Open Payment history on the Credits page to refund an entirely unused one-time top-up in full. If some credits have been used, select Contact billing on that order to request a partial refund for the remaining paid credits. For duplicate charges or missing credits, use the payments and refunds email above. Free credits have no cash refund value.",
         "For purchases covered by Korean e-commerce law, you generally have seven days from receiving the written contract details to withdraw. If supply starts later, the period runs from the start of supply.",
         "Withdrawal may be limited for digital content already supplied when statutory conditions, including notice, are met. The right to withdraw still applies to any undelivered, separable portion. If you were charged twice or received something different from your purchase, you may request a correction or refund using your payment record.",
       ], link: { href: withdrawalLaw, label: "Withdrawal rights under Article 17 of Korean e-commerce law (Korean)" } },
@@ -90,11 +90,11 @@ const copy = {
       ] },
       { title: "Pembelian dan penggunaan kredit", paragraphs: [
         "TOPIQ berencana membuka kembali pembelian kredit setelah usaha terdaftar. Buka Kredit di menu akun untuk melihat ketersediaan isi ulang, saldo, dan riwayat transaksi. Selama isi ulang dihentikan sementara, kredit yang sudah tersedia tetap dapat digunakan untuk belajar.",
-        "Kredit berbayar dan gratis dapat digunakan hingga akun ditutup. Setelah isi ulang dibuka kembali, kebijakan TOPIQ adalah menggunakan kredit berbayar terlebih dahulu jika kedua jenis kredit tersedia.",
+        "Kredit berbayar dan gratis dapat digunakan hingga akun ditutup. Kredit dari isi ulang satu kali digunakan terlebih dahulu, mulai dari pesanan yang paling awal dikreditkan.",
         "Pengguna Free dan Plus menggunakan 100 kredit untuk membuka satu set menulis. Kamu dapat membukanya kembali dengan akun yang sama dan mendapat hingga 20 evaluasi per soal tanpa potongan kredit tambahan.",
       ] },
       { title: "Pembatalan pembelian dan pengembalian dana", paragraphs: [
-        "Pembelian kredit berbayar yang belum digunakan sama sekali dapat dikembalikan dananya secara penuh. Jika sebagian telah digunakan, sisa kredit berbayar dapat diajukan untuk pengembalian dana sebagian. Kredit gratis tidak dapat diuangkan. Hubungi email di atas untuk mengajukan pengembalian dana atau melaporkan tagihan ganda atau kredit yang belum masuk.",
+        "Buka Riwayat pembayaran pada halaman Kredit untuk meminta pengembalian dana penuh atas isi ulang satu kali yang belum digunakan. Jika sebagian kredit telah digunakan, pilih Hubungi layanan pembayaran pada pesanan untuk meminta pengembalian dana sebagian atas sisa kredit berbayar. Untuk tagihan ganda atau kredit yang belum masuk, gunakan email pembayaran dan pengembalian dana di atas. Kredit gratis tidak dapat diuangkan.",
         "Untuk pembelian yang tunduk pada hukum perdagangan elektronik Korea, kamu umumnya dapat membatalkan pembelian dalam tujuh hari sejak menerima rincian kontrak secara tertulis. Jika layanan mulai diberikan lebih lambat, jangka waktu dihitung sejak layanan mulai diberikan.",
         "Hak pembatalan dapat dibatasi untuk konten digital yang mulai diberikan jika persyaratan hukum, termasuk pemberitahuan, terpenuhi. Hak ini tetap berlaku untuk bagian yang dapat dipisahkan dan belum diberikan. Jika terjadi tagihan ganda atau layanan berbeda dari yang dibeli, kamu dapat meminta koreksi atau pengembalian dana berdasarkan bukti pembayaran.",
       ], link: { href: withdrawalLaw, label: "Hak pembatalan menurut Pasal 17 hukum perdagangan elektronik Korea (bahasa Korea)" } },

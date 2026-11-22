@@ -394,7 +394,7 @@ class EvaluationTests(TransactionTestCase):
         with patch.object(services, "evaluation_lock", wait_for_both_readers), ThreadPoolExecutor(max_workers=2) as pool:
             balance, ledger = pool.map(read, ("/api/credits/", "/api/credits/transactions/"))
         self.assertEqual((balance.status_code, ledger.status_code), (200, 200))
-        self.assertEqual(balance.json(), {"balance": 10, "reserved": 0, "available": 10})
+        self.assertEqual(balance.json(), {"balance": 10, "reserved": 0, "available": 10, "pendingRefundCredits": 0})
         releases = [row for row in ledger.json()["transactions"] if row["kind"] == "release"]
         self.assertEqual(len(releases), 1)
         self.assertEqual((releases[0]["evaluationId"], releases[0]["amount"], releases[0]["reservedAfter"]),
@@ -418,7 +418,7 @@ class EvaluationTests(TransactionTestCase):
         self.assertEqual(services.evaluation_usage(self.user.pk, self.set_id)["51"]["pending"], 1)
         self.assertFalse(CreditTransaction.objects.filter(kind="capture").exists())
         Evaluation.objects.update(expires_at=timezone.now() - timedelta(seconds=1))
-        self.assertEqual(self.client.get("/api/credits/").json(), {"balance": 10, "reserved": 0, "available": 10})
+        self.assertEqual(self.client.get("/api/credits/").json(), {"balance": 10, "reserved": 0, "available": 10, "pendingRefundCredits": 0})
 
     def test_concurrent_duplicate_and_global_busy_limit(self):
         entered, release = Event(), Event()
