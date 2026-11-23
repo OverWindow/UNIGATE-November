@@ -33,6 +33,19 @@
 .credits-order-list li + li { border-top: 1px solid #e7ecf3; }
 .credits-order-list li > div { display: grid; gap: 4px; color: #52647e; font-size: 14px; }
 .credits-order-list strong { color: #233651; font-size: 20px; }
+.billing-contact-dialog { width: min(480px, calc(100% - 32px)); max-height: calc(100dvh - 32px); margin: auto; padding: clamp(20px, 4vw, 32px); overflow: auto; overscroll-behavior: contain; border: 1px solid #dfe6f1; border-radius: 18px; background: white; color: #233651; box-shadow: 0 20px 60px #14233d33; }
+.billing-contact-dialog::backdrop { background: #14233d80; }
+.billing-contact-dialog h2 { margin-bottom: 12px; font-size: 22px; font-weight: 650; }
+.billing-contact-dialog p { font-size: 14px; line-height: 1.65; }
+.billing-contact-dialog dl { display: grid; gap: 16px; margin: 20px 0 12px; padding: 16px; border-radius: 12px; background: #f4f7fc; }
+.billing-contact-dialog dt { color: #52647e; font-size: 13px; }
+.billing-contact-dialog dd { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.billing-contact-value { overflow-wrap: anywhere; font-weight: 600; user-select: all; }
+.billing-contact-value:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.billing-contact-dialog dd .button { min-height: 44px; padding: 8px 14px; }
+.billing-contact-copy-help { margin-bottom: 12px; color: #854509; }
+.billing-contact-example { color: #52647e; }
+.billing-contact-dialog > .button { display: flex; margin: 20px 0 0 auto; }
 .credits-history-heading { position: relative; display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
 .credits-history h2 { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -.02em; }
 .credits-info { display: inline-flex; }

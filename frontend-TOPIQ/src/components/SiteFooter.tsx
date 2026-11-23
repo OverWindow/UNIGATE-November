@@ -30,6 +30,7 @@ export default function SiteFooter() {
         <div className="footer-bottom">
           <span>© 2026 UNIGATE. All rights reserved.</span>
           <ul className="footer-document-links">
+            <li><Link href={localizedPath("/settings", language)}>{t.footer.settings}</Link></li>
             <li><Link href={localizedPath("/privacy", language)}><strong>{privacy}</strong></Link></li>
             <li><Link href={localizedPath("/terms", language)}>{terms}</Link></li>
             <li><Link href={localizedPath("/open-source-licenses", language)}>{t.footer.licenses}</Link></li>

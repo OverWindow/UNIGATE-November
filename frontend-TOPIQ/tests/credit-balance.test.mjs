@@ -42,6 +42,7 @@ const { default: SiteHeader } = load("components/SiteHeader.tsx");
 imports["./PlanOffers"] = load("components/credits/PlanOffers.tsx");
 const { default: CreditPurchase } = load("components/credits/CreditPurchase.tsx");
 imports["./CreditPurchase"] = { default: CreditPurchase };
+imports["./BillingContactDialog"] = load("components/credits/BillingContactDialog.tsx");
 imports["./PaymentHistory"] = load("components/credits/PaymentHistory.tsx");
 const { default: CreditsAccount } = load("components/credits/CreditsAccount.tsx");
 const { default: PlansAccount } = load("components/credits/PlansAccount.tsx");
@@ -282,22 +283,43 @@ test("payment history remains available by URL without a wallet button", async (
   history.unmount();
 });
 
-test("unused orders offer a full refund and used orders address billing with their order ID", () => {
+test("unused orders offer a full refund and each contact button selects its own order", () => {
   const { PaymentRow } = imports["./PaymentHistory"];
   const order = { id: crypto.randomUUID(), paidAt: "2026-11-21T12:00:00Z", credits: 1000, remainingCredits: 1000 };
   function row(refundState, remainingCredits) {
     return renderToStaticMarkup(React.createElement(PaymentRow, {
-      order: { ...order, refundState, remainingCredits }, amount: "₩4,900", disabled: false, onRefund() {},
+      order: { ...order, refundState, remainingCredits }, amount: "₩4,900", disabled: false, onRefund() {}, onContact() {},
     }));
   }
   assert.match(row("eligible", 1000), /<button[^>]*>전액 환불<\/button>/);
   const used = row("contact", 900);
-  assert.match(used, /mailto:billing@unigate\.kr\?subject=/);
-  assert.ok(used.includes(order.id));
-  assert.match(used, /고객 문의/);
-  assert.doesNotMatch(used, /<button/);
+  assert.match(used, /<button[^>]*aria-haspopup="dialog"[^>]*>고객 문의<\/button>/);
+  assert.doesNotMatch(used, /mailto:/);
+  const selected = [];
+  const orderIds = [order.id, crypto.randomUUID()];
+  for (const id of orderIds) {
+    const rendered = PaymentRow({ order: { ...order, id, refundState: "contact" }, disabled: false, amount: "₩4,900",
+      onRefund: () => assert.fail("contact must not issue a refund"), onContact: orderId => selected.push(orderId) });
+    React.Children.toArray(rendered.props.children).find(child => child.type === "button").props.onClick();
+  }
+  assert.deepEqual(selected, orderIds);
   assert.match(row("processing", 1000), /환불 처리 중/);
   assert.doesNotMatch(row("refunded", 0), /<button/);
+});
+
+test("the billing dialog shows selectable order details and email instructions in each supported language", () => {
+  const { default: BillingContactDialog } = imports["./BillingContactDialog"];
+  for (const [language, copy] of [["ko", "복사"], ["en", "Copy"], ["id", "Salin"]]) {
+    session.language = language;
+    const id = crypto.randomUUID();
+    const tree = mount(() => React.createElement(BillingContactDialog, { orderId: id, onDismiss() {} }));
+    assert.match(tree.html, /<dialog[^>]*aria-labelledby=/);
+    assert.ok(tree.html.includes("billing@unigate.kr") && tree.html.includes(id));
+    assert.equal(tree.html.split(` · ${copy}"`).length - 1, 2);
+    assert.match(tree.html, /Gmail/);
+    assert.doesNotMatch(tree.html, /mailto:/);
+    tree.unmount();
+  }
 });
 
 test("top-up badge preserves the checkout attempt and Price ID across double clicks and retries", async t => {

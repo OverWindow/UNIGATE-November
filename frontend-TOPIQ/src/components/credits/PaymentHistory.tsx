@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
-import { billingEmail, creditsContent, paymentHistoryContent } from "@/lib/credits-content";
+import { creditsContent, paymentHistoryContent } from "@/lib/credits-content";
 import { creditsRequest, refundTopup, WritingError, type TopupOrder } from "@/lib/writing/writing-api";
+import BillingContactDialog from "./BillingContactDialog";
 
 interface History { purchases: TopupOrder[]; nextPage: number | null }
 
-export function PaymentRow({ order, amount, disabled, onRefund }: {
-  order: TopupOrder; amount: string; disabled: boolean; onRefund: () => void;
+export function PaymentRow({ order, amount, disabled, onRefund, onContact }: {
+  order: TopupOrder; amount: string; disabled: boolean; onRefund: () => void; onContact: (orderId: string) => void;
 }) {
   const { language } = useApp();
   const p = paymentHistoryContent[language];
@@ -21,7 +22,8 @@ export function PaymentRow({ order, amount, disabled, onRefund }: {
       ? <button className="button credits-secondary" type="button" disabled={disabled} onClick={onRefund}>
         {order.refundState === "eligible" ? p.refund : p.confirming}</button>
       : order.refundState === "contact"
-        ? <a className="button credits-secondary" href={`mailto:${billingEmail}?subject=${encodeURIComponent(`${p.subject} · ${order.id}`)}`}>{p.contact}</a>
+        ? <button className="button credits-secondary" type="button" aria-haspopup="dialog"
+          onClick={() => onContact(order.id)}>{p.contact}</button>
         : <span role="status">{p[order.refundState]}</span>}
   </li>;
 }
@@ -37,6 +39,7 @@ export default function PaymentHistory() {
   const [loadError, setLoadError] = useState(false);
   const [notice, setNotice] = useState<"error" | "failed" | null>(null);
   const [busy, setBusy] = useState(false);
+  const [contactOrderId, setContactOrderId] = useState<string | null>(null);
   const operation = useRef<AbortController | null>(null);
   useEffect(() => () => operation.current?.abort(), []);
   useEffect(() => {
@@ -104,12 +107,13 @@ export default function PaymentHistory() {
     {loadError ? <p role="alert">{t.error}</p> : !data ? <p role="status">{t.loading}</p>
       : data.purchases.length ? <ul className="credits-order-list" aria-busy={loading}>
         {data.purchases.map(order => <PaymentRow key={order.id} order={order} amount={money(order)}
-          disabled={busy || loading} onRefund={() => void refund(order)} />)}
+          disabled={busy || loading} onRefund={() => void refund(order)} onContact={setContactOrderId} />)}
       </ul> : <p>{p.empty}</p>}
     {data && (page > 1 || data.nextPage !== null) && <nav className="credits-pagination" aria-label={t.paymentHistory}>
       <button className="button credits-secondary" disabled={busy || loading || page === 1} onClick={() => { setData(null); setPage(page - 1); }}>{t.previous}</button>
       <span>{t.page} {page}</span>
       <button className="button credits-secondary" disabled={busy || loading || data.nextPage === null} onClick={() => { setData(null); setPage(page + 1); }}>{t.next}</button>
     </nav>}
+    {contactOrderId && <BillingContactDialog key={contactOrderId} orderId={contactOrderId} onDismiss={() => setContactOrderId(null)} />}
   </>;
 }
