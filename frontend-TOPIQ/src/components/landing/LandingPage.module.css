@@ -48,29 +48,21 @@
 .cardsArea > .container { position: relative; z-index: 1; }
 .interactiveDots { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; pointer-events: none; mask-image: linear-gradient(transparent, #000 14% 86%, transparent); }
 .planCard { border: 1px solid #d9e1ee; border-radius: 16px; background: #fff; color: #172944; transition: border-color .18s, background-color .18s; }
-.planCard:not(.planFree):hover { border-color: #91aad9; background: #f7faff; }
-.planSharedBenefits { margin-top: 24px; padding: 20px; border: 1px solid #d9e1ee; border-radius: 16px; background: #fff; }
-.planSharedTitle { margin: 0 0 16px; color: #315ba9; font-size: 16px; font-weight: 650; }
+.planCard:hover { border-color: #91aad9; background: #f7faff; }
+.planSharedBenefits { margin-top: 24px; }
 .planSharedBenefits .planBenefits { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; padding: 0; border: 0; }
-.planScrollTrack { margin-top: 24px; }
-.planRow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.planRow { margin-top: 24px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .planCard { display: flex; flex-direction: column; padding: 20px; }
-.planFree { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(130px, 1fr) 2fr; align-items: center; column-gap: 24px; }
-.planFree .planBenefits { grid-column: 2; grid-row: 1 / 3; margin: 0; padding: 0; border: 0; }
 .planCard:focus-visible { outline-offset: -4px; }
 .planTerm { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: #315ba9; font-size: 15px; font-weight: 600; }
 .planPrice { margin-top: 18px; font-size: clamp(24px, 3vw, 32px); font-weight: 650; line-height: 1.2; font-variant-numeric: tabular-nums; }
-.planRenewal { margin-top: 6px; color: #526078; font-size: 14px; line-height: 1.5; }
-.planSavings { margin-top: 12px; color: #286143; font-size: 13px; font-weight: 650; }
+.planSavings { min-height: 20px; margin-top: 12px; color: #286143; font-size: 13px; font-weight: 650; }
 .planBenefits { display: grid; gap: 8px; margin: 16px 0 0; padding: 16px 0 0; border-top: 1px solid #d9e1ee; list-style: none; color: #405370; font-size: 14px; line-height: 1.5; }
 .planBenefits li { display: flex; align-items: flex-start; gap: 8px; overflow-wrap: anywhere; }
 .planBenefits svg { flex: none; margin-top: 3px; color: #286143; }
 @media (max-width: 639px) {
+  .planRow { grid-template-columns: 1fr; }
   .planSharedBenefits .planBenefits { grid-template-columns: 1fr; }
-  .planRow { position: sticky; top: calc(var(--header-height) + 16px); z-index: 1; display: flex; overflow-x: hidden; }
-  .planCard { flex: 0 0 100%; }
-  .planFree { display: flex; }
-  .planFree .planBenefits { margin-top: 16px; padding-top: 16px; border-top: 1px solid #d9e1ee; }
 }
 .guideGrid { display: grid; gap: 40px; }
 .guideIntro { text-align: center; }

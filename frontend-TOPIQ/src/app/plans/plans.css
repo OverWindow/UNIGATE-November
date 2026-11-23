@@ -1,24 +1,21 @@
 .plan-offers { display: grid; width: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .plan-offer { display: grid; align-content: start; gap: 10px; padding: 24px; border: 1px solid #dfe6f1; border-radius: 16px; background: #fff; }
-.plan-shared-benefits { grid-column: 1 / -1; padding: 20px 24px; border: 1px solid #dfe6f1; border-radius: 16px; background: #fff; }
-.plan-shared-benefits .plan-benefits { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; }
 .plan-offer[aria-current="true"] { border-color: #9fb8e6; background: #eaf0fc; }
 .plan-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .plan-current-badge { flex: none; border-radius: 12px; padding: 3px 9px; background: #244e9e; color: #fff; font-size: 12px; font-weight: 600; }
 .plan-period time { display: block; font-weight: 600; }
 .plan-offer h2 { font-size: 1.15rem; }
 .plan-offer .plan-price { font-size: clamp(1.7rem, 3vw, 2.25rem); font-weight: 650; line-height: 1.2; color: #172944; }
-.plan-price small { display: block; margin-top: 6px; color: #586780; font-size: .85rem; font-weight: 500; }
-.plan-savings { color: #286143; font-size: 13px; font-weight: 650; }
+.plan-savings { min-height: 20px; color: #286143; font-size: 13px; font-weight: 650; }
 .plan-benefits { display: grid; align-content: start; gap: 8px; list-style: none; padding: 0; margin: 6px 0 0; color: #405370; font-size: 14px; line-height: 1.5; }
 .plan-benefits li { display: flex; align-items: flex-start; gap: 8px; word-break: keep-all; overflow-wrap: anywhere; }
 .plan-benefits svg { flex: none; margin-top: 3px; color: #286143; }
 .plan-offer .button { margin-top: 12px; }
+.plan-offer:not(.plan-free) > .plan-benefits { margin-top: 16px; padding-top: 18px; border-top: 1px solid #edf0f5; }
 .plan-free { grid-column: 1 / -1; grid-template-columns: minmax(130px, 1fr) 2fr; align-items: center; column-gap: 24px; }
 .plan-free .plan-heading { grid-column: 1 / -1; }
 .plan-free .plan-benefits { grid-column: 2; margin: 0; }
 @media (max-width: 740px) {
   .plan-offers, .plan-free { grid-template-columns: 1fr; }
-  .plan-shared-benefits .plan-benefits { grid-template-columns: 1fr; }
   .plan-free .plan-benefits { grid-area: auto; margin-top: 6px; }
 }

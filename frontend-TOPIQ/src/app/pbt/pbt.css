@@ -318,3 +318,7 @@ button.sentence-order-card { cursor: grab; }
   .exam-feedback-main { padding: 24px 16px 48px; }
   .exam-feedback-card { padding: 24px 18px; }
 }
+
+.pbt-start-action { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 18px 0 0; border: 0; border-top: 1px solid #edf0f5; background: transparent; color: var(--color-primary); font-size: 13px; font-weight: 600; cursor: pointer; }
+.pbt-start-action:hover:not(:disabled) { text-decoration: underline; }
+.pbt-start-action:disabled { opacity: .6; cursor: wait; }

@@ -122,10 +122,10 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
             <h2>{language === "ko" ? `${t[exam.section]} 모의고사 ${exam.round}회` : <>{t[exam.section]} · {t.round} {exam.round}</>}</h2>
             {!user ? <Link className="pbt-login-action" href={`/login?next=${encodeURIComponent(`${basePath}?section=${section}&mode=${mode}#exam-${exam.id}`)}`}>
               <Lock size={16} aria-hidden="true" />{loginLabel}<ArrowRight size={17} aria-hidden="true" />
-            </Link> : <button type="button" className="button button-primary" disabled={!!starting}
+            </Link> : <button type="button" className="pbt-start-action" disabled={!!starting}
               aria-haspopup={exam.accessible ? undefined : "dialog"}
               onClick={() => exam.accessible ? void start(exam, inProgressId) : plusDialog.current?.showModal()}>
-              {t.start}
+              {t.start}<ExternalLink size={14} aria-hidden="true" />
             </button>}
           </article>;
         })}

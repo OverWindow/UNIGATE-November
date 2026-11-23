@@ -24,11 +24,6 @@ export default function PlanOffers({ language, account, renderAction }: {
         <li key={benefit}><Check size={16} aria-hidden="true" /><span>{benefit}</span></li>
       )}</ul>
     </article>
-    <div className="plan-shared-benefits">
-      <ul className="plan-benefits" role="list">{p.benefits(offers[0]?.bonusCredits ?? 400).map(benefit =>
-        <li key={benefit}><Check size={16} aria-hidden="true" /><span>{benefit}</span></li>
-      )}</ul>
-    </div>
     {offers.map(offer => {
       const { months, amount } = offer;
       const current = account?.currentPlanMonths === months;
@@ -36,8 +31,8 @@ export default function PlanOffers({ language, account, renderAction }: {
       const savings = monthlyAmount ? planSavingsPercent(amount, months, monthlyAmount) : 0;
       return <article className="plan-offer" key={months} aria-current={current || undefined}>
         <div className="plan-heading"><h2>{p.term(months)}</h2>{current && currentBadge}</div>
-        <p className="plan-price">{price.format(amount)}<small>{p.interval(months)}</small></p>
-        {savings > 0 && <p className="plan-savings">{p.savings(savings)}</p>}
+        <p className="plan-price">{price.format(amount)}</p>
+        <p className="plan-savings">{savings > 0 ? p.savings(savings) : "\u00a0"}</p>
         {current && account.endsAt && <p className="plan-period">
           {subscription?.state === "active" ? p.renewal : p.until}{" "}
           <time dateTime={account.endsAt}>{new Date(account.endsAt).toLocaleString(language, { dateStyle: "long", timeStyle: "short" })}</time>
@@ -46,6 +41,9 @@ export default function PlanOffers({ language, account, renderAction }: {
         {subscription?.state === "ending" && <p>{p.ending}</p>}
         {subscription?.state === "past_due" && <p>{p.pastDue}</p>}
         {renderAction(offer)}
+        <ul className="plan-benefits" role="list">{p.benefits(offer.bonusCredits).map(benefit =>
+          <li key={benefit}><Check size={16} aria-hidden="true" /><span>{benefit}</span></li>
+        )}</ul>
       </article>;
     })}
   </div>;

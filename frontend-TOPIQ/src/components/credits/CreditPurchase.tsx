@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
-import { creditsContent, paymentHistoryContent } from "@/lib/credits-content";
+import { creditsContent } from "@/lib/credits-content";
 import { plansContent } from "@/lib/plans-content";
 import { creditsRequest, openBillingPortal, startCreditPurchase, startPlanPurchase, WritingError, type CreditPrice, type CreditPurchaseStatus, type PlanAccount } from "@/lib/writing/writing-api";
 import PlanOffers from "./PlanOffers";
@@ -175,7 +175,6 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
   const blocked = opening || notice === "checking" || retryCheck;
   const canSubscribe = planAccount && !planAccount.active && !planAccount.subscription;
   return <div className="credits-purchase">
-    {!isPlan && price && price !== "unavailable" && <p className="card-issuer-notice" id="credit-card-notice">{t.cardIssuerNotice}</p>}
     {isPlan ? planAccount && <PlanOffers language={language} account={planAccount}
       renderAction={({ months, priceId, currency, amount, bonusCredits }) => canSubscribe && <>
         <p className="card-issuer-notice" id={`plan-card-notice-${months}`}>{t.cardIssuerNotice}</p>
@@ -189,15 +188,15 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
       <p role="status">{t.priceUnavailable}</p>
       <button type="button" className="button credits-secondary" onClick={reloadPrice}>{t.retry}</button>
     </> : price ? <>
-      <button type="button" className="button button-primary credits-topup-button" aria-describedby="credit-card-notice credit-topup-price" disabled={blocked} onClick={() => void buy()}>
+      <button type="button" className="button button-primary credits-topup-button" aria-describedby="credit-card-notice" disabled={blocked} onClick={() => void buy()}>
         {t.buy(price.credits.toLocaleString(language))}
       </button>
-      <span className="credits-topup-price" id="credit-topup-price">{new Intl.NumberFormat(language, { style: "currency", currency: "KRW" }).format(price.amount)}</span>
     </> : <p role="status">{t.priceLoading}</p>}
     {!isPlan && <Link className="button credits-secondary credits-topup-button" href="/credits?history=payments">{t.paymentHistory}</Link>}
-    {(!isPlan || planAccount?.subscription) && <button type="button" className="button credits-secondary" disabled={opening} onClick={() => void viewPayments()}>
-      {isPlan ? p.manage : paymentHistoryContent[language].receipts}
+    {isPlan && planAccount?.subscription && <button type="button" className="button credits-secondary" disabled={opening} onClick={() => void viewPayments()}>
+      {p.manage}
     </button>}
+    {!isPlan && price && price !== "unavailable" && <p className="card-issuer-notice" id="credit-card-notice">{t.cardIssuerNotice}</p>}
     {portalNotice && <p role="status">{t.portal[portalNotice]}</p>}
     {notice && notice !== "opening" && <p role="status">{notice === "planInUse" ? p.inUse : checkoutCopy[notice]}</p>}
     {retryCheck && <button type="button" className="button credits-secondary" onClick={() => setCheckCount(count => count + 1)}>{t.checkAgain}</button>}

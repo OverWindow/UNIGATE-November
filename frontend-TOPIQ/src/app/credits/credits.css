@@ -18,7 +18,6 @@
 .credits-purchase { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
 .credits-purchase .button { min-height: 44px; }
 .credits-purchase .credits-topup-button { min-height: 38px; padding: 8px 14px; font-size: 13px; }
-.credits-topup-price { color: #52647e; font-size: 13px; font-variant-numeric: tabular-nums; }
 .credits-purchase .button:disabled { opacity: .6; }
 .credits-purchase p { margin: 0; color: #405370; font-size: 14px; }
 .credits-purchase .card-issuer-notice { color: #6b7280; font-size: 12px; font-weight: 400; line-height: 1.5; }

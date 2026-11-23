@@ -20,7 +20,6 @@ export default function PlansAccount() {
   const cancelled = search.get("cancelled") === "1";
   const next = returnId ? `/plans?purchase=${returnId}${cancelled ? "&cancelled=1" : ""}` : "/plans";
   return <div className="page-container credits-page">
-    <h1 className="catalog-title">Plus</h1>
     {status === "loading" ? <p className="catalog-status" role="status">{a.loading}</p>
       : status === "error" ? <div className="catalog-status" role="alert">{a.network} <button className="button credits-secondary" onClick={() => void refreshSession()}>{a.retry}</button></div>
       : !user ? <div className="credits-purchase">
