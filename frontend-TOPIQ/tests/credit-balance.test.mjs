@@ -123,7 +123,7 @@ function savedCheckout(t, attemptId) {
   return storage;
 }
 
-test("all four purchase buttons display their localized card issuer notice", t => {
+test("credit checkout keeps its notice and Plus cards use the shared page notice", t => {
   savedCheckout(t, crypto.randomUUID());
   const plans = [1, 3, 6].map(months => ({ months, amount: 9900, currency: "krw", priceId: `price_${months}`, bonusCredits: 400 }));
   const { creditsContent } = require("../src/lib/credits-content.ts");
@@ -135,7 +135,7 @@ test("all four purchase buttons display their localized card issuer notice", t =
     );
     const notices = [...tree.html.matchAll(/<p\b[^>]* id="((?:credit|plan)-card-notice[^"]*)"[^>]*>([^<]+)<\/p>/g)];
     assert.deepEqual(notices.map(([, id, message]) => [id, message]),
-      ["credit-card-notice", ...plans.map(({ months }) => `plan-card-notice-${months}`)].map(id => [id, cardIssuerNotice]));
+      ["credit-card-notice"].map(id => [id, cardIssuerNotice]));
     tree.unmount();
   }
 });
@@ -201,6 +201,8 @@ test("plans follow credits in the account menu without a settings link", () => {
   search = new URLSearchParams({ purchase: id, cancelled: "1" });
   const page = mount(PlansAccount);
   assert.doesNotMatch(page.html, /<h1[^>]*>Plus<\/h1>/);
+  assert.equal((page.html.match(/id="plan-card-notice"/g) ?? []).length, 1);
+  assert.ok(page.html.indexOf('id="plan-card-notice"') > page.html.lastIndexOf("</article>"));
   assert.ok(page.html.includes(encodeURIComponent(`/plans?purchase=${id}&cancelled=1`)));
   assert.deepEqual(requests, []);
   page.unmount();

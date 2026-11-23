@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useApp } from "@/app/providers";
 import { authContent } from "@/lib/auth/auth-content";
+import { creditsContent } from "@/lib/credits-content";
 import { plansContent } from "@/lib/plans-content";
 import { getPlans, WritingError, type PlanAccount } from "@/lib/writing/writing-api";
 import CreditPurchase from "./CreditPurchase";
@@ -29,6 +30,7 @@ export default function PlansAccount() {
         } />
       </div>
       : <MemberPlans key={user.id} userId={user.id} returnId={returnId} cancelled={cancelled} />}
+    <p className="card-issuer-notice plan-card-notice" id="plan-card-notice">{creditsContent[language].cardIssuerNotice}</p>
   </div>;
 }
 

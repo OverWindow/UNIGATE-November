@@ -10,7 +10,7 @@ import { vocabularyContent } from "@/lib/vocabulary/vocabulary-content";
 import { localizedPath } from "@/lib/locale-path";
 
 export default function VocabularyQuiz({ id }: { id: string }) {
-  const { language } = useApp();
+  const { language, user } = useApp();
   const t = vocabularyContent[language];
   const [data, setData] = useState<QuizData | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -40,7 +40,7 @@ export default function VocabularyQuiz({ id }: { id: string }) {
       if (!controller.signal.aborted) { setData(result); setQuestions(result.questions); }
     }).catch(cause => { if (!controller.signal.aborted) setError(cause); });
     return () => { controller.abort(); submission.current?.abort(); submission.current = null; };
-  }, [id, revision]);
+  }, [id, revision, user?.plusEndsAt]);
 
   useEffect(() => {
     heading.current?.focus({ preventScroll: true });
@@ -87,6 +87,9 @@ export default function VocabularyQuiz({ id }: { id: string }) {
     setCheckError(null); setReviewing(true);
   }
 
+  if (error instanceof VocabularyError && error.code === "plus_required") return <div className="page-container vocabulary-status">
+    <p>{t.plusRequired}</p><Link className="button button-primary" href={localizedPath("/plans", language)}>{t.viewPlus}</Link>
+  </div>;
   return <div className="page-container vocabulary-quiz">
     <header className="vocabulary-quiz-header">
       <h1>{t.quizTitle}</h1>

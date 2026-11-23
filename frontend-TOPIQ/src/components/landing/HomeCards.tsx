@@ -5,7 +5,7 @@ import { ArrowRight, Check } from "lucide-react";
 import { homeContent } from "@/lib/home-content";
 import type { Language } from "@/lib/landing-content";
 import { localizedPath } from "@/lib/locale-path";
-import { planSavingsPercent, plansContent, publicPlans } from "@/lib/plans-content";
+import { plansContent, publicPlans } from "@/lib/plans-content";
 import InteractiveDots from "./InteractiveDots";
 import styles from "./LandingPage.module.css";
 
@@ -25,11 +25,10 @@ export default function HomeCards({ language }: { language: Language }) {
         </div>
         <div className={styles.planRow}>
             {publicPlans.map(({ months, amount }) => {
-              const savings = planSavingsPercent(amount, months, publicPlans[0].amount);
               return <Link key={months} href={localizedPath("/plans", language)} className={styles.planCard}>
                 <span className={styles.planTerm}>{plan.term(months)}<ArrowRight size={17} aria-hidden="true" /></span>
-                <strong className={styles.planPrice}>{price.format(amount)}</strong>
-                <span className={styles.planSavings}>{savings > 0 ? plan.savings(savings) : "\u00a0"}</span>
+                <strong className={`${styles.planPrice}${months > 1 ? ` ${styles.planPriceBlurred}` : ""}`} aria-hidden={months > 1 || undefined}>{price.format(amount)}</strong>
+                <span className={styles.planSavings}>{months > 1 ? <>{pricing.checkPrice}<ArrowRight size={14} aria-hidden="true" /></> : "\u00a0"}</span>
               </Link>;
             })}
         </div>

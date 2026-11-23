@@ -1,6 +1,7 @@
 import type { Language } from "../landing-content";
 
 const ko = {
+  plusRequired: "Free는 급수별 첫 3세트까지 이용할 수 있습니다. 이후 세트는 Plus에서 이용하세요.", viewPlus: "Plus 요금제 보기",
   title: "TOPIK 단어장", intro: "급수에 맞는 단어를 약 20개씩, 뜻과 예문으로 살펴보세요.",
   vocabulary: "단어장", level: "급", words: "개 단어", sets: "개 세트", levelLabel: "급수 선택",
   browse: "단어 보기", loading: "단어장을 불러오는 중입니다.", empty: "이 급수의 단어장을 준비하고 있습니다.",
@@ -36,6 +37,7 @@ type VocabularyCopy = { [Key in keyof typeof ko]: string };
 export const vocabularyContent: Record<Language, VocabularyCopy> = {
   ko,
   en: {
+    plusRequired: "Free includes the first 3 sets per level. Get Plus to access more sets.", viewPlus: "View Plus plans",
     title: "Your Korean starts with a word.", intro: "Explore words for your level in sets of about 20, with meanings and examples.",
     vocabulary: "Vocabulary", level: "Level", words: "words", sets: "sets", levelLabel: "Choose a level",
     browse: "View words", loading: "Loading vocabulary…", empty: "Vocabulary sets for this level are coming soon.",
@@ -67,6 +69,7 @@ export const vocabularyContent: Record<Language, VocabularyCopy> = {
     retryWrong: "Retry missed questions", reviewing: "Reviewing missed questions", allCorrect: "You got every question right!", showResult: "See results",
   },
   id: {
+    plusRequired: "Free mencakup 3 set pertama per tingkat. Gunakan Plus untuk mengakses set berikutnya.", viewPlus: "Lihat paket Plus",
     title: "Bahasa Korea dimulai dari satu kata.", intro: "Pelajari kata sesuai level dalam set berisi sekitar 20 kata, dengan arti dan contoh.",
     vocabulary: "Kosakata", level: "Level", words: "kata", sets: "set", levelLabel: "Pilih level",
     browse: "Lihat kata", loading: "Memuat kosakata…", empty: "Set kosakata untuk level ini sedang disiapkan.",

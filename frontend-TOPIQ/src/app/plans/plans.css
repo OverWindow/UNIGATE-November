@@ -19,3 +19,5 @@
   .plan-offers, .plan-free { grid-template-columns: 1fr; }
   .plan-free .plan-benefits { grid-area: auto; margin-top: 6px; }
 }
+
+.plan-card-notice { margin-top: 24px; color: #6b7280; font-size: 12px; line-height: 1.5; }

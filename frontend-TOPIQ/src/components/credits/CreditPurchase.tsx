@@ -177,10 +177,9 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
   return <div className="credits-purchase">
     {isPlan ? planAccount && <PlanOffers language={language} account={planAccount}
       renderAction={({ months, priceId, currency, amount, bonusCredits }) => canSubscribe && <>
-        <p className="card-issuer-notice" id={`plan-card-notice-${months}`}>{t.cardIssuerNotice}</p>
         <button type="button" className="button button-primary" disabled={blocked || !priceId}
           aria-label={`${p.term(months)} · ${priceId ? p.buy : p.unavailable}`}
-          aria-describedby={`plan-card-notice-${months}`}
+          aria-describedby="plan-card-notice"
           onClick={() => priceId && void buy({ priceId, currency, amount, credits: bonusCredits, months })}>
           {priceId ? p.buy : p.unavailable}
         </button>

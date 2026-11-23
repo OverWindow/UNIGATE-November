@@ -12,7 +12,7 @@ import VocabularyAudio from "./VocabularyAudio";
 import VocabularyExample from "./VocabularyExample";
 
 export default function VocabularyStudy({ id }: { id: string }) {
-  const { language } = useApp();
+  const { language, user } = useApp();
   const t = vocabularyContent[language];
   const [data, setData] = useState<VocabularyDetail | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -43,7 +43,7 @@ export default function VocabularyStudy({ id }: { id: string }) {
       if (active) setData(result);
     }).catch(cause => { if (active) setError(cause); });
     return () => { active = false; controller.abort(); };
-  }, [id, revision]);
+  }, [id, revision, user?.plusEndsAt]);
 
   useEffect(() => {
     meaningRegion.current?.scrollTo({ top: 0, behavior: "instant" });
@@ -75,6 +75,9 @@ export default function VocabularyStudy({ id }: { id: string }) {
   const backHref = data ? `/vocabulary?level=${data.level}&page=${data.catalogPage}` : "/vocabulary";
   const word = data?.words[index];
   const meaning = word?.meanings[meaningLanguage]?.trim();
+  if (error instanceof VocabularyError && error.code === "plus_required") return <div className="page-container vocabulary-status">
+    <p>{t.plusRequired}</p><Link className="button button-primary" href={localizedPath("/plans", language)}>{t.viewPlus}</Link>
+  </div>;
   return <div className="vocabulary-study">
     {error ? <div className="page-container vocabulary-status vocabulary-error" role="alert">
       <p>{error instanceof VocabularyError && error.status === 404 ? t.notFound : t.error}</p>

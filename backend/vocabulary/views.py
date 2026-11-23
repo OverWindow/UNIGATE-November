@@ -9,6 +9,7 @@ from django.db.models import Count
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 
+from accounts.plans import has_active_plan
 from question_bank.models import VocabularyQuestion
 from .models import VocabularySet
 from .services import (LEVELS, PAGE_SIZE, VocabularyUnavailable, audio_url, quiz_word_ids,
@@ -17,7 +18,8 @@ from .services import (LEVELS, PAGE_SIZE, VocabularyUnavailable, audio_url, quiz
 
 def response(data, status=200):
     result = JsonResponse(data, status=status)
-    result["Cache-Control"] = "no-store"
+    result["Cache-Control"] = "private, no-store"
+    result["Vary"] = "Cookie"
     return result
 
 
@@ -29,6 +31,10 @@ def available(view):
         except (DatabaseError, VocabularyUnavailable):
             return response({"error": "vocabulary_unavailable"}, 503)
     return wrapped
+
+
+def can_access_set(user, group):
+    return group.set_number <= 3 or (user.is_authenticated and has_active_plan(user.pk))
 
 
 @require_GET
@@ -72,6 +78,8 @@ def detail(request, set_id):
     group = VocabularySet.objects.prefetch_related("items").filter(pk=set_id).first()
     if group is None:
         return response({"error": "not_found"}, 404)
+    if not can_access_set(request.user, group):
+        return response({"error": "plus_required"}, 403)
     words = source_words([group], include_details=True)
     data = set_summary(group, words, quiz_word_ids(words))
     data["catalogPage"] = (VocabularySet.objects.filter(
@@ -97,6 +105,8 @@ def questions(request, set_id):
     group = VocabularySet.objects.prefetch_related("items").filter(pk=set_id).first()
     if group is None:
         return response({"error": "not_found"}, 404)
+    if not can_access_set(request.user, group):
+        return response({"error": "plus_required"}, 403)
     words = source_words([group])
     by_word = {}
     for question in VocabularyQuestion.objects.filter(
@@ -136,6 +146,8 @@ def check_answer(request, set_id, question_id):
     group = VocabularySet.objects.prefetch_related("items").filter(pk=set_id).first()
     if group is None:
         return response({"error": "not_found"}, 404)
+    if not can_access_set(request.user, group):
+        return response({"error": "plus_required"}, 403)
     words = source_words([group], include_details=True)
     question = VocabularyQuestion.objects.filter(
         pk=question_id, vocabulary_id__in=words, question_type="sentence_blank",

@@ -20,7 +20,7 @@ export default function VocabularyCatalog() {
 }
 
 function CatalogPage({ level, page }: { level: number; page: number }) {
-  const { language } = useApp();
+  const { language, user } = useApp();
   const t = vocabularyContent[language];
   const [data, setData] = useState<{ levels: VocabularyLevel[]; catalog: VocabularyCatalogData } | null>(null);
   const [error, setError] = useState<{ level: number; page: number; cause: unknown } | null>(null);
@@ -67,9 +67,9 @@ function CatalogPage({ level, page }: { level: number; page: number }) {
             <span className="catalog-set-number">{String(group.number).padStart(2, "0")}</span>
             <h3>{group.preview.map((word, index) => <span key={index} lang="ko">{word}</span>)}</h3>
             <div className="vocabulary-set-actions">
-              <Link className="vocabulary-set-action" href={localizedPath(`/vocabulary/sets/${group.id}`, language)}>{t.browse}<ExternalLink size={14} aria-hidden="true" /></Link>
-              {group.quizQuestionCount ? <Link className="vocabulary-set-action" href={localizedPath(`/vocabulary/sets/${group.id}/quiz`, language)}>
-                {t.quiz}<ExternalLink size={14} aria-hidden="true" />
+              <Link className="vocabulary-set-action" href={localizedPath(group.number > 3 && !user?.plusEndsAt ? "/plans" : `/vocabulary/sets/${group.id}`, language)}>{group.number > 3 && !user?.plusEndsAt ? t.viewPlus : t.browse}<ExternalLink size={14} aria-hidden="true" /></Link>
+              {group.quizQuestionCount ? <Link className="vocabulary-set-action" href={localizedPath(group.number > 3 && !user?.plusEndsAt ? "/plans" : `/vocabulary/sets/${group.id}/quiz`, language)}>
+                {group.number > 3 && !user?.plusEndsAt ? t.viewPlus : t.quiz}<ExternalLink size={14} aria-hidden="true" />
               </Link> : <span className="vocabulary-set-action vocabulary-quiz-unavailable">{group.quizQuestionCount === null ? t.quizUnavailable : t.quizPreparing}</span>}
             </div>
           </article>)}
