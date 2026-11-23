@@ -77,34 +77,37 @@ def collect_pending_refunds(account, *, held_purchase=None):
         reconcile_purchase_refunds(account, purchase, previous_refunded=0)
 
 
+def refund_credit_adjustment(account, purchase, refunded, previous_refunded):
+    if refunded > purchase.amount:
+        raise ValueError("Refunds exceed purchase amount")
+    # Legacy plans with no installment counter received a single bonus.
+    installments = purchase.credited_months if purchase.credited_months is not None else 1
+    credits = purchase.credits * installments
+    target = credits * refunded // purchase.amount
+    entries = purchase.refund_entries.aggregate(
+        debited=Sum("amount", filter=Q(kind="refund"), default=0),
+        restored=Sum("amount", filter=Q(kind="restore"), default=0),
+    )
+    difference = target - (entries["debited"] - entries["restored"])
+    if difference <= 0:
+        return difference
+    if previous_refunded is None:
+        return 0
+    # A newly successful refund never collects a previously forgiven shortfall.
+    previous_target = credits * previous_refunded // purchase.amount
+    return min(difference, max(0, target - previous_target), max(0, account.balance - account.reserved))
+
+
 def reconcile_purchase_refunds(account, purchase, *, from_hold=False, previous_refunded=None):
-    if purchase.status != "fulfilled":
+    if purchase.status != "fulfilled" or not purchase.refunds.exists():
         return
-    if purchase.refunds.exists():
-        refunded = purchase.refunds.filter(status="succeeded").aggregate(total=Sum("amount", default=0))["total"]
-        if refunded > purchase.amount:
-            raise ValueError("Refunds exceed purchase amount")
-        # Legacy plans with no installment counter received a single bonus.
-        installments = purchase.credited_months if purchase.credited_months is not None else 1
-        target = purchase.credits * installments * refunded // purchase.amount
-        entries = purchase.refund_entries.aggregate(
-            debited=Sum("amount", filter=Q(kind="refund"), default=0),
-            restored=Sum("amount", filter=Q(kind="restore"), default=0),
-        )
-        net_debited = entries["debited"] - entries["restored"]
-        difference = target - net_debited
-        purchase.pending_refund_credits = 0
-        if difference > 0 and previous_refunded is not None:
-            # Charge only newly successful refunds, never a previously forgiven shortfall.
-            previous_target = purchase.credits * installments * previous_refunded // purchase.amount
-            amount = min(difference, max(0, target - previous_target), max(0, account.balance - account.reserved))
-            if amount:
-                account.balance -= amount
-                record(account, "refund", amount, refund_purchase=purchase)
-        elif difference < 0:
-            account.balance -= difference
-            record(account, "restore", -difference, refund_purchase=purchase)
-        purchase.save(update_fields=["pending_refund_credits"])
+    refunded = purchase.refunds.filter(status="succeeded").aggregate(total=Sum("amount", default=0))["total"]
+    change = refund_credit_adjustment(account, purchase, refunded, previous_refunded)
+    if change:
+        account.balance -= change
+        record(account, "refund" if change > 0 else "restore", abs(change), refund_purchase=purchase)
+    purchase.pending_refund_credits = 0
+    purchase.save(update_fields=["pending_refund_credits"])
 
 
 

@@ -13,6 +13,7 @@ export function planSavingsPercent(amount: number, months: number, monthlyAmount
 }
 
 interface PlanCopy {
+  intro: string;
   login: string; current: string; until: string; freeBenefits: string[];
   term: (months: number) => string; benefits: (credits: number) => string[]; buy: string; unavailable: string;
   savings: (percent: number) => string;
@@ -25,6 +26,7 @@ interface PlanCopy {
 
 export const plansContent: Record<Language, PlanCopy> = {
   ko: {
+    intro: "읽기, 듣기 모의고사를 무제한으로 풀고, AI 튜터와 함께 쓰기를 연습하세요.",
     login: "로그인하기",
     savings: percent => `월간 결제 대비 ${percent}% 절약`,
     settingsTitle: "구독 관리",
@@ -47,6 +49,7 @@ export const plansContent: Record<Language, PlanCopy> = {
     },
   },
   en: {
+    intro: "Take unlimited reading and listening practice tests and practice writing with the AI tutor.",
     login: "Log in",
     savings: percent => `Save ${percent}% compared with monthly billing`,
     settingsTitle: "Manage subscription",
@@ -69,6 +72,7 @@ export const plansContent: Record<Language, PlanCopy> = {
     },
   },
   id: {
+    intro: "Kerjakan simulasi ujian membaca dan menyimak tanpa batas serta berlatihlah menulis bersama tutor AI.",
     login: "Masuk",
     savings: percent => `Hemat ${percent}% dibanding tagihan bulanan`,
     settingsTitle: "Kelola langganan",

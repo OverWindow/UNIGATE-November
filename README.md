@@ -100,6 +100,40 @@ Checkout에 표시할 결제수단은 Stripe Dashboard에서 관리합니다. �
 
 샌드박스와 운영 각각에서 위 웹훅 수신 이벤트에 `refund.created`, `refund.updated`, `refund.failed`를 추가합니다. 샌드박스에서 1,000크레딧을 충전한 뒤 30%와 나머지 금액을 차례로 환불하고, 각 성공 알림 후 `/credits`를 새로고침해 **−300**, **−700**을 확인합니다. 웹훅 전달에 실패하면 원인을 해결하고 Workbench에서 재전송합니다. [Stripe 웹훅 재전송](https://docs.stripe.com/webhooks#manual-retries)
 
+### 회원 한 명의 기존 Plus 환불 반영
+
+Stripe에서 이미 성공한 요금제 환불이 TOPIQ에 반영되지 않았을 때 운영자가 수동으로 실행합니다.
+명령이 포함된 백엔드 배포 후, 운영 백엔드 컨테이너의 `/app/backend`에서 실행합니다.
+로컬 샌드박스에서 확인할 때는 `backend/`에서 프로젝트 가상환경의 Python을 사용합니다.
+예시의 `123`은 TOPIQ 내부 회원 번호입니다.
+
+```bash
+python manage.py sync_plan_refund --user-id 123
+python manage.py sync_plan_refund --user-id 123 --apply
+```
+
+첫 명령은 Stripe와 DB를 조회합니다. 환불 ID, TOPIQ 주문 ID, 금액, 회원의 현재 등급, 종료할 이용 기간 수,
+원구독의 갱신 취소 여부와 예상 차감량을 확인하세요. 후보가 여러 건이면 목록에서 환불 ID를 골라 미리보기와 적용에 같은 ID를 지정합니다.
+
+```bash
+python manage.py sync_plan_refund --user-id 123 --refund-id re_example
+python manage.py sync_plan_refund --user-id 123 --refund-id re_example --apply
+```
+
+명령은 백엔드에 설정된 Stripe 계정을 사용합니다. 조회에는 해당 결제·청구서·환불·구독의 읽기 권한이,
+갱신 중인 구독의 적용에는 구독 취소 권한이 필요합니다. 최초 결제, 갱신 청구서, 구형 일회성 Plus 이용권을 지원합니다.
+웹훅 도입 전 환불도 실제 성공한 환불과 원주문이 일치하면 선택할 수 있습니다.
+
+`--apply`는 기존 환불 ID와 금액을 기록하고 해당 이용권과 원구독의 남은 기간을 종료합니다.
+이미 성공 기록이 있으면 당시 면제된 부족분을 보존하고 누락된 권한 종료만 처리합니다.
+별도로 재가입한 구독은 유지합니다. 같은 구독의 후속 유료 회차가 있거나 추가 적립·예약 해제·복원으로
+과거 차감액을 확인해야 하면 적용 전에 사유를 표시합니다. 해당 청구서의 결제 시각 및 크레딧 원장을 대조하세요.
+성공 출력에서 실제 차감량과 최종 Free/Plus 등급을 확인합니다. Stripe 응답 오류가 발생하면 같은 환불 ID로
+먼저 조회한 뒤 다시 적용할 수 있습니다.
+
+실행 시 기존 `credit_purchase_refunds`, `credit_purchases`와 필요한 경우 `credit_accounts`,
+`credit_transactions`의 데이터가 변경됩니다. 새 결제 환불이나 DB 구조 변경은 없으며 자동으로 실행되지 않습니다.
+
 ### 운영 적용
 
 사업자 국가·상품에 대한 Stripe 실결제 지원 여부를 확인한 뒤 적용합니다. Stripe Workbench에서 **자체 계정의 스냅샷 웹훅**을 공개 Django HTTPS 주소의 `/api/payments/stripe/webhook/`로 등록하고 위 로컬 CLI 명령의 결제·구독·환불 이벤트 8개를 선택합니다. 백엔드에 운영용 `STRIPE_SECRET_KEY`, 운영 상품의 `STRIPE_PRICE_ID`, 해당 엔드포인트의 `STRIPE_WEBHOOK_SECRET`, 운영 TOPIQ 주소인 `TOPIQ_PUBLIC_URL`을 설정한 후 백엔드와 TOPIQ를 재배포합니다. 운영에서는 기존 `deploy/start.sh`가 migration 적용 후 Gunicorn을 실행합니다. 이후 금액만 변경할 때는 같은 상품에 새 KRW 가격을 만들고 백엔드의 `STRIPE_PRICE_ID`를 교체한 후 백엔드를 재시작합니다. [Stripe 웹훅 등록](https://docs.stripe.com/webhooks)
