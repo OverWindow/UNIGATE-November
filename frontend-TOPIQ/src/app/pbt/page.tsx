@@ -1,11 +1,8 @@
-import type { Metadata } from "next";
+import { seoMetadata } from "@/lib/seo";
+import { seoCopy } from "@/lib/seo-content";
 import PbtCatalog from "@/components/pbt/PbtCatalog";
-import { examContent } from "@/lib/exam/exam-content";
 
-export const metadata: Metadata = {
-  title: "TOPIQ | TOPIK II PBT",
-  description: examContent.ko.formats.pbt.description,
-};
+export const generateMetadata = () => seoMetadata("/pbt", seoCopy.pbt);
 
 export default function PbtPage() {
   return <PbtCatalog />;

@@ -7,6 +7,7 @@ import { createExampleAnalyzer } from "@/lib/vocabulary/vocabulary-analysis";
 import { useApp } from "@/app/providers";
 import { VocabularyError, vocabularyRequest, type MeaningLanguage, type VocabularyDetail } from "@/lib/vocabulary/vocabulary-api";
 import { vocabularyContent } from "@/lib/vocabulary/vocabulary-content";
+import { localizedPath } from "@/lib/locale-path";
 import VocabularyAudio from "./VocabularyAudio";
 import VocabularyExample from "./VocabularyExample";
 
@@ -118,8 +119,8 @@ export default function VocabularyStudy({ id }: { id: string }) {
           <nav className="vocabulary-card-navigation" aria-label={t.wordList}>
             <button className="button vocabulary-secondary" disabled={index === 0} onClick={() => move(index - 1)}><ArrowLeft size={16} aria-hidden="true" /> {t.previous}</button>
             {index < data.words.length - 1 ? <button className="button button-primary" onClick={() => move(index + 1)}>{t.next} <ArrowRight size={16} aria-hidden="true" /></button>
-              : data.quizQuestionCount ? <Link className="button button-primary" href={`/vocabulary/sets/${id}/quiz`}>{t.quiz} <ArrowRight size={16} aria-hidden="true" /></Link>
-                : <Link className="button button-primary" href={backHref}>{t.back} <ArrowRight size={16} aria-hidden="true" /></Link>}
+              : data.quizQuestionCount ? <Link className="button button-primary" href={localizedPath(`/vocabulary/sets/${id}/quiz`, language)}>{t.quiz} <ArrowRight size={16} aria-hidden="true" /></Link>
+                : <Link className="button button-primary" href={localizedPath(backHref, language)}>{t.back} <ArrowRight size={16} aria-hidden="true" /></Link>}
           </nav>
           {index === data.words.length - 1 && <p className="vocabulary-end">{t.lastWord} <button onClick={() => move(0)}>{t.firstWord}</button></p>}
           {index === data.words.length - 1 && !data.quizQuestionCount && <p className="vocabulary-end">{data.quizQuestionCount === null ? t.quizUnavailable : t.quizPreparing}</p>}

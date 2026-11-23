@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
+import { seoMetadata } from "@/lib/seo";
+import { seoCopy } from "@/lib/seo-content";
 import PolicyDocument from "@/components/PolicyDocument";
+import SiteHeader from "@/components/SiteHeader";
+import SiteFooter from "@/components/SiteFooter";
+import "../open-source-licenses/licenses.css";
 
-export const metadata: Metadata = {
-  title: "서비스 이용약관 · 설정 | TOPIQ",
-  description: "TOPIQ 모의시험, AI 쓰기 튜터와 크레딧을 이용할 때 적용되는 조건과 이용자의 권리를 안내합니다.",
-};
+export const generateMetadata = () => seoMetadata("/terms", seoCopy.terms);
 
 const withdrawalLaw = "https://www.law.go.kr/lsLinkCommonInfo.do?chrClsCd=010202&lsJoLnkSeq=1027063337";
 const mediation = "https://www.kcdrc.kr/";
@@ -12,7 +13,6 @@ const mediation = "https://www.kcdrc.kr/";
 const copy = {
   ko: {
     intro: "이 약관은 TOPIQ에서 한국어를 학습하고 크레딧을 구매·사용할 때 이용자와 운영자가 지킬 사항을 설명합니다.",
-    draft: "TOPIQ는 한국에서 개인이 운영합니다. 시행 예정일은 2026년 11월 21일이며 정식 약관은 사이트에 공지할 예정입니다. 미성년자 결제 절차, 부분 환불액의 산정 방식과 서비스 종료 시 환불 신청 기간은 아직 확정되지 않았습니다.",
     sections: [
       { title: "서비스와 계정", paragraphs: [
         "TOPIQ는 TOPIK 대비 PBT·IBT 모의시험, 단어장, 쓰기 연습을 제공합니다. 누구나 공개 회차를 볼 수 있으며 응시는 로그인 후 가능합니다. PBT·IBT 읽기와 듣기에서 Free 회원은 시험 방식과 영역별 첫 공개 세트에, Plus 회원은 모든 공개 세트에 응시할 수 있습니다. 쓰기 평가 이력과 크레딧은 로그인한 계정에 연결됩니다.",
@@ -23,7 +23,7 @@ const copy = {
         "모의시험 점수는 학습 진행을 확인하는 참고자료입니다. 공식 TOPIK 성적이나 급수 인증으로 사용할 수 없습니다. AI 쓰기 튜터는 제출한 답안에 대한 점수와 수정 제안을 제공합니다. 설명에 오류가 있을 수 있으므로 원문과 함께 검토해 주세요.",
       ] },
       { title: "크레딧 구매와 사용", paragraphs: [
-        "유료 크레딧 충전은 사업자등록 후 재개할 예정입니다. 충전 가능 여부, 보유량과 거래 내역은 계정 메뉴의 ‘크레딧’에서 확인할 수 있습니다. 충전을 중지한 기간에도 보유한 크레딧은 학습에 사용할 수 있습니다.",
+        "충전 가능 여부, 보유량과 거래 내역은 계정 메뉴의 ‘크레딧’에서 확인할 수 있습니다. 충전을 중지한 기간에도 보유한 크레딧은 학습에 사용할 수 있습니다.",
         "유료·무료 크레딧은 계정 탈퇴 시까지 사용할 수 있습니다. 일회성 유료 충전분을 먼저 사용하며, 여러 번 충전한 경우 먼저 적립된 주문부터 차감합니다.",
         "Free와 Plus 회원 모두 쓰기 세트를 처음 열 때 100크레딧을 사용합니다. 해제한 세트는 같은 계정에서 다시 열 수 있으며, 문항당 최대 20회의 쓰기 평가는 추가 차감 없이 이용할 수 있습니다.",
       ] },
@@ -45,7 +45,6 @@ const copy = {
   },
   en: {
     intro: "These terms describe the responsibilities of TOPIQ and its users when you study Korean or buy and use credits.",
-    draft: "An individual in South Korea operates TOPIQ. The proposed effective date is November 21, 2026. TOPIQ plans to announce the final terms on this site. Procedures for purchases by minors, the calculation of partial refunds and the refund request period if the service closes are under review.",
     sections: [
       { title: "Service and accounts", paragraphs: [
         "TOPIQ offers PBT and IBT mock exams, vocabulary sets and writing practice for TOPIK preparation. Everyone can browse published exams. Sign in to take an exam. Free includes the first published reading and listening sets in both PBT and IBT. Plus includes all published reading and listening sets in both formats. Writing evaluation history and credits are linked to your signed-in account.",
@@ -56,7 +55,7 @@ const copy = {
         "Mock exam scores help you track your progress. Only the official TOPIK exam certifies a score or level. The AI writing tutor scores your answer and suggests revisions. Its explanations may contain errors, so review them alongside your original answer.",
       ] },
       { title: "Buying and using credits", paragraphs: [
-        "TOPIQ plans to reopen paid credit top-ups after business registration. Open Credits in the account menu to check top-up availability, balances and transaction history. You can use your existing credits for learning while top-ups are paused.",
+        "Open Credits in the account menu to check top-up availability, balances and transaction history. You can use your existing credits for learning while top-ups are paused.",
         "Purchased and free credits can be used until account closure. Credits from one-time top-ups are spent first, starting with the oldest credited order.",
         "On both Free and Plus, it costs 100 credits to unlock a writing set. You can reopen it with the same account and get up to 20 evaluations per question at no additional credit cost.",
       ] },
@@ -78,7 +77,6 @@ const copy = {
   },
   id: {
     intro: "Ketentuan ini menjelaskan tanggung jawab TOPIQ dan pengguna saat kamu belajar bahasa Korea atau membeli dan menggunakan kredit.",
-    draft: "TOPIQ dikelola oleh perorangan di Korea Selatan. Tanggal berlaku yang diusulkan adalah 21 November 2026. TOPIQ akan mengumumkan ketentuan resmi di situs ini. Prosedur pembayaran oleh anak di bawah umur, perhitungan pengembalian dana sebagian, dan batas waktu pengajuan saat layanan ditutup masih ditinjau.",
     sections: [
       { title: "Layanan dan akun", paragraphs: [
         "TOPIQ menyediakan simulasi PBT dan IBT, set kosakata, dan latihan menulis untuk persiapan TOPIK. Siapa saja dapat melihat daftar ujian. Masuk untuk mengikuti ujian. Free mencakup set membaca dan menyimak pertama yang tersedia untuk PBT dan IBT. Plus mencakup semua set membaca dan menyimak yang tersedia pada kedua format ujian. Riwayat evaluasi tulisan dan kredit terhubung ke akun yang kamu gunakan untuk masuk.",
@@ -89,7 +87,7 @@ const copy = {
         "Nilai simulasi membantu kamu memantau kemajuan belajar. Hanya ujian resmi TOPIK yang dapat memberikan sertifikasi nilai atau level. Tutor menulis AI menilai jawaban dan menyarankan perbaikan. Penjelasannya bisa keliru, jadi periksa saran tersebut bersama jawaban aslimu.",
       ] },
       { title: "Pembelian dan penggunaan kredit", paragraphs: [
-        "TOPIQ berencana membuka kembali pembelian kredit setelah usaha terdaftar. Buka Kredit di menu akun untuk melihat ketersediaan isi ulang, saldo, dan riwayat transaksi. Selama isi ulang dihentikan sementara, kredit yang sudah tersedia tetap dapat digunakan untuk belajar.",
+        "Buka Kredit di menu akun untuk melihat ketersediaan isi ulang, saldo, dan riwayat transaksi. Selama isi ulang dihentikan sementara, kredit yang sudah tersedia tetap dapat digunakan untuk belajar.",
         "Kredit berbayar dan gratis dapat digunakan hingga akun ditutup. Kredit dari isi ulang satu kali digunakan terlebih dahulu, mulai dari pesanan yang paling awal dikreditkan.",
         "Pengguna Free dan Plus menggunakan 100 kredit untuk membuka satu set menulis. Kamu dapat membukanya kembali dengan akun yang sama dan mendapat hingga 20 evaluasi per soal tanpa potongan kredit tambahan.",
       ] },
@@ -112,5 +110,7 @@ const copy = {
 };
 
 export default function TermsPage() {
-  return <PolicyDocument kind="terms" copy={copy} />;
+  return <><SiteHeader /><main id="main-content" className="licenses-main page-container" tabIndex={-1}>
+    <PolicyDocument kind="terms" copy={copy} />
+  </main><SiteFooter /></>;
 }

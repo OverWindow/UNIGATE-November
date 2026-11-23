@@ -4,7 +4,9 @@ import Link from "next/link";
 import { ArrowUp, ExternalLink } from "lucide-react";
 import { useApp } from "@/app/providers";
 import { authContent } from "@/lib/auth/auth-content";
+import { billingEmail } from "@/lib/credits-content";
 import { landingContent } from "@/lib/landing-content";
+import { localizedPath } from "@/lib/locale-path";
 import { Logo } from "./SiteHeader";
 
 export default function SiteFooter() {
@@ -16,7 +18,7 @@ export default function SiteFooter() {
     <footer className="site-footer">
       <div className="page-container">
         <div className="footer-main">
-          <Link href="/#intro" aria-label={t.accessibility.home}><Logo /></Link>
+          <Link href={`${localizedPath("/", language)}#intro`} aria-label={t.accessibility.home}><Logo /></Link>
           <div className="footer-links">
             <a href="https://www.unigate.kr/" target="_blank" rel="noopener noreferrer">
               {t.footer.parent}
@@ -28,9 +30,10 @@ export default function SiteFooter() {
         <div className="footer-bottom">
           <span>© 2026 UNIGATE. All rights reserved.</span>
           <ul className="footer-document-links">
-            <li><Link href="/settings/privacy"><strong>{privacy}</strong></Link></li>
-            <li><Link href="/settings/terms">{terms}</Link></li>
-            <li><Link href="/open-source-licenses">{t.footer.licenses}</Link></li>
+            <li><Link href={localizedPath("/privacy", language)}><strong>{privacy}</strong></Link></li>
+            <li><Link href={localizedPath("/terms", language)}>{terms}</Link></li>
+            <li><Link href={localizedPath("/open-source-licenses", language)}>{t.footer.licenses}</Link></li>
+            <li><a href={`mailto:${billingEmail}`}>{t.footer.billing}: {billingEmail}</a></li>
           </ul>
         </div>
         <p className="footer-trademark">{t.footer.trademark}</p>

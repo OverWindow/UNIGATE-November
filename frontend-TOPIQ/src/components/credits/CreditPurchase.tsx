@@ -188,15 +188,18 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
       </>} /> : price === "unavailable" ? <>
       <p role="status">{t.priceUnavailable}</p>
       <button type="button" className="button credits-secondary" onClick={reloadPrice}>{t.retry}</button>
-    </> : price ? <button type="button" className="button button-primary" aria-describedby="credit-card-notice" disabled={blocked} onClick={() => void buy()}>
-      {t.buy(price.credits.toLocaleString(language), price.amount.toLocaleString(language))}
-    </button> : <p role="status">{t.priceLoading}</p>}
-    {!isPlan && <Link className="button credits-secondary" href="/credits?history=payments">{t.paymentHistory}</Link>}
+    </> : price ? <>
+      <button type="button" className="button button-primary credits-topup-button" aria-describedby="credit-card-notice credit-topup-price" disabled={blocked} onClick={() => void buy()}>
+        {t.buy(price.credits.toLocaleString(language))}
+      </button>
+      <span className="credits-topup-price" id="credit-topup-price">{new Intl.NumberFormat(language, { style: "currency", currency: "KRW" }).format(price.amount)}</span>
+    </> : <p role="status">{t.priceLoading}</p>}
+    {!isPlan && <Link className="button credits-secondary credits-topup-button" href="/credits?history=payments">{t.paymentHistory}</Link>}
     {(!isPlan || planAccount?.subscription) && <button type="button" className="button credits-secondary" disabled={opening} onClick={() => void viewPayments()}>
       {isPlan ? p.manage : paymentHistoryContent[language].receipts}
     </button>}
     {portalNotice && <p role="status">{t.portal[portalNotice]}</p>}
-    {notice && <p role="status">{notice === "planInUse" ? p.inUse : checkoutCopy[notice]}</p>}
+    {notice && notice !== "opening" && <p role="status">{notice === "planInUse" ? p.inUse : checkoutCopy[notice]}</p>}
     {retryCheck && <button type="button" className="button credits-secondary" onClick={() => setCheckCount(count => count + 1)}>{t.checkAgain}</button>}
   </div>;
 }

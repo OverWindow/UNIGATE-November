@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { Check, ExternalLink, Minus, Plus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
 import { homeContent } from "@/lib/home-content";
 import SiteHeader from "../SiteHeader";
@@ -16,11 +16,28 @@ export default function LandingPage() {
   const { language } = useApp();
   const t = homeContent[language];
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const mainRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const main = mainRef.current;
+    if (!main || !window.IntersectionObserver || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const sections = main.querySelectorAll<HTMLElement>("[data-reveal]");
+    const observer = new IntersectionObserver(entries => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        (entry.target as HTMLElement).dataset.revealVisible = "true";
+        observer.unobserve(entry.target);
+      }
+    }, { threshold: 0.12, rootMargin: "0px 0px -32px 0px" });
+    sections.forEach(section => observer.observe(section));
+    main.dataset.revealReady = "true";
+    return () => observer.disconnect();
+  }, []);
 
   return <>
     <SiteHeader />
     <div className={styles.page}>
-      <main id="main-content" tabIndex={-1}>
+      <main id="main-content" tabIndex={-1} ref={mainRef}>
         <section id="intro" className={styles.hero} aria-labelledby="hero-title">
           <div className={`${styles.container} ${styles.heroGrid}`}>
             <div className={styles.heroCopy}>
@@ -34,7 +51,7 @@ export default function LandingPage() {
         <div className={styles.flow}>
           <HomeCards language={language} />
 
-          <section id="topik-guide" className={`${styles.container} ${styles.section}`} aria-labelledby="guide-title">
+          <section id="topik-guide" className={`${styles.container} ${styles.section}`} aria-labelledby="guide-title" data-reveal>
             <div className={styles.guideGrid}>
               <div className={styles.guideIntro}>
                 <h2 id="guide-title" className={styles.heading}>{t.guide.title}</h2>
@@ -51,14 +68,14 @@ export default function LandingPage() {
             </div>
           </section>
 
-          <section id="topik-uses" className={styles.section} aria-labelledby="uses-title">
+          <section id="topik-uses" className={styles.section} aria-labelledby="uses-title" data-reveal>
             <div className={styles.container}>
               <div className={styles.sectionIntro}><h2 id="uses-title" className={styles.heading}>{t.uses.title}</h2><p className={styles.description}>{t.uses.description}</p></div>
               <div className={styles.useGrid}>{t.uses.cards.map(card => <article className={styles.useItem} key={card.title}><h3>{card.title}</h3><p>{card.description}</p></article>)}</div>
             </div>
           </section>
 
-          <section id="topik-faq" className={`${styles.section} ${styles.faq}`} aria-labelledby="faq-title">
+          <section id="topik-faq" className={`${styles.section} ${styles.faq}`} aria-labelledby="faq-title" data-reveal>
             <div className={`${styles.container} ${styles.faqContainer}`}>
               <h2 id="faq-title" className={styles.heading}>{t.faq.title}</h2>
               <div className={styles.faqList}>{t.faq.items.map(({ question, answer }, index) => <div className={styles.faqItem} key={index}>

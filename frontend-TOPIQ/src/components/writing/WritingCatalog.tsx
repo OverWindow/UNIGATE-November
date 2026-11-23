@@ -8,6 +8,7 @@ import { useApp } from "@/app/providers";
 import { writingRequest, unlockWriting, WritingError, type WritingSet } from "@/lib/writing/writing-api";
 import { writingContent } from "@/lib/writing/writing-content";
 import { closeWithMotion } from "@/lib/modal-motion";
+import { localizedPath } from "@/lib/locale-path";
 
 export default function WritingCatalog() {
   const { language, user, refreshSession, refreshCredits } = useApp();
@@ -66,7 +67,7 @@ export default function WritingCatalog() {
         });
         if (controller.signal.aborted) return;
         setLockedSet(null);
-        router.push(`/writing/sets/${lockedSet.id}`);
+        router.push(localizedPath(`/writing/sets/${lockedSet.id}`, language));
       }
     } catch (cause) {
       if (!controller.signal.aborted) {
@@ -130,7 +131,7 @@ export default function WritingCatalog() {
                   {!user ? t.loginToOpen : set.unlocked ? t.reopen : t.unlock.replace("{credits}", String(set.setCost))}<ArrowRight size={17} aria-hidden="true" /></span>
               </>;
               return user && set.unlocked
-                ? <Link className="writing-set-card catalog-card" href={`/writing/sets/${set.id}`} key={set.id}>{content}</Link>
+                ? <Link className="writing-set-card catalog-card" href={localizedPath(`/writing/sets/${set.id}`, language)} key={set.id}>{content}</Link>
                 : <button className="writing-set-card catalog-card" type="button" aria-haspopup="dialog" key={set.id}
                   onClick={event => { trigger.current = event.currentTarget; setUnlockError(""); setLockedSet(set); }}>{content}</button>;
             })}</div>}

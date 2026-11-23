@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { getSession, signIn, signOut, signUp, type AuthUser, type SignupInput } from "@/lib/auth/auth-api";
 import { creditsRequest, type CreditBalance } from "@/lib/writing/writing-api";
 import type { Language } from "@/lib/landing-content";
+import { localizedPath } from "@/lib/locale-path";
 
 interface AppContextValue {
   language: Language;
@@ -22,8 +23,8 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null);
 const languageStorageKey = "topiq-language";
 
-export default function Providers({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<Language>("ko");
+export default function Providers({ children, initialLanguage }: { children: ReactNode; initialLanguage: Language }) {
+  const [language, setLanguageState] = useState<Language>(initialLanguage);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState<AppContextValue["status"]>("loading");
   const [creditBalance, setCreditBalance] = useState<CreditBalance | null>(null);
@@ -47,12 +48,14 @@ export default function Providers({ children }: { children: ReactNode }) {
   const creditRequest = useRef(0);
 
   useEffect(() => {
-    // Restore after hydration so the initial render matches the server.
+    // Keep the saved language and URL in sync after the initial server render.
     try {
       const saved = localStorage.getItem(languageStorageKey);
-      if (saved === "ko" || saved === "en" || saved === "id") setLanguageState(saved);
+      if (initialLanguage === "ko" && (saved === "en" || saved === "id")) {
+        window.location.replace(`${localizedPath(window.location.pathname, saved)}${window.location.search}${window.location.hash}`);
+      }
     } catch { /* Storage may be unavailable. */ }
-  }, []);
+  }, [initialLanguage]);
 
   const setLanguage = useCallback((next: Language) => {
     setLanguageState(next);

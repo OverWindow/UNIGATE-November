@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { useApp } from "@/app/providers";
 import { catalogSelection, VocabularyError, vocabularyRequest, type VocabularyCatalogData, type VocabularyLevel } from "@/lib/vocabulary/vocabulary-api";
 import { vocabularyContent, vocabularyLevelLabel } from "@/lib/vocabulary/vocabulary-content";
+import { localizedPath } from "@/lib/locale-path";
 
 export function VocabularyLoading() {
   const { language } = useApp();
@@ -48,7 +49,7 @@ function CatalogPage({ level, page }: { level: number; page: number }) {
     </div></section>
     <div className="page-container vocabulary-catalog">
       <nav className="vocabulary-levels section-switch" aria-label={t.levelLabel}>
-        {[3, 4, 5, 6].map(value => <Link key={value} href={`/vocabulary?level=${value}&page=1`} aria-current={level === value ? "page" : undefined} scroll={false}>
+        {[3, 4, 5, 6].map(value => <Link key={value} href={localizedPath(`/vocabulary?level=${value}&page=1`, language)} aria-current={level === value ? "page" : undefined} scroll={false}>
           {vocabularyLevelLabel(value, language)}
         </Link>)}
       </nav>
@@ -58,7 +59,7 @@ function CatalogPage({ level, page }: { level: number; page: number }) {
       {currentError ? <div className="catalog-status vocabulary-error" role="alert">
         <p>{currentError instanceof VocabularyError && currentError.status === 404 ? t.notFound : t.error}</p>
         <button className="button vocabulary-secondary" onClick={() => setRevision(value => value + 1)}>{t.retry}</button>
-        {page !== 1 && <Link className="button vocabulary-secondary" href={`/vocabulary?level=${level}&page=1`}>{t.back}</Link>}
+        {page !== 1 && <Link className="button vocabulary-secondary" href={localizedPath(`/vocabulary?level=${level}&page=1`, language)}>{t.back}</Link>}
       </div> : !currentData ? <p className="catalog-status" role="status">{t.loading}</p>
         : !currentData.catalog.sets.length ? <p className="catalog-status">{t.empty}</p> : <>
         <div className="vocabulary-set-grid">
@@ -66,17 +67,17 @@ function CatalogPage({ level, page }: { level: number; page: number }) {
             <span className="catalog-set-number">{String(group.number).padStart(2, "0")}</span>
             <h3>{group.preview.map((word, index) => <span key={index} lang="ko">{word}</span>)}</h3>
             <div className="vocabulary-set-actions">
-              <Link className="vocabulary-set-action" href={`/vocabulary/sets/${group.id}`}>{t.browse}<ExternalLink size={14} aria-hidden="true" /></Link>
-              {group.quizQuestionCount ? <Link className="vocabulary-set-action" href={`/vocabulary/sets/${group.id}/quiz`}>
+              <Link className="vocabulary-set-action" href={localizedPath(`/vocabulary/sets/${group.id}`, language)}>{t.browse}<ExternalLink size={14} aria-hidden="true" /></Link>
+              {group.quizQuestionCount ? <Link className="vocabulary-set-action" href={localizedPath(`/vocabulary/sets/${group.id}/quiz`, language)}>
                 {t.quiz}<ExternalLink size={14} aria-hidden="true" />
               </Link> : <span className="vocabulary-set-action vocabulary-quiz-unavailable">{group.quizQuestionCount === null ? t.quizUnavailable : t.quizPreparing}</span>}
             </div>
           </article>)}
         </div>
         {currentData.catalog.pageCount > 1 && <nav className="vocabulary-pagination" aria-label={t.pagination}>
-          {page > 1 ? <Link href={`/vocabulary?level=${level}&page=${page - 1}`}>{t.previous}</Link> : <span aria-disabled="true">{t.previous}</span>}
+          {page > 1 ? <Link href={localizedPath(`/vocabulary?level=${level}&page=${page - 1}`, language)}>{t.previous}</Link> : <span aria-disabled="true">{t.previous}</span>}
           <span aria-current="page">{page} / {currentData.catalog.pageCount}</span>
-          {page < currentData.catalog.pageCount ? <Link href={`/vocabulary?level=${level}&page=${page + 1}`}>{t.next}</Link> : <span aria-disabled="true">{t.next}</span>}
+          {page < currentData.catalog.pageCount ? <Link href={localizedPath(`/vocabulary?level=${level}&page=${page + 1}`, language)}>{t.next}</Link> : <span aria-disabled="true">{t.next}</span>}
         </nav>}
       </>}
     </div>

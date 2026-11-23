@@ -1,10 +1,8 @@
-import type { Metadata } from "next";
+import { seoMetadata } from "@/lib/seo";
+import { seoCopy } from "@/lib/seo-content";
 import LandingPage from "@/components/landing/LandingPage";
 
-export const metadata: Metadata = {
-  title: "UNIGATE TOPIQ",
-  description: "TOPIK II 읽기와 듣기 50문항을 실전 또는 연습 모드로 풀고, 정확한 응답 분석과 오답 해설을 확인하세요.",
-};
+export const generateMetadata = () => seoMetadata("/", seoCopy.home);
 
 export default function Home() {
   return <LandingPage />;

@@ -1,53 +1,89 @@
+"use client";
+
 import Link from "next/link";
-import { ArrowRight, BookOpen, Check, ChevronRight, FileText, Monitor, PenLine } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { homeContent } from "@/lib/home-content";
 import type { Language } from "@/lib/landing-content";
-import { plansContent, publicPlans } from "@/lib/plans-content";
+import { localizedPath } from "@/lib/locale-path";
+import { planSavingsPercent, plansContent, publicPlans } from "@/lib/plans-content";
 import InteractiveDots from "./InteractiveDots";
 import styles from "./LandingPage.module.css";
 
-const learningCards = [
-  { key: "pbt", href: "/pbt", icon: FileText },
-  { key: "ibt", href: "/ibt", icon: Monitor },
-  { key: "vocabulary", href: "/vocabulary", icon: BookOpen },
-  { key: "writing", href: "/writing", icon: PenLine },
-] as const;
-
 export default function HomeCards({ language }: { language: Language }) {
-  const { learning, pricing } = homeContent[language];
+  const { pricing } = homeContent[language];
   const plan = plansContent[language];
   const price = new Intl.NumberFormat(language, { style: "currency", currency: "KRW" });
+  const trackRef = useRef<HTMLDivElement>(null);
+  const rowRef = useRef<HTMLDivElement>(null);
 
-  return <div className={styles.cardsArea}>
+  useEffect(() => {
+    const track = trackRef.current;
+    const row = rowRef.current;
+    if (!track || !row) return;
+    let step = 0;
+    let stickyTop = 0;
+    const update = () => {
+      if (!step) return;
+      const index = Math.min(row.children.length - 1, Math.max(0,
+        Math.floor((-track.getBoundingClientRect().top + stickyTop) / step)));
+      row.scrollLeft = index * step;
+    };
+    const measure = () => {
+      if (window.innerWidth >= 640) {
+        step = 0;
+        track.style.height = "";
+        row.scrollLeft = 0;
+        return;
+      }
+      step = row.clientWidth + 12;
+      stickyTop = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--header-height")) + 16;
+      track.style.height = `${row.offsetHeight + step * row.children.length}px`;
+      update();
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(row);
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", update, { passive: true });
+    measure();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", update);
+      track.style.height = "";
+    };
+  }, [language]);
+
+  return <div className={styles.cardsArea} data-reveal>
     <InteractiveDots />
     <div className={styles.container}>
-      <section id="tests" aria-labelledby="tests-title">
-        <h2 id="tests-title" className={styles.heading}>{learning.title}</h2>
-        <div className={styles.learningCards}>
-          {learningCards.map(({ key, href, icon: Icon }) => (
-            <Link key={key} href={href} className={styles.learningCard}>
-              <span className={styles.cardIcon}><Icon size={22} aria-hidden="true" /></span>
-              <span>{learning[key]}</span>
-              <ChevronRight size={18} aria-hidden="true" />
-            </Link>
-          ))}
-        </div>
-      </section>
       <section className={styles.pricing} aria-labelledby="home-plans-title">
         <h2 id="home-plans-title" className={styles.heading}>{pricing.title}</h2>
-        <div className={styles.planRow}>
-          {publicPlans.map(({ months, amount, bonusCredits }) => (
-            <Link key={months} href="/plans" className={styles.planCard}>
-              <span className={styles.planTerm}>{plan.term(months)}<ArrowRight size={17} aria-hidden="true" /></span>
-              <strong className={styles.planPrice}>{price.format(amount)}</strong>
-              <span className={styles.planRenewal}>{pricing.renewal(months)}</span>
-              <ul className={styles.planBenefits} role="list">
-                {plan.benefits(bonusCredits).map(benefit => (
-                  <li key={benefit}><Check size={16} aria-hidden="true" /><span>{benefit}</span></li>
-                ))}
-              </ul>
-            </Link>
-          ))}
+        <div className={styles.planSharedBenefits}>
+          <h3 className={styles.planSharedTitle}>Plus</h3>
+          <ul className={styles.planBenefits} role="list">{plan.benefits(publicPlans[0].bonusCredits).map(benefit =>
+            <li key={benefit}><Check size={16} aria-hidden="true" /><span>{benefit}</span></li>
+          )}</ul>
+        </div>
+        <div className={styles.planScrollTrack} ref={trackRef}>
+          <div className={styles.planRow} ref={rowRef}>
+            <article className={`${styles.planCard} ${styles.planFree}`}>
+              <span className={styles.planTerm}>Free</span>
+              <strong className={styles.planPrice}>{price.format(0)}</strong>
+              <ul className={styles.planBenefits} role="list">{plan.freeBenefits.map(benefit =>
+                <li key={benefit}><Check size={16} aria-hidden="true" /><span>{benefit}</span></li>
+              )}</ul>
+            </article>
+            {publicPlans.map(({ months, amount }) => {
+              const savings = planSavingsPercent(amount, months, publicPlans[0].amount);
+              return <Link key={months} href={localizedPath("/plans", language)} className={styles.planCard}>
+                <span className={styles.planTerm}>{plan.term(months)}<ArrowRight size={17} aria-hidden="true" /></span>
+                <strong className={styles.planPrice}>{price.format(amount)}</strong>
+                <span className={styles.planRenewal}>{plan.interval(months)}</span>
+                {savings > 0 && <span className={styles.planSavings}>{plan.savings(savings)}</span>}
+              </Link>;
+            })}
+          </div>
         </div>
       </section>
     </div>

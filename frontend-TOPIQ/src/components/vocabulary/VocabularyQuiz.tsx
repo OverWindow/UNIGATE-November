@@ -7,6 +7,7 @@ import { useApp } from "@/app/providers";
 import { VocabularyError, vocabularyRequest, type MeaningLanguage, type VocabularyAnswer,
   type VocabularyQuestion, type VocabularyQuiz as QuizData } from "@/lib/vocabulary/vocabulary-api";
 import { vocabularyContent } from "@/lib/vocabulary/vocabulary-content";
+import { localizedPath } from "@/lib/locale-path";
 
 export default function VocabularyQuiz({ id }: { id: string }) {
   const { language } = useApp();
@@ -100,7 +101,7 @@ export default function VocabularyQuiz({ id }: { id: string }) {
       <p>{error instanceof VocabularyError && error.status === 404 ? t.notFound : t.quizError}</p>
       <button className="button vocabulary-secondary" onClick={() => setRevision(value => value + 1)}>{t.retry}</button>
     </div> : !data ? <p className="vocabulary-status" role="status">{t.quizLoading}</p>
-      : !questions.length ? <div className="vocabulary-status"><p>{t.quizEmpty}</p><Link className="button vocabulary-secondary" href={`/vocabulary/sets/${id}`}>{t.browse}</Link></div>
+      : !questions.length ? <div className="vocabulary-status"><p>{t.quizEmpty}</p><Link className="button vocabulary-secondary" href={localizedPath(`/vocabulary/sets/${id}`, language)}>{t.browse}</Link></div>
       : finished ? <section className="vocabulary-quiz-result" aria-labelledby="quiz-result">
         <h2 id="quiz-result" ref={heading} tabIndex={-1}>{reviewing ? t.reviewResult : t.quizResult}</h2>
         <p className="vocabulary-quiz-score"><strong>{questions.length - wrong.length}</strong> / {questions.length}<span>{t.correctCount}</span></p>
@@ -108,7 +109,7 @@ export default function VocabularyQuiz({ id }: { id: string }) {
         <div className="vocabulary-quiz-actions">
           {!!wrong.length && <button className="button button-primary" onClick={retryWrong}><RotateCcw size={16} aria-hidden="true" /> {t.retryWrong} ({wrong.length})</button>}
           <button className="button vocabulary-secondary" onClick={() => setRevision(value => value + 1)}>{t.quizRestart}</button>
-          <Link className="button vocabulary-secondary" href={`/vocabulary/sets/${id}`}>{t.browse}</Link>
+          <Link className="button vocabulary-secondary" href={localizedPath(`/vocabulary/sets/${id}`, language)}>{t.browse}</Link>
         </div>
       </section> : <>
         {!reviewing && questions.length < data.wordCount && <p className="vocabulary-quiz-note">{t.quizPartial}</p>}

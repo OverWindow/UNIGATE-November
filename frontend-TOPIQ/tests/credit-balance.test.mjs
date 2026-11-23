@@ -133,14 +133,14 @@ test("all four purchase buttons display their localized card issuer notice", t =
       () => React.createElement(CreditPurchase, { userId: 1 }),
       () => React.createElement(CreditPurchase, { userId: 1, planAccount: { plans, active: false, currentPlanMonths: null } }),
     );
-    const notices = [...tree.html.matchAll(/<p\b[^>]* id="([^"]+)"[^>]*>([^<]+)<\/p><button\b[^>]* aria-describedby="\1"/g)];
+    const notices = [...tree.html.matchAll(/<p\b[^>]* id="([^"]+)"[^>]*>([^<]+)<\/p><button\b[^>]* aria-describedby="\1(?: [^"]+)?"/g)];
     assert.deepEqual(notices.map(([, id, message]) => [id, message]),
       ["credit-card-notice", ...plans.map(({ months }) => `plan-card-notice-${months}`)].map(id => [id, cardIssuerNotice]));
     tree.unmount();
   }
 });
 
-test("each Plus card lists its benefits and starts the selected purchase without a history button", async () => {
+test("Plus benefits appear once, longer plans show savings, and the selected purchase starts once", async () => {
   const plans = [[1, 9900], [3, 23900], [6, 43900]].map(([months, amount]) => ({
     months, amount, currency: "krw", priceId: `price_plan_${months}`, bonusCredits: 400,
   }));
@@ -167,6 +167,12 @@ test("each Plus card lists its benefits and starts the selected purchase without
   assert.ok(free.includes("PBT 읽기·듣기 첫 세트 각 1개"));
   assert.ok(free.includes("IBT 읽기·듣기 첫 세트 각 1개"));
   assert.doesNotMatch(free, /<button/);
+  const shared = tree.html.match(/<div class="plan-shared-benefits">([\s\S]*?)<\/div>/)?.[1] ?? "";
+  for (const benefit of ["공개된 PBT·IBT 읽기·듣기 모의고사 무제한 응시", "모든 단어장 및 단어 퀴즈 무제한 열람",
+    "AI 쓰기 튜터용 매월 400크레딧 지급", "쓰기 세트당 100크레딧으로 해제"]) {
+    assert.ok(shared.includes(benefit));
+    assert.equal(tree.html.split(benefit).length - 1, 1);
+  }
   assert.equal(cards.length, plans.length);
   for (const [index, { months, amount }] of plans.entries()) {
     const card = cards[index];
@@ -174,9 +180,9 @@ test("each Plus card lists its benefits and starts the selected purchase without
     assert.ok(card.includes(amount.toLocaleString("ko")));
     assert.ok(card.includes(months === 1 ? "매월" : `${months}개월마다`));
     assert.ok(card.includes(`aria-label="Plus ${months}개월 · 구독하기"`));
-    for (const benefit of ["공개된 PBT·IBT 읽기·듣기 모의고사 무료 응시", "매월 400크레딧 누적 지급",
-      "쓰기 세트당 100크레딧으로 해제", "해제한 세트는 문항당 AI 첨삭 최대 20회"]) assert.ok(card.includes(benefit));
-    assert.equal((card.match(/<li>/g) ?? []).length, 4);
+    assert.equal((card.match(/<li>/g) ?? []).length, 0);
+    if (months > 1) assert.ok(card.includes(`월간 결제 대비 ${months === 3 ? 20 : 26}% 절약`));
+    else assert.doesNotMatch(card, /월간 결제 대비/);
   }
   assert.doesNotMatch(tree.html, /결제 내역/);
   buy();
@@ -189,10 +195,11 @@ test("each Plus card lists its benefits and starts the selected purchase without
   tree.unmount();
 });
 
-test("plans follow credits in the account menu and anonymous returns keep the plan order", () => {
+test("plans follow credits in the account menu without a settings link", () => {
   path = "/plans";
   const header = mount(SiteHeader);
-  assert.match(header.html, /href="\/credits"[\s\S]*?href="\/plans"[\s\S]*?<span>Plus<\/span>[\s\S]*?href="\/settings"/);
+  assert.match(header.html, /href="\/credits"[\s\S]*?href="\/plans"[\s\S]*?<span>Plus<\/span>/);
+  assert.doesNotMatch(header.html, /href="\/settings"/);
   header.unmount();
   session.user = null;
   session.status = "anonymous";
@@ -219,7 +226,7 @@ test("guests can browse all plans and each Plus card returns them to plans after
     for (const [index, card] of offers.entries()) {
       const price = new Intl.NumberFormat(language, { style: "currency", currency: "KRW" }).format(amounts[index]);
       assert.ok(card.includes(price));
-      assert.equal((card.match(/<li>/g) ?? []).length, 4);
+      assert.equal((card.match(/<li>/g) ?? []).length, 0);
       assert.ok(card.includes(`href="/login?next=%2Fplans">${login}</a>`));
     }
     assert.doesNotMatch(page.html, /aria-current="true"|<button/);
@@ -260,8 +267,9 @@ function mountPurchaseButton() {
   let click, viewPayments;
   function Purchase() {
     const tree = CreditPurchase({ userId: 1, returnId: null, cancelled: false, onFulfilled: () => {} });
-    const controls = React.Children.toArray(tree.props.children);
-    click = controls.find(control => control.type === "button" && control.props.className === "button button-primary")?.props.onClick;
+    const controls = React.Children.toArray(tree.props.children).flatMap(control =>
+      control.type === React.Fragment ? React.Children.toArray(control.props.children) : [control]);
+    click = controls.find(control => control.type === "button" && control.props.className?.includes("credits-topup-button"))?.props.onClick;
     viewPayments = controls.find(control => control.props.children === "Stripe 영수증").props.onClick;
     return tree;
   }
@@ -331,7 +339,7 @@ test("resumed checkout displays the original amount and double clicks or retries
     return Response.json({ id: "order", status: "pending", checkoutUrl: "https://checkout.stripe.com/example" });
   };
   const first = mountPurchaseButton();
-  assert.match(first.html, /1,000크레딧 충전 · 6,700원/);
+  assert.match(first.html, /<button[^>]*>1,000 크레딧 충전<\/button><span[^>]*>₩6,700<\/span>/);
   first.click();
   first.click();
   await setImmediate();

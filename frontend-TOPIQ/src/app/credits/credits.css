@@ -1,7 +1,7 @@
 .credits-main { min-height: 70vh; padding-block: var(--catalog-top) 72px; background: #f7f9fc; }
 .credits-page { max-width: 960px; }
 .credits-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 24px; }
-.credits-heading .credits-refresh { flex: 0 0 44px; width: 44px; min-height: 44px; padding: 0; }
+.credits-heading .credits-refresh { flex: 0 0 44px; width: 44px; min-height: 44px; margin-left: auto; padding: 0; }
 .credits-refresh[aria-busy="true"] { opacity: 1; color: #315eb7; background: #edf3ff; }
 .credits-refresh[aria-busy="true"] svg, .credits-loading-icon { animation: credits-spin .8s linear infinite; }
 .credits-content { transition: opacity .2s ease; }
@@ -17,9 +17,11 @@
 .credits-available dt { color: #315eb7; }
 .credits-purchase { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
 .credits-purchase .button { min-height: 44px; }
+.credits-purchase .credits-topup-button { min-height: 38px; padding: 8px 14px; font-size: 13px; }
+.credits-topup-price { color: #52647e; font-size: 13px; font-variant-numeric: tabular-nums; }
 .credits-purchase .button:disabled { opacity: .6; }
 .credits-purchase p { margin: 0; color: #405370; font-size: 14px; }
-.credits-purchase .card-issuer-notice { color: #854509; font-weight: 600; line-height: 1.5; }
+.credits-purchase .card-issuer-notice { color: #6b7280; font-size: 12px; font-weight: 400; line-height: 1.5; }
 .credits-purchase > .card-issuer-notice { flex-basis: 100%; }
 .credits-history { margin-top: 40px; }
 .credits-order-list { margin: 0; padding: 0; list-style: none; border: 1px solid #dfe6f1; border-radius: 12px; background: #fff; }

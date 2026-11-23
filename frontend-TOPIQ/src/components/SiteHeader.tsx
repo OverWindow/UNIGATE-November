@@ -5,10 +5,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import useRouter from "@/lib/use-navigation-router";
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, CreditCard, Globe, Layers, LogOut, Menu, Settings, UserRound, X } from "lucide-react";
+import { Check, ChevronDown, CreditCard, Globe, Layers, LogOut, Menu, UserRound, X } from "lucide-react";
 import { useApp } from "@/app/providers";
 import { authContent } from "@/lib/auth/auth-content";
 import { landingContent, type Language } from "@/lib/landing-content";
+import { localizedPath, unlocalizedPath } from "@/lib/locale-path";
 
 const languages: { code: Language; name: string }[] = [
   { code: "ko", name: "한국어" },
@@ -23,6 +24,7 @@ export function Logo({ className = "", loading = "lazy" }: { className?: string;
 export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: string; onBeforeLogout?: (logout: () => void) => void }) {
   const { language, setLanguage, user, status, refreshSession, logout } = useApp();
   const pathname = usePathname();
+  const routePath = unlocalizedPath(pathname);
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
@@ -36,7 +38,7 @@ export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: st
   const menuButton = useRef<HTMLButtonElement>(null);
   const t = landingContent[language];
   const a = authContent[language];
-  const isAuthPage = ["/login", "/signup", "/verify-email"].includes(pathname);
+  const isAuthPage = ["/login", "/signup", "/verify-email"].includes(routePath);
   const loginHref = authHref || (isAuthPage
     ? "/login" : `/login?next=${encodeURIComponent(pathname)}`);
 
@@ -62,7 +64,7 @@ export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: st
   const navigation = t.navigation.map((label, index) => {
     const href = index === 0 ? "/" : index === 1 ? "/pbt" : index === 2 ? "/ibt" : index === 3 ? "/vocabulary" : index === 4 ? "/writing" : undefined;
     return href ? (
-      <Link key={href} href={href} aria-current={pathname === href || ((href === "/vocabulary" || href === "/writing") && pathname.startsWith(`${href}/`)) ? "page" : undefined} onClick={() => setMenuOpen(false)}>{label}</Link>
+      <Link key={href} href={localizedPath(href, language)} aria-current={routePath === href || ((href === "/vocabulary" || href === "/writing") && routePath.startsWith(`${href}/`)) ? "page" : undefined} onClick={() => setMenuOpen(false)}>{label}</Link>
     ) : (
       <button className="pending-nav-button" type="button" key={label} disabled>{label}</button>
     );
@@ -82,7 +84,7 @@ export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: st
         }
       }}>
         <div className="page-container header-inner">
-          <Link className="brand-link" href="/#intro" aria-label={t.accessibility.home} onClick={() => setMenuOpen(false)}>
+          <Link className="brand-link" href={`${localizedPath("/", language)}#intro`} aria-label={t.accessibility.home} onClick={() => setMenuOpen(false)}>
             <Logo loading="eager" />
           </Link>
           <nav className="desktop-navigation" aria-label={t.accessibility.navigation}>{navigation}</nav>
@@ -100,7 +102,12 @@ export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: st
                 <Globe size={21} strokeWidth={1.6} aria-hidden="true" />
               </button>
               <div className="language-options" id="language-options" role="group" aria-label={t.accessibility.language} hidden={!languageOpen}>
-                {languages.map(({ code, name }) => <button key={code} type="button" lang={code} aria-pressed={language === code} onClick={() => { setLanguage(code); setLanguageOpen(false); languageButton.current?.focus(); }}>
+                {languages.map(({ code, name }) => <button key={code} type="button" lang={code} aria-pressed={language === code} onClick={() => {
+                  setLanguage(code);
+                  setLanguageOpen(false);
+                  const path = unlocalizedPath(window.location.pathname);
+                  window.location.assign(`${localizedPath(path, code)}${window.location.search}${window.location.hash}`);
+                }}>
                   <span>{name}</span><span className="language-check" aria-hidden="true">{language === code && <Check size={14} />}</span>
                 </button>)}
               </div>
@@ -141,10 +148,6 @@ export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: st
                     <Link href="/plans" aria-current={pathname === "/plans" ? "page" : undefined} onClick={() => setAccountOpen(false)}>
                       <Layers size={19} strokeWidth={1.7} aria-hidden="true" />
                       <span>Plus</span>
-                    </Link>
-                    <Link href="/settings" aria-current={pathname === "/settings" ? "page" : undefined} onClick={() => setAccountOpen(false)}>
-                      <Settings size={19} strokeWidth={1.7} aria-hidden="true" />
-                      <span>{a.settings}</span>
                     </Link>
                   </div>
                   <div className="account-menu-section">

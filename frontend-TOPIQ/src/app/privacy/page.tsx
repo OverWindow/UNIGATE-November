@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
+import { seoMetadata } from "@/lib/seo";
+import { seoCopy } from "@/lib/seo-content";
 import PolicyDocument from "@/components/PolicyDocument";
+import SiteHeader from "@/components/SiteHeader";
+import SiteFooter from "@/components/SiteFooter";
+import "../open-source-licenses/licenses.css";
 
-export const metadata: Metadata = {
-  title: "개인정보 처리방침 · 설정 | TOPIQ",
-  description: "TOPIQ의 계정, 학습 기록, 쓰기 평가 및 결제 정보 처리와 이용자의 권리를 안내합니다.",
-};
+export const generateMetadata = () => seoMetadata("/privacy", seoCopy.privacy);
 
 const retentionLaw = "https://www.law.go.kr/LSW/lsLawLinkInfo.do?chrClsCd=010202&lsJoLnkSeq=900619372";
 const privacyPortal = "https://www.privacy.go.kr/";
@@ -12,7 +13,6 @@ const privacyPortal = "https://www.privacy.go.kr/";
 const copy = {
   ko: {
     intro: "TOPIQ에서 계정을 만들거나 모의시험, AI 쓰기 튜터, 크레딧을 이용할 때 어떤 정보가 쓰이는지 안내합니다.",
-    draft: "TOPIQ는 한국에서 개인이 운영합니다. 시행 예정일은 2026년 11월 21일이며 정식 방침은 사이트에 공지할 예정입니다. 비회원 기록·로그·백업의 보관 및 파기 일정, 아동의 동의 절차, 외부 업체별 국외 이전 조건은 확인 중입니다.",
     sections: [
       { title: "가입과 로그인", paragraphs: [
         "TOPIQ는 계정 생성과 본인 확인에 이메일 주소와 닉네임을 사용합니다. 비밀번호로 가입하면 비밀번호를 해시값으로 저장합니다. Google로 로그인하면 Google이 확인한 이메일 주소와 계정 식별자를 받아 TOPIQ 계정에 연결합니다.",
@@ -23,7 +23,7 @@ const copy = {
         "PBT·IBT 모의시험에서는 응시한 시험, 답안, 응시 시각과 점수를 기록해 결과와 이력을 보여줍니다. 이전에 비회원으로 응시한 기록은 당시 브라우저 세션에 연결됩니다. 결과 설문을 제출하면 동의를 받아 이메일, 별점과 학습 설문 응답을 처리합니다. 결과 메일 발송 시 Brevo에 수신 주소와 시험명, 결과 링크가 전달됩니다.",
       ] },
       { title: "AI 쓰기 평가", paragraphs: [
-        "평가를 요청하면 제출한 답안과 평가 결과를 계정의 쓰기 이력에 저장합니다. AI 평가에 필요한 문제와 답안, 평가 지침, 피드백 언어 및 요청 식별자를 BizRouter를 통해 전달합니다. 답안에 이름이나 연락처를 적으면 해당 내용도 함께 전송됩니다.",
+        "평가를 요청하면 제출한 답안과 평가 결과를 계정의 쓰기 이력에 저장합니다. AI 평가에 필요한 문제와 답안, 평가 지침, 피드백 언어 및 요청 식별자를 외부 AI 서비스를 통해 전달합니다. 답안에 이름이나 연락처를 적으면 해당 내용도 함께 전송됩니다.",
       ] },
       { title: "내부 통계와 제품 개선", paragraphs: [
         "TOPIQ는 설문 응답과 제출한 답안을 수집 목적과 동의 범위에서 내부 통계와 학습 기능 개선에 활용합니다. 운영자는 학습 기록과 결제 기록을 조회할 수 있습니다. 설문과 답안은 광고·마케팅에 사용하지 않으며 학교나 제휴사에 제공하지 않습니다.",
@@ -47,7 +47,6 @@ const copy = {
   },
   en: {
     intro: "This policy explains how TOPIQ uses information when you create an account, take a mock exam, submit writing for AI feedback or use credits.",
-    draft: "An individual in South Korea operates TOPIQ. The proposed effective date is November 21, 2026. TOPIQ plans to publish the formal notice on this site. Retention and deletion schedules for guest records, logs and backups, consent procedures for children, and the terms of international transfers by each provider are under review.",
     sections: [
       { title: "Accounts and sign-in", paragraphs: [
         "TOPIQ uses your email address and nickname to create and identify your account. If you register with a password, TOPIQ stores a password hash. If you sign in with Google, TOPIQ receives your verified email address and Google account identifier to link your accounts.",
@@ -58,7 +57,7 @@ const copy = {
         "For PBT and IBT mock exams, TOPIQ records the exam, answers, attempt times and scores to display your results and history. Past guest attempts are linked to the browser session used for the exam. If you submit the results survey, TOPIQ processes your email, rating and learner responses with your consent. To email results, Brevo receives your address, the exam title and the results link.",
       ] },
       { title: "AI writing feedback", paragraphs: [
-        "When you request feedback, TOPIQ saves the submitted answer and evaluation in your writing history. For AI evaluation, TOPIQ sends the question, answer, grading instructions, feedback language and request identifier through BizRouter. A name or contact detail you include in an answer is sent with it.",
+        "When you request feedback, TOPIQ saves the submitted answer and evaluation in your writing history. For AI evaluation, TOPIQ sends the question, answer, grading instructions, feedback language and request identifier through an external AI service. A name or contact detail you include in an answer is sent with it.",
       ] },
       { title: "Internal statistics and product improvement", paragraphs: [
         "TOPIQ uses survey responses and submitted answers for internal statistics and to improve learning features within the purposes of collection and the scope of consent. TOPIQ operators can access learning and payment records. TOPIQ does not use survey responses or answers for advertising or marketing, or share them with schools or business partners.",
@@ -82,7 +81,6 @@ const copy = {
   },
   id: {
     intro: "Kebijakan ini menjelaskan penggunaan data saat kamu membuat akun TOPIQ, mengikuti simulasi ujian, meminta evaluasi tulisan dengan AI, atau menggunakan kredit.",
-    draft: "TOPIQ dikelola oleh perorangan di Korea Selatan. Tanggal berlaku yang diusulkan adalah 21 November 2026. Pemberitahuan resmi akan diumumkan di situs ini. Jadwal penyimpanan dan penghapusan data tamu, log dan cadangan, prosedur persetujuan untuk anak, serta ketentuan transfer data lintas negara tiap penyedia masih ditinjau.",
     sections: [
       { title: "Akun dan proses masuk", paragraphs: [
         "TOPIQ menggunakan alamat email dan nama panggilan untuk membuat dan mengenali akunmu. Jika kamu mendaftar dengan kata sandi, TOPIQ menyimpan nilai hash kata sandi. Jika kamu masuk dengan Google, TOPIQ menerima email terverifikasi dan pengenal akun Google untuk menghubungkan akunmu.",
@@ -93,7 +91,7 @@ const copy = {
         "Dalam simulasi PBT dan IBT, TOPIQ mencatat ujian, jawaban, waktu pengerjaan, dan nilai untuk menampilkan hasil dan riwayat. Riwayat ujian tamu sebelumnya terhubung ke sesi browser yang digunakan saat ujian. Jika kamu mengirim survei hasil, TOPIQ memproses email, penilaian, dan jawaban survei dengan persetujuanmu. Untuk mengirim hasil melalui email, Brevo menerima alamat penerima, judul ujian, dan tautan hasil.",
       ] },
       { title: "Evaluasi tulisan dengan AI", paragraphs: [
-        "Saat kamu meminta evaluasi, TOPIQ menyimpan jawaban dan hasil evaluasi di riwayat tulisanmu. Untuk evaluasi AI, TOPIQ mengirim soal, jawaban, panduan penilaian, bahasa umpan balik, dan pengenal permintaan melalui BizRouter. Nama atau informasi kontak yang kamu tulis di dalam jawaban akan ikut terkirim.",
+        "Saat kamu meminta evaluasi, TOPIQ menyimpan jawaban dan hasil evaluasi di riwayat tulisanmu. Untuk evaluasi AI, TOPIQ mengirim soal, jawaban, panduan penilaian, bahasa umpan balik, dan pengenal permintaan melalui layanan AI eksternal. Nama atau informasi kontak yang kamu tulis di dalam jawaban akan ikut terkirim.",
       ] },
       { title: "Statistik internal dan perbaikan produk", paragraphs: [
         "TOPIQ menggunakan jawaban survei dan jawaban yang dikirim untuk statistik internal serta perbaikan fitur belajar sesuai tujuan pengumpulan dan lingkup persetujuan. Pengelola TOPIQ dapat mengakses riwayat belajar dan pembayaran. Jawaban survei dan jawaban latihan tidak digunakan untuk iklan atau pemasaran dan tidak dibagikan kepada sekolah atau mitra bisnis.",
@@ -118,5 +116,7 @@ const copy = {
 };
 
 export default function PrivacyPage() {
-  return <PolicyDocument kind="privacy" copy={copy} />;
+  return <><SiteHeader /><main id="main-content" className="licenses-main page-container" tabIndex={-1}>
+    <PolicyDocument kind="privacy" copy={copy} />
+  </main><SiteFooter /></>;
 }

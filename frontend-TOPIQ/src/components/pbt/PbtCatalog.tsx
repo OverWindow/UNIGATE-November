@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, ExternalLink, Lock, X } from "lucide-react";
+import { ArrowRight, ExternalLink, Lock } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import useRouter from "@/lib/use-navigation-router";
 import { useApp } from "@/app/providers";
@@ -11,14 +11,14 @@ import { examCopy, ibtTimedHints, pbtErrorMessage } from "@/lib/exam/pbt-content
 import SiteHeader from "../SiteHeader";
 import SiteFooter from "../SiteFooter";
 import { writingContent } from "@/lib/writing/writing-content";
+import { localizedPath } from "@/lib/locale-path";
 
 export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFormat }) {
-  const basePath = `/${examFormat}`;
   const { language, user, refreshSession } = useApp();
+  const basePath = localizedPath(`/${examFormat}`, language);
   const t = examCopy(language, examFormat);
   const loginLabel = writingContent[language].loginToOpen;
-  const loginDialog = useRef<HTMLDialogElement>(null);
-  const [selectedId, setSelectedId] = useState("");
+  const plusDialog = useRef<HTMLDialogElement>(null);
   const returnTarget = useRef("");
   const locale = language === "ko" ? "ko-KR" : language === "id" ? "id-ID" : "en-US";
   const router = useRouter();
@@ -110,7 +110,6 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
         {sectionExams.map(exam => {
           const progress = exam.myProgress?.[mode];
           const inProgressId = progress?.inProgressId ?? attempts.find(attempt => attempt.examId === exam.id && attempt.mode === mode && attempt.status === "in_progress")?.id;
-          const canResume = mode === "practice" && !!inProgressId;
           const result = progress?.latestResult;
           const resultLabel = result ? `${t.latestScore} · ${t[mode]}: ${result.score} / ${result.maxScore} · ${t.submittedOn}: ${new Date(result.submittedAt).toLocaleDateString(locale)} · ${t.result}` : "";
           return <article className="pbt-exam-card catalog-card" id={`exam-${exam.id}`} tabIndex={-1} key={exam.id}>
@@ -118,19 +117,16 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
               <span className="catalog-set-number">{String(exam.round).padStart(2, "0")}</span>
               {result ? <Link className="pbt-badge pbt-badge-score" href={`${basePath}/attempts/${result.id}/result`} title={resultLabel} aria-label={resultLabel}>
                 {result.score} / {result.maxScore} <ExternalLink size={13} aria-hidden="true" />
-              </Link> : <span className="pbt-badge pbt-badge-free">{exam.freeAvailable ? "Free" : "Plus"}</span>}
+              </Link> : exam.freeAvailable && <span className="pbt-badge pbt-badge-free">Free</span>}
             </div>
             <h2>{language === "ko" ? `${t[exam.section]} 모의고사 ${exam.round}회` : <>{t[exam.section]} · {t.round} {exam.round}</>}</h2>
-            {!user ? <button type="button" className="pbt-login-action" aria-haspopup="dialog"
-              onClick={() => { setSelectedId(exam.id); loginDialog.current?.showModal(); }}>
+            {!user ? <Link className="pbt-login-action" href={`/login?next=${encodeURIComponent(`${basePath}?section=${section}&mode=${mode}#exam-${exam.id}`)}`}>
               <Lock size={16} aria-hidden="true" />{loginLabel}<ArrowRight size={17} aria-hidden="true" />
-            </button> : exam.accessible ? <div className="pbt-card-actions">
-              {canResume && <Link className="button button-primary" href={`${basePath}/attempts/${inProgressId}`}>{t.resume}</Link>}
-              <button type="button" className={`button ${canResume ? "pbt-secondary" : "button-primary"}`} disabled={!!starting} onClick={() => void start(exam, inProgressId)}>
-                {starting === exam.id ? t.loading : inProgressId ? t.retake : t.start}
-              </button>
-            </div>
-              : <Link className="button pbt-secondary" href="/plans">{t.viewPlus}<ArrowRight size={14} aria-hidden="true" /></Link>}
+            </Link> : <button type="button" className="button button-primary" disabled={!!starting}
+              aria-haspopup={exam.accessible ? undefined : "dialog"}
+              onClick={() => exam.accessible ? void start(exam, inProgressId) : plusDialog.current?.showModal()}>
+              {t.start}
+            </button>}
           </article>;
         })}
       </div> : !hasError && <p className="catalog-status">{t.empty}</p>}
@@ -140,18 +136,20 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
           <div><strong>{language === "ko" ? attempt.title.replace(/ (\d+)$/, ` ${t[attempt.section]} 모의고사 $1회`) : `${attempt.title} · ${t[attempt.section]}`}</strong><small>{new Date(attempt.startedAt).toLocaleString(locale)}</small></div>
           {attempt.status === "submitted" && attempt.score !== null && <span>{attempt.score} / {attempt.maxScore}</span>}
           {attempt.status === "in_progress" && !exams.some(exam => exam.id === attempt.examId && exam.accessible)
-            ? <Link className="text-link" href="/plans">{t.viewPlus}</Link>
+            ? <Link className="text-link" href={localizedPath("/plans", language)}>{t.viewPlus}</Link>
             : attempt.mode === "timed" && attempt.status === "in_progress"
             ? <button type="button" className="text-link" disabled={!!starting} onClick={() => void endAndReview(attempt)}>{t.endAndReview} <ArrowRight size={14} aria-hidden="true" /></button>
             : <Link className="text-link" href={`${basePath}/attempts/${attempt.id}${attempt.status === "submitted" ? "/result" : ""}`}>{attempt.status === "submitted" ? t.result : t.resume} <ArrowRight size={14} aria-hidden="true" /></Link>}
         </div>)}
       </section>}
-      {!user && <dialog ref={loginDialog} className="pbt-dialog" aria-labelledby="exam-login-title" aria-describedby="exam-login-note"
-        onClick={event => { if (event.target === event.currentTarget) loginDialog.current?.close(); }}>
-        <button type="button" className="pbt-dialog-close" aria-label={t.close} onClick={() => loginDialog.current?.close()}><X size={18} /></button>
-        <Lock size={24} aria-hidden="true" /><h2 id="exam-login-title">{loginLabel}</h2>
-        <p id="exam-login-note">{t.loginRequired}</p>
-        <Link className="button button-primary" href={`/login?next=${encodeURIComponent(`${basePath}?section=${section}&mode=${mode}#exam-${selectedId}`)}`}>{loginLabel}</Link>
+      {user && <dialog ref={plusDialog} className="pbt-dialog" aria-labelledby="exam-plus-title" aria-describedby="exam-plus-note"
+        onClick={event => { if (event.target === event.currentTarget) plusDialog.current?.close(); }}>
+        <h2 id="exam-plus-title">{t.plusDialogTitle}</h2>
+        <p id="exam-plus-note">{t.plusRequired}</p>
+        <div className="pbt-dialog-actions">
+          <button type="button" className="button pbt-secondary" onClick={() => plusDialog.current?.close()}>{t.close}</button>
+          <Link className="button button-primary" href={localizedPath("/plans", language)}>{t.viewPlus}</Link>
+        </div>
       </dialog>}
     </div>
   </main><SiteFooter /></>;

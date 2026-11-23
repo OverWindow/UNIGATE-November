@@ -22,7 +22,6 @@ export default function CreditsAccount() {
   const history = search.get("history") === "payments";
   const next = history ? "/credits?history=payments" : returnId ? `/credits?purchase=${returnId}${cancelled ? "&cancelled=1" : ""}` : "/credits";
   return <div className="page-container credits-page">
-    {(status !== "authenticated" || !user) && <div className="credits-heading"><h1 className="catalog-title">{t.title}</h1></div>}
     {status === "loading" ? <p className="catalog-status" role="status">{a.loading}</p>
       : status === "error" ? <div className="catalog-status" role="alert"><p>{a.network}</p><button className="button credits-secondary" onClick={() => void refreshSession()}>{a.retry}</button></div>
       : status !== "authenticated" || !user ? <div className="catalog-status"><p>{t.loginRequired}</p><Link className="button button-primary" href={`/login?next=${encodeURIComponent(next)}`}>{a.login}</Link></div>
@@ -81,7 +80,6 @@ function CreditWallet({ userId, returnId, cancelled }: { userId: number; returnI
 
   return <>
     <div className="credits-heading">
-      <h1 className="catalog-title">{t.title}</h1>
       <button className="button credits-secondary credits-refresh" type="button" aria-label={t.refresh} title={t.refresh}
         disabled={loading} aria-busy={loading} onClick={() => refresh()}>
         <RefreshCw size={20} strokeWidth={1.8} aria-hidden="true" />

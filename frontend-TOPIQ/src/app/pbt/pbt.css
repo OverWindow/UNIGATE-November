@@ -26,11 +26,6 @@
 .pbt-exam-card:has(.pbt-login-action) { display: flex; flex-direction: column; }
 .pbt-login-action { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; margin-top: auto; padding-top: 12px; border-top: 1px solid #e0e6ef; color: #2d5ec5; font-size: 14px; font-weight: 650; }
 .pbt-login-action svg:last-child { margin-left: auto; }
-.pbt-card-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.pbt-card-actions .button { min-width: 0; padding-inline: 8px; justify-content: center; }
-.pbt-card-actions .button:only-child { grid-column: 1 / -1; }
-.pbt-card-actions .button:disabled { transform: none; }
-.pbt-card-actions .button-primary:disabled:hover { background: var(--color-primary); }
 .pbt-main button:disabled, .pbt-workspace button:disabled { opacity: .5; cursor: not-allowed; }
 .pbt-alert { margin-block: 18px; padding: 16px 20px; border: 1px solid #eccabb; border-radius: 9px; color: #8b3e21; background: #fff7f0; font-size: 14px; line-height: 1.8; }
 .pbt-alert button, .pbt-audio button { text-decoration: underline; font-weight: 600; min-height: 40px; margin-left: 10px; }
