@@ -38,7 +38,8 @@ TOPIQ는 Google Identity Services 팝업에서 받은 ID 토큰을 Django에서 
 - **API와 DB.** 기존 `GET /api/plans/`, `POST /api/plans/purchases/`, 청구 포털 및 웹훅 경로를 사용합니다. `accounts.0010_recurring_plus`가 `credit_purchases`에 구독 원주문의 Stripe ID(`stripe_subscription_id`), 갱신 상태(`subscription_state`), 결제 회차의 고유 청구서 ID(`stripe_invoice_id`)를 추가합니다. 이미 결제한 일회성 이용권은 기존 만료일까지 유효하며 만료 후 직접 구독할 수 있습니다.
 - **적용.** 개발에서는 사용자가 백엔드 설정 후 서버를 시작하기 전에 `backend/`에서 `.\.venv\Scripts\python.exe manage.py migrate`를 수동 실행합니다. 운영에서는 세 가격·포털·웹훅 설정을 마치고 백엔드와 TOPIQ를 배포합니다. 기존 `deploy/start.sh`가 Gunicorn 시작 전에 마이그레이션을 자동 적용합니다.
 - **월별 적립 스키마.** `accounts.0011_creditpurchase_credited_months`는 `credit_purchases.credited_months`에 결제 회차별 지급 완료 개월 수를 기록합니다. `GET /api/plans/`의 `currentPlanMonths`는 현재 유효한 이용권의 개월 수이고, 무료 계정은 `null`입니다.
-- **확인.** Stripe 샌드박스에서 첫 결제와 갱신 후 각각 청구 기간과 **플랜 지급 +400**을 확인합니다. 같은 청구서 이벤트를 다시 전송해 지급 횟수를 확인합니다. **Plus → 구독 관리 및 해지**에서 해지한 뒤 기간 종료 시 Free로 돌아가는지 확인합니다.
+- **구독 관리.** 설정 → 구독 관리(`/settings/subscription`)에서 내 상품, 결제 주기, 이용 가능 기한과 갱신 상태를 확인합니다. `GET /api/subscriptions/me/`는 로그인한 회원의 정보와 Stripe 고객 연결 여부(`canOpenBillingPortal`)를 반환합니다. 연결된 회원은 **결제 관리**에서 결제 수단을 관리하고 정기 구독의 자동 갱신을 해지할 수 있습니다. Stripe 연결이 없는 회원과 무료 회원에게는 **요금제 보기** 버튼을 표시합니다.
+- **확인.** Stripe 샌드박스에서 첫 결제와 갱신 후 각각 청구 기간과 **플랜 지급 +400**을 확인합니다. 같은 청구서 이벤트를 다시 전송해 지급 횟수를 확인합니다. **설정 → 구독 관리**에서 해지한 뒤 기간 종료 시 Free로 돌아가는지 확인합니다.
 
 ## TOPIQ 크레딧 충전
 

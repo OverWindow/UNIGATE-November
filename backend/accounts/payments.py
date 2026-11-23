@@ -66,21 +66,44 @@ def configured_price(client, months=None):
             "credits": PLAN_BONUS if months else CREDIT_PURCHASE_QUANTITY}
 
 
+def stripe_customer_id_for(user_id):
+    return CreditAccount.objects.filter(user_id=user_id).values_list("stripe_customer_id", flat=True).first()
+
+
+def subscription_details(user_id):
+    current_months, end = current_plan(user_id)
+    subscription = open_subscription(user_id)
+    return {
+        "active": end is not None, "endsAt": end, "currentPlanMonths": current_months,
+        "subscription": {"state": subscription.subscription_state, "months": subscription.plan_months}
+                        if subscription and subscription.subscription_state != "checkout" else None,
+    }
+
+
+@require_GET
+def my_subscription(request):
+    if not request.user.is_authenticated:
+        return api_response({"error": "authentication_required"}, 401)
+    try:
+        account = subscription_details(request.user.pk)
+        account["canOpenBillingPortal"] = bool(stripe_customer_id_for(request.user.pk))
+        return api_response(account)
+    except DatabaseError:
+        return api_response({"error": "subscription_unavailable"}, 503)
+
+
 @require_GET
 def plans(request):
     if not request.user.is_authenticated:
         return api_response({"error": "authentication_required"}, 401)
     try:
-        current_months, end = current_plan(request.user.pk)
-        subscription = open_subscription(request.user.pk)
+        account = subscription_details(request.user.pk)
     except DatabaseError:
         return api_response({"error": "plans_unavailable"}, 503)
     return api_response({
+        **account,
         "plans": [{"months": months, "priceId": price_id_for(months) or None, "amount": amount,
                    "currency": "krw", "bonusCredits": PLAN_BONUS} for months, amount in PLAN_AMOUNTS.items()],
-        "active": end is not None, "endsAt": end, "currentPlanMonths": current_months,
-        "subscription": {"state": subscription.subscription_state, "months": subscription.plan_months}
-                        if subscription and subscription.subscription_state != "checkout" else None,
     })
 
 
@@ -120,7 +143,7 @@ def expire_checkout(purchase, *, missing_session=False):
 
 def recover_plan_session(purchase, sessions, *, customer_id=None):
     if customer_id is None:
-        customer_id = CreditAccount.objects.filter(user_id=purchase.user_id).values_list("stripe_customer_id", flat=True).first()
+        customer_id = stripe_customer_id_for(purchase.user_id)
         if not customer_id:
             return None
     rows = sessions.list({"customer": customer_id, "created": {
@@ -359,11 +382,10 @@ def billing_portal(request):
     if error is not None:
         return error
     page = data.get("from", "credits")
-    if page not in {"plans", "credits"}:
+    if page not in {"plans", "credits", "settings/subscription", "en/settings/subscription", "id/settings/subscription"}:
         return api_response({"error": "invalid_return_page"}, 400)
     try:
-        customer_id = (CreditAccount.objects.filter(user_id=request.user.pk)
-                       .values_list("stripe_customer_id", flat=True).first())
+        customer_id = stripe_customer_id_for(request.user.pk)
         if not customer_id:
             return api_response({"portalUrl": None})
         session = stripe_client(require_webhook=False).v1.billing_portal.sessions.create({

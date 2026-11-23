@@ -58,10 +58,12 @@ export function refundTopup(id: string, signal: AbortSignal) {
 }
 export interface CreditPrice { priceId: string; amount: number; currency: "krw"; credits: number }
 export interface PlanOffer { months: number; priceId: string | null; amount: number; currency: "krw"; bonusCredits: number }
-export interface PlanAccount {
-  plans: PlanOffer[]; active: boolean; endsAt: string | null; currentPlanMonths: number | null;
+interface PlanAccess {
+  active: boolean; endsAt: string | null; currentPlanMonths: number | null;
   subscription: { state: "active" | "ending" | "past_due"; months: number } | null;
 }
+export interface SubscriptionAccount extends PlanAccess { canOpenBillingPortal: boolean }
+export interface PlanAccount extends PlanAccess { plans: PlanOffer[] }
 export interface Evaluation {
   id: string; setId: string; typeSlot: number; status: "processing" | "succeeded" | "failed";
   totalScore: number | null; maxScore: number; creditCost: number; chargedCredits: number;
@@ -110,12 +112,17 @@ export function getPlans(signal: AbortSignal) {
   return requestJson<PlanAccount>("/api/plans/", signal);
 }
 
+export function getMySubscription(signal: AbortSignal) {
+  return requestJson<SubscriptionAccount>("/api/subscriptions/me/", signal);
+}
+
 export function startPlanPurchase(attemptId: string, priceId: string, months: number, signal: AbortSignal) {
   return postJson<CreditPurchaseStatus & { checkoutUrl: string | null }>("/api/plans/purchases/", { attemptId, priceId, months }, signal);
 }
 
-export function openBillingPortal(signal: AbortSignal, from: "credits" | "plans" = "credits") {
-  return postJson<{ portalUrl: string | null }>("/api/credits/billing-portal/", from === "plans" ? { from } : {}, signal);
+type BillingPage = "credits" | "plans" | "settings/subscription" | `${Exclude<Language, "ko">}/settings/subscription`;
+export function openBillingPortal(signal: AbortSignal, from: BillingPage = "credits") {
+  return postJson<{ portalUrl: string | null }>("/api/credits/billing-portal/", from === "credits" ? {} : { from }, signal);
 }
 
 export function creditsRequest<T>(path: string, signal: AbortSignal): Promise<T> {

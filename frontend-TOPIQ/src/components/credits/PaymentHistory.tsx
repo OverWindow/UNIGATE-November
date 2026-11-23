@@ -2,13 +2,14 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
 import { creditsContent, paymentHistoryContent } from "@/lib/credits-content";
+import { localizedPath } from "@/lib/locale-path";
 import { creditsRequest, refundTopup, WritingError, type TopupOrder } from "@/lib/writing/writing-api";
 import BillingContactDialog from "./BillingContactDialog";
 
 interface History { purchases: TopupOrder[]; nextPage: number | null }
 
 export function PaymentRow({ order, amount, disabled, onRefund, onContact }: {
-  order: TopupOrder; amount: string; disabled: boolean; onRefund: () => void; onContact: (orderId: string) => void;
+  order: TopupOrder; amount: string; disabled: boolean; onRefund: () => void; onContact?: (orderId: string) => void;
 }) {
   const { language } = useApp();
   const p = paymentHistoryContent[language];
@@ -17,6 +18,11 @@ export function PaymentRow({ order, amount, disabled, onRefund, onContact }: {
     if (order.refundState === "eligible" && !window.confirm(p.confirm(amount, credits))) return;
     onRefund();
   }
+  const contactAction = onContact
+    ? <button className="button credits-secondary" type="button" aria-haspopup="dialog"
+        onClick={() => onContact(order.id)}>{p.contact}</button>
+    : <Link className="button credits-secondary"
+        href={`${localizedPath("/settings/contact", language)}?order=${encodeURIComponent(order.id)}#refund-inquiry`}>{p.contact}</Link>;
   return <li>
     <div><time dateTime={order.paidAt}>{new Date(order.paidAt).toLocaleString(language)}</time>
       <strong>{amount}</strong>
@@ -25,10 +31,7 @@ export function PaymentRow({ order, amount, disabled, onRefund, onContact }: {
     {order.refundState === "eligible" || order.refundState === "confirming"
       ? <button className="button credits-secondary" type="button" disabled={disabled} onClick={confirmRefund}>
         {order.refundState === "eligible" ? p.refund : p.confirming}</button>
-      : order.refundState === "contact"
-        ? <button className="button credits-secondary" type="button" aria-haspopup="dialog"
-          onClick={() => onContact(order.id)}>{p.contact}</button>
-        : <span role="status">{p[order.refundState]}</span>}
+      : order.refundState === "contact" ? contactAction : <span role="status">{p[order.refundState]}</span>}
   </li>;
 }
 
@@ -110,7 +113,7 @@ export default function PaymentHistory({ inSettings = false }: { inSettings?: bo
     {loadError ? <p role="alert">{t.error}</p> : !data ? <p role="status">{t.loading}</p>
       : data.purchases.length ? <ul className="credits-order-list" aria-busy={loading}>
         {data.purchases.map(order => <PaymentRow key={order.id} order={order} amount={money(order)}
-          disabled={busy || loading} onRefund={() => void refund(order)} onContact={setContactOrderId} />)}
+          disabled={busy || loading} onRefund={() => void refund(order)} onContact={inSettings ? undefined : setContactOrderId} />)}
       </ul> : <p>{p.empty}</p>}
     {data && (page > 1 || data.nextPage !== null) && <nav className="credits-pagination" aria-label={t.paymentHistory}>
       <button className="button credits-secondary" disabled={busy || loading || page === 1} onClick={() => { setData(null); setPage(page - 1); }}>{t.previous}</button>

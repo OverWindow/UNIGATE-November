@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
 import { creditsContent } from "@/lib/credits-content";
+import { localizedPath } from "@/lib/locale-path";
 import { plansContent } from "@/lib/plans-content";
-import { creditsRequest, openBillingPortal, startCreditPurchase, startPlanPurchase, WritingError, type CreditPrice, type CreditPurchaseStatus, type PlanAccount } from "@/lib/writing/writing-api";
+import { creditsRequest, startCreditPurchase, startPlanPurchase, WritingError, type CreditPrice, type CreditPurchaseStatus, type PlanAccount } from "@/lib/writing/writing-api";
 import PlanOffers from "./PlanOffers";
 
 type Notice = keyof typeof creditsContent.ko.checkout | "planInUse";
@@ -34,7 +36,6 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
   const [price, setPrice] = useState<CreditPrice | "unavailable" | null>(initialAttempt?.price ?? null);
   const [priceRevision, setPriceRevision] = useState(0);
   const [checkCount, setCheckCount] = useState(0);
-  const [portalNotice, setPortalNotice] = useState<keyof typeof t.portal | null>(null);
   const operation = useRef<AbortController | null>(null);
 
   const remember = useCallback((value: Attempt | null) => {
@@ -104,7 +105,6 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
     if (!selected || selected === "unavailable") return;
     const controller = new AbortController();
     operation.current = controller;
-    setPortalNotice(null);
     setNotice("opening");
     try {
       const prior = attempt.current;
@@ -149,28 +149,8 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
     }
   }
 
-  async function viewPayments() {
-    if (operation.current) return;
-    const controller = new AbortController();
-    operation.current = controller;
-    setPortalNotice("opening");
-    try {
-      const { portalUrl } = await openBillingPortal(controller.signal, isPlan ? "plans" : "credits");
-      if (controller.signal.aborted) return;
-      if (portalUrl) window.location.assign(portalUrl);
-      setPortalNotice(portalUrl ? null : "empty");
-    } catch (cause) {
-      if (controller.signal.aborted) return;
-      setPortalNotice("error");
-      if (cause instanceof WritingError && cause.status === 401) void refreshSession();
-    } finally {
-      if (operation.current === controller) operation.current = null;
-    }
-  }
-
   const retryCheck = notice === "delayed" || notice === "checkError";
-  const opening = notice === "opening" || portalNotice === "opening";
-  const blocked = opening || notice === "checking" || retryCheck;
+  const blocked = notice === "opening" || notice === "checking" || retryCheck;
   const canSubscribe = planAccount && !planAccount.active && !planAccount.subscription;
   return <div className="credits-purchase">
     {isPlan ? planAccount && <PlanOffers language={language} account={planAccount}
@@ -189,9 +169,8 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
         {t.topup}
       </button>
     </> : <p role="status">{t.priceLoading}</p>}
-    {isPlan && planAccount?.subscription && <button type="button" className="button credits-secondary" disabled={opening} onClick={() => void viewPayments()}>
-      {p.manage}
-    </button>}
+    {(planAccount?.active || planAccount?.subscription) && <Link className="button credits-secondary"
+      href={localizedPath("/settings/subscription", language)}>{p.settingsTitle}</Link>}
     {retryCheck && <button type="button" className="button credits-secondary" onClick={() => setCheckCount(count => count + 1)}>{t.checkAgain}</button>}
   </div>;
 }

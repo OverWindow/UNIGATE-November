@@ -46,6 +46,9 @@ imports["./CreditPurchase"] = { default: CreditPurchase };
 imports["./BillingContactDialog"] = load("components/credits/BillingContactDialog.tsx");
 imports["./PaymentHistory"] = load("components/credits/PaymentHistory.tsx");
 const { default: RefundSettings } = load("components/credits/RefundSettings.tsx");
+imports["./CopyEmailAddress"] = load("app/settings/contact/CopyEmailAddress.tsx");
+const { default: ContactPage } = load("app/settings/contact/page.tsx");
+const { default: SubscriptionSettings, SubscriptionSummary } = load("app/settings/subscription/SubscriptionSettings.tsx");
 const { default: SettingsPage } = load("app/settings/page.tsx");
 const { default: CreditsAccount } = load("components/credits/CreditsAccount.tsx");
 const { default: PlansAccount } = load("components/credits/PlansAccount.tsx");
@@ -161,6 +164,7 @@ test("Each Plus card lists benefits and savings and the selected purchase starts
   });
   const cards = tree.html.match(/<article\b[\s\S]*?<\/article>/g) ?? [];
   const free = cards.shift();
+  assert.doesNotMatch(tree.html, /내 구독|구독 관리 및 해지/);
   assert.match(free, /<h2>Free<\/h2>/);
   assert.match(free, /aria-current="true"[\s\S]*?내 플랜/);
   assert.equal((tree.html.match(/내 플랜/g) ?? []).length, 1);
@@ -231,33 +235,83 @@ test("guests can browse all plans and each Plus card returns them to plans after
   assert.deepEqual(requests, []);
 });
 
-test("a subscriber can manage renewal in the portal and returns to Plus", async () => {
-  const posts = [];
-  window.location = { assign() {} };
-  globalThis.fetch = async (url, options) => {
-    if (url === "/api/csrf/") return Response.json({ csrfToken: "synthetic" });
-    posts.push([url, JSON.parse(options.body)]);
-    return Response.json({ portalUrl: "https://billing.stripe.com/p/session/fixture" });
-  };
-  let manage;
-  const page = mount(() => {
-    const ui = CreditPurchase({ userId: 1, returnId: null, planAccount: {
+test("Plus links subscribers to their separate settings page below the offers", () => {
+  const page = mount(() => React.createElement(CreditPurchase, { userId: 1, returnId: null, planAccount: {
       plans: [1, 3, 6].map(months => ({ months, currency: "krw", amount: 9900, bonusCredits: 400 })),
       active: true, currentPlanMonths: 3, endsAt: "2026-12-15T12:00:00Z", subscription: { months: 3, state: "ending" },
-    }, onFulfilled() {} });
-    manage = React.Children.toArray(ui.props.children).find(el => el.type === "button").props.onClick;
-    return ui;
-  });
+    }, onFulfilled() {} }));
   assert.doesNotMatch(page.html, /구독하기/);
   const cards = page.html.match(/<article\b[\s\S]*?<\/article>/g);
   assert.equal(cards.filter(card => card.includes("내 플랜")).length, 1);
   assert.match(cards[2], /aria-current="true"[\s\S]*?Plus 3개월[\s\S]*?내 플랜/);
-  assert.doesNotMatch(page.html, /<time|다음 결제 예정|만료 일시/);
-  assert.match(page.html, /구독 관리 및 해지/);
-  manage();
-  await setImmediate();
-  assert.deepEqual(posts, [["/api/credits/billing-portal/", { from: "plans" }]]);
+  assert.doesNotMatch(page.html, /내 구독|<time|다음 결제 예정|만료 일시/);
+  assert.ok(page.html.slice(page.html.lastIndexOf("</article>")).includes('href="/settings/subscription">구독 관리'));
   page.unmount();
+});
+
+test("subscription details distinguish renewal, cancellation, overdue payment, prepaid and free access", () => {
+  const paid = { active: true, currentPlanMonths: 3, endsAt: "2026-12-15T12:00:00Z" };
+  const expired = { active: false, currentPlanMonths: null, endsAt: null };
+  for (const [access, state, canOpenBillingPortal, showPlans, description] of [
+    [paid, "active", true, false, "자동 갱신 중"], [paid, "ending", true, false, "자동 갱신 해지됨"],
+    [paid, "past_due", true, false, "결제 수단을 확인"], [expired, "past_due", true, false, "결제 수단을 확인"],
+    [paid, null, true, false, "자동 갱신 없음"], [paid, null, false, true, "자동 갱신 없음"],
+    [expired, null, true, true, "이용 중인 유료 구독이 없습니다"], [expired, null, false, true, "이용 중인 유료 구독이 없습니다"],
+  ]) {
+    const account = { ...access, canOpenBillingPortal, subscription: state ? { months: 3, state } : null };
+    const page = mount(() => React.createElement(SubscriptionSummary, { account }));
+    assert.ok(page.html.includes(description));
+    assert.equal(page.html.includes('dateTime="' + paid.endsAt + '"'), access.active);
+    assert.ok(page.html.includes(access.active || state ? "Plus 3개월" : "Free"));
+    assert.equal(/<button[^>]*>결제 관리<\/button>/.test(page.html), canOpenBillingPortal);
+    assert.equal(page.html.includes("3개월마다"), Boolean(state));
+    assert.equal(page.html.includes('href="/plans">요금제 보기</a>'), showPlans);
+    if (state && !access.active) assert.ok(page.html.includes("현재 적용된 유료 이용 기간이 없습니다"));
+    page.unmount();
+  }
+});
+
+test("subscription settings fetch only the signed-in member's summary and preserve the guest login return", () => {
+  const member = mount(SubscriptionSettings);
+  assert.deepEqual(requests, [{ url: "/api/subscriptions/me/", method: "GET" }]);
+  member.unmount();
+  requests.length = 0;
+  session.user = null;
+  session.status = "anonymous";
+  for (const [language, prefix] of [["ko", ""], ["en", "/en"], ["id", "/id"]]) {
+    session.language = language;
+    const page = mount(SubscriptionSettings);
+    assert.ok(page.html.includes(`href="${prefix}/login?next=${encodeURIComponent(prefix + "/settings/subscription")}"`));
+    page.unmount();
+  }
+  assert.deepEqual(requests, []);
+});
+
+test("the billing button opens a single portal session returning to the localized subscription page", async t => {
+  const posts = [], visits = [];
+  const portalUrl = "https://billing.stripe.com/p/session/fixture";
+  window.location = { assign: url => visits.push(url) };
+  globalThis.fetch = async (url, options) => {
+    if (url === "/api/csrf/") return Response.json({ csrfToken: "synthetic" });
+    posts.push([url, JSON.parse(options.body)]);
+    return Response.json({ portalUrl });
+  };
+  const runtime = require("react/jsx-runtime");
+  const jsx = runtime.jsx;
+  let click;
+  t.mock.method(runtime, "jsx", (type, props, key) => {
+    if (type === "button") click = props.onClick;
+    return jsx(type, props, key);
+  });
+  for (const [language, prefix] of [["ko", ""], ["en", "en/"], ["id", "id/"]]) {
+    session.language = language;
+    const account = { active: false, currentPlanMonths: null, endsAt: null, subscription: null, canOpenBillingPortal: true };
+    const page = mount(() => React.createElement(SubscriptionSummary, { account }));
+    await Promise.all([click(), click()]);
+    assert.deepEqual(posts.splice(0), [["/api/credits/billing-portal/", { from: prefix + "settings/subscription" }]]);
+    assert.deepEqual(visits.splice(0), [portalUrl]);
+    page.unmount();
+  }
 });
 
 function mountPurchaseButton() {
@@ -286,13 +340,15 @@ test("payment history remains available by URL without a wallet button", async (
   history.unmount();
 });
 
-test("the settings list links to localized refunds without loading orders", async () => {
+test("the settings list links to localized subscription management and refunds without loading orders", async () => {
   const { paymentHistoryContent } = require("../src/lib/credits-content.ts");
+  const { plansContent } = require("../src/lib/plans-content.ts");
   for (const [language, prefix] of [["ko", ""], ["en", "/en"], ["id", "/id"]]) {
     session.language = language;
     const page = await SettingsPage();
     const tree = mount(() => page);
     const { refundTitle, policy } = paymentHistoryContent[language];
+    assert.ok(tree.html.includes('<a href="' + prefix + '/settings/subscription">' + plansContent[language].settingsTitle));
     assert.ok(tree.html.includes('<a href="' + prefix + '/settings/refunds">' + refundTitle));
     assert.ok(!tree.html.includes(policy));
     tree.unmount();
@@ -356,6 +412,50 @@ test("unused orders offer a full refund and each contact button selects its own 
   assert.doesNotMatch(row("held", 1000), /<button/);
   assert.match(row("processing", 1000), /환불 처리 중/);
   assert.doesNotMatch(row("refunded", 0), /<button/);
+});
+
+test("refund settings link each order to its localized refund card and email draft", async () => {
+  const { PaymentRow } = imports["./PaymentHistory"];
+  const { contactContent } = require("../src/lib/contact-content.ts");
+  for (const [language, prefix, label] of [["ko", "", "주문번호"], ["en", "/en", "Order number"], ["id", "/id", "Nomor pesanan"]]) {
+    session.language = language;
+    const order = { id: crypto.randomUUID(), paidAt: "2026-11-21T12:00:00Z", credits: 1000, remainingCredits: 900, refundState: "contact" };
+    const row = mount(() => React.createElement(PaymentRow, { order, amount: "₩4,900", disabled: false, onRefund() {} }));
+    const link = new URL(row.html.match(/<a href="([^"]+)"/)[1], "https://example.test");
+    assert.equal(link.pathname, `${prefix}/settings/contact`);
+    assert.equal(link.searchParams.get("order"), order.id);
+    const page = await ContactPage({ searchParams: Promise.resolve(Object.fromEntries(link.searchParams)) });
+    const html = renderToStaticMarkup(page);
+    const [general, refund] = html.match(/<section\b[\s\S]*?<\/section>/g);
+    const guidance = contactContent[language].refund;
+    for (const text of [guidance.description, guidance.emailGuidance, guidance.orderIncluded, `${label}: ${order.id}`]) {
+      assert.ok(refund.includes(text));
+      assert.ok(!general.includes(text));
+    }
+    assert.ok(!refund.includes(guidance.includeOrder));
+    assert.equal(link.hash, "#refund-inquiry");
+    assert.ok(refund.includes(`id="${link.hash.slice(1)}"`) && refund.includes(order.id));
+    const draft = new URL(refund.match(/href="(mailto:[^"]+)"/)[1].replaceAll("&amp;", "&"));
+    assert.equal(draft.pathname, "billing@unigate.kr");
+    assert.equal(draft.searchParams.get("body"), `${label}: ${order.id}`);
+    assert.ok(!general.includes(order.id));
+    row.unmount();
+  }
+  assert.deepEqual(requests, []);
+});
+
+test("contact visits without a single valid order show refund guidance and keep the ordinary refund email", async () => {
+  const { contactContent } = require("../src/lib/contact-content.ts");
+  for (const [language, { refund }] of Object.entries(contactContent)) {
+    session.language = language;
+    for (const order of [undefined, "invalid", [crypto.randomUUID(), crypto.randomUUID()]]) {
+      const page = await ContactPage({ searchParams: Promise.resolve({ order }) });
+      const html = renderToStaticMarkup(page);
+      assert.ok(html.includes(refund.description) && html.includes(refund.emailGuidance));
+      assert.ok(html.includes(refund.includeOrder) && !html.includes(refund.orderIncluded));
+      assert.doesNotMatch(html, /body=/);
+    }
+  }
 });
 
 test("only confirming a new full refund submits it and checking an existing request needs no new confirmation", () => {

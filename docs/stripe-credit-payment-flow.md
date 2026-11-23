@@ -137,13 +137,18 @@ sequenceDiagram
     N->>D: 크레딧 요청 전달
     D->>DB: 지급일이 지난 미지급 월마다 400크레딧 적립
     opt 회원이 기간 종료 시 해지 선택
-        B->>N: 구독 관리 및 해지 열기
-        N->>D: POST /api/credits/billing-portal/ (from=plans)
+        B->>N: 설정에서 구독 관리 열기
+        N->>D: GET /api/subscriptions/me/
+        D-->>N: 내 상품, 결제한 이용 기한, 갱신 상태
+        N-->>B: 구독 상세 표시
+        B->>N: 결제 관리 선택
+        N->>D: POST /api/credits/billing-portal/ (from=settings/subscription)
         D->>S: 회원의 고객 포털 세션 생성
         S-->>D: 포털 URL
         D-->>N: 포털 URL
         N-->>B: 포털 URL
         B->>S: 포털에서 기간 종료 시 해지 예약
+        S-->>B: 선택한 언어의 구독 관리 화면으로 복귀
         S->>D: customer.subscription.updated
         D->>S: 최신 구독 상태 조회
         D->>DB: 해지 예정 상태 저장

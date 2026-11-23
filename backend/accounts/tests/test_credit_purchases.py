@@ -21,6 +21,7 @@ from accounts.payments import checkout, checkout_customer
 PURCHASES = "/api/credits/purchases/"
 PRICE = "/api/credits/price/"
 PORTAL = "/api/credits/billing-portal/"
+MY_SUBSCRIPTION = "/api/subscriptions/me/"
 WEBHOOK = "/api/payments/stripe/webhook/"
 SIGNING_SECRET = "local-unit-test-signing-value"
 CHECKOUT_URL = "https://checkout.stripe.com/c/pay/test-session"
@@ -173,6 +174,27 @@ class CreditPurchaseTests(TestCase):
         self.sessions.create.assert_not_called()
         self.assertFalse(CreditPurchase.objects.exists())
 
+    def test_subscription_details_are_private_and_separate_from_plan_offers(self):
+        self.assertEqual(Client().get(MY_SUBSCRIPTION).status_code, 401)
+        free = {"active": False, "currentPlanMonths": None, "endsAt": None, "subscription": None,
+                "canOpenBillingPortal": False}
+        self.assertEqual(self.client.get(MY_SUBSCRIPTION).json(), free)
+        self.prices.retrieve.return_value = plan_price(3, 23900, "price_three")
+        order = CreditPurchase.objects.get(pk=self.post_plan(3, "price_three").json()["id"])
+        self.assertEqual(self.client.get(MY_SUBSCRIPTION).json(), free | {"canOpenBillingPortal": True})
+        now = int(time.time())
+        bill = plan_invoice(order, "in_my_subscription", "subscription_create", now - 60, now + 3600)
+        self.assertEqual(signed_event(self.client, "invoice.paid", bill).status_code, 200)
+        response = self.client.get(MY_SUBSCRIPTION)
+        self.assertIn("no-store", response["Cache-Control"])
+        self.assertEqual(response.json(), {
+            "active": True, "currentPlanMonths": 3,
+            "endsAt": datetime.fromtimestamp(now + 3600, UTC).isoformat().replace("+00:00", "Z"),
+            "subscription": {"state": "active", "months": 3}, "canOpenBillingPortal": True,
+        })
+        self.client.force_login(get_user_model().objects.create_user(username="another-subscription-owner"))
+        self.assertEqual(self.client.get(MY_SUBSCRIPTION, {"user_id": self.user.pk}).json(), free)
+
     def test_subscription_renewals_and_cancellation_with_reordered_webhooks(self):
         self.prices.retrieve.return_value = plan_price(1, 9900, "price_one")
         order_id = self.post_plan(1, "price_one").json()["id"]
@@ -205,9 +227,19 @@ class CreditPurchaseTests(TestCase):
             self.subscriptions.retrieve.return_value = stripe.Subscription.construct_from(sub | latest, None)
             self.assertEqual(signed_event(self.client, "customer.subscription.updated", sub).status_code, 200)
             self.assertEqual(self.client.get("/api/plans/").json()["subscription"]["state"], state)
+            self.assertEqual(self.client.get(MY_SUBSCRIPTION).json()["subscription"]["state"], state)
         self.assertEqual(signed_event(self.client, "invoice.payment_failed", first).status_code, 200)
         self.assertEqual(signed_event(self.client, "customer.subscription.deleted", sub | {"status": "canceled"}).status_code, 200)
         self.assertEqual(signed_event(self.client, "customer.subscription.updated", sub).status_code, 200)
+        details = self.client.get(MY_SUBSCRIPTION).json()
+        self.assertIsNone(details["subscription"])
+        self.assertTrue(details["canOpenBillingPortal"])
+        response = self.client.post(PORTAL, {"from": "settings/subscription"},
+                                    content_type="application/json", HTTP_X_CSRFTOKEN=self.csrf)
+        self.assertEqual(response.json(), {"portalUrl": self.portals.create.return_value.url})
+        self.portals.create.assert_called_once_with({
+            "customer": "cus_fixture_owner", "return_url": "https://topiq.example.invalid/settings/subscription",
+        })
         data = self.client.get("/api/plans/").json()
         self.assertIsNone(data["subscription"])
         self.assertTrue(data["active"])
@@ -353,6 +385,10 @@ class CreditPurchaseTests(TestCase):
         for date, active in [(paid_at - timedelta(seconds=1), False), (paid_at, True), (first_end, True), (final_end, False)]:
             with patch("accounts.plans.timezone.now", return_value=date):
                 data = self.client.get("/api/plans/").json()
+                self.assertEqual(self.client.get(MY_SUBSCRIPTION).json(), {
+                    "active": active, "currentPlanMonths": data["currentPlanMonths"],
+                    "endsAt": data["endsAt"], "subscription": None, "canOpenBillingPortal": False,
+                })
                 if active:
                     self.prices.retrieve.return_value = plan_price(1, 9900, "price_one")
                     self.assertEqual(self.post_plan(1, "price_one").json()["error"], "plan_in_use")
@@ -484,6 +520,7 @@ class CreditPurchaseTests(TestCase):
         self.assertEqual(self.client.get(PORTAL).status_code, 405)
         self.assertEqual(post({"customer": "cus_fixture_other"}).status_code, 400)
         self.assertEqual(post({"return_url": "https://example.invalid"}).status_code, 400)
+        self.assertEqual(post({"from": "settings/other"}).status_code, 400)
         self.assertEqual(post({}).json(), {"portalUrl": None})
         self.customers.create.assert_not_called()
         self.portals.create.assert_not_called()
@@ -498,6 +535,9 @@ class CreditPurchaseTests(TestCase):
             self.assertEqual(response.json(), {"portalUrl": self.portals.create.return_value.url})
             self.assertIn("no-store", response["Cache-Control"])
             self.portals.create.assert_called_with({"customer": customer, "return_url": "https://topiq.example.invalid/credits"})
+        for page in ("settings/subscription", "en/settings/subscription", "id/settings/subscription"):
+            self.assertEqual(post({"from": page}).status_code, 200)
+            self.portals.create.assert_called_with({"customer": "cus_fixture_other", "return_url": f"https://topiq.example.invalid/{page}"})
         self.portals.create.side_effect = stripe.APIConnectionError("fixture portal unavailable")
         self.assertEqual(post({}).status_code, 503)
 
