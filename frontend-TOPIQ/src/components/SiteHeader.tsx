@@ -147,7 +147,7 @@ export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: st
                     </Link>
                     <Link href="/plans" aria-current={pathname === "/plans" ? "page" : undefined} onClick={() => setAccountOpen(false)}>
                       <Layers size={19} strokeWidth={1.7} aria-hidden="true" />
-                      <span>Plus</span>
+                      <span>{a.plusPlans}</span>
                     </Link>
                   </div>
                   <div className="account-menu-section">

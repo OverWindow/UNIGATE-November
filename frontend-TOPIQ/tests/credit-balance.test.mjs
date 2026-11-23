@@ -188,7 +188,7 @@ test("Each Plus card lists benefits and savings and the selected purchase starts
 test("plans follow credits in the account menu without a settings link", () => {
   path = "/plans";
   const header = mount(SiteHeader);
-  assert.match(header.html, /href="\/credits"[\s\S]*?href="\/plans"[\s\S]*?<span>Plus<\/span>/);
+  assert.match(header.html, /href="\/credits"[\s\S]*?href="\/plans"[\s\S]*?<span>Plus 요금제<\/span>/);
   assert.doesNotMatch(header.html, /href="\/settings"/);
   header.unmount();
   session.user = null;

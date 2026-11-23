@@ -20,8 +20,10 @@
 .credits-topup-button { min-height: 32px; padding: 5px 13px; border: 1px solid #adc1e7; border-radius: 999px; background: #fff; color: #244e9e; font-size: 12px; font-weight: 600; cursor: pointer; }
 .credits-topup-button:hover:not(:disabled) { background: #f5f8ff; border-color: #315eb7; }
 .credits-topup-button:disabled { opacity: .6; cursor: default; }
-.credits-available { position: relative; }
-.credits-balances dd.credits-topup { margin-top: 16px; font-size: 12px; font-weight: 400; }
+.credits-available { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.credits-available dt { flex-basis: 100%; margin-bottom: 0; }
+.credits-available dd:not(.credits-topup) { flex: 1 1 120px; min-width: 0; }
+.credits-balances dd.credits-topup { flex: 0 0 auto; max-width: 100%; margin: 0; font-size: 12px; font-weight: 400; }
 .credits-topup .credits-purchase { margin-top: 0; gap: 8px; }
 .credits-purchase .button:disabled { opacity: .6; }
 .credits-purchase p { margin: 0; color: #405370; font-size: 14px; }
