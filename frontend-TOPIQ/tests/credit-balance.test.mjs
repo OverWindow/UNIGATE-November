@@ -49,6 +49,9 @@ const { default: RefundSettings } = load("components/credits/RefundSettings.tsx"
 imports["./CopyEmailAddress"] = load("app/settings/contact/CopyEmailAddress.tsx");
 const { default: ContactPage } = load("app/settings/contact/page.tsx");
 const { default: SubscriptionSettings, SubscriptionSummary } = load("app/settings/subscription/SubscriptionSettings.tsx");
+imports["../csrf"] = require("../src/lib/csrf.ts");
+imports["@/lib/exam/pbt-api"] = load("lib/exam/pbt-api.ts");
+const { default: ExamHistory } = load("app/settings/exam-history/ExamHistory.tsx");
 const { default: SettingsPage } = load("app/settings/page.tsx");
 const { default: CreditsAccount } = load("components/credits/CreditsAccount.tsx");
 const { default: PlansAccount } = load("components/credits/PlansAccount.tsx");
@@ -340,20 +343,47 @@ test("payment history remains available by URL without a wallet button", async (
   history.unmount();
 });
 
-test("the settings list links to localized subscription management and refunds without loading orders", async () => {
+test("the settings list links to localized exam history, subscription management and refunds without fetching data", async () => {
   const { paymentHistoryContent } = require("../src/lib/credits-content.ts");
+  const { pbtContent } = require("../src/lib/exam/pbt-content.ts");
   const { plansContent } = require("../src/lib/plans-content.ts");
   for (const [language, prefix] of [["ko", ""], ["en", "/en"], ["id", "/id"]]) {
     session.language = language;
     const page = await SettingsPage();
     const tree = mount(() => page);
     const { refundTitle, policy } = paymentHistoryContent[language];
+    assert.ok(tree.html.includes('<a href="' + prefix + '/settings/exam-history">' + pbtContent[language].history));
     assert.ok(tree.html.includes('<a href="' + prefix + '/settings/subscription">' + plansContent[language].settingsTitle));
     assert.ok(tree.html.includes('<a href="' + prefix + '/settings/refunds">' + refundTitle));
     assert.ok(!tree.html.includes(policy));
     tree.unmount();
   }
   assert.deepEqual(requests, []);
+});
+
+test("exam history waits for sign-in and preserves the localized return path", async () => {
+  session.user = null;
+  for (const status of ["loading", "error", "anonymous"]) {
+    session.status = status;
+    for (const [language, prefix] of [["ko", ""], ["en", "/en"], ["id", "/id"]]) {
+      session.language = language;
+      const page = mount(ExamHistory);
+      const loginHref = prefix + "/login?next=" + encodeURIComponent(prefix + "/settings/exam-history");
+      assert.equal(page.html.includes(loginHref), status === "anonymous");
+      page.unmount();
+    }
+  }
+  assert.deepEqual(requests, []);
+  session.user = { id: 1 };
+  session.status = "authenticated";
+  globalThis.fetch = async url => {
+    requests.push(url);
+    return Response.json({ attempts: [] });
+  };
+  const page = mount(ExamHistory);
+  await setImmediate();
+  assert.deepEqual(requests, ["/api/pbt/attempts/", "/api/ibt/attempts/"]);
+  page.unmount();
 });
 
 test("public refund details link back to settings and keep their language on sign-in", () => {

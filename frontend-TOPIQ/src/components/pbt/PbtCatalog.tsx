@@ -25,7 +25,6 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
   const [section, setSection] = useState<Section>("reading");
   const [mode, setMode] = useState<Mode>("practice");
   const [exams, setExams] = useState<Exam[]>([]);
-  const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [starting, setStarting] = useState<string | null>(null);
@@ -50,12 +49,11 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
 
   useEffect(() => {
     let active = true;
-    setLoading(true); setError(null); setExams([]); setAttempts([]);
+    setLoading(true); setError(null); setExams([]);
     void (async () => {
       try {
         const catalog = await pbtRequest<{ exams: Exam[] }>("exams/", "GET", undefined, examFormat);
-        const history = user ? await pbtRequest<{ attempts: Attempt[] }>("attempts/", "GET", undefined, examFormat) : null;
-        if (active) { setExams(catalog.exams); setAttempts(history?.attempts ?? []); }
+        if (active) setExams(catalog.exams);
       } catch (cause) { if (active) showError(cause); }
       finally { if (active) setLoading(false); }
     })();
@@ -75,15 +73,6 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
   }
 
   const perPassage = section === "listening";
-  async function endAndReview(attempt: Attempt) {
-    if (startingRef.current) return;
-    startingRef.current = true; setStarting(attempt.id); setError(null);
-    try {
-      await pbtRequest(`attempts/${attempt.id}/submit/`, "POST", {}, examFormat);
-      router.push(`${basePath}/attempts/${attempt.id}/result`);
-    } catch (cause) { showError(cause); setStarting(null); startingRef.current = false; }
-  }
-
   const timedHint = perPassage ? ibtTimedHints[language].listening : examFormat === "ibt" ? ibtTimedHints[language].reading : t.timedHint;
   const sectionExams = exams.filter(exam => exam.section === section);
   const hasError = !!error;
@@ -109,7 +98,6 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
         : sectionExams.length ? <div className="pbt-exam-grid">
         {sectionExams.map(exam => {
           const progress = exam.myProgress?.[mode];
-          const inProgressId = progress?.inProgressId ?? attempts.find(attempt => attempt.examId === exam.id && attempt.mode === mode && attempt.status === "in_progress")?.id;
           const result = progress?.latestResult;
           const resultLabel = result ? `${t.latestScore} · ${t[mode]}: ${result.score} / ${result.maxScore} · ${t.submittedOn}: ${new Date(result.submittedAt).toLocaleDateString(locale)} · ${t.result}` : "";
           return <article className="pbt-exam-card catalog-card" id={`exam-${exam.id}`} tabIndex={-1} key={exam.id}>
@@ -124,24 +112,12 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
               <Lock size={16} aria-hidden="true" />{loginLabel}<ArrowRight size={17} aria-hidden="true" />
             </Link> : <button type="button" className="pbt-start-action" disabled={!!starting}
               aria-haspopup={exam.accessible ? undefined : "dialog"}
-              onClick={() => exam.accessible ? void start(exam, inProgressId) : plusDialog.current?.showModal()}>
+              onClick={() => exam.accessible ? void start(exam, progress?.inProgressId ?? undefined) : plusDialog.current?.showModal()}>
               {t.start}<ExternalLink size={14} aria-hidden="true" />
             </button>}
           </article>;
         })}
       </div> : !hasError && <p className="catalog-status">{t.empty}</p>}
-      {user && <section className="pbt-history" aria-labelledby="pbt-history"><h2 id="pbt-history">{t.history}</h2>
-        {!loading && !attempts.length && <p className="pbt-muted">{t.noHistory}</p>}
-        {attempts.map(attempt => <div className="pbt-history-row" key={attempt.id}>
-          <div><strong>{language === "ko" ? attempt.title.replace(/ (\d+)$/, ` ${t[attempt.section]} 모의고사 $1회`) : `${attempt.title} · ${t[attempt.section]}`}</strong><small>{new Date(attempt.startedAt).toLocaleString(locale)}</small></div>
-          {attempt.status === "submitted" && attempt.score !== null && <span>{attempt.score} / {attempt.maxScore}</span>}
-          {attempt.status === "in_progress" && !exams.some(exam => exam.id === attempt.examId && exam.accessible)
-            ? <Link className="text-link" href={localizedPath("/plans", language)}>{t.viewPlus}</Link>
-            : attempt.mode === "timed" && attempt.status === "in_progress"
-            ? <button type="button" className="text-link" disabled={!!starting} onClick={() => void endAndReview(attempt)}>{t.endAndReview} <ArrowRight size={14} aria-hidden="true" /></button>
-            : <Link className="text-link" href={`${basePath}/attempts/${attempt.id}${attempt.status === "submitted" ? "/result" : ""}`}>{attempt.status === "submitted" ? t.result : t.resume} <ArrowRight size={14} aria-hidden="true" /></Link>}
-        </div>)}
-      </section>}
       {user && <dialog ref={plusDialog} className="pbt-dialog" aria-labelledby="exam-plus-title" aria-describedby="exam-plus-note"
         onClick={event => { if (event.target === event.currentTarget) plusDialog.current?.close(); }}>
         <h2 id="exam-plus-title">{t.plusDialogTitle}</h2>
