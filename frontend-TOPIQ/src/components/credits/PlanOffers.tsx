@@ -27,20 +27,12 @@ export default function PlanOffers({ language, account, renderAction }: {
     {offers.map(offer => {
       const { months, amount } = offer;
       const current = account?.currentPlanMonths === months;
-      const subscription = account?.subscription?.months === months ? account.subscription : null;
       const savings = monthlyAmount ? planSavingsPercent(amount, months, monthlyAmount) : 0;
       return <article className="plan-offer" key={months} aria-current={current || undefined}>
         <div className="plan-heading"><h2>{p.term(months)}</h2>{current && currentBadge}</div>
         <p className="plan-price">{price.format(amount)}</p>
         <p className="plan-savings">{savings > 0 ? p.savings(savings) : "\u00a0"}</p>
-        {current && account.endsAt && <p className="plan-period">
-          {subscription?.state === "active" ? p.renewal : p.until}{" "}
-          <time dateTime={account.endsAt}>{new Date(account.endsAt).toLocaleString(language, { dateStyle: "long", timeStyle: "short" })}</time>
-        </p>}
-        {current && !account.subscription && <p>{p.prepaid}</p>}
-        {subscription?.state === "ending" && <p>{p.ending}</p>}
-        {subscription?.state === "past_due" && <p>{p.pastDue}</p>}
-        {renderAction(offer)}
+        <div className="plan-action">{renderAction(offer)}</div>
         <ul className="plan-benefits" role="list">{p.benefits(offer.bonusCredits).map(benefit =>
           <li key={benefit}><Check size={16} aria-hidden="true" /><span>{benefit}</span></li>
         )}</ul>

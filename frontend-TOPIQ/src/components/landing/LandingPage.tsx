@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { localizedPath } from "@/lib/locale-path";
 import Image from "next/image";
 import { Check, ExternalLink, Minus, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -43,6 +45,7 @@ export default function LandingPage() {
             <div className={styles.heroCopy}>
               <h1 id="hero-title">{t.hero.title}</h1>
               <p className={styles.description}>{t.hero.description}</p>
+              <Link className={`button ${styles.heroAction}`} href={localizedPath("/pbt", language)}>{t.hero.action}</Link>
             </div>
             <LandingCharacter />
           </div>

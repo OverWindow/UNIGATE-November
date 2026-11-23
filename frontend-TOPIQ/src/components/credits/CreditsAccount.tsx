@@ -27,6 +27,7 @@ export default function CreditsAccount() {
       : status !== "authenticated" || !user ? <div className="catalog-status"><p>{t.loginRequired}</p><Link className="button button-primary" href={`/login?next=${encodeURIComponent(next)}`}>{a.login}</Link></div>
       : history ? <PaymentHistory key={user.id} />
       : <CreditWallet key={user.id} userId={user.id} returnId={returnId} cancelled={cancelled} />}
+    <div className="billing-notice" id="credit-card-notice"><Info size={16} aria-hidden="true" /><p>{t.cardIssuerNotice}</p></div>
   </div>;
 }
 
@@ -87,15 +88,14 @@ function CreditWallet({ userId, returnId, cancelled }: { userId: number; returnI
     </div>
     {error && <div className="catalog-status" role="alert"><p>{t.error}</p><button className="button credits-secondary" onClick={() => refresh()}>{t.retry}</button></div>}
     {!current && !error && <p className="catalog-status credits-loading" role="status"><RefreshCw className="credits-loading-icon" size={20} aria-hidden="true" />{t.loading}</p>}
-    {current && <div className="credits-content" aria-busy={loading}>
+    <div className="credits-content" aria-busy={loading}>
         <dl className="credits-balances">
-          <div className="credits-available"><dt>{t.available}</dt><dd>{number(current.balance.available)} <span>{t.unit}</span></dd></div>
-          <div><dt>{t.balance}</dt><dd>{number(current.balance.balance)} <span>{t.unit}</span></dd></div>
-          <div><dt>{t.reserved}</dt><dd>{number(current.balance.reserved)} <span>{t.unit}</span></dd></div>
+          <div className="credits-available"><dt>{t.available}</dt><dd>{current ? number(current.balance.available) : "—"} <span>{t.unit}</span></dd><dd className="credits-topup"><CreditPurchase userId={userId} returnId={returnId} cancelled={cancelled} onFulfilled={refreshAfterPurchase} /></dd></div>
+          <div><dt>{t.balance}</dt><dd>{current ? number(current.balance.balance) : "—"} <span>{t.unit}</span></dd></div>
+          <div><dt>{t.reserved}</dt><dd>{current ? number(current.balance.reserved) : "—"} <span>{t.unit}</span></dd></div>
         </dl>
-        {!!current.balance.pendingRefundCredits && <p role="status">{t.pendingRefund(number(current.balance.pendingRefundCredits))}</p>}
-      </div>}
-    <CreditPurchase userId={userId} returnId={returnId} cancelled={cancelled} onFulfilled={refreshAfterPurchase} />
+        {!!current?.balance.pendingRefundCredits && <p role="status">{t.pendingRefund(number(current.balance.pendingRefundCredits))}</p>}
+      </div>
     {current && <div className="credits-content" aria-busy={loading}>
         <section className="credits-history" aria-labelledby="credit-transactions-heading">
           <div className="credits-history-heading">
@@ -121,9 +121,9 @@ function CreditWallet({ userId, returnId, cancelled }: { userId: number; returnI
               <strong className={`credits-amount credits-amount-${entry.kind}`}>{["grant", "welcome", "purchase", "plan_bonus", "restore"].includes(entry.kind) ? "+" : ["capture", "unlock", "refund"].includes(entry.kind) ? "−" : ""}{number(entry.amount)} <span>{t.unit}</span></strong>
             </li>)}</ul></div>}
           <nav className="credits-pagination" aria-label={t.transactions}>
-            <button className="button credits-secondary" disabled={loading || current.page === 1} onClick={() => refresh(current.page - 1)}>{t.previous}</button>
-            <span aria-live="polite">{t.page} {number(current.page)}</span>
-            <button className="button credits-secondary" disabled={loading || current.nextPage === null} onClick={() => current.nextPage !== null && refresh(current.nextPage)}>{t.next}</button>
+            <button disabled={loading || current.page === 1} onClick={() => refresh(current.page - 1)}>{t.previous}</button>
+            <span aria-live="polite">{number(current.page)}</span>
+            <button disabled={loading || current.nextPage === null} onClick={() => current.nextPage !== null && refresh(current.nextPage)}>{t.next}</button>
           </nav>
         </section>
       </div>}

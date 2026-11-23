@@ -3,7 +3,6 @@
 .plan-offer[aria-current="true"] { border-color: #9fb8e6; background: #eaf0fc; }
 .plan-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .plan-current-badge { flex: none; border-radius: 12px; padding: 3px 9px; background: #244e9e; color: #fff; font-size: 12px; font-weight: 600; }
-.plan-period time { display: block; font-weight: 600; }
 .plan-offer h2 { font-size: 1.15rem; }
 .plan-offer .plan-price { font-size: clamp(1.7rem, 3vw, 2.25rem); font-weight: 650; line-height: 1.2; color: #172944; }
 .plan-savings { min-height: 20px; color: #286143; font-size: 13px; font-weight: 650; }
@@ -20,4 +19,7 @@
   .plan-free .plan-benefits { grid-area: auto; margin-top: 6px; }
 }
 
-.plan-card-notice { margin-top: 24px; color: #6b7280; font-size: 12px; line-height: 1.5; }
+.plan-offer:not(.plan-free) { grid-template-rows: 56px 44px 20px 56px 1fr; }
+.plan-action { display: flex; align-items: start; }
+.plan-action > .button { width: 100%; }
+.plan-heading h2 { margin: 0; }

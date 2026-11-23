@@ -1,5 +1,6 @@
 "use client";
 
+import { Info } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -30,7 +31,7 @@ export default function PlansAccount() {
         } />
       </div>
       : <MemberPlans key={user.id} userId={user.id} returnId={returnId} cancelled={cancelled} />}
-    <p className="card-issuer-notice plan-card-notice" id="plan-card-notice">{creditsContent[language].cardIssuerNotice}</p>
+    <div className="billing-notice" id="plan-card-notice"><Info size={16} aria-hidden="true" /><p>{creditsContent[language].cardIssuerNotice}</p></div>
   </div>;
 }
 

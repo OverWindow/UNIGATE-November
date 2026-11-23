@@ -1,7 +1,7 @@
 import type { Language } from "./landing-content";
 
 interface HomeContent {
-  hero: { title: string; description: string };
+  hero: { title: string; description: string; action: string };
   pricing: { title: string; checkPrice: string };
   guide: { title: string; organizations: string; ministry: string; institute: string; points: string[]; action: string };
   uses: { title: string; description: string; cards: { title: string; description: string }[] };
@@ -11,10 +11,11 @@ interface HomeContent {
 export const homeContent: Record<Language, HomeContent> = {
   ko: {
     hero: {
+      action: "지금 사용해보기",
       title: "TOPIK II 실력을\n확인해보세요.",
       description: "TOPIK II 읽기와 듣기 50문항을 실전 또는 연습 모드로 풀고,\n정확한 응답 분석과 오답 해설을 확인할 수 있습니다.",
     },
-    pricing: { title: "요금제 비교하기", checkPrice: "지금 가격 확인하기" },
+    pricing: { title: "무제한 요금제 비교하기", checkPrice: "지금 혜택 확인하기" },
     guide: {
       title: "TOPIK 시험이란 무엇인가요?", organizations: "TOPIK 주관 기관", ministry: "대한민국 교육부", institute: "국립국제교육원",
       points: ["한국어가 모국어가 아닌 외국인과 재외동포를 위한 시험", "TOPIK I은 1급과 2급, TOPIK II는 3급부터 6급까지 평가", "공식 성적은 성적 발표일부터 2년 동안 유효", "대한민국 교육부 국립국제교육원이 주관"],
@@ -42,10 +43,11 @@ export const homeContent: Record<Language, HomeContent> = {
   },
   en: {
     hero: {
+      action: "Try it now",
       title: "Find out where you stand in TOPIK II.",
       description: "Take 50-question TOPIK II reading and listening tests in timed or practice mode,\nthen review detailed response analysis and explanations.",
     },
-    pricing: { title: "Compare plans", checkPrice: "Check the current price" },
+    pricing: { title: "Compare unlimited plans", checkPrice: "Explore the benefits" },
     guide: {
       title: "What is the TOPIK test?", organizations: "TOPIK organizers", ministry: "Ministry of Education, Republic of Korea", institute: "National Institute for International Education",
       points: ["For overseas Koreans and international learners whose first language is not Korean", "TOPIK I awards Levels 1 and 2. TOPIK II awards Levels 3 to 6", "Official scores are valid for two years from the result date", "Administered by the National Institute for International Education in Korea"],
@@ -73,10 +75,11 @@ export const homeContent: Record<Language, HomeContent> = {
   },
   id: {
     hero: {
+      action: "Coba sekarang",
       title: "Ketahui kemampuan TOPIK II Anda.",
       description: "Kerjakan 50 soal membaca dan menyimak TOPIK II dalam mode simulasi atau latihan,\nlalu tinjau analisis jawaban dan pembahasannya.",
     },
-    pricing: { title: "Bandingkan paket", checkPrice: "Lihat harga saat ini" },
+    pricing: { title: "Bandingkan paket tanpa batas", checkPrice: "Lihat manfaatnya" },
     guide: {
       title: "Apa itu ujian TOPIK?", organizations: "Penyelenggara TOPIK", ministry: "Kementerian Pendidikan Republik Korea", institute: "National Institute for International Education",
       points: ["Untuk warga Korea di luar negeri dan pelajar yang bahasa ibunya bukan bahasa Korea", "TOPIK I menilai level 1 dan 2. TOPIK II menilai level 3 hingga 6", "Nilai resmi berlaku selama dua tahun sejak pengumuman hasil", "Diselenggarakan oleh National Institute for International Education di Korea"],

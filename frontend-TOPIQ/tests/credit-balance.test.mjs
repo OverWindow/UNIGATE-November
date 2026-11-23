@@ -72,7 +72,7 @@ afterEach(() => { delete globalThis.window; globalThis.fetch = originalFetch; })
 test("only signed-in users request the price; returning guests keep their order when signing in", () => {
   const wallet = mount(CreditsAccount);
   assert.match(wallet.html, /충전 가격을 불러오는 중/);
-  assert.match(wallet.html, /결제 내역/);
+  assert.doesNotMatch(wallet.html, /결제 내역/);
   assert.deepEqual(requests.filter(call => call.url === "/api/credits/price/"), [{ url: "/api/credits/price/", method: "GET" }]);
   wallet.unmount();
   session.user = null;
@@ -123,20 +123,16 @@ function savedCheckout(t, attemptId) {
   return storage;
 }
 
-test("credit checkout keeps its notice and Plus cards use the shared page notice", t => {
-  savedCheckout(t, crypto.randomUUID());
-  const plans = [1, 3, 6].map(months => ({ months, amount: 9900, currency: "krw", priceId: `price_${months}`, bonusCredits: 400 }));
+test("credit and Plus pages each display one shared billing notice", () => {
   const { creditsContent } = require("../src/lib/credits-content.ts");
   for (const [language, { cardIssuerNotice }] of Object.entries(creditsContent)) {
     session.language = language;
-    const tree = mount(
-      () => React.createElement(CreditPurchase, { userId: 1 }),
-      () => React.createElement(CreditPurchase, { userId: 1, planAccount: { plans, active: false, currentPlanMonths: null } }),
-    );
-    const notices = [...tree.html.matchAll(/<p\b[^>]* id="((?:credit|plan)-card-notice[^"]*)"[^>]*>([^<]+)<\/p>/g)];
-    assert.deepEqual(notices.map(([, id, message]) => [id, message]),
-      ["credit-card-notice"].map(id => [id, cardIssuerNotice]));
-    tree.unmount();
+    for (const Page of [CreditsAccount, PlansAccount]) {
+      const tree = mount(Page);
+      assert.equal(tree.html.split(cardIssuerNotice).length - 1, 1);
+      assert.match(tree.html, /class="billing-notice"[^>]*><svg/);
+      tree.unmount();
+    }
   }
 });
 
@@ -174,7 +170,7 @@ test("Each Plus card lists benefits and savings and the selected purchase starts
     assert.ok(card.includes(amount.toLocaleString("ko")));
     assert.doesNotMatch(card, /개월마다/);
     assert.ok(card.includes(`aria-label="Plus ${months}개월 · 구독하기"`));
-    assert.equal((card.match(/<li>/g) ?? []).length, 4);
+    assert.equal((card.match(/<li>/g) ?? []).length, 3);
     if (months > 1) assert.ok(card.includes(`월간 결제 대비 ${months === 3 ? 20 : 26}% 절약`));
     else assert.doesNotMatch(card, /월간 결제 대비/);
   }
@@ -222,7 +218,7 @@ test("guests can browse all plans and each Plus card returns them to plans after
     for (const [index, card] of offers.entries()) {
       const price = new Intl.NumberFormat(language, { style: "currency", currency: "KRW" }).format(amounts[index]);
       assert.ok(card.includes(price));
-      assert.equal((card.match(/<li>/g) ?? []).length, 4);
+      assert.equal((card.match(/<li>/g) ?? []).length, 3);
       assert.ok(card.includes(`href="/login?next=%2Fplans">${login}</a>`));
     }
     assert.doesNotMatch(page.html, /aria-current="true"|<button/);
@@ -251,7 +247,8 @@ test("a subscriber can manage renewal in the portal and returns to Plus", async 
   assert.doesNotMatch(page.html, /구독하기/);
   const cards = page.html.match(/<article\b[\s\S]*?<\/article>/g);
   assert.equal(cards.filter(card => card.includes("내 플랜")).length, 1);
-  assert.match(cards[2], /aria-current="true"[\s\S]*?Plus 3개월[\s\S]*?내 플랜[\s\S]*?만료 일시[\s\S]*?자동 갱신 해지 예정/);
+  assert.match(cards[2], /aria-current="true"[\s\S]*?Plus 3개월[\s\S]*?내 플랜/);
+  assert.doesNotMatch(page.html, /<time|다음 결제 예정|만료 일시/);
   assert.match(page.html, /구독 관리 및 해지/);
   manage();
   await setImmediate();
@@ -272,9 +269,10 @@ function mountPurchaseButton() {
   return { ...tree, click };
 }
 
-test("payment history opens the member's top-up orders even when pricing is unavailable", async () => {
+test("payment history remains available by URL without a wallet button", async () => {
   const wallet = mount(CreditsAccount);
-  assert.match(wallet.html, /href="\/credits\?history=payments">결제 내역/);
+  assert.doesNotMatch(wallet.html, /href="\/credits\?history=payments"/);
+  assert.match(wallet.html, /class="credits-available"[\s\S]*class="credits-topup"/);
   wallet.unmount();
   requests.length = 0;
   search = new URLSearchParams({ history: "payments" });
@@ -302,7 +300,7 @@ test("unused orders offer a full refund and used orders address billing with the
   assert.doesNotMatch(row("refunded", 0), /<button/);
 });
 
-test("resumed checkout displays the original amount and double clicks or retries keep its attempt and Price ID", async t => {
+test("top-up badge preserves the checkout attempt and Price ID across double clicks and retries", async t => {
   const attemptId = "10c9b4ea-f68f-44c2-bb79-4bf13d951ab2";
   savedCheckout(t, attemptId);
   const attempts = [], redirects = [];
@@ -315,9 +313,9 @@ test("resumed checkout displays the original amount and double clicks or retries
     return Response.json({ id: "order", status: "pending", checkoutUrl: "https://checkout.stripe.com/example" });
   };
   const first = mountPurchaseButton();
-  assert.match(first.html, /<button[^>]*>1,000 크레딧 충전<\/button>/);
+  assert.match(first.html, /<button[^>]*class="credits-topup-button"[^>]*>충전<\/button>/);
   assert.doesNotMatch(first.html, /₩6,700|Stripe 영수증|credit-topup-price/);
-  assert.ok(first.html.indexOf("1,000 크레딧 충전") < first.html.indexOf('id="credit-card-notice"'));
+  assert.doesNotMatch(first.html, /id="credit-card-notice"/);
   first.click();
   first.click();
   await setImmediate();

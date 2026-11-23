@@ -185,3 +185,9 @@ body:has(.vocabulary-quiz-bottom-bar) { padding-bottom: calc(80px + env(safe-are
   .vocabulary-toolbar label { margin-left: auto; }
   .vocabulary-card-navigation .button { padding-inline: 16px; }
 }
+
+.vocabulary-plus-dialog { width: min(480px, calc(100% - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; margin: auto; padding: 30px; border: 1px solid #dce4ee; border-radius: 16px; color: #253450; }
+.vocabulary-plus-dialog::backdrop { background: #12244180; }
+.vocabulary-plus-dialog h2 { font-size: 19px; font-weight: 650; }
+.vocabulary-plus-dialog p { margin-block: 20px; }
+.vocabulary-plus-actions { display: flex; justify-content: flex-end; gap: 10px; }

@@ -91,9 +91,9 @@ Checkout에 표시할 결제수단은 Stripe Dashboard에서 관리합니다. �
 
 ### Stripe 대시보드 환불
 
-운영자는 Stripe의 **Payments → 해당 결제 → Refund payment**에서 전액 또는 부분 환불합니다. TOPIQ는 성공한 환불액을 주문별로 합산하고, `지금까지 지급한 크레딧 × 누적 성공 환불액 ÷ 주문 당시 실결제액`의 정수 부분만큼 회수합니다. 여러 번 나눠 환불해도 누적 차감량은 같습니다. Plus는 해당 청구 회차의 월별 400크레딧에 적용하며, 이후 월 지급 시점에도 같은 비율을 반영합니다. 구독 해지·이용 기간은 기존 절차로 관리합니다. [Stripe 환불 안내](https://docs.stripe.com/refunds)
+운영자는 Stripe의 **Payments → 해당 결제 → Refund payment**에서 전액 또는 부분 환불합니다. TOPIQ는 성공한 환불액을 주문별로 합산하고, `지금까지 지급한 크레딧 × 누적 성공 환불액 ÷ 주문 당시 실결제액`의 정수 부분만큼 회수합니다. 여러 번 나눠 환불해도 누적 차감량은 같습니다. Plus는 일부·전액 환불이 성공하면 즉시 권한을 종료하고 Stripe 구독을 중단합니다. 남은 이용 기간의 월별 크레딧 지급도 종료합니다. 종료된 권한은 환불 실패 알림만으로 자동 복구하지 않습니다. [Stripe 환불 안내](https://docs.stripe.com/refunds)
 
-예약 중인 크레딧은 보호합니다. 가용 잔액이 부족하면 나머지는 **차감 예정**으로 표시하고, 다음 적립 또는 예약 해제 시 오래된 주문부터 차감합니다. 성공 처리된 환불이 나중에 실패하면 실제로 초과 차감한 크레딧을 복원하고 예정분을 정정합니다. 회원은 `/credits`에서 **환불 차감**과 **환불 복원** 내역을 조회합니다. 기존 `GET /api/credits/`의 `pendingRefundCredits`는 예정 수량, `GET /api/credits/transactions/`의 `refund`와 `restore`는 실제 차감·복원 내역입니다.
+예약 중인 크레딧은 보호합니다. 가용 잔액까지만 회수하고 부족분은 소멸시킵니다. 이후 적립 또는 예약 해제된 크레딧에서는 재차감하지 않습니다. 부족분은 기록하지 않습니다. 기존 환불 이력의 변경 전·후 성공 금액 차이만 처리하므로, 재전송이나 이후 적립에서 재차감하지 않습니다. 성공 처리된 환불이 나중에 실패하면 실제로 초과 차감한 크레딧을 복원하고 예정분을 정정합니다. 회원은 `/credits`에서 **환불 차감**과 **환불 복원** 내역을 조회합니다. 기존 차감 예정량도 잔액 조회 시 새 정책으로 정산하며 `pendingRefundCredits`는 0으로 정리합니다. `GET /api/credits/transactions/`의 `refund`와 `restore`는 실제 차감·복원 내역입니다.
 
 로컬에서는 개발 서버 시작 전에 사용자가 `backend/`에서 `.\.venv\Scripts\python.exe manage.py migrate`를 수동 실행합니다. `accounts.0012_credit_refunds`는 `credit_purchase_refunds`에 환불 ID·원주문·금액·통화·상태를 기록하고, `credit_purchases`에 결제 ID와 차감 예정 수량, `credit_transactions`에 환불 원주문 연결과 차감·복원 유형을 추가합니다. 이 마이그레이션 적용 시각부터 생성된 Stripe 환불이 대상입니다. 기존 주문은 Checkout 세션 또는 청구서로 대조합니다.
 
@@ -1424,3 +1424,7 @@ CSV 전용 실행 명령·예약 작업·환경 변수나 프론트엔드 배포
 Django 테스트 러너가 테스트 DB를 생성·삭제하며 운영·개발 DB 설정으로 실행하지 않습니다.
 권한 분리, 읽기 전용 관리자 목록의 버튼, 검색·필터와 페이지 처리, CSV 형식·수식 처리,
 토큰 제외와 원본 데이터 보존, 관련 회원·시험 정보를 조회할 때 불필요한 반복 쿼리가 없는지 확인합니다.
+
+환불 정책 변경은 DB 구조 변경이나 추가 migrate 없이 배포합니다. Stripe 제한 키를 사용하는 경우 구독 취소를 위한 Subscriptions 쓰기 권한과 환불·결제·청구서 조회 권한을 허용해야 합니다.
+
+환불 정책 회귀 검증은 `backend/`에서 `.venv/bin/python manage.py test accounts.tests.test_refund_policy accounts.tests.test_credit_refunds accounts.tests.test_credit_purchases --noinput`으로 실행합니다. 이는 수동 개발 검증이며 실제 서비스 DB 대신 Django 테스트 DB를 사용합니다. DB 구조 변경은 없습니다.

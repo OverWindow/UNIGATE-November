@@ -71,25 +71,13 @@ def allocate_transaction(account, kind, amount, purchase):
 
 
 def collect_pending_refunds(account, *, held_purchase=None):
-    # All wallet writers hold the same account lock. Never spend an evaluation reservation.
-    available = account.balance - account.reserved
-    if not available:
-        return
+    # Reconcile legacy pending deductions once, forgiving any unavailable balance.
     pending = CreditPurchase.objects.filter(user_id=account.pk, pending_refund_credits__gt=0).order_by("created_at", "pk")
-    if held_purchase:
-        pending = pending.alias(held=Q(pk=held_purchase)).order_by("-held", "created_at", "pk")
     for purchase in pending:
-        amount = min(available, purchase.pending_refund_credits)
-        purchase.pending_refund_credits -= amount
-        purchase.save(update_fields=["pending_refund_credits"])
-        account.balance -= amount
-        record(account, "refund", amount, refund_purchase=purchase)
-        available -= amount
-        if not available:
-            break
+        reconcile_purchase_refunds(account, purchase, previous_refunded=0)
 
 
-def reconcile_purchase_refunds(account, purchase, *, from_hold=False):
+def reconcile_purchase_refunds(account, purchase, *, from_hold=False, previous_refunded=None):
     if purchase.status != "fulfilled":
         return
     if purchase.refunds.exists():
@@ -103,13 +91,21 @@ def reconcile_purchase_refunds(account, purchase, *, from_hold=False):
             debited=Sum("amount", filter=Q(kind="refund"), default=0),
             restored=Sum("amount", filter=Q(kind="restore"), default=0),
         )
-        difference = target - (entries["debited"] - entries["restored"])
-        purchase.pending_refund_credits = max(0, difference)
-        purchase.save(update_fields=["pending_refund_credits"])
-        if difference < 0:
+        net_debited = entries["debited"] - entries["restored"]
+        difference = target - net_debited
+        purchase.pending_refund_credits = 0
+        if difference > 0 and previous_refunded is not None:
+            # Charge only newly successful refunds, never a previously forgiven shortfall.
+            previous_target = purchase.credits * installments * previous_refunded // purchase.amount
+            amount = min(difference, max(0, target - previous_target), max(0, account.balance - account.reserved))
+            if amount:
+                account.balance -= amount
+                record(account, "refund", amount, refund_purchase=purchase)
+        elif difference < 0:
             account.balance -= difference
             record(account, "restore", -difference, refund_purchase=purchase)
-    collect_pending_refunds(account, held_purchase=purchase.pk if from_hold else None)
+        purchase.save(update_fields=["pending_refund_credits"])
+
 
 
 def due_plan_months(user_id, now):
@@ -130,7 +126,8 @@ def due_plan_months(user_id, now):
 
 @transaction.atomic
 def account_with_monthly_credits(user_id, *, for_update=False):
-    if not for_update and not any(due_plan_months(user_id, timezone.now())):
+    if (not for_update and not any(due_plan_months(user_id, timezone.now()))
+            and not CreditPurchase.objects.filter(user_id=user_id, pending_refund_credits__gt=0).exists()):
         account, _ = CreditAccount.objects.get_or_create(user_id=user_id)
         return account
     account = locked_account(user_id)
@@ -144,6 +141,7 @@ def account_with_monthly_credits(user_id, *, for_update=False):
         receipt.credited_months = months_due
         receipt.save(update_fields=["credited_months", "transaction"])
         reconcile_purchase_refunds(account, receipt)
+    collect_pending_refunds(account)
     return account
 
 

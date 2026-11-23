@@ -17,11 +17,14 @@
 .credits-available dt { color: #315eb7; }
 .credits-purchase { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
 .credits-purchase .button { min-height: 44px; }
-.credits-purchase .credits-topup-button { min-height: 38px; padding: 8px 14px; font-size: 13px; }
+.credits-topup-button { min-height: 32px; padding: 5px 13px; border: 1px solid #adc1e7; border-radius: 999px; background: #fff; color: #244e9e; font-size: 12px; font-weight: 600; cursor: pointer; }
+.credits-topup-button:hover:not(:disabled) { background: #f5f8ff; border-color: #315eb7; }
+.credits-topup-button:disabled { opacity: .6; cursor: default; }
+.credits-available { position: relative; }
+.credits-balances dd.credits-topup { margin-top: 16px; font-size: 12px; font-weight: 400; }
+.credits-topup .credits-purchase { margin-top: 0; gap: 8px; }
 .credits-purchase .button:disabled { opacity: .6; }
 .credits-purchase p { margin: 0; color: #405370; font-size: 14px; }
-.credits-purchase .card-issuer-notice { color: #6b7280; font-size: 12px; font-weight: 400; line-height: 1.5; }
-.credits-purchase > .card-issuer-notice { flex-basis: 100%; }
 .credits-history { margin-top: 40px; }
 .credits-order-list { margin: 0; padding: 0; list-style: none; border: 1px solid #dfe6f1; border-radius: 12px; background: #fff; }
 .credits-order-list li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 24px; }
@@ -51,8 +54,10 @@
 .credits-transaction-details { display: flex; flex-wrap: wrap; justify-self: center; gap: 4px 24px; margin: 0; font-size: 13px; color: #596a81; }
 .credits-transaction-details > div { display: flex; align-items: baseline; gap: 8px; }
 .credits-transaction-details dd { font-weight: 600; color: #334760; font-variant-numeric: tabular-nums; }
-.credits-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 24px; }
-.credits-pagination > span { font-size: 13px; color: #596a81; }
+.credits-pagination { display: flex; align-items: center; justify-content: center; gap: 28px; margin-top: 32px; font-size: 14px; }
+.credits-pagination button { padding: 10px; color: var(--color-primary); cursor: pointer; }
+.credits-pagination button:disabled { color: #717b8b; cursor: default; }
+.credits-pagination > span { color: var(--color-ink); }
 @media (hover: hover) and (pointer: fine) {
   .credits-info-trigger, .credits-transactions li { transition: background-color .18s ease, color .18s ease; }
   .credits-transactions li:hover { background: #f7f9ff; }
@@ -73,10 +78,13 @@
   .credits-balances { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .credits-balances > div { padding: 20px; }
   .credits-balances .credits-available { grid-column: 1 / -1; }
-  .credits-pagination .button { min-height: 44px; padding: 10px 16px; }
 }
 @keyframes credits-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
   .credits-refresh[aria-busy="true"] svg, .credits-loading-icon { animation: none; }
   .credits-content { transition: none; }
 }
+
+.billing-notice { display: flex; align-items: start; gap: 9px; margin-top: 28px; padding-top: 20px; border-top: 1px solid #dfe6f1; }
+.billing-notice > svg { flex-shrink: 0; margin-top: 3px; color: #65728a; }
+.billing-notice p { margin: 0; color: #65728a; font-size: 13px; line-height: 1.8; }

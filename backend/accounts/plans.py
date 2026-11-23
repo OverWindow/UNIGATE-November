@@ -7,7 +7,7 @@ from .models import OPEN_SUBSCRIPTION_STATES, CreditPurchase
 
 
 def paid_plans():
-    return CreditPurchase.objects.filter(status="fulfilled", plan_months__isnull=False)
+    return CreditPurchase.objects.filter(status="fulfilled", plan_months__isnull=False).exclude(subscription_state="revoked").exclude(refunds__status="succeeded")
 
 
 def active_plans(user_id, at):

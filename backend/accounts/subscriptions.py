@@ -62,6 +62,8 @@ def apply_paid_invoice(invoice):
         order.save(update_fields=["subscription_state"])
     receipt.stripe_invoice_id = invoice["id"]
     receipt.plan_starts_at, receipt.plan_ends_at = start, end
+    if order.subscription_state == "revoked":
+        receipt.subscription_state = "revoked"
     receipt.status = "fulfilled"
     receipt.save()
     reconcile_purchase_refunds(account, receipt)
@@ -73,7 +75,7 @@ def sync_subscription(event_type, subscription, client_factory):
     if not order_id:
         return
     order, _ = subscription_order(order_id, subscription["customer"], subscription["id"])
-    if order.subscription_state == "ended":
+    if order.subscription_state in {"ended", "revoked"}:
         return
     if event_type == "customer.subscription.updated":
         # Stripe retries events out of order, including changes within the same second.

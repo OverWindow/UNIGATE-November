@@ -33,6 +33,7 @@ class CreditRefundTests(TestCase):
         self.api = self.enterContext(patch("accounts.payments.stripe.StripeClient")).return_value.v1
         self.api.checkout.sessions.list.return_value.data = []
         self.api.invoice_payments.list.return_value.data = []
+        self.api.subscriptions.retrieve.return_value.to_dict.return_value = {"status": "active"}
 
     def paid(self):
         self.assertEqual(post_webhook(self.client, self.order, payment_intent="pi_topup").status_code, 200)
@@ -235,18 +236,18 @@ class CreditRefundTests(TestCase):
         self.notify(refund | {"status": "pending"})
         self.wallet(80, reserved=20)
         self.notify(refund, "refund.updated")
-        self.wallet(0, due=220, reserved=20)
+        self.wallet(0, reserved=20)
         evaluation = Evaluation.objects.create(user=self.user, set_id=uuid4(), type_slot=51, question_snapshot={},
             answer={}, credit_cost=20, status="processing", expires_at=timezone.now() + timedelta(hours=1))
         with transaction.atomic():
             settle(evaluation, success=False)
-        self.wallet(0, due=200)
+        self.wallet(20)
         grant(user_id=self.user.pk, amount=50, actor=self.user, reason="test", entry_id=uuid4())
-        self.wallet(0, due=150)
+        self.wallet(70)
         self.notify(refund | {"status": "failed"}, "refund.failed")
         self.notify(refund | {"status": "failed"}, status="succeeded")
         self.wallet(150)
-        self.assertEqual(CreditTransaction.objects.get(kind="restore").amount, 150)
+        self.assertEqual(CreditTransaction.objects.get(kind="restore").amount, 80)
 
     @override_settings(SESSION_COOKIE_AGE=365 * 86400)
     def test_refunded_quarterly_renewal_before_invoice_and_future_months(self):
@@ -262,18 +263,22 @@ class CreditRefundTests(TestCase):
         self.api.invoice_payments.list.return_value = Mock(data=[payment], has_more=False)
         refund = refund_object("re_plan", 11950, intent="pi_renewal")
         self.notify(refund)
+        self.assertFalse(self.client.get("/api/plans/").json()["active"])
+        self.api.subscriptions.cancel.assert_called_once()
+        self.notify(refund)
+        self.api.subscriptions.cancel.assert_called_once()
         self.assertEqual(signed_event(self.client, "invoice.paid", renewal).status_code, 200)
         self.wallet(400)
         with patch("accounts.credits.timezone.now", return_value=start + timedelta(days=1)):
-            self.wallet(1400)  # 1,200 original credits plus 200 for the renewal.
+            self.wallet(400)  # Refund revoked both remaining periods before any renewal bonus.
         with patch("accounts.credits.timezone.now", return_value=start + timedelta(days=34)):
-            self.wallet(1600)
+            self.wallet(400)
             self.notify(refund_object("re_plan_rest", 11950, intent="pi_renewal"))
-            self.wallet(1200)
+            self.wallet(400)
         with patch("accounts.credits.timezone.now", return_value=start + timedelta(days=80)):
-            self.wallet(1200)
+            self.wallet(400)
             self.notify(refund | {"status": "failed"}, "refund.failed")
-            self.wallet(1800)
+            self.wallet(400)
         self.assertEqual(CreditPurchase.objects.filter(stripe_invoice_id="in_next").count(), 1)
 
 

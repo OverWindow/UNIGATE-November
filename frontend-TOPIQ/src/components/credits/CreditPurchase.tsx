@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
 import { creditsContent } from "@/lib/credits-content";
@@ -28,7 +27,6 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
   const t = creditsContent[language];
   const p = plansContent[language];
   const isPlan = planAccount !== undefined;
-  const checkoutCopy = isPlan ? { ...t.checkout, ...p.checkout } : t.checkout;
   const storageKey = `topiq-${isPlan ? "plan" : "credit"}-purchase:${userId}`;
   const [initialAttempt] = useState(() => savedAttempt(storageKey));
   const attempt = useRef<Attempt | null>(initialAttempt);
@@ -187,17 +185,13 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
       <p role="status">{t.priceUnavailable}</p>
       <button type="button" className="button credits-secondary" onClick={reloadPrice}>{t.retry}</button>
     </> : price ? <>
-      <button type="button" className="button button-primary credits-topup-button" aria-describedby="credit-card-notice" disabled={blocked} onClick={() => void buy()}>
-        {t.buy(price.credits.toLocaleString(language))}
+      <button type="button" className="credits-topup-button" aria-describedby="credit-card-notice" disabled={blocked} onClick={() => void buy()}>
+        {t.topup}
       </button>
     </> : <p role="status">{t.priceLoading}</p>}
-    {!isPlan && <Link className="button credits-secondary credits-topup-button" href="/credits?history=payments">{t.paymentHistory}</Link>}
     {isPlan && planAccount?.subscription && <button type="button" className="button credits-secondary" disabled={opening} onClick={() => void viewPayments()}>
       {p.manage}
     </button>}
-    {!isPlan && price && price !== "unavailable" && <p className="card-issuer-notice" id="credit-card-notice">{t.cardIssuerNotice}</p>}
-    {portalNotice && <p role="status">{t.portal[portalNotice]}</p>}
-    {notice && notice !== "opening" && <p role="status">{notice === "planInUse" ? p.inUse : checkoutCopy[notice]}</p>}
     {retryCheck && <button type="button" className="button credits-secondary" onClick={() => setCheckCount(count => count + 1)}>{t.checkAgain}</button>}
   </div>;
 }

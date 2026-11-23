@@ -3,7 +3,8 @@ from uuid import UUID, uuid4
 import stripe
 from django.db import connection, transaction
 from django.db.migrations.recorder import MigrationRecorder
-from django.db.models import Sum
+from django.db.models import Sum, Q
+from django.utils import timezone
 
 from .credits import collect_pending_refunds, locked_account, reconcile_purchase_refunds
 from .models import CreditPurchase, CreditPurchaseRefund
@@ -92,7 +93,7 @@ def apply_refund(notification, api):
         if not purchase.stripe_payment_intent_id:
             purchase.stripe_payment_intent_id = intent_id
             purchase.save(update_fields=["stripe_payment_intent_id"])
-    save_refund(account, purchase, refund)
+    save_refund(account, purchase, refund, api=api)
 
 
 def release_hold(account, purchase):
@@ -111,7 +112,25 @@ def billing_review(account, purchase):
     return "contact"
 
 
-def save_refund(account, purchase, refund):
+def revoke_refunded_plan(purchase, api):
+    if not purchase.plan_months or purchase.subscription_state == "revoked":
+        return
+    # Refund success ends the account's current Plus period and future installments.
+    orders = CreditPurchase.objects.filter(user_id=purchase.user_id, plan_months__isnull=False)
+    for order in orders.filter(subscription_state__in=["checkout", "active", "ending", "past_due"]):
+        if order.stripe_subscription_id:
+            subscription = api.subscriptions.retrieve(order.stripe_subscription_id).to_dict()
+            if subscription["status"] not in {"canceled", "incomplete_expired"}:
+                api.subscriptions.cancel(order.stripe_subscription_id, {"invoice_now": False, "prorate": False})
+    affected = orders.filter(Q(plan_ends_at__gt=timezone.now()) | Q(pk=purchase.pk)
+                             | Q(subscription_state__in=["checkout", "active", "ending", "past_due"]))
+    affected.filter(status="pending").update(status="expired")
+    affected.update(subscription_state="revoked")
+    purchase.subscription_state = "revoked"
+
+
+def save_refund(account, purchase, refund, *, api=None):
+    previous_refunded = purchase.refunds.filter(status="succeeded").aggregate(total=Sum("amount", default=0))["total"]
     row, created = CreditPurchaseRefund.objects.get_or_create(
         stripe_refund_id=refund["id"], defaults={
             "purchase": purchase, "amount": refund["amount"], "currency": refund["currency"], "status": refund["status"],
@@ -128,7 +147,11 @@ def save_refund(account, purchase, refund):
     if not created:
         row.status = refund["status"]
         row.save(update_fields=["status"])
-    reconcile_purchase_refunds(account, purchase, from_hold=from_hold)
+    if refund["status"] == "succeeded" and purchase.plan_months:
+        if api is None:
+            raise ValueError("Plan refund requires Stripe client")
+        revoke_refunded_plan(purchase, api)
+    reconcile_purchase_refunds(account, purchase, from_hold=from_hold, previous_refunded=previous_refunded)
 
 
 def reserved_orders(account):

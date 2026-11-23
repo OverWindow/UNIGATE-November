@@ -145,3 +145,6 @@
 
 .planPriceBlurred { filter: blur(7px); user-select: none; }
 .planSavings { display: flex; align-items: center; gap: 6px; }
+
+.heroAction { margin-top: 24px; background: #fff; color: #244e9e; border-color: #d9e1ee; }
+.heroAction:hover { background: #f8faff; border-color: #91aad9; }
