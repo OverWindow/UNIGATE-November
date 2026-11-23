@@ -58,7 +58,7 @@ Checkout에 표시할 결제수단은 Stripe Dashboard에서 관리합니다. �
 
 `backend/migration/accounts/`의 Django 마이그레이션이 결제 스키마를 관리합니다. `credit_purchases`에는 주문·회원·구매 시도(`id`, `user_id`, `attempt_id`), 주문 당시의 가격과 지급량(`stripe_price_id`, `amount`, `currency`, `credits`), 처리 상태와 생성 시각(`status`, `created_at`), Stripe 세션과 적립 내역(`stripe_session_id`, `transaction_id`)을 기록합니다. Django가 주문을 생성할 때 Stripe에서 읽은 금액을 저장하고, 적립 시 `credit_transactions.kind`에 유료 충전(`purchase`)을 기록합니다.
 
-**결제 내역.** `/credits`의 **결제 내역**에서 주문별 결제액과 남은 크레딧을 확인합니다. 유료 충전분을 실제 적립 시각이 빠른 주문부터 사용합니다. 한 주문의 크레딧이 모두 남아 있으면 **전액 환불**을 선택해 금액을 확인합니다. 일부 사용했거나 이전 기록만으로 사용량을 확인하기 어려우면 **고객 문의**를 누릅니다. 팝업에서 `billing@unigate.kr`와 해당 주문번호를 각각 복사한 뒤, 평소 사용하는 메일에서 주문번호와 문의 내용을 적어 보내세요. **Stripe 영수증** 버튼은 기존 고객 포털의 청구서를 엽니다. 일회성 청구서에는 별도 발행 수수료가 적용됩니다. [Stripe 청구서 발행 요금](https://support.stripe.com/questions/pricing-for-post-payment-invoices-for-one-time-purchases-via-checkout-and-payment-links)
+**일회성 크레딧 환불.** TOPIQ 하단의 **설정 → 일회성 크레딧 환불**에서 환불 규정을 볼 수 있습니다. 로그인하면 **내 충전 주문**에 결제액과 남은 크레딧이 표시됩니다. 유료 충전분은 먼저 적립된 주문부터 사용합니다. 한 주문의 크레딧이 모두 남아 있으면 **전액 환불**을 선택해 금액을 확인합니다. 일부 사용했거나 이전 기록만으로 사용량을 확인하기 어려우면 **고객 문의**를 누릅니다. 팝업에서 `billing@unigate.kr`와 해당 주문번호를 각각 복사한 뒤, 평소 사용하는 메일에서 주문번호와 문의 내용을 적어 보내세요. 일회성 청구서에는 별도 발행 수수료가 적용됩니다. [Stripe 청구서 발행 요금](https://support.stripe.com/questions/pricing-for-post-payment-invoices-for-one-time-purchases-via-checkout-and-payment-links)
 
 **Stripe 포털 설정.** 테스트 전에 샌드박스에서, 배포 전에 라이브 모드에서 각각 기본 고객 포털의 **Invoice history**를 켜고 설정을 저장합니다. API가 회원별로 임시 포털 세션을 생성하므로 공개 로그인 링크를 만들 필요는 없습니다. 테스트와 운영은 각 Stripe 환경에 대응하는 별도 DB를 사용합니다. [고객 포털 설정](https://dashboard.stripe.com/settings/billing/portal)
 

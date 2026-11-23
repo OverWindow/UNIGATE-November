@@ -12,14 +12,18 @@ export function PaymentRow({ order, amount, disabled, onRefund, onContact }: {
 }) {
   const { language } = useApp();
   const p = paymentHistoryContent[language];
+  const credits = order.credits.toLocaleString(language);
+  function confirmRefund() {
+    if (order.refundState === "eligible" && !window.confirm(p.confirm(amount, credits))) return;
+    onRefund();
+  }
   return <li>
     <div><time dateTime={order.paidAt}>{new Date(order.paidAt).toLocaleString(language)}</time>
       <strong>{amount}</strong>
-      <span>{order.credits.toLocaleString(language)} {creditsContent[language].unit}
-        {order.remainingCredits !== null && ` · ${p.remaining} ${order.remainingCredits.toLocaleString(language)}`}</span>
+      <span>{order.remainingCredits !== null && `${p.remaining} ${order.remainingCredits.toLocaleString(language)} / `}{credits} {creditsContent[language].unit}</span>
     </div>
     {order.refundState === "eligible" || order.refundState === "confirming"
-      ? <button className="button credits-secondary" type="button" disabled={disabled} onClick={onRefund}>
+      ? <button className="button credits-secondary" type="button" disabled={disabled} onClick={confirmRefund}>
         {order.refundState === "eligible" ? p.refund : p.confirming}</button>
       : order.refundState === "contact"
         ? <button className="button credits-secondary" type="button" aria-haspopup="dialog"
@@ -28,7 +32,7 @@ export function PaymentRow({ order, amount, disabled, onRefund, onContact }: {
   </li>;
 }
 
-export default function PaymentHistory() {
+export default function PaymentHistory({ inSettings = false }: { inSettings?: boolean }) {
   const { language, refreshSession, refreshCredits } = useApp();
   const t = creditsContent[language];
   const p = paymentHistoryContent[language];
@@ -72,7 +76,6 @@ export default function PaymentHistory() {
   }).format(order.amount);
   async function refund(order: TopupOrder) {
     if (operation.current) return;
-    if (order.refundState === "eligible" && !window.confirm(p.confirm(money(order), order.credits.toLocaleString(language)))) return;
     const controller = new AbortController();
     operation.current = controller;
     setBusy(true);
@@ -97,9 +100,9 @@ export default function PaymentHistory() {
   }
 
   return <>
-    <Link className="settings-back" href="/credits">{p.back}</Link>
+    {!inSettings && <Link className="settings-back" href="/credits">{p.back}</Link>}
     <div className="credits-heading">
-      <h1 className="catalog-title">{t.paymentHistory}</h1>
+      {inSettings ? <h2 className="text-lg font-semibold">{p.orders}</h2> : <h1 className="catalog-title">{t.paymentHistory}</h1>}
       <button className="button credits-secondary" type="button" disabled={loading || busy}
         onClick={() => setRevision(value => value + 1)}>{t.refresh}</button>
     </div>

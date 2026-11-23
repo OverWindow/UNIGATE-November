@@ -21,6 +21,7 @@ const imports = {
   "next/image": { default: () => null },
   "next/link": { default: ({ href, children }) => React.createElement("a", { href }, children) },
   "@/app/providers": { useApp: () => session },
+  "@/lib/seo": { requestLanguage: async () => session.language },
   "@/lib/use-navigation-router": { default: () => ({}) },
 };
 function load(relativePath) {
@@ -44,6 +45,8 @@ const { default: CreditPurchase } = load("components/credits/CreditPurchase.tsx"
 imports["./CreditPurchase"] = { default: CreditPurchase };
 imports["./BillingContactDialog"] = load("components/credits/BillingContactDialog.tsx");
 imports["./PaymentHistory"] = load("components/credits/PaymentHistory.tsx");
+const { default: RefundSettings } = load("components/credits/RefundSettings.tsx");
+const { default: SettingsPage } = load("app/settings/page.tsx");
 const { default: CreditsAccount } = load("components/credits/CreditsAccount.tsx");
 const { default: PlansAccount } = load("components/credits/PlansAccount.tsx");
 const { default: WritingCreditBadge } = load("components/writing/WritingCreditBadge.tsx");
@@ -283,6 +286,52 @@ test("payment history remains available by URL without a wallet button", async (
   history.unmount();
 });
 
+test("the settings list links to localized refunds without loading orders", async () => {
+  const { paymentHistoryContent } = require("../src/lib/credits-content.ts");
+  for (const [language, prefix] of [["ko", ""], ["en", "/en"], ["id", "/id"]]) {
+    session.language = language;
+    const page = await SettingsPage();
+    const tree = mount(() => page);
+    const { refundTitle, policy } = paymentHistoryContent[language];
+    assert.ok(tree.html.includes('<a href="' + prefix + '/settings/refunds">' + refundTitle));
+    assert.ok(!tree.html.includes(policy));
+    tree.unmount();
+  }
+  assert.deepEqual(requests, []);
+});
+
+test("public refund details link back to settings and keep their language on sign-in", () => {
+  session.user = null;
+  session.status = "anonymous";
+  for (const [language, prefix, title] of [
+    ["ko", "", "일회성 크레딧 환불"], ["en", "/en", "One-time credit refunds"], ["id", "/id", "Pengembalian dana isi ulang satu kali"],
+  ]) {
+    session.language = language;
+    const tree = mount(RefundSettings);
+    assert.ok(tree.html.includes(title));
+    assert.ok(tree.html.includes('href="' + prefix + '/settings"'));
+    assert.ok(tree.html.includes(`href="${prefix}/terms"`));
+    assert.ok(tree.html.includes(`href="${prefix}/login?next=${encodeURIComponent(prefix + "/settings/refunds")}"`));
+    tree.unmount();
+  }
+  for (const status of ["loading", "error"]) {
+    session.status = status;
+    const tree = mount(RefundSettings);
+    assert.match(tree.html, /<h1[^>]*>/);
+    assert.doesNotMatch(tree.html, /login\?next/);
+    tree.unmount();
+  }
+  assert.deepEqual(requests, []);
+});
+
+test("signed-in refund details load the shared one-time order list under the refund policy", () => {
+  const tree = mount(RefundSettings);
+  assert.match(tree.html, /<h1[^>]*>일회성 크레딧 환불<\/h1>[\s\S]*<h2[^>]*>내 충전 주문<\/h2>/);
+  assert.doesNotMatch(tree.html, /크레딧으로 돌아가기|login\?next/);
+  assert.deepEqual(requests, [{ url: "/api/credits/purchases/?page=1", method: "GET" }]);
+  tree.unmount();
+});
+
 test("unused orders offer a full refund and each contact button selects its own order", () => {
   const { PaymentRow } = imports["./PaymentHistory"];
   const order = { id: crypto.randomUUID(), paidAt: "2026-11-21T12:00:00Z", credits: 1000, remainingCredits: 1000 };
@@ -293,6 +342,7 @@ test("unused orders offer a full refund and each contact button selects its own 
   }
   assert.match(row("eligible", 1000), /<button[^>]*>전액 환불<\/button>/);
   const used = row("contact", 900);
+  assert.match(used, /잔여 900 \/ 1,000 크레딧/);
   assert.match(used, /<button[^>]*aria-haspopup="dialog"[^>]*>고객 문의<\/button>/);
   assert.doesNotMatch(used, /mailto:/);
   const selected = [];
@@ -303,8 +353,33 @@ test("unused orders offer a full refund and each contact button selects its own 
     React.Children.toArray(rendered.props.children).find(child => child.type === "button").props.onClick();
   }
   assert.deepEqual(selected, orderIds);
+  assert.doesNotMatch(row("held", 1000), /<button/);
   assert.match(row("processing", 1000), /환불 처리 중/);
   assert.doesNotMatch(row("refunded", 0), /<button/);
+});
+
+test("only confirming a new full refund submits it and checking an existing request needs no new confirmation", () => {
+  const { PaymentRow } = imports["./PaymentHistory"];
+  const order = { id: crypto.randomUUID(), paidAt: "2026-11-21T12:00:00Z", credits: 1000, remainingCredits: 1000 };
+  let submissions = 0;
+  function click(refundState) {
+    const rendered = PaymentRow({ order: { ...order, refundState }, amount: "₩4,900", disabled: false,
+      onRefund: () => submissions++, onContact: () => assert.fail("unexpected billing inquiry") });
+    React.Children.toArray(rendered.props.children).find(child => child.type === "button").props.onClick();
+  }
+  let accepted = false;
+  window.confirm = message => {
+    assert.ok(message.includes("₩4,900") && message.includes("1,000"));
+    return accepted;
+  };
+  click("eligible");
+  assert.equal(submissions, 0);
+  accepted = true;
+  click("eligible");
+  assert.equal(submissions, 1);
+  window.confirm = () => assert.fail("existing refund should check status immediately");
+  click("confirming");
+  assert.equal(submissions, 2);
 });
 
 test("the billing dialog shows selectable order details and email instructions in each supported language", () => {
