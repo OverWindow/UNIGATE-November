@@ -12,6 +12,7 @@ import SiteHeader from "../SiteHeader";
 import SiteFooter from "../SiteFooter";
 import { writingContent } from "@/lib/writing/writing-content";
 import { localizedPath } from "@/lib/locale-path";
+import ExamHistory from "@/app/settings/exam-history/ExamHistory";
 
 export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFormat }) {
   const { language, user, refreshSession } = useApp();
@@ -127,6 +128,10 @@ export default function PbtCatalog({ examFormat = "pbt" }: { examFormat?: ExamFo
           <Link className="button button-primary" href={localizedPath("/plans", language)}>{t.viewPlus}</Link>
         </div>
       </dialog>}
+      {user && <section className="pbt-catalog-history" aria-labelledby="pbt-catalog-history-title">
+        <h2 id="pbt-catalog-history-title">{t.history}</h2>
+        <ExamHistory format={examFormat} />
+      </section>}
     </div>
   </main><SiteFooter /></>;
 }

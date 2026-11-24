@@ -64,6 +64,26 @@ class IbtTests(BankFixtures, TransactionTestCase):
             self.assertEqual(len(history), 1)
             self.assertEqual(history[0]["examFormat"], exam_format)
 
+    def test_attempt_history_paginates_each_format_and_combined_history(self):
+        now = timezone.now()
+        rows = [Attempt(exam=self.exam if index % 3 else self.ibt_exam,
+                        exam_format="pbt" if index % 3 else "ibt", user=self.user,
+                        title="History", section="reading", mode="practice", status="submitted",
+                        started_at=now - timedelta(minutes=index), submitted_at=now - timedelta(minutes=index), score=0)
+                for index in range(15)]
+        Attempt.objects.bulk_create(rows)
+        first = self.client.get("/api/pbt/attempts/?format=all&page=1").json()
+        second = self.client.get("/api/pbt/attempts/?format=all&page=2").json()
+        self.assertEqual((first["page"], first["pageCount"], len(first["attempts"])), (1, 2, 10))
+        self.assertEqual([row["id"] for row in first["attempts"] + second["attempts"]],
+                         [str(row.pk) for row in rows])
+        pbt = self.client.get("/api/pbt/attempts/?page=1").json()
+        ibt = self.client.get("/api/ibt/attempts/?page=1").json()
+        self.assertEqual((pbt["pageCount"], len(pbt["attempts"])), (1, 10))
+        self.assertEqual((ibt["pageCount"], len(ibt["attempts"])), (1, 5))
+        self.assertEqual(self.client.get("/api/pbt/attempts/?page=0").status_code, 400)
+        self.assertEqual(self.client.get("/api/pbt/attempts/?format=ibt").status_code, 400)
+
     def test_free_uses_first_visible_set_and_plus_expiry_blocks_active_attempts(self):
         paid_attempts = []
         for exam_format in ("pbt", "ibt"):

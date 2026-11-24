@@ -132,11 +132,24 @@ def exam_progress(user, exam_format, rows):
 @available
 def attempts(request, exam_format="pbt"):
     if request.method == "GET":
+        try:
+            page = int(request.GET.get("page", "1"))
+            if page < 1 or request.GET.get("format", exam_format) not in (exam_format, "all"):
+                raise ValueError
+        except ValueError:
+            return response({"error": "invalid_request"}, 400)
+        selected_format = request.GET.get("format", exam_format)
         with transaction.atomic():
-            rows = list(Attempt.objects.filter(owner_filter(request), exam_format=exam_format).select_for_update().order_by("-started_at")[:100])
+            attempts_query = Attempt.objects.filter(owner_filter(request))
+            if selected_format != "all":
+                attempts_query = attempts_query.filter(exam_format=exam_format)
+            total = attempts_query.count()
+            page_size = 10
+            rows = list(attempts_query.select_for_update().order_by("-started_at", "-id")[(page - 1) * page_size:page * page_size])
             for attempt in rows:
                 finalize(attempt)
-            return response({"attempts": [attempt_data(a, request=request) for a in rows]})
+            return response({"attempts": [attempt_data(a, request=request) for a in rows],
+                             "page": page, "pageCount": max(1, (total + page_size - 1) // page_size)})
     try:
         data = payload(request, {"examId", "mode"}, {"restartAttemptId"})
         exam_id = uuid.UUID(data["examId"])

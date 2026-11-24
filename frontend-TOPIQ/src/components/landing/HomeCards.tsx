@@ -28,7 +28,7 @@ export default function HomeCards({ language }: { language: Language }) {
               return <Link key={months} href={localizedPath("/plans", language)} className={styles.planCard}>
                 <span className={styles.planTerm}>{plan.term(months)}<ArrowRight size={17} aria-hidden="true" /></span>
                 <strong className={`${styles.planPrice}${months > 1 ? ` ${styles.planPriceBlurred}` : ""}`} aria-hidden={months > 1 || undefined}>{price.format(amount)}</strong>
-                <span className={styles.planSavings}>{months > 1 ? <>{pricing.checkPrice}<ArrowRight size={14} aria-hidden="true" /></> : "\u00a0"}</span>
+                <span className={styles.planSavings}>{months > 1 ? pricing.checkPrice : "\u00a0"}</span>
               </Link>;
             })}
         </div>

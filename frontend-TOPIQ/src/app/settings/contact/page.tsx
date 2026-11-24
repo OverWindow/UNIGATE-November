@@ -18,8 +18,8 @@ export default async function ContactPage({ searchParams }: PageProps<"/settings
   const orderLine = typeof order === "string" && /^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(order)
     ? `${paymentHistoryContent[language].inquiry.order}: ${order}` : null;
   const contacts = [
-    { ...labels.general, email: "overwindow@unigate.kr", refundHref: null, body: null },
-    { ...labels.refund, email: billingEmail, refundHref: localizedPath("/settings/refunds", language), body: orderLine },
+    { ...labels.general, email: "overwindow@unigate.kr", refund: false, body: null },
+    { ...labels.refund, email: billingEmail, refund: true, body: orderLine },
   ];
 
   return (
@@ -29,24 +29,19 @@ export default async function ContactPage({ searchParams }: PageProps<"/settings
       </Link>
       <h1 className="section-heading">{labels.title}</h1>
       <div className="mt-8 grid gap-4 md:grid-cols-2">
-        {contacts.map(({ title, description, email, refundHref, body }) => (
-          <section key={email} id={refundHref ? "refund-inquiry" : undefined} tabIndex={refundHref ? -1 : undefined}
+        {contacts.map(({ title, description, email, refund, body }) => (
+          <section key={email} id={refund ? "refund-inquiry" : undefined} tabIndex={refund ? -1 : undefined}
             className="flex flex-col items-start rounded-xl border border-slate-200 p-5 sm:p-6">
             <h2 className="text-xl font-semibold">{title}</h2>
             <div className="mb-1 mt-2 space-y-2 leading-relaxed text-muted">
               <p>{description}</p>
-              {refundHref && <>
+              {refund && <>
                 <p>{labels.refund.emailGuidance}</p>
                 <p>{body ? labels.refund.orderIncluded : labels.refund.includeOrder}</p>
                 {body && <p className="select-all break-words">{body}</p>}
               </>}
             </div>
             <CopyEmailAddress email={email} language={language} />
-            <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 pt-4">
-              <a className="button button-primary" aria-label={`${labels.compose} · ${title}`}
-                href={`mailto:${email}?subject=${encodeURIComponent(`[TOPIQ] ${title}`)}${body ? `&body=${encodeURIComponent(body)}` : ""}`}>{labels.compose}</a>
-              {refundHref && <Link className="text-link" href={refundHref}>{labels.refundsLink}</Link>}
-            </div>
           </section>
         ))}
       </div>

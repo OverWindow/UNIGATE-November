@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import useRouter from "@/lib/use-navigation-router";
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, CreditCard, Globe, Layers, LogOut, Menu, UserRound, X } from "lucide-react";
+import { Check, ChevronDown, CreditCard, Globe, Layers, LogOut, Menu, Settings, UserRound, X } from "lucide-react";
 import { useApp } from "@/app/providers";
 import { authContent } from "@/lib/auth/auth-content";
 import { landingContent, type Language } from "@/lib/landing-content";
@@ -151,6 +151,10 @@ export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: st
                     </Link>
                   </div>
                   <div className="account-menu-section">
+                    <Link href={localizedPath("/settings", language)} aria-current={routePath.startsWith("/settings") ? "page" : undefined} onClick={() => setAccountOpen(false)}>
+                      <Settings size={19} strokeWidth={1.7} aria-hidden="true" />
+                      <span>{t.footer.settings}</span>
+                    </Link>
                     <button type="button" disabled={loggingOut} aria-busy={loggingOut} onClick={() => onBeforeLogout ? onBeforeLogout(() => void handleLogout()) : void handleLogout()}>
                       <LogOut size={19} strokeWidth={1.7} aria-hidden="true" />
                       <span>{loggingOut ? a.submitting : a.logout}</span>

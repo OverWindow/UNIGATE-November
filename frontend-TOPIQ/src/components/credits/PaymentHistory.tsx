@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
 import { creditsContent, paymentHistoryContent } from "@/lib/credits-content";
@@ -106,8 +107,9 @@ export default function PaymentHistory({ inSettings = false }: { inSettings?: bo
     {!inSettings && <Link className="settings-back" href="/credits">{p.back}</Link>}
     <div className="credits-heading">
       {inSettings ? <h2 className="text-lg font-semibold">{p.orders}</h2> : <h1 className="catalog-title">{t.paymentHistory}</h1>}
-      <button className="button credits-secondary" type="button" disabled={loading || busy}
-        onClick={() => setRevision(value => value + 1)}>{t.refresh}</button>
+      <button className="button credits-secondary credits-refresh" type="button" disabled={loading || busy}
+        aria-label={t.refresh} title={t.refresh} aria-busy={loading || busy}
+        onClick={() => setRevision(value => value + 1)}><RefreshCw size={20} strokeWidth={1.8} aria-hidden="true" /></button>
     </div>
     {notice && <p role="alert">{p[notice]}</p>}
     {loadError ? <p role="alert">{t.error}</p> : !data ? <p role="status">{t.loading}</p>

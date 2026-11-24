@@ -1,5 +1,7 @@
 .pbt-main, .pbt-workspace { background: #f7f9fc; min-height: 75vh; }
 .pbt-catalog { padding-block: 36px 70px; }
+.pbt-catalog-history { margin-top: 56px; }
+.pbt-catalog-history > h2 { margin-bottom: 20px; font-size: 22px; font-weight: 650; }
 .pbt-section-tabs { display: flex; gap: 5px; flex-wrap: wrap; }
 .pbt-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 24px 0 30px; }
 .pbt-mode { display: flex; align-items: center; gap: 14px; padding: 22px; border: 1px solid #dce3ee; border-radius: 14px; background: #fff; text-align: left; transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease; }

@@ -196,11 +196,11 @@ test("Each Plus card lists benefits and savings and the selected purchase starts
   tree.unmount();
 });
 
-test("plans follow credits in the account menu without a settings link", () => {
+test("settings follows plans in the account menu", () => {
   path = "/plans";
   const header = mount(SiteHeader);
   assert.match(header.html, /href="\/credits"[\s\S]*?href="\/plans"[\s\S]*?<span>Plus 요금제<\/span>/);
-  assert.doesNotMatch(header.html, /href="\/settings"/);
+  assert.match(header.html, /href="\/plans"[\s\S]*href="\/settings"[\s\S]*<span>설정<\/span>/);
   header.unmount();
   session.user = null;
   session.status = "anonymous";
@@ -378,11 +378,11 @@ test("exam history waits for sign-in and preserves the localized return path", a
   session.status = "authenticated";
   globalThis.fetch = async url => {
     requests.push(url);
-    return Response.json({ attempts: [] });
+    return Response.json({ attempts: [], pageCount: 1 });
   };
   const page = mount(ExamHistory);
   await setImmediate();
-  assert.deepEqual(requests, ["/api/pbt/attempts/", "/api/ibt/attempts/"]);
+  assert.deepEqual(requests, ["/api/pbt/attempts/?format=all&page=1"]);
   page.unmount();
 });
 
@@ -444,7 +444,7 @@ test("unused orders offer a full refund and each contact button selects its own 
   assert.doesNotMatch(row("refunded", 0), /<button/);
 });
 
-test("refund settings link each order to its localized refund card and email draft", async () => {
+test("refund settings link each order to its localized refund card", async () => {
   const { PaymentRow } = imports["./PaymentHistory"];
   const { contactContent } = require("../src/lib/contact-content.ts");
   for (const [language, prefix, label] of [["ko", "", "주문번호"], ["en", "/en", "Order number"], ["id", "/id", "Nomor pesanan"]]) {
@@ -465,9 +465,7 @@ test("refund settings link each order to its localized refund card and email dra
     assert.ok(!refund.includes(guidance.includeOrder));
     assert.equal(link.hash, "#refund-inquiry");
     assert.ok(refund.includes(`id="${link.hash.slice(1)}"`) && refund.includes(order.id));
-    const draft = new URL(refund.match(/href="(mailto:[^"]+)"/)[1].replaceAll("&amp;", "&"));
-    assert.equal(draft.pathname, "billing@unigate.kr");
-    assert.equal(draft.searchParams.get("body"), `${label}: ${order.id}`);
+    assert.doesNotMatch(refund, /mailto:|href="[^\"]*\/settings\/refunds"/);
     assert.ok(!general.includes(order.id));
     row.unmount();
   }

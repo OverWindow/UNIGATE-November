@@ -130,6 +130,9 @@ main:focus { outline: none; }
 .account-menu button svg, .account-menu a svg { flex-shrink: 0; }
 .account-menu button:disabled { opacity: .6; }
 .account-menu-error { margin: 6px 0 0; padding: 10px 12px; border-radius: 7px; background: #fff8f5; color: #914332; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.exam-history-pagination { display: flex; justify-content: center; align-items: center; gap: 28px; margin-top: 32px; font-size: 14px; }
+.exam-history-pagination button { padding: 10px; color: var(--color-primary); cursor: pointer; }
+.exam-history-pagination [aria-disabled] { color: #717b8b; }
 .menu-toggle { display: none; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 8px; color: #253450; }
 .mobile-navigation { display: none; }
 
