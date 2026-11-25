@@ -41,6 +41,8 @@ const writingApi = load("lib/writing/writing-api.ts");
 imports["@/lib/writing/writing-api"] = writingApi;
 const { default: SiteHeader } = load("components/SiteHeader.tsx");
 imports["./PlanOffers"] = load("components/credits/PlanOffers.tsx");
+imports["./PlanChangeControls"] = load("components/credits/PlanChangeControls.tsx");
+imports["@/components/credits/PlanChangeControls"] = imports["./PlanChangeControls"];
 const { default: CreditPurchase } = load("components/credits/CreditPurchase.tsx");
 imports["./CreditPurchase"] = { default: CreditPurchase };
 imports["./BillingContactDialog"] = load("components/credits/BillingContactDialog.tsx");
@@ -288,6 +290,105 @@ test("subscription settings fetch only the signed-in member's summary and preser
     page.unmount();
   }
   assert.deepEqual(requests, []);
+});
+
+test("a longer cycle must be confirmed with the renewal date, price and zero due today before scheduling once", async t => {
+  const nextBillingAt = "2099-12-10T08:00:00Z";
+  const account = { active: true, currentPlanMonths: 3, subscription: { state: "active", months: 3 },
+    plans: [1, 3, 6].map(months => ({ months, priceId: `price_${months}`, amount: 43900, currency: "krw", bonusCredits: 400 })),
+    nextBillingAt, canChangePlan: true, scheduledChange: null };
+  const scheduledChange = { id: "sub_sched_six", months: 6, amount: 43900, effectiveAt: nextBillingAt };
+  const updated = [];
+  const calls = [];
+  const clicks = {};
+  const runtime = require("react/jsx-runtime");
+  const jsx = runtime.jsx;
+  t.mock.method(runtime, "jsx", (type, props, key) => {
+    if (type === "button") clicks[props.children] = props.onClick;
+    return jsx(type, props, key);
+  });
+  globalThis.fetch = async (url, options) => {
+    if (url === "/api/csrf/") return Response.json({ csrfToken: "synthetic" });
+    assert.equal(options.headers["X-CSRFToken"], "synthetic");
+    calls.push([url, options.method, JSON.parse(options.body)]);
+    return Response.json({ scheduledChange });
+  };
+  const page = mount(() => React.createElement(CreditPurchase, {
+    planAccount: account, onPlanRefresh: value => updated.push(value), userId: 1, returnId: null, onFulfilled() {},
+  }));
+  assert.doesNotMatch(page.html, /1개월로 변경|3개월로 변경|구독하기/);
+  assert.match(page.html, /<dialog[^>]*aria-labelledby=/);
+  assert.match(page.html, /오늘 결제할 금액<\/dt><dd>₩0/);
+  assert.match(page.html, /다음 결제 금액<\/dt><dd>₩43,900 · 6개월마다/);
+  assert.ok(page.html.includes(`dateTime="${nextBillingAt}"`));
+  clicks["6개월로 변경"]();
+  clicks["돌아가기"]();
+  assert.deepEqual(calls, []);
+  clicks["6개월로 변경"]();
+  clicks["변경 예약"]();
+  clicks["변경 예약"]();
+  await setImmediate();
+  assert.deepEqual(calls, [["/api/subscriptions/me/plan-change/", "POST", { months: 6, priceId: "price_6", effectiveAt: nextBillingAt }]]);
+  assert.deepEqual(updated, [scheduledChange]);
+  page.unmount();
+});
+
+test("settings display a scheduled change and cancel only that reservation before its effective time", async t => {
+  const future = "2099-12-10T08:00:00Z";
+  const account = { active: true, currentPlanMonths: 1, subscription: { state: "active", months: 1 }, endsAt: future,
+    canChangePlan: false, canOpenBillingPortal: true, scheduledChange: { id: "sub_sched_three", months: 3, amount: 23900, effectiveAt: future } };
+  let click;
+  const runtime = require("react/jsx-runtime");
+  const jsx = runtime.jsx;
+  t.mock.method(runtime, "jsx", (type, props, key) => {
+    if (type === "button" && props.children === "3개월 변경 예약 취소") click = props.onClick;
+    return jsx(type, props, key);
+  });
+  const calls = [], updated = [];
+  globalThis.fetch = async (url, options) => {
+    if (url === "/api/csrf/") return Response.json({ csrfToken: "synthetic" });
+    assert.equal(options.headers["X-CSRFToken"], "synthetic");
+    calls.push([url, options.method, JSON.parse(options.body)]);
+    return Response.json({ scheduledChange: null });
+  };
+  const summary = () => React.createElement(SubscriptionSummary, { account, onRefresh: value => updated.push(value) });
+  const page = mount(summary);
+  assert.ok(page.html.includes("Plus 1개월") && page.html.includes("Plus 3개월") && page.html.includes("₩23,900"));
+  click();
+  click();
+  await setImmediate();
+  assert.deepEqual(calls, [["/api/subscriptions/me/plan-change/", "DELETE", { id: "sub_sched_three", months: 3, effectiveAt: future }]]);
+  assert.deepEqual(updated, [null]);
+  page.unmount();
+  account.scheduledChange.effectiveAt = "2000-12-10T08:00:00Z";
+  const expired = mount(summary);
+  assert.doesNotMatch(expired.html, /3개월 변경 예약 취소/);
+  expired.unmount();
+});
+
+test("a change confirmation held open until renewal refreshes the quote without submitting", () => {
+  const nextBillingAt = new Date(Date.now() + 60_000).toISOString();
+  const account = { active: true, currentPlanMonths: 1, subscription: { state: "active", months: 1 },
+    nextBillingAt, canChangePlan: true, scheduledChange: null,
+    plans: [{ months: 3, amount: 23900, priceId: "price_3", bonusCredits: 400, currency: "krw" }] };
+  let confirm, reloads = 0;
+  const { default: PlanChangeControls } = imports["./PlanChangeControls"];
+  const tree = mount(() => {
+    const controls = PlanChangeControls({ account, onRefresh: () => reloads++ });
+    const offers = React.Children.toArray(controls.props.children)[0];
+    confirm = offers.props.renderAction(account.plans[0]).props.onConfirm;
+    return controls;
+  });
+  const originalNow = Date.now;
+  try {
+    Date.now = () => Date.parse(nextBillingAt);
+    confirm();
+    assert.equal(reloads, 1);
+    assert.deepEqual(requests, []);
+  } finally {
+    Date.now = originalNow;
+    tree.unmount();
+  }
 });
 
 test("the billing button opens a single portal session returning to the localized subscription page", async t => {

@@ -187,6 +187,15 @@ class SyncPlanRefundTests(TestCase):
         self.assertEqual(CreditPurchase.objects.filter(subscription_state="revoked").count(), 2)
         self.assertEqual(CreditPurchaseRefund.objects.get().purchase.stripe_invoice_id, "in_cycle")
 
+    def test_plan_refund_cancels_attached_schedule_only_when_applied(self):
+        self.subscriptions["sub_old"]["schedule"] = "sub_sched_test"
+        self.api.subscription_schedules.cancel.return_value = page([{"id": "sub_sched_test", "status": "canceled"}]).data[0]
+        self.assertIn("자동 갱신 취소 예정", self.run_command())
+        self.api.subscription_schedules.cancel.assert_not_called()
+        self.assertIn("현재 Free", self.run_command(apply=True))
+        self.api.subscription_schedules.cancel.assert_called_once_with("sub_sched_test", {"invoice_now": False, "prorate": False})
+        self.api.subscriptions.cancel.assert_not_called()
+
     def test_legacy_pass_does_not_cancel_a_subscription(self):
         CreditPurchase.objects.filter(pk=self.order.pk).update(stripe_invoice_id=None, stripe_subscription_id=None,
             stripe_session_id="cs_legacy", subscription_state=None)

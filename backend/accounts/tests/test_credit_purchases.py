@@ -14,8 +14,9 @@ from django.test import Client, TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 
 from accounts.credits import account_with_monthly_credits
-from accounts.models import CreditAccount, CreditPurchase, CreditTransaction
+from accounts.models import PLAN_AMOUNTS, CreditAccount, CreditPurchase, CreditTransaction
 from accounts.payments import checkout, checkout_customer
+from accounts.plans import current_plan
 
 
 PURCHASES = "/api/credits/purchases/"
@@ -79,6 +80,19 @@ def plan_invoice(order, invoice_id, reason, start, end):
                 "parent": {"subscription_item_details": {"subscription": sub, "proration": False}}}]}}
 
 
+def changed_plan_invoice(order, invoice_id, reason, months, start, end, change_at):
+    price_id = TEST_SETTINGS["STRIPE_PLAN_PRICE_IDS"][months]
+    bill = plan_invoice(order, invoice_id, reason, int(start.timestamp()), int(end.timestamp()))
+    bill["amount_paid"] = PLAN_AMOUNTS[months]
+    bill["parent"]["subscription_details"]["metadata"].update({
+        "topiq_plan_price": price_id, "topiq_plan_months": str(months), "topiq_change_at": str(int(change_at.timestamp())),
+    })
+    line = bill["lines"]["data"][0]
+    line["amount"] = PLAN_AMOUNTS[months]
+    line["pricing"]["price_details"]["price"] = price_id
+    return bill
+
+
 @override_settings(**TEST_SETTINGS)
 class CreditPurchaseTests(TestCase):
     def setUp(self):
@@ -97,6 +111,7 @@ class CreditPurchaseTests(TestCase):
         self.prices.retrieve.return_value = stripe_price()
         self.sessions = stripe_client.return_value.v1.checkout.sessions
         self.subscriptions = stripe_client.return_value.v1.subscriptions
+        self.schedules = stripe_client.return_value.v1.subscription_schedules
         session = stripe.checkout.Session.construct_from({"id": SESSION_ID, "url": CHECKOUT_URL, "status": "open"}, None)
         self.sessions.create.return_value = session
         self.sessions.retrieve.return_value = session
@@ -177,7 +192,8 @@ class CreditPurchaseTests(TestCase):
     def test_subscription_details_are_private_and_separate_from_plan_offers(self):
         self.assertEqual(Client().get(MY_SUBSCRIPTION).status_code, 401)
         free = {"active": False, "currentPlanMonths": None, "endsAt": None, "subscription": None,
-                "canOpenBillingPortal": False}
+                "canOpenBillingPortal": False, "canChangePlan": False, "scheduledChange": None,
+                "nextBillingAt": None, "planChangeUnavailable": False}
         self.assertEqual(self.client.get(MY_SUBSCRIPTION).json(), free)
         self.prices.retrieve.return_value = plan_price(3, 23900, "price_three")
         order = CreditPurchase.objects.get(pk=self.post_plan(3, "price_three").json()["id"])
@@ -185,12 +201,14 @@ class CreditPurchaseTests(TestCase):
         now = int(time.time())
         bill = plan_invoice(order, "in_my_subscription", "subscription_create", now - 60, now + 3600)
         self.assertEqual(signed_event(self.client, "invoice.paid", bill).status_code, 200)
+        self.subscriptions.retrieve.side_effect = stripe.APIConnectionError("test read unavailable")
         response = self.client.get(MY_SUBSCRIPTION)
         self.assertIn("no-store", response["Cache-Control"])
         self.assertEqual(response.json(), {
             "active": True, "currentPlanMonths": 3,
             "endsAt": datetime.fromtimestamp(now + 3600, UTC).isoformat().replace("+00:00", "Z"),
             "subscription": {"state": "active", "months": 3}, "canOpenBillingPortal": True,
+            "canChangePlan": False, "scheduledChange": None, "nextBillingAt": None, "planChangeUnavailable": True,
         })
         self.client.force_login(get_user_model().objects.create_user(username="another-subscription-owner"))
         self.assertEqual(self.client.get(MY_SUBSCRIPTION, {"user_id": self.user.pk}).json(), free)
@@ -280,6 +298,71 @@ class CreditPurchaseTests(TestCase):
     def pending_subscription(self):
         return CreditPurchase.objects.create(user=self.user, attempt_id=self.attempt_id, amount=9900, credits=400,
             plan_months=1, stripe_price_id="price_one", subscription_state="checkout")
+
+    def test_changed_interval_uses_each_invoices_booked_terms_and_monthly_credits(self):
+        order = self.pending_subscription()
+        CreditAccount.objects.filter(pk=self.user.pk).update(stripe_customer_id="cus_fixture_owner")
+        feb, mar, jun, dec = (datetime(2026, month, 10, tzinfo=UTC) for month in (2, 3, 6, 12))
+        first = plan_invoice(order, "in_month", "subscription_create", int(feb.timestamp()), int(mar.timestamp()))
+        quarter = changed_plan_invoice(order, "in_quarter", "subscription_update", 3, mar, jun, mar)
+        half = changed_plan_invoice(order, "in_half", "subscription_cycle", 6, jun, dec, jun)
+        next_jun = jun.replace(year=jun.year + 1)
+        renewal = changed_plan_invoice(order, "in_renew", "subscription_cycle", 6, dec, next_jun, jun)
+        # An old booking remains billable after the catalog rotates to new Stripe Price IDs.
+        with self.settings(STRIPE_PLAN_PRICE_IDS={}):
+            for bill in (half, first, renewal, quarter, quarter, half):
+                self.assertEqual(signed_event(self.client, "invoice.paid", bill).status_code, 200)
+        self.assertEqual(list(CreditPurchase.objects.order_by("plan_starts_at").values_list(
+            "plan_months", "amount", "stripe_price_id",
+        )), [(1, 9900, "price_one"), (3, 23900, "price_three"), (6, 43900, "price_six"), (6, 43900, "price_six")])
+        for at, months, balance in ((mar - timedelta(seconds=1), 1, 550), (mar, 3, 950),
+                                    (jun - timedelta(seconds=1), 3, 1750), (jun, 6, 2150)):
+            with patch("accounts.plans.timezone.now", return_value=at):
+                self.assertEqual(current_plan(self.user.pk), (months, next_jun))
+                self.assertEqual(account_with_monthly_credits(self.user.pk).balance, balance)
+
+    def test_changed_invoice_requires_full_paid_charge_and_matching_scheduled_terms(self):
+        order = self.pending_subscription()
+        CreditAccount.objects.filter(pk=self.user.pk).update(stripe_customer_id="cus_fixture_owner")
+        start, end = (datetime(2026, month, 10, tzinfo=UTC) for month in (3, 6))
+        bill = changed_plan_invoice(order, "in_changed", "subscription_cycle", 3, start, end, start)
+        self.assertEqual(signed_event(self.client, "invoice.payment_failed", bill).status_code, 200)
+        self.assertEqual(signed_event(self.client, "invoice.paid", bill | {"status": "open"}).status_code, 400)
+        self.assertEqual(signed_event(self.client, "invoice.paid", bill | {"amount_paid": 9900}).status_code, 400)
+        self.assertEqual(signed_event(self.client, "invoice.paid", bill | {"billing_reason": "subscription_create"}).status_code, 400)
+        line = bill["lines"]["data"][0]
+        line["parent"]["subscription_item_details"]["proration"] = True
+        self.assertEqual(signed_event(self.client, "invoice.paid", bill).status_code, 400)
+        line["parent"]["subscription_item_details"]["proration"] = False
+        metadata = bill["parent"]["subscription_details"]["metadata"]
+        metadata["topiq_plan_price"] = "price_other"
+        self.assertEqual(signed_event(self.client, "invoice.paid", bill).status_code, 400)
+        metadata.pop("topiq_change_at")
+        self.assertEqual(signed_event(self.client, "invoice.paid", bill).status_code, 400)
+        self.assertEqual(signed_event(self.client, "invoice.paid", bill | {"billing_reason": "subscription_update"}).status_code, 200)
+        self.assertFalse(CreditPurchase.objects.filter(status="fulfilled").exists())
+        self.assertFalse(CreditTransaction.objects.exists())
+
+    def test_subscription_update_releases_only_applied_schedule(self):
+        order = self.pending_subscription()
+        CreditAccount.objects.filter(pk=self.user.pk).update(stripe_customer_id="cus_fixture_owner")
+        metadata = {"credit_purchase_id": str(order.pk), "topiq_plan_months": "3",
+                    "topiq_plan_price": "price_three", "topiq_change_at": "50"}
+        sub = {"id": "sub_fixture", "object": "subscription", "status": "active", "customer": "cus_fixture_owner",
+               "schedule": "sub_sched_test", "metadata": metadata,
+               "items": {"data": [{"price": plan_price(3, 23900, "price_three").to_dict(), "quantity": 1}]}}
+        phases = [{"start_date": 20, "end_date": 50, "items": [{"price": "price_one", "quantity": 1}]},
+                  {"start_date": 50, "end_date": 150, "items": [{"price": "price_three", "quantity": 1}], "metadata": metadata}]
+        schedule = {"id": "sub_sched_test", "status": "active", "subscription": sub["id"], "customer": sub["customer"],
+                    "end_behavior": "release", "metadata": {"topiq_order": str(order.pk)}, "phases": phases}
+        self.subscriptions.retrieve.return_value = stripe.Subscription.construct_from(sub, None)
+        event = {key: sub[key] for key in ("id", "object", "customer", "metadata")}
+        for current_start in (20, 50):
+            self.schedules.retrieve.return_value = stripe.SubscriptionSchedule.construct_from(
+                schedule | {"current_phase": {"start_date": current_start}}, None)
+            self.assertEqual(signed_event(self.client, "customer.subscription.updated", event).status_code, 200)
+            self.assertEqual(self.schedules.release.call_count, int(current_start == 50))
+        self.schedules.release.assert_called_once_with(schedule["id"], {"preserve_cancel_date": True})
 
     def test_subscription_key_conflict_recovers_matching_open_complete_or_expired_session(self):
         order = self.pending_subscription()
@@ -388,6 +471,7 @@ class CreditPurchaseTests(TestCase):
                 self.assertEqual(self.client.get(MY_SUBSCRIPTION).json(), {
                     "active": active, "currentPlanMonths": data["currentPlanMonths"],
                     "endsAt": data["endsAt"], "subscription": None, "canOpenBillingPortal": False,
+                    "canChangePlan": False, "scheduledChange": None, "nextBillingAt": None, "planChangeUnavailable": False,
                 })
                 if active:
                     self.prices.retrieve.return_value = plan_price(1, 9900, "price_one")

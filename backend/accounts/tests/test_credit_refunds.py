@@ -15,7 +15,7 @@ from accounts.credits import grant, locked_account, record, settle
 from accounts.models import CreditAccount, CreditPurchase, CreditPurchaseRefund, CreditTransaction
 from writing.models import Evaluation
 
-from .test_credit_purchases import AMOUNT, SESSION_ID, TEST_SETTINGS, plan_invoice, post_webhook, signed_event
+from .test_credit_purchases import AMOUNT, SESSION_ID, TEST_SETTINGS, changed_plan_invoice, plan_invoice, post_webhook, signed_event
 
 
 def refund_object(refund_id, amount, status="succeeded", intent="pi_topup"):
@@ -33,7 +33,10 @@ class CreditRefundTests(TestCase):
         self.api = self.enterContext(patch("accounts.payments.stripe.StripeClient")).return_value.v1
         self.api.checkout.sessions.list.return_value.data = []
         self.api.invoice_payments.list.return_value.data = []
-        self.api.subscriptions.retrieve.return_value.to_dict.return_value = {"status": "active"}
+        self.api.subscriptions.retrieve.return_value.to_dict.return_value = {
+            "id": "sub_fixture", "customer": self.account.stripe_customer_id, "status": "active",
+        }
+        self.api.subscriptions.cancel.return_value.to_dict.return_value = {"id": "sub_fixture", "status": "canceled"}
 
     def paid(self):
         self.assertEqual(post_webhook(self.client, self.order, payment_intent="pi_topup").status_code, 200)
@@ -280,6 +283,23 @@ class CreditRefundTests(TestCase):
             self.notify(refund | {"status": "failed"}, "refund.failed")
             self.wallet(400)
         self.assertEqual(CreditPurchase.objects.filter(stripe_invoice_id="in_next").count(), 1)
+
+    def test_refund_before_changed_invoice_revokes_scheduled_subscription(self):
+        order = CreditPurchase.objects.create(user=self.user, attempt_id=uuid4(), amount=9900, plan_months=1,
+            credits=400, subscription_state="checkout", stripe_price_id="price_one")
+        start = timezone.now()
+        bill = changed_plan_invoice(order, "in_switch", "subscription_update", 3, start, start + timedelta(days=91), start)
+        self.api.invoice_payments.list.return_value = Mock(data=[stripe.InvoicePayment.construct_from({"invoice": bill}, None)],
+                                                          has_more=False)
+        self.api.subscriptions.retrieve.return_value.to_dict.return_value["schedule"] = "sub_sched_fixture"
+        self.api.subscription_schedules.cancel.return_value.to_dict.return_value = {"id": "sub_sched_fixture", "status": "canceled"}
+        self.notify(refund_object("re_change", 23900, intent="pi_switch"))
+        self.assertEqual(signed_event(self.client, "invoice.paid", bill).status_code, 200)
+        receipt = CreditPurchase.objects.get(stripe_invoice_id="in_switch")
+        self.assertEqual((receipt.plan_months, receipt.amount, receipt.subscription_state), (3, 23900, "revoked"))
+        self.api.subscription_schedules.cancel.assert_called_once_with("sub_sched_fixture", {"invoice_now": False, "prorate": False})
+        self.api.subscriptions.cancel.assert_not_called()
+        self.wallet(0)
 
 
 @override_settings(**TEST_SETTINGS)

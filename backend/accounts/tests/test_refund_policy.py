@@ -53,16 +53,18 @@ class RefundPolicyTests(SimpleTestCase):
         orders.filter.return_value = Mock()
         orders.filter.return_value.__iter__ = Mock(return_value=iter([order]))
         api = Mock()
-        api.subscriptions.retrieve.return_value.to_dict.return_value = {"status": "active"}
+        account = SimpleNamespace(stripe_customer_id="cus_test")
+        api.subscriptions.retrieve.return_value.to_dict.return_value = {"id": "sub_test", "status": "active", "customer": "cus_test"}
+        api.subscriptions.cancel.return_value.to_dict.return_value = {"id": "sub_test", "status": "canceled"}
         purchase = SimpleNamespace(plan_months=3, subscription_state=None, user_id=1, pk="purchase")
-        revoke_refunded_plan(purchase, api)
+        revoke_refunded_plan(account, purchase, api)
         api.subscriptions.cancel.assert_called_once_with("sub_test", {"invoice_now": False, "prorate": False})
         self.assertEqual(purchase.subscription_state, "revoked")
         orders.filter.return_value.update.assert_called_once_with(subscription_state="revoked")
-        revoke_refunded_plan(purchase, api)
+        revoke_refunded_plan(account, purchase, api)
         self.assertEqual(api.subscriptions.cancel.call_count, 1)
 
     def test_topup_refund_does_not_cancel_plus(self):
         api = Mock()
-        revoke_refunded_plan(SimpleNamespace(plan_months=None), api)
+        revoke_refunded_plan(Mock(), SimpleNamespace(plan_months=None), api)
         api.subscriptions.cancel.assert_not_called()

@@ -8,6 +8,7 @@ from django.core.exceptions import RequestDataTooBig
 from django.db import DatabaseError, transaction
 from django.http import HttpResponse
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.debug import sensitive_variables
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
@@ -16,6 +17,7 @@ from writing.services import expire_for_user
 
 from .credits import locked_account, reconcile_purchase_refunds, record
 from .models import CREDIT_PURCHASE_QUANTITY, PLAN_AMOUNTS, PLAN_BONUS, CreditAccount, CreditPurchase
+from .plan_changes import InvalidBillingState, PlanChangeConflict, can_schedule, next_change, plan_item, read_subscription, update_change
 from .plans import assign_plan_period, current_plan, current_plan_end, open_subscription
 from .refunds import RefundOrderNotReady, apply_refund, refund_state, reserve_refund, reserved_orders, submit_refund, topups
 from .subscriptions import apply_paid_invoice, sync_subscription
@@ -72,11 +74,24 @@ def stripe_customer_id_for(user_id):
 
 def subscription_details(user_id):
     current_months, end = current_plan(user_id)
-    subscription = open_subscription(user_id)
+    order = open_subscription(user_id)
+    subscription = None
+    change = {"scheduledChange": None, "canChangePlan": False, "nextBillingAt": None, "planChangeUnavailable": False}
+    if order and order.subscription_state != "checkout":
+        subscription = {"state": order.subscription_state, "months": current_months or order.plan_months}
+        if order.stripe_subscription_id:
+            try:
+                live = read_subscription(stripe_client().v1, order, stripe_customer_id_for(user_id))
+                item = plan_item(live)
+                subscription["months"] = item["price"]["recurring"]["interval_count"]
+                change["nextBillingAt"] = datetime.fromtimestamp(item["current_period_end"], UTC)
+                change["scheduledChange"] = next_change(live)
+                change["canChangePlan"] = (order.subscription_state == "active" and order.status == "fulfilled"
+                                           and not change["scheduledChange"] and can_schedule(live, end))
+            except (PaymentsUnavailable, stripe.StripeError, InvalidBillingState, KeyError, TypeError, ValueError):
+                change["planChangeUnavailable"] = True
     return {
-        "active": end is not None, "endsAt": end, "currentPlanMonths": current_months,
-        "subscription": {"state": subscription.subscription_state, "months": subscription.plan_months}
-                        if subscription and subscription.subscription_state != "checkout" else None,
+        "active": end is not None, "endsAt": end, "currentPlanMonths": current_months, "subscription": subscription, **change,
     }
 
 
@@ -105,6 +120,47 @@ def plans(request):
         "plans": [{"months": months, "priceId": price_id_for(months) or None, "amount": amount,
                    "currency": "krw", "bonusCredits": PLAN_BONUS} for months, amount in PLAN_AMOUNTS.items()],
     })
+
+
+@require_http_methods(["POST", "DELETE"])
+@sensitive_variables()
+def change_subscription_plan(request):
+    if not request.user.is_authenticated:
+        return api_response({"error": "authentication_required"}, 401)
+    booking = request.method == "POST"
+    fields = {"months", "effectiveAt", "priceId" if booking else "id"}
+    data, error = read_payload(request, fields, integer_fields={"months"})
+    if error is not None:
+        return error
+    months = data.get("months")
+    try:
+        effective_at = parse_datetime(data.get("effectiveAt", ""))
+    except ValueError:
+        effective_at = None
+    if months not in PLAN_AMOUNTS or not effective_at or timezone.is_naive(effective_at):
+        return api_response({"error": "invalid_plan"}, 400)
+    if booking and not data.get("priceId"):
+        return api_response({"error": "invalid_price"}, 400)
+    if not booking and not data.get("id"):
+        return api_response({"error": "invalid_plan_change"}, 400)
+    try:
+        with transaction.atomic():
+            wallet = locked_account(request.user.pk)
+            order = open_subscription(request.user.pk)
+            if (not order or not order.stripe_subscription_id or order.status != "fulfilled"
+                    or (booking and order.subscription_state != "active")):
+                raise PlanChangeConflict
+            client = stripe_client()
+            price = configured_price(client, months) if booking else None
+            if price and price["priceId"] != data["priceId"]:
+                return api_response({"error": "price_changed"}, 409)
+            live = read_subscription(client.v1, order, wallet.stripe_customer_id)
+            change = update_change(client.v1, live, current_plan_end(request.user.pk), months, effective_at, price, data.get("id"))
+    except PlanChangeConflict:
+        return api_response({"error": "plan_change_conflict"}, 409)
+    except (PaymentsUnavailable, stripe.StripeError, InvalidBillingState, DatabaseError, KeyError, TypeError, ValueError):
+        return api_response({"error": "payments_unavailable"}, 503)
+    return api_response({"scheduledChange": change})
 
 
 @require_GET
@@ -480,6 +536,6 @@ def stripe_webhook(request):
     except (ValueError, TypeError, AttributeError, KeyError, stripe.SignatureVerificationError,
             CreditPurchase.DoesNotExist, RequestDataTooBig):
         return HttpResponse(status=400)
-    except (DatabaseError, PaymentsUnavailable, RefundOrderNotReady, stripe.StripeError):
+    except (DatabaseError, PaymentsUnavailable, InvalidBillingState, RefundOrderNotReady, stripe.StripeError):
         return HttpResponse(status=503)
     return HttpResponse(status=status)

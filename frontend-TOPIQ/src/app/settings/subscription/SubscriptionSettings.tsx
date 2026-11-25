@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
+import PlanChangeControls, { usePlanRefresh } from "@/components/credits/PlanChangeControls";
 import { authContent } from "@/lib/auth/auth-content";
 import { localizedPath } from "@/lib/locale-path";
 import { plansContent } from "@/lib/plans-content";
-import { getMySubscription, openBillingPortal, WritingError, type SubscriptionAccount } from "@/lib/writing/writing-api";
+import { getMySubscription, openBillingPortal, WritingError, type ScheduledPlanChange, type SubscriptionAccount } from "@/lib/writing/writing-api";
 
 export default function SubscriptionSettings() {
   const { user, status, language, refreshSession } = useApp();
@@ -28,6 +29,12 @@ function MemberSubscription({ userId }: { userId: number }) {
   const [account, setAccount] = useState<SubscriptionAccount | null>(null);
   const [failed, setFailed] = useState(false);
   const [revision, setRevision] = useState(0);
+  const reload = useCallback(() => setRevision(value => value + 1), []);
+  usePlanRefresh(account, reload);
+  function refreshPlan(change?: ScheduledPlanChange | null) {
+    if (change !== undefined) setAccount(current => current && { ...current, scheduledChange: change });
+    reload();
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -44,22 +51,15 @@ function MemberSubscription({ userId }: { userId: number }) {
     return () => controller.abort();
   }, [revision, userId, updatePlan, refreshSession]);
 
-  useEffect(() => {
-    const reload = () => setRevision(value => value + 1);
-    const onPageShow = (event: PageTransitionEvent) => { if (event.persisted) reload(); };
-    window.addEventListener("pageshow", onPageShow);
-    const timer = account?.endsAt ? setTimeout(reload,
-      Math.max(1000, Math.min(Date.parse(account.endsAt) - Date.now(), 2_147_483_647))) : undefined;
-    return () => { window.removeEventListener("pageshow", onPageShow); clearTimeout(timer); };
-  }, [account]);
-
   if (failed) return <div className="catalog-status" role="alert">
     <p>{a.network}</p><button type="button" className="button credits-secondary" onClick={() => setRevision(value => value + 1)}>{a.retry}</button>
   </div>;
-  return account ? <SubscriptionSummary account={account} /> : <p role="status">{a.loading}</p>;
+  return account ? <SubscriptionSummary account={account} onRefresh={refreshPlan} /> : <p role="status">{a.loading}</p>;
 }
 
-export function SubscriptionSummary({ account }: { account: SubscriptionAccount }) {
+export function SubscriptionSummary({ account, onRefresh }: {
+  account: SubscriptionAccount; onRefresh: (change?: ScheduledPlanChange | null) => void;
+}) {
   const { language } = useApp();
   const p = plansContent[language];
   const { subscription, currentPlanMonths, endsAt, canOpenBillingPortal } = account;
@@ -80,9 +80,11 @@ export function SubscriptionSummary({ account }: { account: SubscriptionAccount 
         <dt className="text-muted">{label}</dt><dd className="font-medium">{value}</dd>
       </div>)}
     </dl> : <p className="mt-3 text-muted">{p.details.free}</p>}
+    <PlanChangeControls account={account} onRefresh={onRefresh} />
     <div className="mt-5 flex flex-wrap items-start gap-3">
       {canOpenBillingPortal && <BillingPortalButton />}
-      {(!canOpenBillingPortal || !months) && <Link className="button credits-secondary" href={localizedPath("/plans", language)}>{p.details.seePlans}</Link>}
+      {(!canOpenBillingPortal || !months || account.canChangePlan && !account.scheduledChange) &&
+        <Link className="button credits-secondary" href={localizedPath("/plans", language)}>{p.details.seePlans}</Link>}
     </div>
   </section>;
 }

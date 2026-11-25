@@ -23,6 +23,7 @@ urlpatterns = [
     path("api/credits/price/", payments.purchase_price),
     path("api/plans/", payments.plans),
     path("api/subscriptions/me/", payments.my_subscription),
+    path("api/subscriptions/me/plan-change/", payments.change_subscription_plan),
     path("api/plans/purchases/", payments.create_purchase, {"plan": True}),
     path("api/credits/billing-portal/", payments.billing_portal),
     path("api/credits/purchases/", payments.credit_purchases),

@@ -8,8 +8,9 @@ import { useApp } from "@/app/providers";
 import { authContent } from "@/lib/auth/auth-content";
 import { creditsContent } from "@/lib/credits-content";
 import { plansContent } from "@/lib/plans-content";
-import { getPlans, WritingError, type PlanAccount } from "@/lib/writing/writing-api";
+import { getPlans, WritingError, type PlanAccount, type ScheduledPlanChange } from "@/lib/writing/writing-api";
 import CreditPurchase from "./CreditPurchase";
+import { usePlanRefresh } from "./PlanChangeControls";
 import PlanOffers from "./PlanOffers";
 
 export default function PlansAccount() {
@@ -46,6 +47,11 @@ function MemberPlans({ userId, returnId, cancelled }: { userId: number; returnId
   const [error, setError] = useState(false);
   const [revision, setRevision] = useState(0);
   const reload = useCallback(() => setRevision(value => value + 1), []);
+  usePlanRefresh(data, reload);
+  function refreshPlan(change?: ScheduledPlanChange | null) {
+    if (change !== undefined) setData(current => current && { ...current, scheduledChange: change });
+    reload();
+  }
   const onFulfilled = useCallback((signal: AbortSignal) => {
     reload();
     void refreshCredits(signal).catch(() => {});
@@ -67,18 +73,10 @@ function MemberPlans({ userId, returnId, cancelled }: { userId: number; returnId
     return () => controller.abort();
   }, [revision, refreshSession, updatePlan, userId]);
 
-  useEffect(() => {
-    if (!data?.endsAt) return;
-    // Browsers accept at most a signed 32-bit timeout for long passes.
-    const untilExpiry = new Date(data.endsAt).getTime() - Date.now();
-    const timer = setTimeout(reload, Math.max(1000, Math.min(untilExpiry, 2_147_483_647)));
-    return () => clearTimeout(timer);
-  }, [data, reload]);
-
   return <>
     {error ? <div className="catalog-status" role="alert">{a.network} <button className="button credits-secondary" onClick={reload}>{a.retry}</button></div>
       : !data ? <p className="catalog-status" role="status">{a.loading}</p> : null}
-    <CreditPurchase userId={userId} returnId={returnId} cancelled={cancelled} planAccount={data}
-      onFulfilled={onFulfilled} onPriceChanged={reload} />
+    <CreditPurchase userId={userId} returnId={returnId} cancelled={cancelled} planAccount={error ? null : data}
+      onFulfilled={onFulfilled} onPlanRefresh={refreshPlan} />
   </>;
 }

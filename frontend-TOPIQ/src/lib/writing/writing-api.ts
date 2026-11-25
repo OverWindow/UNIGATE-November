@@ -54,13 +54,16 @@ export interface TopupOrder {
 }
 
 export function refundTopup(id: string, signal: AbortSignal) {
-  return postJson<{ refundState: RefundState }>(`/api/credits/purchases/${id}/refund/`, {}, signal);
+  return mutateJson<{ refundState: RefundState }>("POST", `/api/credits/purchases/${id}/refund/`, {}, signal);
 }
 export interface CreditPrice { priceId: string; amount: number; currency: "krw"; credits: number }
 export interface PlanOffer { months: number; priceId: string | null; amount: number; currency: "krw"; bonusCredits: number }
+export interface ScheduledPlanChange { id: string; months: number; effectiveAt: string; amount: number }
 interface PlanAccess {
   active: boolean; endsAt: string | null; currentPlanMonths: number | null;
   subscription: { state: "active" | "ending" | "past_due"; months: number } | null;
+  nextBillingAt: string | null; canChangePlan: boolean; scheduledChange: ScheduledPlanChange | null;
+  planChangeUnavailable?: boolean;
 }
 export interface SubscriptionAccount extends PlanAccess { canOpenBillingPortal: boolean }
 export interface PlanAccount extends PlanAccess { plans: PlanOffer[] }
@@ -81,12 +84,12 @@ export interface Evaluation {
 }
 export interface Submission { id: string; setId: string; typeSlot: number; answer: LearnerAnswer; priceVersion: string; feedbackLanguage: Language }
 
-async function postJson<T>(path: string, body: object, signal: AbortSignal, timeout = 15000): Promise<T> {
+async function mutateJson<T>(method: "POST" | "DELETE", path: string, body: object, signal: AbortSignal, timeout = 15000): Promise<T> {
   for (let attempt = 0; attempt < 2; attempt++) {
     const { csrfToken } = await requestJson<{ csrfToken: string }>("/api/csrf/", signal);
     try {
       return await requestJson<T>(path, signal, {
-        method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken }, body: JSON.stringify(body),
+        method, headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken }, body: JSON.stringify(body),
       }, timeout);
     } catch (error) {
       // Only a CSRF rejection guarantees that the operation was never started.
@@ -97,15 +100,15 @@ async function postJson<T>(path: string, body: object, signal: AbortSignal, time
 }
 
 export function submitWriting(body: Submission, signal: AbortSignal, timeoutSeconds: number): Promise<Evaluation> {
-  return postJson("/api/writing/evaluations/", body, signal, (timeoutSeconds + 20) * 1000);
+  return mutateJson("POST", "/api/writing/evaluations/", body, signal, (timeoutSeconds + 20) * 1000);
 }
 
 export function unlockWriting(setId: string, signal: AbortSignal): Promise<{ setId: string; unlocked: boolean; chargedCredits: number; credits: CreditBalance }> {
-  return postJson(`/api/writing/sets/${setId}/unlock/`, {}, signal);
+  return mutateJson("POST", `/api/writing/sets/${setId}/unlock/`, {}, signal);
 }
 
 export function startCreditPurchase(attemptId: string, priceId: string, signal: AbortSignal) {
-  return postJson<CreditPurchaseStatus & { checkoutUrl: string | null }>("/api/credits/purchases/", { attemptId, priceId }, signal);
+  return mutateJson<CreditPurchaseStatus & { checkoutUrl: string | null }>("POST", "/api/credits/purchases/", { attemptId, priceId }, signal);
 }
 
 export function getPlans(signal: AbortSignal) {
@@ -116,13 +119,21 @@ export function getMySubscription(signal: AbortSignal) {
   return requestJson<SubscriptionAccount>("/api/subscriptions/me/", signal);
 }
 
+export function schedulePlanChange(months: number, priceId: string, effectiveAt: string, signal: AbortSignal) {
+  return mutateJson<{ scheduledChange: ScheduledPlanChange }>("POST", "/api/subscriptions/me/plan-change/", { months, priceId, effectiveAt }, signal);
+}
+
+export function cancelPlanChange({ id, months, effectiveAt }: ScheduledPlanChange, signal: AbortSignal) {
+  return mutateJson<{ scheduledChange: null }>("DELETE", "/api/subscriptions/me/plan-change/", { id, months, effectiveAt }, signal);
+}
+
 export function startPlanPurchase(attemptId: string, priceId: string, months: number, signal: AbortSignal) {
-  return postJson<CreditPurchaseStatus & { checkoutUrl: string | null }>("/api/plans/purchases/", { attemptId, priceId, months }, signal);
+  return mutateJson<CreditPurchaseStatus & { checkoutUrl: string | null }>("POST", "/api/plans/purchases/", { attemptId, priceId, months }, signal);
 }
 
 type BillingPage = "credits" | "plans" | "settings/subscription" | `${Exclude<Language, "ko">}/settings/subscription`;
 export function openBillingPortal(signal: AbortSignal, from: BillingPage = "credits") {
-  return postJson<{ portalUrl: string | null }>("/api/credits/billing-portal/", from === "credits" ? {} : { from }, signal);
+  return mutateJson<{ portalUrl: string | null }>("POST", "/api/credits/billing-portal/", from === "credits" ? {} : { from }, signal);
 }
 
 export function creditsRequest<T>(path: string, signal: AbortSignal): Promise<T> {

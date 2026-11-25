@@ -4,7 +4,26 @@ from uuid import UUID, uuid4
 from django.db import transaction
 
 from .credits import locked_account, reconcile_purchase_refunds, record
-from .models import CreditPurchase
+from .models import PLAN_AMOUNTS, CreditPurchase
+from .plan_changes import release_applied_schedule
+
+
+def invoice_subscription_details(invoice):
+    return (invoice.get("parent") or {}).get("subscription_details") or invoice.get("subscription_details") or {}
+
+
+def is_plan_invoice(invoice):
+    reason = invoice.get("billing_reason")
+    if reason in ("subscription_create", "subscription_cycle"):
+        return True
+    if reason != "subscription_update":
+        return False
+    # An interval switch can invoice at the phase boundary. Ignore unrelated updates.
+    metadata = invoice_subscription_details(invoice).get("metadata") or {}
+    change_at = metadata.get("topiq_change_at")
+    return bool(change_at) and any(
+        change_at == str(line["period"]["start"]) for line in invoice["lines"]["data"]
+    )
 
 
 def subscription_order(order_id, customer_id, subscription_id):
@@ -23,10 +42,11 @@ def subscription_order(order_id, customer_id, subscription_id):
 
 @transaction.atomic
 def apply_paid_invoice(invoice):
-    details = (invoice.get("parent") or {}).get("subscription_details") or invoice.get("subscription_details") or {}
-    order_id = (details.get("metadata") or {}).get("credit_purchase_id")
+    details = invoice_subscription_details(invoice)
+    metadata = details.get("metadata") or {}
+    order_id = metadata.get("credit_purchase_id")
     reason = invoice.get("billing_reason")
-    if not order_id or reason not in ("subscription_create", "subscription_cycle"):
+    if not order_id or not is_plan_invoice(invoice):
         return
     subscription_id = details.get("subscription") or invoice.get("subscription")
     order, account = subscription_order(order_id, invoice["customer"], subscription_id)
@@ -38,8 +58,17 @@ def apply_paid_invoice(invoice):
     line = lines["data"][0]
     price_id = ((line.get("pricing") or {}).get("price_details") or {}).get("price") or (line.get("price") or {}).get("id")
     item = (line.get("parent") or {}).get("subscription_item_details") or line
-    if (invoice["status"] != "paid" or invoice["currency"] != order.currency or invoice["amount_paid"] != order.amount
-            or line["amount"] != order.amount or price_id != order.stripe_price_id or line["quantity"] != 1
+    months, expected_price, amount = order.plan_months, order.stripe_price_id, order.amount
+    if reason != "subscription_create" and metadata.get("topiq_change_at"):
+        # Finalized invoices snapshot the terms set on the booked phase, including retired prices.
+        months = int(metadata["topiq_plan_months"])
+        expected_price = metadata["topiq_plan_price"]
+        if (months not in PLAN_AMOUNTS or months <= order.plan_months or not expected_price
+                or line["period"]["start"] < int(metadata["topiq_change_at"])):
+            raise ValueError("Invalid scheduled plan terms")
+        amount = PLAN_AMOUNTS[months]
+    if (invoice["status"] != "paid" or invoice["currency"] != order.currency or invoice["amount_paid"] != amount
+            or line["amount"] != amount or price_id != expected_price or line["quantity"] != 1
             or item.get("proration") or item.get("subscription") != subscription_id):
         raise ValueError("Unexpected subscription charge")
     start, end = (datetime.fromtimestamp(line["period"][key], UTC) for key in ("start", "end"))
@@ -54,9 +83,9 @@ def apply_paid_invoice(invoice):
         receipt.credited_months = 1
     else:
         # A renewal can arrive early. Its first month is due when the new period starts.
-        receipt = CreditPurchase(user_id=order.user_id, attempt_id=uuid4(), plan_months=order.plan_months,
-                                 stripe_price_id=order.stripe_price_id, currency=order.currency,
-                                 amount=order.amount, credits=order.credits, credited_months=0)
+        receipt = CreditPurchase(user_id=order.user_id, attempt_id=uuid4(), plan_months=months,
+                                 stripe_price_id=price_id, currency=order.currency,
+                                 amount=amount, credits=order.credits, credited_months=0)
     if order.subscription_state == "checkout":
         order.subscription_state = "active"
         order.save(update_fields=["subscription_state"])
@@ -79,7 +108,10 @@ def sync_subscription(event_type, subscription, client_factory):
         return
     if event_type == "customer.subscription.updated":
         # Stripe retries events out of order, including changes within the same second.
-        subscription = client_factory().v1.subscriptions.retrieve(subscription["id"]).to_dict()
+        api = client_factory().v1
+        subscription = api.subscriptions.retrieve(subscription["id"]).to_dict()
+        if subscription["status"] == "active" and subscription.get("schedule"):
+            release_applied_schedule(subscription, api)
     status = subscription["status"]
     if status in ("canceled", "incomplete_expired"):
         order.subscription_state = "ended"

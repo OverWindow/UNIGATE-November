@@ -32,6 +32,7 @@ const nextConfig: NextConfig = {
       { source: "/api/credits/:path*", destination: `${backendOrigin.origin}/api/credits/:path*/` },
       { source: "/api/plans/:path*", destination: `${backendOrigin.origin}/api/plans/:path*/` },
       { source: "/api/subscriptions/me/", destination: `${backendOrigin.origin}/api/subscriptions/me/` },
+      { source: "/api/subscriptions/me/plan-change/", destination: `${backendOrigin.origin}/api/subscriptions/me/plan-change/` },
       { source: "/api/csrf/", destination: `${backendOrigin.origin}/api/csrf/` },
     ];
   },

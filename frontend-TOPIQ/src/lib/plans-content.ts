@@ -18,6 +18,11 @@ interface PlanCopy {
   term: (months: number) => string; benefits: (credits: number) => string[]; buy: string; unavailable: string;
   savings: (percent: number) => string;
   settingsTitle: string; portalUnavailable: string;
+  change: {
+    select: (months: number) => string; today: string; effective: string; nextCharge: string; confirm: string; back: string;
+    scheduled: (plan: string, date: string, amount: string) => string; cancel: (months: number) => string;
+    cancelled: string; cancelBeforeEnding: string; unavailable: string; conflict: string; error: string;
+  };
   details: { myPlan: string; status: string; cycle: string; renewing: string; nonrenewing: string;
     noPaidPeriod: string; free: string; seePlans: string };
   interval: (months: number) => string; manage: string; renewal: string; ending: string; pastDue: string; prepaid: string; inUse: string;
@@ -30,6 +35,15 @@ export const plansContent: Record<Language, PlanCopy> = {
     login: "로그인하기",
     savings: percent => `월간 결제 대비 ${percent}% 절약`,
     settingsTitle: "구독 관리",
+    change: {
+      select: n => `${n}개월로 변경`,
+      today: "오늘 결제할 금액", effective: "적용일", nextCharge: "다음 결제 금액", confirm: "변경 예약", back: "돌아가기",
+      scheduled: (plan, date, amount) => `${date}부터 ${plan} 요금제가 적용됩니다. 다음 결제 금액은 ${amount}입니다.`,
+      cancel: n => `${n}개월 변경 예약 취소`, cancelled: "변경 예약을 취소했습니다. 현재 결제 주기가 유지됩니다.",
+      cancelBeforeEnding: "구독을 해지하려면 먼저 변경 예약을 취소해 주세요.",
+      unavailable: "변경 예약 상태를 불러오지 못했습니다.", conflict: "구독 정보가 변경되었습니다. 최신 요금과 예약 상태를 확인해 주세요.",
+      error: "요청 결과를 확인하지 못했습니다. 예약 상태를 다시 확인해 주세요.",
+    },
     details: { myPlan: "내 이용 상품", status: "구독 상태", cycle: "결제 주기", renewing: "자동 갱신 중",
       nonrenewing: "자동 갱신 없음", noPaidPeriod: "현재 적용된 유료 이용 기간이 없습니다.",
       free: "이용 중인 유료 구독이 없습니다.", seePlans: "요금제 보기" },
@@ -53,6 +67,15 @@ export const plansContent: Record<Language, PlanCopy> = {
     login: "Log in",
     savings: percent => `Save ${percent}% compared with monthly billing`,
     settingsTitle: "Manage subscription",
+    change: {
+      select: n => `Switch to ${n} months`,
+      today: "Due today", effective: "Effective date", nextCharge: "Next charge", confirm: "Schedule change", back: "Go back",
+      scheduled: (plan, date, amount) => `Switching to ${plan} on ${date}. Next charge: ${amount}.`,
+      cancel: n => `Cancel switch to ${n} months`, cancelled: "Scheduled change cancelled. Your current billing cycle continues.",
+      cancelBeforeEnding: "To end your subscription, cancel the scheduled change first.",
+      unavailable: "Couldn’t load your scheduled change.", conflict: "Your subscription changed. Check the updated pricing and scheduled change.",
+      error: "Couldn’t confirm the result. Check the status of your scheduled change.",
+    },
     details: { myPlan: "My plan", status: "Subscription status", cycle: "Billing cycle", renewing: "Auto-renewal on",
       nonrenewing: "No automatic renewal", noPaidPeriod: "No paid access period is currently in effect.",
       free: "You have no paid subscription.", seePlans: "View plans" },
@@ -76,6 +99,15 @@ export const plansContent: Record<Language, PlanCopy> = {
     login: "Masuk",
     savings: percent => `Hemat ${percent}% dibanding tagihan bulanan`,
     settingsTitle: "Kelola langganan",
+    change: {
+      select: n => `Ganti ke ${n} bulan`,
+      today: "Tagihan hari ini", effective: "Tanggal mulai", nextCharge: "Tagihan berikutnya", confirm: "Jadwalkan perubahan", back: "Kembali",
+      scheduled: (plan, date, amount) => `Paket akan berubah menjadi ${plan} pada ${date}. Tagihan berikutnya: ${amount}.`,
+      cancel: n => `Batalkan perubahan ke ${n} bulan`, cancelled: "Perubahan terjadwal dibatalkan. Siklus tagihan saat ini tetap berlaku.",
+      cancelBeforeEnding: "Untuk mengakhiri langganan, batalkan perubahan terjadwal terlebih dahulu.",
+      unavailable: "Status perubahan terjadwal gagal dimuat.", conflict: "Langganan Anda berubah. Periksa harga dan jadwal perubahan terbaru.",
+      error: "Hasil permintaan belum dapat dikonfirmasi. Periksa status perubahan terjadwal.",
+    },
     details: { myPlan: "Paket saya", status: "Status langganan", cycle: "Siklus tagihan", renewing: "Perpanjangan otomatis aktif",
       nonrenewing: "Tanpa perpanjangan otomatis", noPaidPeriod: "Saat ini tidak ada masa akses berbayar yang aktif.",
       free: "Anda tidak memiliki langganan berbayar.", seePlans: "Lihat paket" },

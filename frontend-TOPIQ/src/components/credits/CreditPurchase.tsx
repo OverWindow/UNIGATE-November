@@ -4,7 +4,9 @@ import { useApp } from "@/app/providers";
 import { creditsContent } from "@/lib/credits-content";
 import { localizedPath } from "@/lib/locale-path";
 import { plansContent } from "@/lib/plans-content";
-import { creditsRequest, startCreditPurchase, startPlanPurchase, WritingError, type CreditPrice, type CreditPurchaseStatus, type PlanAccount } from "@/lib/writing/writing-api";
+import { creditsRequest, startCreditPurchase, startPlanPurchase, WritingError, type CreditPrice, type CreditPurchaseStatus,
+  type PlanAccount, type ScheduledPlanChange } from "@/lib/writing/writing-api";
+import PlanChangeControls from "./PlanChangeControls";
 import PlanOffers from "./PlanOffers";
 
 type Notice = keyof typeof creditsContent.ko.checkout | "planInUse";
@@ -21,10 +23,10 @@ function savedAttempt(key: string): Attempt | null {
   return null;
 }
 
-export default function CreditPurchase({ userId, returnId, cancelled, onFulfilled, planAccount, onPriceChanged }: {
+export default function CreditPurchase({ userId, returnId, cancelled, onFulfilled, planAccount, onPlanRefresh }: {
   userId: number; returnId: string | null; cancelled: boolean; onFulfilled: (signal: AbortSignal) => void;
-  planAccount?: PlanAccount | null; onPriceChanged?: () => void;
-}) {
+} & ({ planAccount: PlanAccount | null; onPlanRefresh: (change?: ScheduledPlanChange | null) => void }
+  | { planAccount?: undefined; onPlanRefresh?: undefined })) {
   const { language, refreshSession } = useApp();
   const t = creditsContent[language];
   const p = plansContent[language];
@@ -135,11 +137,11 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
         remember(null);
         setNotice("priceChanged");
         reloadPrice();
-        onPriceChanged?.();
+        onPlanRefresh?.();
       } else if (cause instanceof WritingError && cause.code === "plan_in_use") {
         remember(null);
         setNotice("planInUse");
-        onPriceChanged?.();
+        onPlanRefresh?.();
       } else {
         setNotice("startError");
         if (cause instanceof WritingError && cause.status === 401) void refreshSession();
@@ -153,15 +155,15 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
   const blocked = notice === "opening" || notice === "checking" || retryCheck;
   const canSubscribe = planAccount && !planAccount.active && !planAccount.subscription;
   return <div className="credits-purchase">
-    {isPlan ? planAccount && <PlanOffers language={language} account={planAccount}
-      renderAction={({ months, priceId, currency, amount, bonusCredits }) => canSubscribe && <>
+    {isPlan ? planAccount && (canSubscribe ? <PlanOffers language={language} account={planAccount}
+      renderAction={({ months, priceId, currency, amount, bonusCredits }) => <>
         <button type="button" className="button button-primary" disabled={blocked || !priceId}
           aria-label={`${p.term(months)} · ${priceId ? p.buy : p.unavailable}`}
           aria-describedby="plan-card-notice"
           onClick={() => priceId && void buy({ priceId, currency, amount, credits: bonusCredits, months })}>
           {priceId ? p.buy : p.unavailable}
         </button>
-      </>} /> : price === "unavailable" ? <>
+      </>} /> : <PlanChangeControls account={planAccount} onRefresh={onPlanRefresh} />) : price === "unavailable" ? <>
       <p role="status">{t.priceUnavailable}</p>
       <button type="button" className="button credits-secondary" onClick={reloadPrice}>{t.retry}</button>
     </> : price ? <>

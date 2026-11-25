@@ -10,6 +10,8 @@ from accounts.credits import reconcile_purchase_refunds, refund_credit_adjustmen
 from accounts.models import CreditAccount, CreditPurchase, CreditPurchaseRefund, CreditTransaction
 from accounts.payments import PaymentsUnavailable, stripe_client
 from accounts.plans import has_active_plan
+from accounts.refunds import cancel_refunded_subscription
+from accounts.subscriptions import invoice_subscription_details, is_plan_invoice
 
 
 def plan_payment(api, account, order):
@@ -20,7 +22,7 @@ def plan_payment(api, account, order):
             raise CommandError(f"주문 {order.pk}의 청구서 결제를 하나로 특정할 수 없습니다.")
         payment = page.data[0].to_dict()
         invoice = payment["invoice"]
-        details = (invoice.get("parent") or {}).get("subscription_details") or invoice.get("subscription_details") or {}
+        details = invoice_subscription_details(invoice)
         subscription = details.get("subscription") or invoice.get("subscription")
         if (not subscription or order.stripe_subscription_id not in (None, subscription)
                 or not account.stripe_customer_id or invoice["customer"] != account.stripe_customer_id
@@ -48,7 +50,7 @@ def plan_payment(api, account, order):
 def subscription_periods(api, account, order, subscription, refund):
     orders = CreditPurchase.objects.filter(user_id=account.pk, plan_months__isnull=False)
     if not subscription:
-        return orders.filter(pk=order.pk), False
+        return orders.filter(pk=order.pk), None
     root = orders.filter(stripe_subscription_id=subscription).first()
     remote = api.subscriptions.retrieve(subscription).to_dict()
     if not root or remote["id"] != subscription or remote["customer"] != account.stripe_customer_id:
@@ -57,7 +59,7 @@ def subscription_periods(api, account, order, subscription, refund):
     invoice_ids = set()
     for item in api.invoices.list({"subscription": subscription, "status": "paid", "limit": 100}).auto_paging_iter():
         invoice = item.to_dict()
-        if invoice["billing_reason"] not in {"subscription_create", "subscription_cycle"}:
+        if not is_plan_invoice(invoice):
             continue
         invoice_ids.add(invoice["id"])
         if invoice["id"] != order.stripe_invoice_id and invoice["amount_paid"] > 0:
@@ -68,7 +70,7 @@ def subscription_periods(api, account, order, subscription, refund):
         raise CommandError("원구독의 결제 목록에 환불 대상 청구서가 없습니다.")
     periods = orders.filter(Q(pk__in=[root.pk, order.pk])
                             | Q(stripe_invoice_id__in=invoice_ids, plan_ends_at__gt=timezone.now()))
-    return periods, remote["status"] not in {"canceled", "incomplete_expired"}
+    return periods, remote if remote["status"] not in {"canceled", "incomplete_expired"} else None
 
 
 def credit_change(account, order, refund, previous, recorded):
@@ -209,7 +211,5 @@ class Command(BaseCommand):
             raise CommandError("환불 반영 결과가 예상과 달라 DB 변경을 취소했습니다.")
         # Cancel last. If the response or DB commit is lost, a retry reads Stripe's current state.
         if cancel:
-            canceled = api.subscriptions.cancel(subscription, {"invoice_now": False, "prorate": False}).to_dict()
-            if canceled["id"] != subscription or canceled["status"] != "canceled":
-                raise CommandError("Stripe 구독 종료를 확인하지 못했습니다. 다시 조회하세요.")
+            cancel_refunded_subscription(api, cancel)
         return "Plus" if has_active_plan(user_id) else "Free", balance_before - account.balance

@@ -39,6 +39,8 @@ TOPIQ는 Google Identity Services 팝업에서 받은 ID 토큰을 Django에서 
 - **적용.** 개발에서는 사용자가 백엔드 설정 후 서버를 시작하기 전에 `backend/`에서 `.\.venv\Scripts\python.exe manage.py migrate`를 수동 실행합니다. 운영에서는 세 가격·포털·웹훅 설정을 마치고 백엔드와 TOPIQ를 배포합니다. 기존 `deploy/start.sh`가 Gunicorn 시작 전에 마이그레이션을 자동 적용합니다.
 - **월별 적립 스키마.** `accounts.0011_creditpurchase_credited_months`는 `credit_purchases.credited_months`에 결제 회차별 지급 완료 개월 수를 기록합니다. `GET /api/plans/`의 `currentPlanMonths`는 현재 유효한 이용권의 개월 수이고, 무료 계정은 `null`입니다.
 - **구독 관리.** 설정 → 구독 관리(`/settings/subscription`)에서 내 상품, 결제 주기, 이용 가능 기한과 갱신 상태를 확인합니다. `GET /api/subscriptions/me/`는 로그인한 회원의 정보와 Stripe 고객 연결 여부(`canOpenBillingPortal`)를 반환합니다. 연결된 회원은 **결제 관리**에서 결제 수단을 관리하고 정기 구독의 자동 갱신을 해지할 수 있습니다. Stripe 연결이 없는 회원과 무료 회원에게는 **요금제 보기** 버튼을 표시합니다.
+- **결제 주기 변경.** 자동 갱신 중인 Plus 회원은 요금제 화면에서 1개월을 3개월 또는 6개월로, 3개월을 6개월로 변경할 수 있습니다. 확인 화면에서 다음 결제일과 금액을 확인하고 예약합니다. 예를 들어 1개월에서 3개월로 예약하면 당일 청구액은 0원이고, 다음 결제일에 23,900원을 결제합니다. 적용 전에는 구독 설정에서 예약을 취소할 수 있으며 기존 주기로 계속 갱신됩니다. 예약 중에 자동 갱신 자체를 해지하려면 예약을 먼저 취소하고 **결제 관리**를 엽니다.
+- **예약 API와 운영 설정.** `POST /api/subscriptions/me/plan-change/`는 변경을 예약하고 같은 경로의 `DELETE`는 예약을 취소합니다. `GET /api/plans/`와 `GET /api/subscriptions/me/`에서 예약한 주기와 적용일을 조회합니다. Stripe가 기존 구독의 결제 주기를 전환하고 TOPIQ는 결제된 회차를 기존 구매 테이블에 기록합니다. 제한된 Stripe API 키를 사용하는 경우 구독 일정(Subscription Schedules)의 읽기·쓰기 권한이 필요합니다. 이 기능 전용 마이그레이션이나 정기 실행 명령은 없습니다. [Stripe 구독 일정](https://docs.stripe.com/billing/subscriptions/subscription-schedules)
 - **확인.** Stripe 샌드박스에서 첫 결제와 갱신 후 각각 청구 기간과 **플랜 지급 +400**을 확인합니다. 같은 청구서 이벤트를 다시 전송해 지급 횟수를 확인합니다. **설정 → 구독 관리**에서 해지한 뒤 기간 종료 시 Free로 돌아가는지 확인합니다.
 
 ## TOPIQ 크레딧 충전
@@ -121,7 +123,7 @@ python manage.py sync_plan_refund --user-id 123 --refund-id re_example --apply
 ```
 
 명령은 백엔드에 설정된 Stripe 계정을 사용합니다. 조회에는 해당 결제·청구서·환불·구독의 읽기 권한이,
-갱신 중인 구독의 적용에는 구독 취소 권한이 필요합니다. 최초 결제, 갱신 청구서, 구형 일회성 Plus 이용권을 지원합니다.
+갱신 중인 구독의 적용에는 구독 취소 권한이 필요하며, 결제 주기 변경이 예약된 구독은 Stripe 구독 일정도 종료합니다. 최초 결제, 주기 변경 후 결제를 포함한 갱신 청구서, 구형 일회성 Plus 이용권을 지원합니다.
 웹훅 도입 전 환불도 실제 성공한 환불과 원주문이 일치하면 선택할 수 있습니다.
 
 `--apply`는 기존 환불 ID와 금액을 기록하고 해당 이용권과 원구독의 남은 기간을 종료합니다.
