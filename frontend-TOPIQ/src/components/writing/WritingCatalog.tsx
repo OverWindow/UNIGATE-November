@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import useRouter from "@/lib/use-navigation-router";
-import { ArrowRight, Check, Info, Lock, X } from "lucide-react";
+import { ArrowRight, Check, Lock, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
 import { writingRequest, unlockWriting, WritingError, type WritingSet } from "@/lib/writing/writing-api";
@@ -136,7 +136,6 @@ export default function WritingCatalog() {
                   onClick={event => { trigger.current = event.currentTarget; setUnlockError(""); setLockedSet(set); }}>{content}</button>;
             })}</div>}
       </section>
-      <div className="writing-catalog-notice"><Info size={16} aria-hidden="true" /><p className="writing-notice">{t.notice}</p></div>
     </div>
     <dialog ref={dialog} className="writing-login-dialog" aria-labelledby="writing-login-title" aria-describedby="writing-login-description"
       onCancel={event => { event.preventDefault(); closeDialog(); }}

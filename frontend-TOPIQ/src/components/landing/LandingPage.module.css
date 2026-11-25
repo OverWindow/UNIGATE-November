@@ -99,6 +99,10 @@
 .faqAnswer > div { min-height: 0; overflow: hidden; }
 .faqAnswer p { max-width: 672px; margin: 0; padding: 0 32px 20px 0; color: #4b5563; font-size: 14px; line-height: 28px; }
 
+@media (width < 640px) {
+  .characterFloat { width: min(90%, 306px); }
+}
+
 @media (min-width: 640px) {
   .container { padding-inline: 32px; }
   .section { padding-block: 96px; }

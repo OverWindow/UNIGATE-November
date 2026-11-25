@@ -52,14 +52,14 @@ main:focus { outline: none; }
 
 .section-switch > :is(a, button) { min-height: 44px; padding: 10px 25px; border-radius: 9px; color: #657186; font-weight: 600; transition: background-color .2s ease, color .2s ease, transform .2s ease; }
 .section-switch > :is(a, button):focus-visible { outline: 2px solid #2d5ec5; outline-offset: 3px; }
-.section-switch > :is([aria-pressed="true"], [aria-current="page"]) { background: #253d67; color: #fff; }
+.section-switch > :is([aria-pressed="true"], [aria-current="page"], [aria-current="step"]) { background: #253d67; color: #fff; }
 @media (hover: hover) and (pointer: fine) {
-  .section-switch > :is(a, button):hover:not([aria-pressed="true"], [aria-current="page"]) { color: #253d67; }
-  .section-switch > :is([aria-pressed="true"], [aria-current="page"]):hover { color: #dbe8ff; }
+  .section-switch > :is(a, button):hover:not([aria-pressed="true"], [aria-current="page"], [aria-current="step"]) { color: #253d67; }
+  .section-switch > :is([aria-pressed="true"], [aria-current="page"], [aria-current="step"]):hover { color: #dbe8ff; }
 }
 @media (prefers-reduced-motion: no-preference) {
   .section-switch > :is(a, button):active { transform: scale(.96); }
-  .section-switch > :is([aria-pressed="true"], [aria-current="page"]) { animation: section-select .24s ease-out; }
+  .section-switch > :is([aria-pressed="true"], [aria-current="page"], [aria-current="step"]) { animation: section-select .24s ease-out; }
 }
 @keyframes section-select { 50% { transform: scale(1.04); } }
 

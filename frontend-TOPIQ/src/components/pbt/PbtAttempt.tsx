@@ -59,7 +59,7 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
   const receivedAt = useRef(0);
   const autoSubmitted = useRef(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const dialogTitleRef = useRef<HTMLHeadingElement>(null);
+  const dialogDismissRef = useRef<HTMLButtonElement>(null);
   const paperRef = useRef<HTMLElement>(null);
   const retry = () => setRevision(n => n + 1);
 
@@ -152,7 +152,7 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
       closeAnimation.current = null;
       visibleDialog.current = dialog;
       if (!element.open) element.showModal();
-      dialogTitleRef.current?.focus();
+      dialogDismissRef.current?.focus({ preventScroll: true });
     } else if (element.open) {
       closeAnimation.current = closeWithMotion(element, () => {
         element.close();
@@ -314,10 +314,10 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
       </>}
     </div>
     <dialog ref={dialogRef} className={`pbt-dialog${shownDialog === "questions" ? " pbt-navigator-dialog" : ""}`} onCancel={event => { event.preventDefault(); setDialog(null); }} aria-labelledby="pbt-dialog-title">
-      {shownDialog === "questions" && <button className="pbt-dialog-close" type="button" aria-label={t.close} onClick={() => setDialog(null)}>
+      {shownDialog === "questions" && <button ref={dialogDismissRef} className="pbt-dialog-close" type="button" aria-label={t.close} onClick={() => setDialog(null)}>
         <X size={18} strokeWidth={1.7} aria-hidden="true" />
       </button>}
-      <h2 ref={dialogTitleRef} id="pbt-dialog-title" tabIndex={-1}>{shownDialog === "questions" ? t.allQuestions : shownDialog === "exit" ? (exitTimed ? t.exitTitle : t.practiceExitTitle) : t.confirm}</h2>
+      <h2 id="pbt-dialog-title">{shownDialog === "questions" ? t.allQuestions : shownDialog === "exit" ? (exitTimed ? t.exitTitle : t.practiceExitTitle) : t.confirm}</h2>
       {shownDialog === "questions" ? <>
         <p className="pbt-navigator-summary">{t.answered} <strong>{answered} / {total}</strong><span>{t.unanswered} <strong>{total - answered}</strong></span></p>
         <div className="pbt-number-grid">
@@ -331,10 +331,10 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
         <div className="pbt-dialog-actions"><button className="button pbt-secondary" disabled={busy || submitting} onClick={() => {
           if (exitTimed) void submit(exitAction.current ?? undefined);
           else { attemptActive.current = false; exitAction.current?.(); }
-        }}>{exitTimed ? t.exitConfirm : t.practiceExitConfirm}</button><button className="button button-primary" onClick={() => setDialog(null)}>{t.cancel}</button></div>
+        }}>{exitTimed ? t.exitConfirm : t.practiceExitConfirm}</button><button ref={dialogDismissRef} className="button button-primary" onClick={() => setDialog(null)}>{t.cancel}</button></div>
       </> : <>
         <p>{t.unanswered}: {total - answered}</p>
-        <div className="pbt-dialog-actions"><button className="button pbt-secondary" onClick={() => setDialog(null)}>{t.cancel}</button><button className="button button-primary" onClick={() => void submit()} disabled={busy || submitting}>{t.submit}</button></div>
+        <div className="pbt-dialog-actions"><button ref={dialogDismissRef} className="button pbt-secondary" onClick={() => setDialog(null)}>{t.cancel}</button><button className="button button-primary" onClick={() => void submit()} disabled={busy || submitting}>{t.submit}</button></div>
       </>}
     </dialog>
   </main></div>;

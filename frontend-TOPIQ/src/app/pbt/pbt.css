@@ -204,10 +204,9 @@ button.sentence-order-card { cursor: grab; }
 @media (max-width: 760px) {
   .pbt-modes { grid-template-columns: 1fr; gap: 10px; }
   .pbt-exam-back { display: none; }
-  .pbt-exam { --pbt-toolbar-height: 64px; }
   .pbt-exam-width { width: calc(100% - 32px); }
   .pbt-exam-toolbar-inner { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; }
-  .pbt-exam-toolbar h1 { grid-column: 1 / -1; grid-row: 1; text-align: left; font-size: 13px; }
+  .pbt-exam-toolbar h1 { text-align: left; font-size: 13px; }
   .pbt-test-paper { padding: 14px 18px; }
   .pbt-question-split .pbt-question-body, .pbt-group-layout { grid-template-columns: 1fr; gap: 12px; }
   .pbt-number-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }

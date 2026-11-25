@@ -104,8 +104,8 @@ export default function WritingStudy({ id }: { id: string }) {
       <p>{error instanceof WritingError && error.status === 404 ? t.notFound : t.error}</p>
       <button className="button writing-secondary" onClick={() => setRevision(value => value + 1)}>{t.retry}</button>
     </div> : !data || !question ? <p className="writing-status" role="status">{t.loading}</p> : <>
-      <div className="writing-study-heading"><h1>{t.set} {data.number}</h1><p>{t.questions}</p></div>
-      <nav className="writing-question-nav" aria-label={t.navigation} data-question={question.number}>
+      <h1 className="writing-study-heading">{t.set} {data.number}</h1>
+      <nav className="writing-question-nav section-switch" aria-label={t.navigation}>
         {data.questions.map((entry, position) => <button type="button" key={entry.number}
           aria-label={`${entry.number} · ${t.types[entry.number]}${submittedSlots.includes(entry.number) ? ` · ${t.submitted}` : ""}`}
           aria-current={position === index ? "step" : undefined} onClick={() => move(position)}>
@@ -130,7 +130,6 @@ export default function WritingStudy({ id }: { id: string }) {
         <button className="button writing-secondary" disabled={index === 0} onClick={() => move(index - 1, true)}><ArrowLeft size={16} aria-hidden="true" />{t.previous}</button>
         {index < data.questions.length - 1 && <button className="button button-primary" onClick={() => move(index + 1, true)}>{t.next}<ArrowRight size={16} aria-hidden="true" /></button>}
       </div>
-      <p className="writing-notice">{t.notice}</p>
     </>}
   </div>;
 }
