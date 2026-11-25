@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { getSession, signIn, signOut, signUp, type AuthUser, type SignupInput } from "@/lib/auth/auth-api";
 import { creditsRequest, type CreditBalance } from "@/lib/writing/writing-api";
 import type { Language } from "@/lib/landing-content";
-import { localizedPath } from "@/lib/locale-path";
+import { isPasswordConfirmPath, localizedPath } from "@/lib/locale-path";
 
 interface AppContextValue {
   language: Language;
@@ -49,6 +49,7 @@ export default function Providers({ children, initialLanguage }: { children: Rea
 
   useEffect(() => {
     // Keep the saved language and URL in sync after the initial server render.
+    if (isPasswordConfirmPath(window.location.pathname)) return;
     try {
       const saved = localStorage.getItem(languageStorageKey);
       if (initialLanguage === "ko" && (saved === "en" || saved === "id")) {

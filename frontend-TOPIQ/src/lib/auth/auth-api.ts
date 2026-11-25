@@ -7,6 +7,7 @@ export interface AuthUser {
   email: string;
   nickname: string;
   plusEndsAt: string | null;
+  hasUsablePassword?: boolean;
 }
 
 export interface SignupInput {
@@ -72,6 +73,7 @@ function parseUser(value: unknown): AuthUser {
   }
   const end = "plusEndsAt" in value ? value.plusEndsAt : null;
   return { id: value.id, email: value.email, nickname: value.nickname,
+    hasUsablePassword: "hasUsablePassword" in value && typeof value.hasUsablePassword === "boolean" ? value.hasUsablePassword : undefined,
     plusEndsAt: typeof end === "string" && Number.isFinite(Date.parse(end)) ? end : null };
 }
 
@@ -109,6 +111,25 @@ export async function signIn(email: string, password: string): Promise<AuthUser>
   const result = await post("/api/auth/login/", { email, password });
   if (!result) throw new AuthError("server_error");
   return parseUser(result.user);
+}
+
+type PasswordRequest =
+  | { purpose: "reset"; email: string; language: Language }
+  | { purpose: "change"; current_password: string; language: Language };
+
+export async function requestPassword(input: PasswordRequest): Promise<number> {
+  const data = await post("/api/auth/password/request/", input);
+  if (data?.status !== "request_accepted" || typeof data.retryAfter !== "number" ||
+      !Number.isInteger(data.retryAfter) || data.retryAfter < 0) throw new AuthError("server_error");
+  return data.retryAfter;
+}
+
+export async function confirmPassword(token: string, newPassword: string, confirmation: string): Promise<PasswordRequest["purpose"]> {
+  const data = await post("/api/auth/password/confirm/", {
+    token, new_password: newPassword, new_password_confirm: confirmation,
+  });
+  if (data?.purpose !== "reset" && data?.purpose !== "change") throw new AuthError("server_error");
+  return data.purpose;
 }
 
 export async function signUp(input: SignupInput): Promise<AuthUser> {
@@ -182,7 +203,7 @@ export function safeReturnPath(value: string | null): string {
       [...value].some(character => character.charCodeAt(0) < 32)) return "/";
   const parsed = new URL(value, "https://topiq.unigate.kr");
   if (parsed.origin !== "https://topiq.unigate.kr" || parsed.pathname.startsWith("//") ||
-      /^\/(login|signup|verify-email)(\/|$)/.test(parsed.pathname)) return "/";
+      /^\/(?:(?:en|id)\/)?(login|signup|verify-email|forgot-password|password\/confirm)(\/|$)/.test(parsed.pathname)) return "/";
   return `${parsed.pathname}${parsed.search}${parsed.hash}`;
 }
 

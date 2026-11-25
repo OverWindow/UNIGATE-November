@@ -830,16 +830,22 @@ PowerShell에서는 먼저 `$env:NEXT_PUBLIC_BACKEND_URL="http://localhost:8000"
 
 ## 공유 백엔드의 TOPIQ 인증
 
-`frontend-TOPIQ/`의 코드는 원격 최신 상태 그대로 유지합니다. TOPIQ의 Next.js 서버가 `DJANGO_BACKEND_URL`로 공유 Django를 호출하며, 랜딩페이지의 정적 빌드와는 별개입니다.
+TOPIQ의 Next.js 서버가 `DJANGO_BACKEND_URL`로 공유 Django를 호출합니다. 로그인과 비밀번호 관리는 `frontend-TOPIQ/`에서 제공합니다.
 
-| 메서드 | 기존 경로 | 목적 |
+| 메서드 | 경로 | 목적 |
 |---|---|---|
 | POST | `/api/auth/email/send/` | Brevo 이메일 인증 발송·재발송 |
 | POST | `/api/auth/email/verify/` | 서명된 인증 토큰 검증 |
 | POST | `/api/auth/signup/` | 이메일 인증 후 가입·로그인 |
 | POST | `/api/auth/login/` | 이메일·비밀번호 로그인 |
+| POST | `/api/auth/password/request/` | 비밀번호 복구 또는 설정 변경 확인 메일 요청 |
+| POST | `/api/auth/password/confirm/` | 메일 링크를 검증하고 새 비밀번호 저장 |
 | POST | `/api/auth/logout/` | 세션 종료 |
-| GET | `/api/auth/me/` | 현재 회원 조회 |
+| GET | `/api/auth/me/` | 현재 회원 및 비밀번호 사용 여부(`hasUsablePassword`) 조회 |
+
+비밀번호 찾기는 `purpose=reset`과 이메일을, 설정의 비밀번호 변경은 `purpose=change`와 현재 비밀번호를 전송합니다. 두 요청 모두 화면 언어(`ko`, `en`, `id`)를 전달합니다. 설정 변경은 로그인 계정에 등록된 이메일로만 발송합니다. 분실 요청은 가입 여부와 관계없이 같은 접수 메시지를 표시합니다.
+
+메일 링크는 15분간 유효합니다. 확인 API에 `token`, `new_password`, `new_password_confirm`을 제출해 저장하면 먼저 발급된 링크도 무효가 됩니다. 분실 복구 후에는 다시 로그인해야 합니다. 설정 변경은 메일을 요청한 브라우저에서 완료하며 그 로그인 세션만 유지됩니다. 기존 Brevo 설정을 사용하며 이 기능에 필요한 추가 마이그레이션이나 수동 실행 명령은 없습니다.
 
 CSRF·세션 쿠키·사용자 테이블과 기존 `accounts_rate_limit` 테이블을 유지합니다. 로그인·가입·메일 발송의 시도 제한은 PostgreSQL에 저장하며 서버 재시작 후에도 유지됩니다. 제한 저장소 오류는 503으로 응답합니다.
 이 테이블과 `migration/accounts/0002_rate_limit.py`는 기존 원격 변경이며 이번 랜딩페이지 변경에서 새로 추가한 것이 아닙니다.
@@ -857,6 +863,7 @@ TOPIQ 이메일 인증에는 백엔드 런타임에 `BREVO_API_KEY`, `BREVO_SEND
 | 기능 | 요청자별 한도 | 함께 적용되는 기존 한도 |
 |---|---|---|
 | 가입 인증 메일 | 비회원 세션별 100회/시간 | 이메일별 60초 재발송 간격, 5회/10분 |
+| 비밀번호 복구·변경 메일 | 용도별 요청 계정 또는 세션당 100회/시간 | 용도별로 이메일당 60초 재발송 간격, 5회/10분 |
 | 기존 비회원 시험 결과 메일 | 로그인 계정별 100회/시간 | 응시별 60초 재발송 간격, 응시·수신 이메일별 각각 5회/시간 |
 | 결과 링크 인증 | 로그인 계정별 100회/10분 | 토큰 검증·만료·접근 권한 검사 |
 
@@ -864,7 +871,7 @@ TOPIQ 이메일 인증에는 백엔드 런타임에 `BREVO_API_KEY`, `BREVO_SEND
 같은 계정은 여러 브라우저에서 한도를 공유하며, 비회원의 여러 탭은 같은 세션을 사용하면 한도를 공유합니다.
 동일 이메일·응시의 보호 한도는 세션을 바꿔도 유지합니다. 비회원이 쿠키를 삭제하면 새 세션이 생기므로 세션별 제한만으로 자동화 공격이나 대량 신규 세션 생성을 막을 수는 없습니다.
 
-기존 `django_session`, `accounts_rate_limit` 테이블과 HMAC 저장 방식을 사용하며, 제한 시 `429`와 `Retry-After`를 반환합니다.
+기존 `django_session`, `accounts_rate_limit` 테이블과 HMAC 저장 방식을 사용하며, 제한 시 `429`와 `Retry-After`를 반환합니다. 공개 비밀번호 복구 요청에서는 수신 주소별 제한에 도달해도 같은 `202` 접수 응답을 반환합니다.
 같은 PostgreSQL과 `DJANGO_SECRET_KEY`를 유지하면 세션과 제한 기록은 서버 재시작·재배포 후에도 유지됩니다. 세션 쿠키를 정상적으로 송수신해야 합니다.
 이전 `email-send-peer`, `result-peer`, `result-access-peer` 기록은 새 제한에서 조회하지 않으며 기존 만료 정리 절차로 정리합니다. 배포 시 직접 삭제할 필요는 없습니다.
 요청자별 카운터는 새 범위로 시작하고 기존 이메일·응시별 카운터는 이어서 사용합니다.

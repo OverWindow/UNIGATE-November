@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import google_views, views
+from . import google_views, passwords, views
 
 
 urlpatterns = [
@@ -12,6 +12,8 @@ urlpatterns = [
     path("email/verify/", views.verify_email, name="email-verify"),
     path("signup/", views.signup, name="account-signup"),
     path("login/", views.login_view, name="account-login"),
+    path("password/request/", passwords.request_password, name="account-password-request"),
+    path("password/confirm/", passwords.confirm_password, name="account-password-confirm"),
     path("logout/", views.logout_view, name="account-logout"),
     path("me/", views.me, name="account-me"),
 ]

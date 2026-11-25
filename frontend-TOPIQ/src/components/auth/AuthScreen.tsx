@@ -9,6 +9,8 @@ import { useApp } from "@/app/providers";
 import { AuthError, finishGoogleSignup, linkGoogle, safeReturnPath, type GoogleStep, type SignupInput, type VerifiedEmail } from "@/lib/auth/auth-api";
 import { authContent } from "@/lib/auth/auth-content";
 import { emailContent } from "@/lib/auth/email-content";
+import { passwordContent } from "@/lib/auth/password-content";
+import { localizedPath } from "@/lib/locale-path";
 import { emptySurvey, signupSurveyCopy, surveyErrors } from "@/lib/learner-survey";
 import SiteHeader from "../SiteHeader";
 import EmailVerificationRequest from "./EmailVerificationRequest";
@@ -177,6 +179,7 @@ export default function AuthScreen({ mode, verification, returnPath }: {
                   <div className="password-input"><input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete={isSignup ? "new-password" : "current-password"} maxLength={4096} required placeholder="••••••••" aria-invalid={!!fields.password} aria-describedby={fields.password ? "password-error" : isSignup ? "password-hint" : undefined} /><button type="button" className="password-toggle" aria-label={showPassword ? t.hide : t.show} aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff size={20} aria-hidden="true" /> : <Eye size={20} aria-hidden="true" />}</button></div>
                   {fields.password && <p className="field-error" id="password-error">{fieldMessage("password")}</p>}
                   {isSignup && <p className="field-hint" id="password-hint">{t.passwordHint}</p>}
+                  {!isSignup && !google && <Link className="text-link mt-2 inline-block text-sm" href={localizedPath("/forgot-password", language)}>{passwordContent[language].forgot}</Link>}
                 </div>}
                 {isSignup && !google && <div className="auth-field">
                   <label htmlFor="password_confirm">{t.confirm}</label>

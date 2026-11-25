@@ -35,6 +35,21 @@ MAIL_CONTENT = {
     },
 }
 
+PASSWORD_MAIL_CONTENT = {
+    "ko": {
+        "reset": ("비밀번호 재설정", "아래 버튼을 열어 새 비밀번호를 설정해 주세요."),
+        "change": ("비밀번호 변경", "비밀번호 변경을 요청한 브라우저에서 아래 버튼을 열어 새 비밀번호를 설정해 주세요."),
+    },
+    "en": {
+        "reset": ("Reset your password", "Use the button below to choose a new password."),
+        "change": ("Change your password", "Open the button below in the browser where you requested the change to choose a new password."),
+    },
+    "id": {
+        "reset": ("Atur ulang kata sandi", "Gunakan tombol di bawah untuk membuat kata sandi baru."),
+        "change": ("Ubah kata sandi", "Buka tautan di bawah melalui peramban tempat kamu meminta perubahan untuk membuat kata sandi baru."),
+    },
+}
+
 
 class EmailDeliveryError(Exception):
     def __init__(self, message="Email delivery is unavailable.", *, uncertain=False):
@@ -44,9 +59,13 @@ class EmailDeliveryError(Exception):
 
 @sensitive_variables()
 def build_verification_email(token, language):
-    text = MAIL_CONTENT[language]
     # Fragments stay out of HTTP request URLs and access logs.
     link = f"{settings.TOPIQ_PUBLIC_URL}/verify-email#token={quote(token, safe='')}"
+    return build_link_email(MAIL_CONTENT[language], language, link)
+
+
+@sensitive_variables()
+def build_link_email(text, language, link):
     return {
         "subject": text["subject"],
         "textContent": f"{text['heading']}\n\n{text['body']}\n\n{link}\n\n{text['expiry']}",
@@ -69,6 +88,16 @@ def build_verification_email(token, language):
 @sensitive_variables()
 def send_verification_email(email, token, language):
     send_transactional_email(email, build_verification_email(token, language), "topiq-email-verification")
+
+
+@sensitive_variables()
+def send_password_email(email, token, purpose, language):
+    heading, body = PASSWORD_MAIL_CONTENT[language][purpose]
+    text = {"heading": heading, "subject": f"[TOPIQ] {heading}", "body": body,
+            "button": heading, "expiry": MAIL_CONTENT[language]["expiry"]}
+    prefix = "" if language == "ko" else f"/{language}"
+    link = f"{settings.TOPIQ_PUBLIC_URL}{prefix}/password/confirm#token={quote(token, safe='')}"
+    send_transactional_email(email, build_link_email(text, language, link), f"topiq-password-{purpose}")
 
 
 @sensitive_variables()

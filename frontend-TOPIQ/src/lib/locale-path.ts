@@ -9,3 +9,7 @@ export function localizedPath(path: string, language: Language) {
 export function unlocalizedPath(path: string) {
   return path.replace(/^\/(en|id)(?=\/|$)/, "") || "/";
 }
+
+export function isPasswordConfirmPath(pathname: string) {
+  return /^\/password\/confirm\/?$/.test(unlocalizedPath(pathname));
+}

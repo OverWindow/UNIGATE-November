@@ -16,7 +16,7 @@ async function loadApi(file) {
 const api = await loadApi("../src/lib/auth/auth-api.ts");
 const { pbtRequest, submitOnPageExit } = await loadApi("../src/lib/exam/pbt-api.ts");
 const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
-const user = { id: 1, email: "synthetic@example.invalid", nickname: "Learner", plusEndsAt: null };
+const user = { id: 1, email: "synthetic@example.invalid", nickname: "Learner", plusEndsAt: null, hasUsablePassword: true };
 
 test("Google posts use same-origin CSRF, bind the pending flow and rotate CSRF after linking", async () => {
   const step = { step: "link", email: user.email, flow: "pending", expiresAt: 12345, needsEmail: false };
@@ -67,6 +67,43 @@ test("return paths stay on TOPIQ and cannot loop through auth pages", async () =
     assert.equal(safeReturnPath(path), "/");
   }
   assert.equal(safeReturnPath("/vocabulary?set=1#review"), "/vocabulary?set=1#review");
+  for (const path of ["/forgot-password", "/password/confirm#token=fixture", "/en/password/confirm#token=fixture", "/id/forgot-password"]) {
+    assert.equal(safeReturnPath(path), "/");
+  }
+});
+
+test("password requests share one CSRF-protected endpoint and confirmation trusts the returned purpose", async () => {
+  const reset = { purpose: "reset", email: user.email, language: "ko" };
+  const change = { purpose: "change", current_password: "current-fixture", language: "id" };
+  for (const input of [reset, change]) {
+    globalThis.fetch = async (path, options) => {
+      if (path === "/api/csrf/") return json({ csrfToken: "csrf" });
+      assert.equal(options.headers["X-CSRFToken"], "csrf");
+      assert.equal(options.credentials, "same-origin");
+      assert.equal(options.method, "POST");
+      if (path === "/api/auth/password/request/") {
+        assert.deepEqual(JSON.parse(options.body), input);
+        return json({ status: "request_accepted", retryAfter: 60 }, 202);
+      }
+      assert.equal(path, "/api/auth/password/confirm/");
+      assert.deepEqual(JSON.parse(options.body), { token: "proof", new_password: "new-fixture", new_password_confirm: "repeat" });
+      return json({ purpose: input.purpose });
+    };
+    assert.equal(await api.requestPassword(input), 60);
+    assert.equal(await api.confirmPassword("proof", "new-fixture", "repeat"), input.purpose);
+  }
+});
+
+test("password field errors, throttling, and malformed success responses reach the form", async () => {
+  setCsrfToken("csrf");
+  globalThis.fetch = async () => json({ error: "validation_error", fields: { new_password_confirm: ["password_mismatch"] } }, 400);
+  await assert.rejects(api.confirmPassword("proof", "new", "different"), error =>
+    error.code === "validation_error" && error.fields.new_password_confirm[0] === "password_mismatch");
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: "rate_limited" }), { status: 429, headers: { "Retry-After": "47" } });
+  await assert.rejects(api.requestPassword({ purpose: "reset", email: user.email, language: "en" }), error =>
+    error.code === "rate_limited" && error.retryAfter === 47);
+  globalThis.fetch = async () => json({ purpose: "invalid" });
+  await assert.rejects(api.confirmPassword("proof", "new", "new"), error => error.code === "server_error");
 });
 
 test("normalized return paths cannot become external navigation", async () => {
@@ -155,6 +192,10 @@ test("session data is validated and requested without shared caching", async () 
     return json({ user });
   };
   assert.deepEqual(await api.getSession(), user);
+  globalThis.fetch = async () => json({ user: { ...user, hasUsablePassword: false } });
+  assert.equal((await api.getSession()).hasUsablePassword, false);
+  globalThis.fetch = async () => json({ user: { id: user.id, email: user.email, nickname: user.nickname } });
+  assert.equal((await api.getSession()).hasUsablePassword, undefined);
   globalThis.fetch = async () => json({ user: { id: "invalid" } });
   await assert.rejects(api.getSession(), error => error.code === "server_error");
 });

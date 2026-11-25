@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import { Suspense, type ReactNode } from "react";
 import NavigationOverlay from "@/components/NavigationOverlay";
+import SiteAnalytics from "@/components/SiteAnalytics";
 import Providers from "./providers";
 import { requestLanguage } from "@/lib/seo";
 import { seoOrigin } from "@/lib/locale-path";
@@ -19,17 +19,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     <html lang={language} data-scroll-behavior="smooth">
       <body>
         <Providers initialLanguage={language}><Suspense fallback={null}><NavigationOverlay /></Suspense>{children}</Providers>
-        <Script
-          src="https://www.googletagmanager.com/gtm.js?id=G-MNFFKP03XD"
-          strategy="afterInteractive"
-        />
-        <Script id="google-analytics-init" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-          `}
-        </Script>
+        <Suspense fallback={null}><SiteAnalytics /></Suspense>
       </body>
     </html>
   );

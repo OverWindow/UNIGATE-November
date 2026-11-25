@@ -21,7 +21,8 @@ interface PlanCopy {
   change: {
     select: (months: number) => string; today: string; effective: string; nextCharge: string; confirm: string; back: string;
     scheduled: (plan: string, date: string, amount: string) => string; cancel: (months: number) => string;
-    cancelled: string; cancelBeforeEnding: string; unavailable: string; conflict: string; error: string;
+    cancelled: string; cancelBeforeEnding: string; alreadyScheduled: string; cannotSchedule: string;
+    unavailable: string; conflict: string; error: string;
   };
   details: { myPlan: string; status: string; cycle: string; renewing: string; nonrenewing: string;
     noPaidPeriod: string; free: string; seePlans: string };
@@ -41,6 +42,8 @@ export const plansContent: Record<Language, PlanCopy> = {
       scheduled: (plan, date, amount) => `${date}부터 ${plan} 요금제가 적용됩니다. 다음 결제 금액은 ${amount}입니다.`,
       cancel: n => `${n}개월 변경 예약 취소`, cancelled: "변경 예약을 취소했습니다. 현재 결제 주기가 유지됩니다.",
       cancelBeforeEnding: "구독을 해지하려면 먼저 변경 예약을 취소해 주세요.",
+      alreadyScheduled: "이미 변경을 예약했습니다. 예약을 취소하면 다시 선택할 수 있습니다.",
+      cannotSchedule: "현재 구독 상태에서는 변경을 예약할 수 없습니다.",
       unavailable: "변경 예약 상태를 불러오지 못했습니다.", conflict: "구독 정보가 변경되었습니다. 최신 요금과 예약 상태를 확인해 주세요.",
       error: "요청 결과를 확인하지 못했습니다. 예약 상태를 다시 확인해 주세요.",
     },
@@ -49,7 +52,7 @@ export const plansContent: Record<Language, PlanCopy> = {
       free: "이용 중인 유료 구독이 없습니다.", seePlans: "요금제 보기" },
     portalUnavailable: "결제 관리를 열지 못했습니다. 잠시 후 다시 시도해 주세요.",
     interval: n => n === 1 ? "매월" : `${n}개월마다`, manage: "결제 관리", renewal: "다음 결제 예정", ending: "자동 갱신 해지됨",
-    pastDue: "결제 수단을 확인해 주세요.", prepaid: "현재 이용권이 만료되면 구독을 시작할 수 있습니다.",
+    pastDue: "결제 수단을 확인해 주세요.", prepaid: "자동 갱신이 없는 이용권입니다. 만료 후 새 요금제를 선택할 수 있습니다.",
     inUse: "이 계정의 기존 결제 또는 구독 상태를 확인해 주세요.",
     current: "내 플랜", until: "이용 가능 기한",
     freeBenefits: ["PBT 읽기·듣기 첫 세트 각 1개", "IBT 읽기·듣기 첫 세트 각 1개", "단어장 및 단어 퀴즈 급수별 첫 3세트 열람", "AI 쓰기 튜터용 100크레딧 지급"],
@@ -73,6 +76,8 @@ export const plansContent: Record<Language, PlanCopy> = {
       scheduled: (plan, date, amount) => `Switching to ${plan} on ${date}. Next charge: ${amount}.`,
       cancel: n => `Cancel switch to ${n} months`, cancelled: "Scheduled change cancelled. Your current billing cycle continues.",
       cancelBeforeEnding: "To end your subscription, cancel the scheduled change first.",
+      alreadyScheduled: "You already have a scheduled change. Cancel it to choose a new plan.",
+      cannotSchedule: "You can’t schedule a change on your current subscription.",
       unavailable: "Couldn’t load your scheduled change.", conflict: "Your subscription changed. Check the updated pricing and scheduled change.",
       error: "Couldn’t confirm the result. Check the status of your scheduled change.",
     },
@@ -81,7 +86,7 @@ export const plansContent: Record<Language, PlanCopy> = {
       free: "You have no paid subscription.", seePlans: "View plans" },
     portalUnavailable: "Couldn’t open the billing page. Please try again shortly.",
     interval: n => n === 1 ? "Every month" : `Every ${n} months`, manage: "Manage billing", renewal: "Next billing date", ending: "Renewal cancelled",
-    pastDue: "Please check your payment method.", prepaid: "You can subscribe when your current pass expires.",
+    pastDue: "Please check your payment method.", prepaid: "Your pass doesn’t renew automatically. You can choose a new plan when it expires.",
     inUse: "Please check the existing payment or subscription for this account.",
     current: "My plan", until: "Access until",
     freeBenefits: ["First PBT reading and listening sets", "First IBT reading and listening sets", "First 3 vocabulary sets and quizzes per level", "100 credits for the AI Writing Tutor"],
@@ -105,6 +110,8 @@ export const plansContent: Record<Language, PlanCopy> = {
       scheduled: (plan, date, amount) => `Paket akan berubah menjadi ${plan} pada ${date}. Tagihan berikutnya: ${amount}.`,
       cancel: n => `Batalkan perubahan ke ${n} bulan`, cancelled: "Perubahan terjadwal dibatalkan. Siklus tagihan saat ini tetap berlaku.",
       cancelBeforeEnding: "Untuk mengakhiri langganan, batalkan perubahan terjadwal terlebih dahulu.",
+      alreadyScheduled: "Perubahan sudah dijadwalkan. Batalkan terlebih dahulu untuk memilih paket lain.",
+      cannotSchedule: "Perubahan paket belum tersedia untuk status langgananmu saat ini.",
       unavailable: "Status perubahan terjadwal gagal dimuat.", conflict: "Langganan Anda berubah. Periksa harga dan jadwal perubahan terbaru.",
       error: "Hasil permintaan belum dapat dikonfirmasi. Periksa status perubahan terjadwal.",
     },
@@ -113,7 +120,7 @@ export const plansContent: Record<Language, PlanCopy> = {
       free: "Anda tidak memiliki langganan berbayar.", seePlans: "Lihat paket" },
     portalUnavailable: "Halaman pembayaran tidak dapat dibuka. Silakan coba lagi.",
     interval: n => n === 1 ? "Setiap bulan" : `Setiap ${n} bulan`, manage: "Kelola pembayaran", renewal: "Tagihan berikutnya", ending: "Perpanjangan dibatalkan",
-    pastDue: "Periksa metode pembayaran Anda.", prepaid: "Anda dapat berlangganan setelah paket saat ini berakhir.",
+    pastDue: "Periksa metode pembayaran Anda.", prepaid: "Paketmu tidak diperpanjang otomatis. Kamu bisa memilih paket baru setelah masa berlakunya berakhir.",
     inUse: "Periksa pembayaran atau langganan yang sudah ada untuk akun ini.",
     current: "Paket saya", until: "Akses hingga",
     freeBenefits: ["Set pertama membaca dan menyimak PBT", "Set pertama membaca dan menyimak IBT", "3 set kosakata dan kuis pertama per tingkat", "100 kredit untuk Tutor Menulis AI"],

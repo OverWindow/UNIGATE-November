@@ -18,7 +18,10 @@ def safe_return_path(value):
     if value.startswith("//") or "\\" in value or any(ord(char) < 32 for char in value):
         return "/"
     parsed = urlsplit(value)
-    if parsed.netloc or re.match(r"^/(login|signup|verify-email)(/|$)", parsed.path):
+    auth_page = re.match(
+        r"^/(?:(?:en|id)/)?(?:login|signup|verify-email|forgot-password|password/confirm)(?:/|$)", parsed.path
+    )
+    if parsed.netloc or auth_page:
         return "/"
     return value
 

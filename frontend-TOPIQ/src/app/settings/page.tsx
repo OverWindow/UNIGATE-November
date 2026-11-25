@@ -1,5 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { passwordContent } from "@/lib/auth/password-content";
 import { contactContent } from "@/lib/contact-content";
 import { paymentHistoryContent } from "@/lib/credits-content";
 import { pbtContent } from "@/lib/exam/pbt-content";
@@ -16,6 +17,7 @@ export async function generateMetadata() {
 export default async function SettingsPage() {
   const language = await requestLanguage();
   const links = [
+    { path: "/settings/password", label: passwordContent[language].change },
     { path: "/settings/exam-history", label: pbtContent[language].history },
     { path: "/settings/subscription", label: plansContent[language].settingsTitle },
     { path: "/settings/refunds", label: paymentHistoryContent[language].refundTitle },

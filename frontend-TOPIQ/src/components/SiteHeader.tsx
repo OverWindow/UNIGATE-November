@@ -9,7 +9,7 @@ import { Check, ChevronDown, CreditCard, Globe, Layers, LogOut, Menu, Settings, 
 import { useApp } from "@/app/providers";
 import { authContent } from "@/lib/auth/auth-content";
 import { landingContent, type Language } from "@/lib/landing-content";
-import { localizedPath, unlocalizedPath } from "@/lib/locale-path";
+import { isPasswordConfirmPath, localizedPath, unlocalizedPath } from "@/lib/locale-path";
 
 const languages: { code: Language; name: string }[] = [
   { code: "ko", name: "한국어" },
@@ -38,7 +38,8 @@ export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: st
   const menuButton = useRef<HTMLButtonElement>(null);
   const t = landingContent[language];
   const a = authContent[language];
-  const isAuthPage = ["/login", "/signup", "/verify-email"].includes(routePath);
+  const isPasswordConfirm = isPasswordConfirmPath(pathname);
+  const isAuthPage = isPasswordConfirm || ["/login", "/signup", "/verify-email", "/forgot-password"].includes(routePath);
   const loginHref = authHref || (isAuthPage
     ? "/login" : `/login?next=${encodeURIComponent(pathname)}`);
 
@@ -73,7 +74,7 @@ export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: st
   return (
     <>
       <a className="skip-link" href="#main-content" onClick={(event) => {
-        if (pathname !== "/verify-email") return;
+        if (routePath !== "/verify-email" && !isPasswordConfirm) return;
         const main = document.getElementById("main-content");
         if (main) { event.preventDefault(); main.focus(); main.scrollIntoView(); }
       }}>{t.accessibility.skip}</a>
@@ -105,6 +106,7 @@ export default function SiteHeader({ authHref, onBeforeLogout }: { authHref?: st
                 {languages.map(({ code, name }) => <button key={code} type="button" lang={code} aria-pressed={language === code} onClick={() => {
                   setLanguage(code);
                   setLanguageOpen(false);
+                  if (isPasswordConfirm) return;
                   const path = unlocalizedPath(window.location.pathname);
                   window.location.assign(`${localizedPath(path, code)}${window.location.search}${window.location.hash}`);
                 }}>

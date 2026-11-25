@@ -292,6 +292,39 @@ test("subscription settings fetch only the signed-in member's summary and preser
   assert.deepEqual(requests, []);
 });
 
+test("monthly Plus members see both longer cycles even when they cannot schedule a change", () => {
+  const { publicPlans } = require("../src/lib/plans-content.ts");
+  const plans = publicPlans.map(offer => ({ ...offer, priceId: `price_${offer.months}` }));
+  const nextBillingAt = "2099-12-10T08:00:00Z";
+  const monthly = { plans, active: true, currentPlanMonths: 1, endsAt: nextBillingAt, nextBillingAt,
+    subscription: { months: 1, state: "active" }, canChangePlan: true, scheduledChange: null };
+  const scheduledChange = { id: "schedule", months: 3, amount: 23900, effectiveAt: nextBillingAt };
+  for (const { changes, disabled, notice } of [
+    { changes: {}, disabled: [] },
+    { changes: { subscription: null, nextBillingAt: null, canChangePlan: false }, disabled: [3, 6], notice: /자동 갱신|이용권이 만료/ },
+    { changes: { scheduledChange, canChangePlan: false }, disabled: [3, 6], notice: /<button[^>]*>3개월 변경 예약 취소<\/button>/ },
+    { changes: { plans: plans.map(offer => offer.months === 3 ? { ...offer, priceId: null } : offer) }, disabled: [3] },
+  ]) {
+    const page = mount(() => React.createElement(CreditPurchase, { userId: 1, returnId: null,
+      planAccount: { ...monthly, ...changes }, onFulfilled() {}, onPlanRefresh() {} }));
+    const cards = page.html.match(/<article\b[\s\S]*?<\/article>/g);
+    assert.doesNotMatch(page.html, /1개월로 변경|구독하기/);
+    for (const months of [3, 6]) {
+      const card = cards.find(card => card.includes(`<h2>Plus ${months}개월</h2>`));
+      const button = card?.match(new RegExp(`<button([^>]*)>${months}개월로 변경</button>`));
+      assert.ok(button, `Plus ${months}개월 card is missing its change button`);
+      assert.equal(/\bdisabled\b/.test(button[1]), disabled.includes(months));
+      if (disabled.includes(months)) {
+        const reasonId = button[1].match(/aria-describedby="([^"]+)"/)?.[1];
+        assert.ok(reasonId && card.includes(`id="${reasonId}"`), "disabled button must identify its explanation within this card");
+      }
+    }
+    if (notice) assert.match(page.html, notice);
+    page.unmount();
+  }
+  assert.deepEqual(requests, []);
+});
+
 test("a longer cycle must be confirmed with the renewal date, price and zero due today before scheduling once", async t => {
   const nextBillingAt = "2099-12-10T08:00:00Z";
   const account = { active: true, currentPlanMonths: 3, subscription: { state: "active", months: 3 },

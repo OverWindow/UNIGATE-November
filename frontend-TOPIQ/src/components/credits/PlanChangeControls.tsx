@@ -26,6 +26,8 @@ export default function PlanChangeControls({ account, onRefresh }: {
   const { language, refreshSession } = useApp();
   const p = plansContent[language];
   const { scheduledChange, nextBillingAt, subscription } = account;
+  const currentMonths = subscription?.months ?? account.currentPlanMonths;
+  const reasonId = useId();
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<"cancelled" | "conflict" | "error" | null>(null);
   const operation = useRef<AbortController | null>(null);
@@ -66,12 +68,22 @@ export default function PlanChangeControls({ account, onRefresh }: {
   const canSchedule = !account.planChangeUnavailable && account.canChangePlan && !scheduledChange
     && nextBillingAt && Date.parse(nextBillingAt) > Date.now() && subscription?.state === "active";
   return <>
-    {"plans" in account && <PlanOffers language={language} account={account} renderAction={({ months, amount, priceId }) =>
-      canSchedule && nextBillingAt && subscription && months > subscription.months && priceId &&
-      <ChangeOffer key={`${nextBillingAt}:${priceId}:${amount}`} months={months} busy={busy}
-        effectiveAt={nextBillingAt} date={date.format(new Date(nextBillingAt))} today={money.format(0)} amount={money.format(amount)}
-        onConfirm={() => void submit(nextBillingAt, signal => schedulePlanChange(months, priceId, nextBillingAt, signal))} />
-    } />}
+    {"plans" in account && <PlanOffers language={language} account={account} renderAction={({ months, amount, priceId }) => {
+      if (!currentMonths || months <= currentMonths) return null;
+      if (canSchedule && nextBillingAt && priceId) {
+        return <ChangeOffer key={`${nextBillingAt}:${priceId}:${amount}`} months={months} busy={busy}
+          effectiveAt={nextBillingAt} date={date.format(new Date(nextBillingAt))} today={money.format(0)} amount={money.format(amount)}
+          onConfirm={() => void submit(nextBillingAt, signal => schedulePlanChange(months, priceId, nextBillingAt, signal))} />;
+      }
+      const status = { active: priceId ? p.change.cannotSchedule : p.unavailable, ending: p.ending, past_due: p.pastDue };
+      const reason = account.planChangeUnavailable ? p.change.unavailable : scheduledChange ? p.change.alreadyScheduled
+        : subscription ? status[subscription.state] : p.prepaid;
+      const description = `${reasonId}-${months}`;
+      return <>
+        <button type="button" className="button button-primary" disabled aria-describedby={description}>{p.change.select(months)}</button>
+        <p id={description} className="text-sm text-muted">{reason}</p>
+      </>;
+    }} />}
     {scheduledChange && <div className="my-3 w-full space-y-2">
       <p role="status">{p.change.scheduled(p.term(scheduledChange.months), date.format(new Date(scheduledChange.effectiveAt)),
         money.format(scheduledChange.amount))}</p>

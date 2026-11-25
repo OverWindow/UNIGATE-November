@@ -89,7 +89,8 @@ def rate_limit_errors(view):
 
 
 def user_data(user):
-    return {"id": user.pk, "email": user.email, "plusEndsAt": current_plan_end(user.pk),
+    return {"id": user.pk, "email": user.email, "hasUsablePassword": user.has_usable_password(),
+            "plusEndsAt": current_plan_end(user.pk),
             "nickname": user.first_name or user.get_username()}
 
 

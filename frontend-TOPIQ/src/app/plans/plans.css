@@ -19,7 +19,7 @@
   .plan-free .plan-benefits { grid-area: auto; margin-top: 6px; }
 }
 
-.plan-offer:not(.plan-free) { grid-template-rows: 56px 44px 20px 56px 1fr; }
-.plan-action { display: flex; align-items: start; }
+.plan-offer:not(.plan-free) { grid-template-rows: 56px 44px 20px minmax(56px, auto) 1fr; }
+.plan-action { display: flex; flex-direction: column; align-items: start; gap: 6px; }
 .plan-action > .button { width: 100%; }
 .plan-heading h2 { margin: 0; }
