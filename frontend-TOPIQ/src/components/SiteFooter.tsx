@@ -18,7 +18,7 @@ export default function SiteFooter() {
     <footer className="site-footer">
       <div className="page-container">
         <div className="footer-main">
-          <Link href={`${localizedPath("/", language)}#intro`} aria-label={t.accessibility.home}><Logo /></Link>
+          <Link href={`${localizedPath("/", language)}#intro`} aria-label={t.accessibility.home}><Logo loading="eager" /></Link>
           <div className="footer-links">
             <a href="https://www.unigate.kr/" target="_blank" rel="noopener noreferrer">
               {t.footer.parent}
