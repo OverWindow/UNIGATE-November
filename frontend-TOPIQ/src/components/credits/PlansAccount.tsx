@@ -25,7 +25,7 @@ export default function PlansAccount() {
   const next = returnId ? `/plans?purchase=${returnId}${cancelled ? "&cancelled=1" : ""}` : "/plans";
   return <div className="page-container credits-page">
     <header>
-      <h1 className="catalog-title">{a.plusPlans}</h1>
+      <h1 className="catalog-title">{p.title}</h1>
       <p className="catalog-description">{p.intro}</p>
     </header>
     {status === "loading" ? <p className="catalog-status" role="status">{a.loading}</p>

@@ -23,13 +23,14 @@ export function planSavingsPercent(amount: number, months: number, monthlyAmount
 }
 
 interface PlanCopy {
+  title: string;
   intro: string;
   login: string; current: string; until: string; freeBenefits: string[];
   term: (months: number) => string; benefits: string[]; unavailable: string;
   savings: (percent: number) => string;
   trial: {
     start: string; pay: (amount: string) => string; after: (amount: string) => string;
-    register: string; cancel: string; bonus: (credits: number) => string; confirm: string; agree: string;
+    cancel: string; bonus: (credits: number) => string; confirm: string; agree: string;
     firstCharge: string; method: string; card: string; active: string; noCharge: string; accessEnds: string;
     checking: string; creating: string; started: string; cardUsed: string; accountUsed: string;
     cardUnavailable: string; termsChanged: string; delayed: string; retry: string; ended: string;
@@ -50,11 +51,11 @@ interface PlanCopy {
 
 export const plansContent: Record<Language, PlanCopy> = {
   ko: {
+    title: "무제한 요금제 둘러보기",
     intro: "읽기, 듣기 모의고사를 무제한으로 풀고, AI 튜터와 함께 쓰기를 연습하세요.",
     login: "로그인하기",
     trial: {
       start: "7일 무료 체험 시작", pay: amount => `${amount} 결제하고 시작`, after: amount => `7일 동안 0원, 이후 매월 ${amount}`,
-      register: "Stripe에 카드 정보를 직접 입력한 뒤 TOPIQ에서 체험 시작을 확인하세요.",
       cancel: "첫 결제 전에 설정의 구독 관리에서 해지하면 체험 종료일까지 이용할 수 있고 구독료가 청구되지 않습니다.",
       bonus: credits => `첫 결제 성공 후부터 유료 이용 기간에 매월 쓰기용 ${credits}크레딧 지급`,
       confirm: "무료 체험과 자동결제 확인", agree: "표시된 일시부터 등록 카드로 매월 자동 결제되는 데 동의합니다.",
@@ -101,11 +102,11 @@ export const plansContent: Record<Language, PlanCopy> = {
     },
   },
   en: {
+    title: "Explore unlimited plans",
     intro: "Take unlimited reading and listening practice tests and practice writing with the AI tutor.",
     login: "Log in",
     trial: {
       start: "Start 7-day free trial", pay: amount => `Pay ${amount} and subscribe`, after: amount => `Free for 7 days, then ${amount} a month`,
-      register: "Enter your card details directly in Stripe, then return to TOPIQ to confirm your trial.",
       cancel: "Cancel in Settings → Manage subscription before the first charge to keep access until the trial ends and pay nothing.",
       bonus: credits => `${credits} writing credits each paid month, starting with the first successful payment`,
       confirm: "Confirm your trial and automatic payments", agree: "I agree to monthly charges to my registered card starting at the date and time shown.",
@@ -152,11 +153,11 @@ export const plansContent: Record<Language, PlanCopy> = {
     },
   },
   id: {
+    title: "Jelajahi paket tanpa batas",
     intro: "Kerjakan simulasi ujian membaca dan menyimak tanpa batas serta berlatihlah menulis bersama tutor AI.",
     login: "Masuk",
     trial: {
       start: "Mulai uji coba gratis 7 hari", pay: amount => `Bayar ${amount} dan mulai`, after: amount => `Gratis 7 hari, lalu ${amount} per bulan`,
-      register: "Masukkan informasi kartu langsung di Stripe, lalu kembali ke TOPIQ untuk mengonfirmasi uji coba.",
       cancel: "Batalkan di Pengaturan → Kelola langganan sebelum tagihan pertama. Akses tetap berlaku hingga uji coba berakhir tanpa biaya langganan.",
       bonus: credits => `${credits} kredit menulis setiap bulan berbayar, mulai dari pembayaran pertama yang berhasil`,
       confirm: "Konfirmasi uji coba dan pembayaran otomatis", agree: "Saya menyetujui tagihan bulanan otomatis pada kartu terdaftar mulai tanggal dan waktu yang tertera.",
