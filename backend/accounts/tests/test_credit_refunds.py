@@ -23,6 +23,14 @@ def refund_object(refund_id, amount, status="succeeded", intent="pi_topup"):
             "amount": amount, "status": status, "created": int(time.time())}
 
 
+def topup_session(order):
+    return stripe.checkout.Session.construct_from({
+        "id": order.stripe_session_id, "metadata": {"credit_purchase_id": str(order.pk)},
+        "mode": "payment", "amount_total": order.amount, "currency": order.currency,
+        "payment_intent": "pi_topup", "payment_status": "paid", "status": "complete",
+    }, None)
+
+
 @override_settings(**TEST_SETTINGS)
 class CreditRefundTests(TestCase):
     def setUp(self):
@@ -191,16 +199,34 @@ class CreditRefundTests(TestCase):
         self.assertEqual([(e["kind"], e["amount"]) for e in history], [("refund", 999), ("refund", 1), ("purchase", 1000)])
 
     def test_early_refund_is_saved_and_reconciled_on_fulfillment(self):
-        data = {"id": SESSION_ID, "metadata": {"credit_purchase_id": str(self.order.pk)}, "mode": "payment",
-                "amount_total": AMOUNT, "currency": "krw", "payment_intent": "pi_topup"}
-        self.api.checkout.sessions.list.return_value.data = [stripe.checkout.Session.construct_from(data, None)]
-        self.notify(refund_object("re_early", AMOUNT))
+        self.api.checkout.sessions.list.return_value.data = [topup_session(self.order)]
+        refund = refund_object("re_early", AMOUNT)
+        self.notify(refund)
+        self.notify(refund, "refund.updated")
         self.wallet(0)
         self.assertFalse(CreditTransaction.objects.exists())
         self.paid()
         self.paid()
+        self.notify(refund)
         self.wallet(0)
-        self.assertEqual(CreditTransaction.objects.filter(kind="refund").count(), 1)
+        self.assertEqual(self.states()[str(self.order.pk)], (0, "refunded"))
+        self.assertEqual(list(self.order.refund_entries.values_list("kind", "amount")), [("refund", 1000)])
+
+    def test_partial_refund_before_fulfillment_restores_only_its_deduction_on_failure(self):
+        self.api.checkout.sessions.list.return_value.data = [topup_session(self.order)]
+        refund = refund_object("re_early_partial", AMOUNT * 3 // 10)
+        self.notify(refund)
+        self.paid()
+        self.paid()
+        self.notify(refund, "refund.updated")
+        self.wallet(700)
+        self.assertEqual(self.states()[str(self.order.pk)], (700, "contact"))
+        self.spend_set()
+        self.notify(refund | {"status": "failed"}, "refund.failed")
+        self.notify(refund | {"status": "failed"}, "refund.failed")
+        self.wallet(900)
+        self.assertEqual(self.states()[str(self.order.pk)], (900, "contact"))
+        self.assertCountEqual(self.order.refund_entries.values_list("kind", "amount"), [("refund", 300), ("restore", 300)])
 
     def test_invalid_or_unrelated_events_and_atomic_retry(self):
         self.paid()
@@ -304,6 +330,40 @@ class CreditRefundTests(TestCase):
 
 @override_settings(**TEST_SETTINGS)
 class ConcurrentRefundTests(TransactionTestCase):
+    def test_first_credit_and_partial_refund_settle_once_when_delivered_together(self):
+        user = get_user_model().objects.create_user(username="first-credit-concurrency")
+        account = CreditAccount.objects.create(user=user)
+        order = CreditPurchase.objects.create(user=user, attempt_id=uuid4(), amount=AMOUNT, stripe_session_id=SESSION_ID)
+        refund = refund_object("re_first_credit", AMOUNT // 2)
+        gate = Barrier(2, timeout=10)
+
+        def deliver(request):
+            close_old_connections()
+            try:
+                gate.wait()
+                return request().status_code
+            finally:
+                connection.close()
+
+        def paid():
+            return post_webhook(Client(), order, payment_intent="pi_topup")
+
+        def refunded():
+            return signed_event(Client(), "refund.created", refund)
+
+        with patch("accounts.payments.stripe.StripeClient") as client, ThreadPoolExecutor(max_workers=2) as pool:
+            api = client.return_value.v1
+            api.checkout.sessions.list.return_value.data = [topup_session(order)]
+            api.refunds.retrieve.return_value = stripe.Refund.construct_from(refund, None)
+            self.assertEqual(list(pool.map(deliver, [paid, refunded])), [200, 200])
+            self.assertEqual((paid().status_code, refunded().status_code), (200, 200))
+
+        account.refresh_from_db()
+        order.refresh_from_db()
+        self.assertEqual((account.balance, account.reserved, order.remaining_credits), (500, 0, 500))
+        self.assertCountEqual(CreditTransaction.objects.filter(account=account).values_list("kind", "amount"),
+                              [("purchase", 1000), ("refund", 500)])
+
     def test_same_refund_posts_once_under_concurrent_delivery(self):
         user = get_user_model().objects.create_user(username="refund-concurrency")
         order = CreditPurchase.objects.create(user=user, attempt_id=uuid4(), amount=AMOUNT, stripe_session_id=SESSION_ID)

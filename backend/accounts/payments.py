@@ -20,7 +20,7 @@ from .models import CREDIT_PURCHASE_QUANTITY, PLAN_AMOUNTS, PLAN_BONUS, CreditAc
 from .plan_changes import InvalidBillingState, PlanChangeConflict, can_schedule, next_change, plan_item, read_subscription, update_change
 from .plans import assign_plan_period, current_plan, current_plan_end, open_subscription
 from .refunds import RefundOrderNotReady, apply_refund, refund_state, reserve_refund, reserved_orders, submit_refund, topups
-from .subscriptions import apply_paid_invoice, sync_subscription
+from .subscriptions import apply_paid_invoice, cancel_order_subscription, close_revoked_checkout, matching_checkout, sync_subscription
 from . import trial_checkout
 from .views import api_response, read_payload
 
@@ -215,15 +215,10 @@ def recover_plan_session(purchase, sessions, *, customer_id=None):
         customer_id = stripe_customer_id_for(purchase.user_id)
         if not customer_id:
             return None
-    rows = sessions.list({"customer": customer_id, "created": {
-        "gte": int(purchase.created_at.timestamp()) - 60,
-        "lte": int((purchase.created_at + timedelta(days=1)).timestamp()),
-    }})
-    for session in rows.auto_paging_iter():
-        if (session.to_dict().get("metadata") or {}).get("credit_purchase_id") == str(purchase.pk):
-            CreditPurchase.objects.filter(pk=purchase.pk, stripe_session_id__isnull=True).update(stripe_session_id=session.id)
-            return session
-    return None
+    session = matching_checkout(sessions, purchase, customer_id)
+    if session is not None:
+        CreditPurchase.objects.filter(pk=purchase.pk, stripe_session_id__isnull=True).update(stripe_session_id=session.id)
+    return session
 
 
 def create_subscription_session(purchase, sessions, params, *, retry):
@@ -249,6 +244,10 @@ def create_subscription_session(purchase, sessions, params, *, retry):
 
 
 def checkout(purchase, client, *, retry):
+    if purchase.subscription_state == "revoked":
+        if purchase.status == "expired" and purchase.stripe_session_id and not purchase.stripe_payment_intent_id:
+            close_revoked_checkout(client.v1, purchase)
+        return None
     if purchase.plan_months == 1 and PlusFreeTrial.objects.filter(purchase=purchase).exists():
         with transaction.atomic():
             locked_account(purchase.user_id)
@@ -322,6 +321,10 @@ def checkout_session(purchase, client, *, retry, setup=False):
     if session.status == "expired":
         expire_checkout(purchase)
     purchase.refresh_from_db()
+    if purchase.subscription_state == "revoked" and session.status != "expired" and session.mode in ("setup", "subscription"):
+        # The refund can commit while Stripe is creating the Session outside our transaction.
+        close_revoked_checkout(client.v1, purchase)
+        return None
     if purchase.status == "pending" and session.status == "open" and purchase.stripe_session_id == session.id:
         return session.url
     return None
@@ -502,6 +505,8 @@ def create_purchase(request, plan=False):
             return api_response({"error": "trial_offer_changed"}, 409)
         try:
             url = checkout(purchase, client, retry=not created)
+        except (KeyError, TypeError, ValueError):
+            return api_response({"error": "payments_unavailable"}, 503)
         except stripe.InvalidRequestError as exc:
             # A rejected, superseded Price cannot open a new Checkout Session.
             if (not purchase.stripe_session_id and price_id_for(months)
@@ -623,7 +628,8 @@ def apply_checkout_event(event_type, session, event_created=None):
         if trial:
             trial_checkout.receive_setup(purchase, trial, session, account.stripe_customer_id, stripe_client().v1)
             return 200
-    if purchase.subscription_state:
+    revoked_legacy = purchase.subscription_state == "revoked" and session["mode"] == "payment"
+    if purchase.subscription_state and not revoked_legacy:
         if (session["mode"] != "subscription" or not session.get("customer") or purchase.stripe_session_id not in (None, session["id"])
                 or not CreditAccount.objects.filter(user_id=purchase.user_id, stripe_customer_id=session["customer"]).exists()):
             return 400
@@ -632,12 +638,20 @@ def apply_checkout_event(event_type, session, event_created=None):
             purchase.save(update_fields=["stripe_session_id"])
         if event_type == "checkout.session.expired" and session["status"] == "expired":
             expire_checkout(purchase)
+        elif purchase.subscription_state == "revoked" and session["status"] == "complete":
+            cancel_order_subscription(stripe_client().v1, purchase, account.stripe_customer_id, session["subscription"])
         return 200  # Only a paid invoice grants a subscription period and its credits.
     if not purchase.stripe_session_id:
         return 503  # Retry after session creation has committed.
     if (session["id"] != purchase.stripe_session_id or session["mode"] != "payment"
             or session["currency"] != purchase.currency or session["amount_total"] != purchase.amount):
         return 400
+    if revoked_legacy:
+        if purchase.stripe_subscription_id or purchase.stripe_invoice_id or (
+                session["status"] == "complete" and purchase.stripe_payment_intent_id
+                and purchase.stripe_payment_intent_id != session.get("payment_intent")):
+            return 400
+        return 200  # A legacy one-time Plus receipt can also be marked revoked by its refund.
     if purchase.status == "fulfilled":
         return 200
     if event_type == "checkout.session.expired":
@@ -659,7 +673,7 @@ def apply_checkout_event(event_type, session, event_created=None):
         purchase.status = "fulfilled"
         purchase.save(update_fields=["transaction", "status", "plan_starts_at", "plan_ends_at", "credited_months",
                                      "stripe_payment_intent_id", "remaining_credits"])
-        reconcile_purchase_refunds(account, purchase)
+        reconcile_purchase_refunds(account, purchase, previous_refunded=0 if purchase.plan_months is None else None)
     return 200
 
 
@@ -677,7 +691,7 @@ def stripe_webhook(request):
         if event.type in {"checkout.session.completed", "checkout.session.expired"}:
             status = apply_checkout_event(event.type, event.data.object.to_dict(), getattr(event, "created", None))
         elif event.type == "invoice.paid":
-            apply_paid_invoice(event.data.object.to_dict())
+            apply_paid_invoice(event.data.object.to_dict(), get_api=lambda: stripe_client().v1)
         elif event.type in {"refund.created", "refund.updated", "refund.failed"}:
             apply_refund(event.data.object.to_dict(), stripe_client().v1)
         elif event.type in {"customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"}:

@@ -3,15 +3,15 @@ from datetime import UTC, datetime
 import stripe
 from django.core.management.base import BaseCommand, CommandError
 from django.db import DatabaseError, transaction
-from django.db.models import Q, Sum
+from django.db.models import Sum
 from django.utils import timezone
 
 from accounts.credits import reconcile_purchase_refunds, refund_credit_adjustment
 from accounts.models import CreditAccount, CreditPurchase, CreditPurchaseRefund, CreditTransaction
 from accounts.payments import PaymentsUnavailable, stripe_client
 from accounts.plans import has_active_plan
-from accounts.refunds import cancel_refunded_subscription
-from accounts.subscriptions import invoice_subscription_details, is_plan_invoice
+from accounts.refunds import refunded_plan_periods
+from accounts.subscriptions import cancel_refunded_subscription, invoice_subscription_details
 
 
 def plan_payment(api, account, order):
@@ -45,32 +45,6 @@ def plan_payment(api, account, order):
     if not intent or order.stripe_payment_intent_id not in (None, intent):
         raise CommandError(f"주문 {order.pk}의 결제 ID를 확인할 수 없습니다.")
     return intent, subscription
-
-
-def subscription_periods(api, account, order, subscription, refund):
-    orders = CreditPurchase.objects.filter(user_id=account.pk, plan_months__isnull=False)
-    if not subscription:
-        return orders.filter(pk=order.pk), None
-    root = orders.filter(stripe_subscription_id=subscription).first()
-    remote = api.subscriptions.retrieve(subscription).to_dict()
-    if not root or remote["id"] != subscription or remote["customer"] != account.stripe_customer_id:
-        raise CommandError("환불한 청구서와 TOPIQ 원구독을 연결할 수 없습니다.")
-
-    invoice_ids = set()
-    for item in api.invoices.list({"subscription": subscription, "status": "paid", "limit": 100}).auto_paging_iter():
-        invoice = item.to_dict()
-        if not is_plan_invoice(invoice):
-            continue
-        invoice_ids.add(invoice["id"])
-        if invoice["id"] != order.stripe_invoice_id and invoice["amount_paid"] > 0:
-            paid_at = (invoice.get("status_transitions") or {}).get("paid_at")
-            if not paid_at or paid_at >= refund["created"]:
-                raise CommandError("같은 구독에 결제 시각이 불분명하거나 환불 이후 결제된 회차가 있습니다.")
-    if order.stripe_invoice_id not in invoice_ids:
-        raise CommandError("원구독의 결제 목록에 환불 대상 청구서가 없습니다.")
-    periods = orders.filter(Q(pk__in=[root.pk, order.pk])
-                            | Q(stripe_invoice_id__in=invoice_ids, plan_ends_at__gt=timezone.now()))
-    return periods, remote if remote["status"] not in {"canceled", "incomplete_expired"} else None
 
 
 def credit_change(account, order, refund, previous, recorded):
@@ -185,7 +159,10 @@ class Command(BaseCommand):
         previous = order.refunds.filter(status="succeeded").aggregate(total=Sum("amount", default=0))["total"]
         if previous > order.amount:
             raise CommandError("기록된 누적 환불액이 결제액을 초과합니다. 기존 정산을 확인하세요.")
-        periods, cancel = subscription_periods(api, account, order, subscription, refund)
+        try:
+            periods, cancel = refunded_plan_periods(api, account, order, subscription, historical_refund_at=refund["created"])
+        except ValueError as exc:
+            raise CommandError(str(exc)) from None
         periods = periods.exclude(subscription_state="revoked")
         count = periods.count()
         change = credit_change(account, order, refund, previous, recorded)

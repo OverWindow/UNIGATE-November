@@ -1,6 +1,7 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
+import stripe
 from django.db import transaction
 
 from .credits import locked_account, reconcile_purchase_refunds, record
@@ -33,7 +34,8 @@ def subscription_order(order_id, customer_id, subscription_id):
     account = locked_account(order.user_id)
     order = CreditPurchase.objects.select_for_update().get(pk=order.pk)
     if (not subscription_id or not customer_id or customer_id != account.stripe_customer_id
-            or order.stripe_subscription_id not in (None, subscription_id)):
+            or order.stripe_subscription_id not in (None, subscription_id)
+            or (not order.stripe_subscription_id and (order.status == "fulfilled" or order.stripe_payment_intent_id))):
         raise ValueError("Subscription does not match order")
     if not order.stripe_subscription_id:
         order.stripe_subscription_id = subscription_id
@@ -58,8 +60,80 @@ def cancel_refunded_subscription(api, subscription):
         raise ValueError("Stripe cancellation did not complete")
 
 
+def matching_checkout(sessions, order, customer_id):
+    rows = sessions.list({"customer": customer_id, "created": {
+        "gte": int(order.created_at.timestamp()) - 60,
+        "lte": int((order.created_at + timedelta(days=1)).timestamp()),
+    }})
+    for session in rows.auto_paging_iter():
+        if (session.to_dict().get("metadata") or {}).get("credit_purchase_id") == str(order.pk):
+            return session
+    return None
+
+
+def live_order_subscription(api, order, customer_id, subscription_id):
+    if not customer_id or not subscription_id or order.stripe_subscription_id not in (None, subscription_id):
+        raise ValueError("Subscription does not match order")
+    subscription = api.subscriptions.retrieve(subscription_id).to_dict()
+    if (subscription["id"] != subscription_id or subscription["customer"] != customer_id
+            or (subscription.get("metadata") or {}).get("credit_purchase_id") != str(order.pk)):
+        raise ValueError("Retrieved subscription does not match order")
+    return subscription
+
+
+def cancel_order_subscription(api, order, customer_id, subscription_id):
+    subscription = live_order_subscription(api, order, customer_id, subscription_id)
+    if subscription["status"] not in ("canceled", "incomplete_expired"):
+        cancel_refunded_subscription(api, subscription)
+    if not order.stripe_subscription_id:
+        order.stripe_subscription_id = subscription_id
+        order.save(update_fields=["stripe_subscription_id"])
+
+
 @transaction.atomic
-def apply_paid_invoice(invoice):
+def close_revoked_checkout(api, order):
+    customer_id = locked_account(order.user_id).stripe_customer_id
+    order = CreditPurchase.objects.select_for_update().get(pk=order.pk)
+    sessions = api.checkout.sessions
+    if order.stripe_session_id:
+        session = sessions.retrieve(order.stripe_session_id)
+    elif customer_id:
+        session = matching_checkout(sessions, order, customer_id)
+    else:
+        return
+    if session is None:
+        return
+    expected_mode = "setup" if getattr(order, "free_trial", None) else "subscription"
+    session_id = session.id
+
+    def checked(result):
+        data = result.to_dict()
+        if (not customer_id or not session_id or data["id"] != session_id
+                or order.stripe_session_id not in (None, session_id) or data["customer"] != customer_id
+                or data["mode"] != expected_mode or (data.get("metadata") or {}).get("credit_purchase_id") != str(order.pk)):
+            raise ValueError("Checkout does not match revoked order")
+        return data
+
+    data = checked(session)
+    if data["status"] == "open":
+        try:
+            data = checked(sessions.expire(session_id))
+        except stripe.InvalidRequestError:
+            # Completion or automatic expiration may win while Stripe handles our request.
+            data = checked(sessions.retrieve(session_id))
+            if data["status"] == "open":
+                raise
+    if data["status"] not in ("complete", "expired"):
+        raise ValueError("Checkout did not close")
+    if not order.stripe_session_id:
+        order.stripe_session_id = session_id
+        order.save(update_fields=["stripe_session_id"])
+    if expected_mode == "subscription" and data["status"] == "complete":
+        cancel_order_subscription(api, order, customer_id, data["subscription"])
+
+
+@transaction.atomic
+def apply_paid_invoice(invoice, *, get_api=None):
     details = invoice_subscription_details(invoice)
     metadata = details.get("metadata") or {}
     order_id = metadata.get("credit_purchase_id")
@@ -93,24 +167,29 @@ def apply_paid_invoice(invoice):
             or line["amount"] != amount or price_id != expected_price or line["quantity"] != 1
             or item.get("proration") or item.get("subscription") != subscription_id):
         raise ValueError("Unexpected subscription charge")
+    if not free_invoice:
+        start, end = (datetime.fromtimestamp(line["period"][key], UTC) for key in ("start", "end"))
+        if end <= start or (trial and start < trial.agreed_trial_ends_at):
+            raise ValueError("Invalid subscription period")
+        first_payment = start == trial.agreed_trial_ends_at if trial else reason == "subscription_create"
+        if trial and not order.stripe_invoice_id:
+            # A later monthly cycle can arrive before the first paid cycle.
+            anchor = trial.agreed_trial_ends_at
+            interval = 12 * (start.year - anchor.year) + start.month - anchor.month
+            if (interval < 0 or add_calendar_months(anchor, interval) != start
+                    or (first_payment and (months != 1 or amount != order.amount))):
+                raise ValueError("Charge does not match the trial's billing cycle")
+    if order.subscription_state == "revoked":
+        if get_api is None:
+            raise ValueError("Revoked invoice requires Stripe client")
+        cancel_order_subscription(get_api(), order, account.stripe_customer_id, subscription_id)
     if free_invoice:
         return  # Trial access comes from the confirmed subscription, never the zero-value invoice.
-    start, end = (datetime.fromtimestamp(line["period"][key], UTC) for key in ("start", "end"))
-    if end <= start or (trial and start < trial.agreed_trial_ends_at):
-        raise ValueError("Invalid subscription period")
-    first_payment = start == trial.agreed_trial_ends_at if trial else reason == "subscription_create"
-    if trial and not order.stripe_invoice_id:
-        # A later monthly cycle can arrive before the first paid cycle.
-        anchor = trial.agreed_trial_ends_at
-        interval = 12 * (start.year - anchor.year) + start.month - anchor.month
-        if (interval < 0 or add_calendar_months(anchor, interval) != start
-                or (first_payment and (months != 1 or amount != order.amount))):
-            raise ValueError("Charge does not match the trial's billing cycle")
     if first_payment:
         if order.stripe_invoice_id:
             raise ValueError("Order already has an initial invoice")
         receipt = order
-        if trial and order.subscription_state == "revoked":
+        if order.subscription_state == "revoked":
             receipt.credited_months = 0
         else:
             account.balance += order.credits
@@ -141,18 +220,15 @@ def sync_subscription(event_type, subscription, client_factory):
     order, account = subscription_order(order_id, subscription["customer"], subscription["id"])
     trial = order_trial(order)
     terminal_order = order.subscription_state in ("ended", "revoked")
-    if not trial and (event_type == "customer.subscription.created" or terminal_order):
+    if not trial and order.subscription_state != "revoked" and (event_type == "customer.subscription.created" or terminal_order):
         return
     if event_type == "trial.confirmed" and trial and trial.status == "started" and not terminal_order:
         return  # A newer cancellation or invoice may have arrived before our create response.
     if event_type in ("customer.subscription.updated", "customer.subscription.created") or (
-            terminal_order and event_type == "trial.confirmed"):
+            terminal_order and (event_type == "trial.confirmed" or subscription["status"] not in ("canceled", "incomplete_expired"))):
         # Stripe retries events out of order, including changes within the same second.
         api = client_factory().v1
-        subscription = api.subscriptions.retrieve(subscription["id"]).to_dict()
-        if (subscription["id"] != order.stripe_subscription_id or subscription["customer"] != account.stripe_customer_id
-                or (subscription.get("metadata") or {}).get("credit_purchase_id") != str(order.pk)):
-            raise ValueError("Retrieved subscription does not match order")
+        subscription = live_order_subscription(api, order, account.stripe_customer_id, subscription["id"])
         if not terminal_order and subscription["status"] == "active" and subscription.get("schedule"):
             release_applied_schedule(subscription, api)
     if trial and trial.status == "reserved":

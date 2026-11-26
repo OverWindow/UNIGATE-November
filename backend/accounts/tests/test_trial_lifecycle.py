@@ -2,17 +2,19 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
+import stripe
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from accounts.credits import account_with_monthly_credits
 from accounts.models import CreditAccount, CreditPurchase, CreditTransaction, PlusFreeTrial
+from accounts.payments import checkout
 from accounts.plans import current_plan, has_active_plan, open_subscription
-from accounts.refunds import resolve_refund_purchase, save_refund
+from accounts.refunds import resolve_refund_purchase, revoke_refunded_plan, save_refund
 from accounts.subscriptions import apply_paid_invoice, sync_subscription
 
-from .test_credit_purchases import plan_invoice, plan_price
+from .test_credit_purchases import TEST_SETTINGS, plan_invoice, plan_price, signed_event
 
 
 class TrialLifecycleTests(TestCase):
@@ -92,11 +94,12 @@ class TrialLifecycleTests(TestCase):
         payment.to_dict.return_value = {"invoice": bill}
         self.api.invoice_payments.list.return_value.data = [payment]
         self.api.invoice_payments.list.return_value.has_more = False
-        purchase = resolve_refund_purchase(self.api, "pi_paid")
+        purchase, subscription = resolve_refund_purchase(self.api, "pi_paid")
         self.assertEqual(purchase.pk, self.order.pk)
         self.account.refresh_from_db()
         self.api.subscriptions.retrieve.return_value.to_dict.return_value = self.subscription | {"status": "canceled"}
-        save_refund(self.account, purchase, {"id": "re_first", "status": "succeeded", "amount": 9900, "currency": "krw"}, api=self.api)
+        save_refund(self.account, purchase, {"id": "re_first", "status": "succeeded", "amount": 9900, "currency": "krw"},
+                    api=self.api, subscription=subscription)
         apply_paid_invoice(bill)
         self.assertEqual(account_with_monthly_credits(self.user.pk).balance, 0)
         with patch("accounts.plans.timezone.now", return_value=self.end):
@@ -128,7 +131,7 @@ class TrialLifecycleTests(TestCase):
         self.api.subscriptions.cancel.assert_called_once()
         self.assertFalse(has_active_plan(self.user.pk))
         invoice = self.invoice("in_late_paid", self.end, self.end + timedelta(days=30))
-        apply_paid_invoice(invoice)
+        apply_paid_invoice(invoice, get_api=lambda: self.api)
         self.order.refresh_from_db()
         self.assertEqual((self.order.stripe_invoice_id, self.order.subscription_state), ("in_late_paid", "revoked"))
         self.assertFalse(CreditTransaction.objects.filter(kind="plan_bonus").exists())
@@ -147,3 +150,145 @@ class TrialLifecycleTests(TestCase):
                     consent_version="v1", consented_at=self.start, agreed_trial_ends_at=self.end, status="consent")
                 with self.assertRaises(IntegrityError), transaction.atomic():
                     PlusFreeTrial.objects.filter(pk=attempt.pk).update(status="reserved")
+
+
+@override_settings(**TEST_SETTINGS)
+class RevokedPlanCheckoutTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username="revoked-plan")
+        self.account = CreditAccount.objects.create(user=self.user, stripe_customer_id="cus_fixture_owner")
+        self.order = CreditPurchase.objects.create(user=self.user, attempt_id=uuid4(), plan_months=3, amount=23900,
+            credits=400, stripe_price_id="price_three", subscription_state="checkout", stripe_session_id="cs_revoked")
+        client = patch("accounts.payments.stripe.StripeClient")
+        self.api = client.start().return_value.v1
+        self.addCleanup(client.stop)
+        self.session = {"id": self.order.stripe_session_id, "object": "checkout.session", "status": "open",
+                        "customer": self.account.stripe_customer_id, "mode": "subscription",
+                        "metadata": {"credit_purchase_id": str(self.order.pk)}}
+        self.subscription = {"id": "sub_fixture", "object": "subscription", "status": "active",
+                             "customer": self.account.stripe_customer_id, "metadata": self.session["metadata"]}
+        self.api.subscriptions.retrieve.return_value.to_dict.return_value = self.subscription
+
+        def cancel(subscription_id, options):
+            self.subscription["status"] = "canceled"
+            return stripe.Subscription.construct_from(self.subscription, None)
+        self.api.subscriptions.cancel.side_effect = cancel
+
+    def checkout(self, **changes):
+        return stripe.checkout.Session.construct_from(self.session | changes, None)
+
+    def test_revocation_closes_only_the_checkout_matching_order_and_customer(self):
+        sessions = self.api.checkout.sessions
+        for changes in ({"customer": "cus_other"}, {"metadata": {}}, {"id": "cs_other"}, {"mode": "payment"}):
+            sessions.retrieve.return_value = self.checkout(**changes)
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                revoke_refunded_plan(self.account, self.order, self.api)
+        sessions.expire.assert_not_called()
+        sessions.retrieve.return_value = self.checkout()
+        sessions.expire.return_value = self.checkout(status="expired")
+        revoke_refunded_plan(self.account, self.order, self.api)
+        sessions.expire.assert_called_once_with(self.session["id"])
+        self.order.refresh_from_db()
+        self.assertEqual((self.order.status, self.order.subscription_state), ("expired", "revoked"))
+
+    def test_completion_wins_expiration_then_checkout_and_lifecycle_events_are_idempotent(self):
+        sessions = self.api.checkout.sessions
+        complete = self.checkout(status="complete", subscription=self.subscription["id"])
+        sessions.retrieve.side_effect = [self.checkout(), complete]
+        sessions.expire.side_effect = stripe.InvalidRequestError("Checkout already completed", "id")
+        revoke_refunded_plan(self.account, self.order, self.api)
+        for event_type, obj in (("checkout.session.completed", complete.to_dict()),
+                                ("customer.subscription.created", self.subscription | {"status": "active"})):
+            self.assertEqual(signed_event(self.client, event_type, obj).status_code, 200)
+        self.api.subscriptions.cancel.assert_called_once()
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.stripe_subscription_id, self.subscription["id"])
+        self.assertEqual(self.order.subscription_state, "revoked")
+
+    def test_retry_of_previously_revoked_checkout_expires_its_saved_session(self):
+        CreditPurchase.objects.filter(pk=self.order.pk).update(subscription_state="revoked", status="expired")
+        self.order.refresh_from_db()
+        self.api.checkout.sessions.retrieve.return_value = self.checkout()
+        self.api.checkout.sessions.expire.return_value = self.checkout(status="expired")
+        self.assertIsNone(checkout(self.order, Mock(v1=self.api), retry=True))
+        self.api.checkout.sessions.expire.assert_called_once_with(self.session["id"])
+        self.api.checkout.sessions.list.assert_not_called()
+
+    def test_retry_endpoint_reports_unavailable_if_saved_checkout_belongs_to_another_order(self):
+        CreditPurchase.objects.filter(pk=self.order.pk).update(subscription_state="revoked", status="expired")
+        self.api.checkout.sessions.retrieve.return_value = self.checkout(metadata={"credit_purchase_id": str(uuid4())})
+        self.client.force_login(self.user)
+        response = self.client.post("/api/plans/purchases/", {
+            "attemptId": str(self.order.attempt_id), "months": 3, "priceId": self.order.stripe_price_id,
+        }, content_type="application/json")
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["error"], "payments_unavailable")
+        self.api.checkout.sessions.expire.assert_not_called()
+        self.api.subscriptions.cancel.assert_not_called()
+        self.order.refresh_from_db()
+        self.assertEqual((self.order.status, self.order.subscription_state, self.order.stripe_subscription_id),
+                         ("expired", "revoked", None))
+
+    def test_revocation_during_remote_checkout_creation_closes_new_session(self):
+        self.order.stripe_session_id = None
+        self.order.save(update_fields=["stripe_session_id"])
+        sessions = self.api.checkout.sessions
+
+        def create(*args, **kwargs):
+            CreditPurchase.objects.filter(pk=self.order.pk).update(subscription_state="revoked", status="expired")
+            return self.checkout()
+
+        sessions.create.side_effect = create
+        sessions.retrieve.return_value = self.checkout()
+        sessions.expire.return_value = self.checkout(status="expired")
+        self.assertIsNone(checkout(self.order, Mock(v1=self.api), retry=False))
+        sessions.expire.assert_called_once_with(self.session["id"])
+
+    def test_first_paid_invoice_cancels_revoked_subscription_once_and_preserves_receipt_without_bonus(self):
+        CreditPurchase.objects.filter(pk=self.order.pk).update(subscription_state="revoked", status="expired")
+        start = datetime.now(UTC) - timedelta(days=1)
+        invoice = plan_invoice(self.order, "in_revoked", "subscription_create", int(start.timestamp()),
+                               int((start + timedelta(days=90)).timestamp()))
+        self.api.subscriptions.retrieve.return_value.to_dict.return_value = self.subscription | {"metadata": {}}
+        self.assertEqual(signed_event(self.client, "invoice.paid", invoice).status_code, 400)
+        self.api.subscriptions.cancel.assert_not_called()
+        self.assertFalse(CreditPurchase.objects.filter(stripe_invoice_id=invoice["id"]).exists())
+        self.api.subscriptions.retrieve.return_value.to_dict.return_value = self.subscription
+        for _ in range(2):
+            self.assertEqual(signed_event(self.client, "invoice.paid", invoice).status_code, 200)
+        self.api.subscriptions.cancel.assert_called_once()
+        self.order.refresh_from_db()
+        self.assertEqual((self.order.status, self.order.subscription_state, self.order.credited_months),
+                         ("fulfilled", "revoked", 0))
+        self.assertEqual(self.order.stripe_invoice_id, invoice["id"])
+        self.assertFalse(has_active_plan(self.user.pk))
+        self.assertFalse(CreditTransaction.objects.exists())
+
+    def test_late_lifecycle_event_alone_cancels_revoked_but_preserves_naturally_ended_order(self):
+        for state in ("ended", "revoked"):
+            CreditPurchase.objects.filter(pk=self.order.pk).update(subscription_state=state, status="expired")
+            self.assertEqual(signed_event(self.client, "customer.subscription.created", self.subscription).status_code, 200)
+            self.order.refresh_from_db()
+            self.assertEqual(self.order.subscription_state, state)
+            if state == "ended":
+                self.api.subscriptions.cancel.assert_not_called()
+        self.api.subscriptions.cancel.assert_called_once()
+
+    def test_replayed_revoked_legacy_payment_cannot_restore_access_or_start_a_subscription(self):
+        CreditPurchase.objects.filter(pk=self.order.pk).update(subscription_state="revoked", status="expired",
+                                                              stripe_payment_intent_id="pi_legacy")
+        legacy = self.session | {"mode": "payment", "status": "complete", "payment_status": "paid",
+                                 "amount_total": self.order.amount, "currency": "krw", "payment_intent": "pi_legacy"}
+        self.assertEqual(signed_event(self.client, "checkout.session.completed", legacy).status_code, 200)
+        self.assertFalse(has_active_plan(self.user.pk))
+        self.assertFalse(CreditTransaction.objects.exists())
+        self.assertEqual(signed_event(self.client, "customer.subscription.created", self.subscription).status_code, 400)
+        self.api.subscriptions.cancel.assert_not_called()
+
+    @override_settings(STRIPE_SECRET_KEY="")
+    def test_regular_paid_invoice_only_needs_the_signing_secret(self):
+        start = datetime.now(UTC) - timedelta(days=1)
+        invoice = plan_invoice(self.order, "in_regular", "subscription_create", int(start.timestamp()),
+                               int((start + timedelta(days=90)).timestamp()))
+        self.assertEqual(signed_event(self.client, "invoice.paid", invoice).status_code, 200)
+        self.assertTrue(has_active_plan(self.user.pk))

@@ -47,22 +47,18 @@ class RefundPolicyTests(SimpleTestCase):
             self.assertEqual(purchase.refund_sources, [])
 
     @patch("accounts.refunds.CreditPurchase")
-    def test_plan_refund_cancels_renewal_and_revokes_periods(self, purchases):
-        order = SimpleNamespace(stripe_subscription_id="sub_test")
-        orders = purchases.objects.filter.return_value
-        orders.filter.return_value = Mock()
-        orders.filter.return_value.__iter__ = Mock(return_value=iter([order]))
+    def test_legacy_plan_refund_only_revokes_the_original_pass(self, purchases):
         api = Mock()
-        account = SimpleNamespace(stripe_customer_id="cus_test")
-        api.subscriptions.retrieve.return_value.to_dict.return_value = {"id": "sub_test", "status": "active", "customer": "cus_test"}
-        api.subscriptions.cancel.return_value.to_dict.return_value = {"id": "sub_test", "status": "canceled"}
-        purchase = SimpleNamespace(plan_months=3, subscription_state=None, user_id=1, pk="purchase")
+        account = SimpleNamespace(pk=1, stripe_customer_id="cus_test")
+        purchase = SimpleNamespace(plan_months=3, subscription_state=None, stripe_subscription_id=None,
+                                   stripe_invoice_id=None, pk="purchase")
         revoke_refunded_plan(account, purchase, api)
-        api.subscriptions.cancel.assert_called_once_with("sub_test", {"invoice_now": False, "prorate": False})
+        periods = purchases.objects.filter.return_value.filter
+        periods.assert_called_once_with(pk=purchase.pk)
+        periods.return_value.update.assert_called_once_with(subscription_state="revoked")
+        api.subscriptions.retrieve.assert_not_called()
+        api.subscriptions.cancel.assert_not_called()
         self.assertEqual(purchase.subscription_state, "revoked")
-        orders.filter.return_value.update.assert_called_once_with(subscription_state="revoked")
-        revoke_refunded_plan(account, purchase, api)
-        self.assertEqual(api.subscriptions.cancel.call_count, 1)
 
     def test_topup_refund_does_not_cancel_plus(self):
         api = Mock()

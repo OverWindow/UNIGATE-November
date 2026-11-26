@@ -7,8 +7,10 @@ from django.db.models import Sum, Q
 from django.utils import timezone
 
 from .credits import collect_pending_refunds, locked_account, reconcile_purchase_refunds
-from .models import OPEN_SUBSCRIPTION_STATES, CreditPurchase, CreditPurchaseRefund
-from .subscriptions import apply_paid_invoice, cancel_refunded_subscription, invoice_subscription_details, is_plan_invoice
+from .models import CreditPurchase, CreditPurchaseRefund
+from .subscriptions import (
+    apply_paid_invoice, cancel_refunded_subscription, close_revoked_checkout, invoice_subscription_details, is_plan_invoice,
+)
 
 
 class RefundOrderNotReady(Exception):
@@ -22,8 +24,8 @@ def refunds_enabled_at():
 
 def resolve_refund_purchase(api, intent_id):
     purchase = CreditPurchase.objects.filter(stripe_payment_intent_id=intent_id).first()
-    if purchase:
-        return purchase
+    if purchase and not purchase.stripe_invoice_id:
+        return purchase, None
 
     # Older top-ups only stored the Checkout Session ID.
     sessions = api.checkout.sessions.list({"payment_intent": intent_id, "limit": 1})
@@ -38,7 +40,7 @@ def resolve_refund_purchase(api, intent_id):
         if (purchase.stripe_session_id != data["id"] or data["payment_intent"] != intent_id
                 or data["amount_total"] != purchase.amount or data["currency"] != purchase.currency):
             raise ValueError("Checkout does not match refund")
-        return purchase
+        return purchase, None
 
     payments = api.invoice_payments.list({
         "payment": {"type": "payment_intent", "payment_intent": intent_id},
@@ -54,14 +56,22 @@ def resolve_refund_purchase(api, intent_id):
             raise ValueError("Ambiguous invoice payment")
         if invoice["status"] != "paid":
             raise RefundOrderNotReady
-        if existing:
-            return existing
         if not is_plan_invoice(invoice):
             continue
-        # A renewal refund can arrive before the invoice.paid event.
-        apply_paid_invoice(invoice)
-        return CreditPurchase.objects.get(stripe_invoice_id=invoice["id"])
-    return None
+        if not existing:
+            # A renewal refund can arrive before the invoice.paid event.
+            apply_paid_invoice(invoice, get_api=lambda: api)
+            existing = CreditPurchase.objects.get(stripe_invoice_id=invoice["id"])
+        subscription = details.get("subscription") or invoice.get("subscription")
+        root_id = (details.get("metadata") or {}).get("credit_purchase_id")
+        if (not subscription or not root_id or existing.stripe_subscription_id not in (None, subscription)
+                or invoice["amount_paid"] != existing.amount
+                or invoice["currency"] != existing.currency
+                or not CreditPurchase.objects.filter(pk=UUID(root_id), user_id=existing.user_id,
+                    stripe_subscription_id=subscription, user__creditaccount__stripe_customer_id=invoice["customer"]).exists()):
+            raise ValueError("Refund invoice does not match the original subscription")
+        return existing, subscription
+    return None, None
 
 
 @transaction.atomic
@@ -74,7 +84,7 @@ def apply_refund(notification, api):
         intent_id = api.charges.retrieve(notification["charge"]).to_dict().get("payment_intent")
     if not intent_id:
         return
-    purchase = resolve_refund_purchase(api, intent_id)
+    purchase, subscription = resolve_refund_purchase(api, intent_id)
     if purchase is None:
         return  # Other products can share the Stripe account.
     account = locked_account(purchase.user_id)
@@ -93,7 +103,7 @@ def apply_refund(notification, api):
         if not purchase.stripe_payment_intent_id:
             purchase.stripe_payment_intent_id = intent_id
             purchase.save(update_fields=["stripe_payment_intent_id"])
-    save_refund(account, purchase, refund, api=api)
+    save_refund(account, purchase, refund, api=api, subscription=subscription)
 
 
 def release_hold(account, purchase):
@@ -112,27 +122,58 @@ def billing_review(account, purchase):
     return "contact"
 
 
-def revoke_refunded_plan(account, purchase, api):
+def refunded_plan_periods(api, account, order, subscription, *, historical_refund_at=None):
+    orders = CreditPurchase.objects.filter(user_id=account.pk, plan_months__isnull=False)
+    if not subscription:
+        if order.stripe_invoice_id or order.stripe_subscription_id:
+            raise ValueError("환불한 청구서와 TOPIQ 원구독을 연결할 수 없습니다.")
+        return orders.filter(pk=order.pk), None
+
+    root = orders.filter(stripe_subscription_id=subscription).first()
+    remote = api.subscriptions.retrieve(subscription).to_dict()
+    if (not root or remote["id"] != subscription or not account.stripe_customer_id
+            or remote["customer"] != account.stripe_customer_id
+            or (remote.get("metadata") or {}).get("credit_purchase_id", str(root.pk)) != str(root.pk)):
+        raise ValueError("환불한 청구서와 TOPIQ 원구독을 연결할 수 없습니다.")
+    matched = Q(pk__in=[root.pk, order.pk])
+    # Renewal receipts store their invoice ID. Resolve other outstanding periods only within this subscription.
+    renewals = orders.filter(stripe_invoice_id__isnull=False, stripe_subscription_id__isnull=True,
+                             plan_ends_at__gt=timezone.now()).exclude(matched)
+    if historical_refund_at is not None or renewals.exists():
+        invoice_ids = set()
+        for item in api.invoices.list({"subscription": subscription, "status": "paid", "limit": 100}).auto_paging_iter():
+            invoice = item.to_dict()
+            if not is_plan_invoice(invoice):
+                continue
+            details = invoice_subscription_details(invoice)
+            if (invoice["customer"] != account.stripe_customer_id
+                    or (details.get("subscription") or invoice.get("subscription")) != subscription):
+                raise ValueError("원구독의 청구서 정보를 확인할 수 없습니다.")
+            invoice_ids.add(invoice["id"])
+            if historical_refund_at is not None and invoice["id"] != order.stripe_invoice_id and invoice["amount_paid"] > 0:
+                paid_at = (invoice.get("status_transitions") or {}).get("paid_at")
+                if not paid_at or paid_at >= historical_refund_at:
+                    raise ValueError("같은 구독에 결제 시각이 불분명하거나 환불 이후 결제된 회차가 있습니다.")
+        if order.stripe_invoice_id not in invoice_ids:
+            raise ValueError("원구독의 결제 목록에 환불 대상 청구서가 없습니다.")
+        matched |= Q(stripe_invoice_id__in=invoice_ids, plan_ends_at__gt=timezone.now())
+    return orders.filter(matched), remote if remote["status"] not in {"canceled", "incomplete_expired"} else None
+
+
+def revoke_refunded_plan(account, purchase, api, subscription=None):
     if not purchase.plan_months or purchase.subscription_state == "revoked":
         return
-    # Refund success ends the account's current Plus period and future installments.
-    orders = CreditPurchase.objects.filter(user_id=purchase.user_id, plan_months__isnull=False)
-    for order in orders.filter(subscription_state__in=OPEN_SUBSCRIPTION_STATES):
-        if order.stripe_subscription_id:
-            subscription = api.subscriptions.retrieve(order.stripe_subscription_id).to_dict()
-            if (subscription["id"] != order.stripe_subscription_id
-                    or subscription["customer"] != account.stripe_customer_id):
-                raise ValueError("Subscription does not match refunded account")
-            if subscription["status"] not in {"canceled", "incomplete_expired"}:
-                cancel_refunded_subscription(api, subscription)
-    affected = orders.filter(Q(plan_ends_at__gt=timezone.now()) | Q(pk=purchase.pk)
-                             | Q(subscription_state__in=OPEN_SUBSCRIPTION_STATES))
+    affected, cancel = refunded_plan_periods(api, account, purchase, subscription or purchase.stripe_subscription_id)
+    if purchase.subscription_state == "checkout" and not purchase.stripe_subscription_id:
+        close_revoked_checkout(api, purchase)
     affected.filter(status="pending").update(status="expired")
     affected.update(subscription_state="revoked")
     purchase.subscription_state = "revoked"
+    if cancel:
+        cancel_refunded_subscription(api, cancel)
 
 
-def save_refund(account, purchase, refund, *, api=None):
+def save_refund(account, purchase, refund, *, api=None, subscription=None):
     previous_refunded = purchase.refunds.filter(status="succeeded").aggregate(total=Sum("amount", default=0))["total"]
     row, created = CreditPurchaseRefund.objects.get_or_create(
         stripe_refund_id=refund["id"], defaults={
@@ -153,7 +194,7 @@ def save_refund(account, purchase, refund, *, api=None):
     if refund["status"] == "succeeded" and purchase.plan_months:
         if api is None:
             raise ValueError("Plan refund requires Stripe client")
-        revoke_refunded_plan(account, purchase, api)
+        revoke_refunded_plan(account, purchase, api, subscription)
     reconcile_purchase_refunds(account, purchase, from_hold=from_hold, previous_refunded=previous_refunded)
 
 
