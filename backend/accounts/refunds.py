@@ -7,8 +7,8 @@ from django.db.models import Sum, Q
 from django.utils import timezone
 
 from .credits import collect_pending_refunds, locked_account, reconcile_purchase_refunds
-from .models import CreditPurchase, CreditPurchaseRefund
-from .subscriptions import apply_paid_invoice, invoice_subscription_details, is_plan_invoice
+from .models import OPEN_SUBSCRIPTION_STATES, CreditPurchase, CreditPurchaseRefund
+from .subscriptions import apply_paid_invoice, cancel_refunded_subscription, invoice_subscription_details, is_plan_invoice
 
 
 class RefundOrderNotReady(Exception):
@@ -112,22 +112,12 @@ def billing_review(account, purchase):
     return "contact"
 
 
-def cancel_refunded_subscription(api, subscription):
-    # The attached schedule controls both the subscription and its future renewals.
-    schedule_id = subscription.get("schedule")
-    target = schedule_id or subscription["id"]
-    service = api.subscription_schedules if schedule_id else api.subscriptions
-    canceled = service.cancel(target, {"invoice_now": False, "prorate": False}).to_dict()
-    if canceled["id"] != target or canceled["status"] != "canceled":
-        raise ValueError("Stripe cancellation did not complete")
-
-
 def revoke_refunded_plan(account, purchase, api):
     if not purchase.plan_months or purchase.subscription_state == "revoked":
         return
     # Refund success ends the account's current Plus period and future installments.
     orders = CreditPurchase.objects.filter(user_id=purchase.user_id, plan_months__isnull=False)
-    for order in orders.filter(subscription_state__in=["checkout", "active", "ending", "past_due"]):
+    for order in orders.filter(subscription_state__in=OPEN_SUBSCRIPTION_STATES):
         if order.stripe_subscription_id:
             subscription = api.subscriptions.retrieve(order.stripe_subscription_id).to_dict()
             if (subscription["id"] != order.stripe_subscription_id
@@ -136,7 +126,7 @@ def revoke_refunded_plan(account, purchase, api):
             if subscription["status"] not in {"canceled", "incomplete_expired"}:
                 cancel_refunded_subscription(api, subscription)
     affected = orders.filter(Q(plan_ends_at__gt=timezone.now()) | Q(pk=purchase.pk)
-                             | Q(subscription_state__in=["checkout", "active", "ending", "past_due"]))
+                             | Q(subscription_state__in=OPEN_SUBSCRIPTION_STATES))
     affected.filter(status="pending").update(status="expired")
     affected.update(subscription_state="revoked")
     purchase.subscription_state = "revoked"

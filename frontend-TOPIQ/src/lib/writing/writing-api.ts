@@ -46,7 +46,11 @@ export interface LearnerAnswer { a?: string; b?: string; text?: string }
 export interface EvaluationConfig { questionPrices: Record<number, number>; setCost: number; evaluationLimit: number; enabled: boolean; priceVersion: string; timeoutSeconds: number }
 export interface CreditBalance { balance: number; reserved: number; available: number; pendingRefundCredits?: number }
 export interface CreditEntry { id: string; kind: "grant" | "reserve" | "capture" | "release" | "welcome" | "unlock" | "purchase" | "plan_bonus" | "refund" | "restore"; amount: number; evaluationId: string | null; setId: string | null; balanceAfter: number; reservedAfter: number; createdAt: string }
-export interface CreditPurchaseStatus { id: string; status: "pending" | "fulfilled" | "expired" }
+export interface TrialProgress {
+  status: "awaiting_card" | "awaiting_consent" | "creating" | "started" | "card_used" | "account_used" | "ended" | "card_unavailable";
+  endsAt?: string | null; consentVersion?: string | null; priceId?: string | null; amount?: number; currency?: string;
+}
+export interface CreditPurchaseStatus { id: string; status: "pending" | "fulfilled" | "expired"; trial?: TrialProgress | null }
 export type RefundState = "eligible" | "contact" | "held" | "confirming" | "processing" | "refunded";
 export interface TopupOrder {
   id: string; paidAt: string; amount: number; currency: string; credits: number;
@@ -57,16 +61,17 @@ export function refundTopup(id: string, signal: AbortSignal) {
   return mutateJson<{ refundState: RefundState }>("POST", `/api/credits/purchases/${id}/refund/`, {}, signal);
 }
 export interface CreditPrice { priceId: string; amount: number; currency: "krw"; credits: number }
-export interface PlanOffer { months: number; priceId: string | null; amount: number; currency: "krw"; bonusCredits: number }
+export interface PlanOffer { months: number; priceId: string | null; amount: number; currency: "krw"; bonusCredits: number; trialDays: number }
 export interface ScheduledPlanChange { id: string; months: number; effectiveAt: string; amount: number }
 interface PlanAccess {
   active: boolean; endsAt: string | null; currentPlanMonths: number | null;
-  subscription: { state: "active" | "ending" | "past_due"; months: number } | null;
+  subscription: { state: "active" | "trialing" | "ending" | "past_due"; months: number } | null;
+  trialEndsAt?: string | null; firstChargeAmount?: number | null;
   nextBillingAt: string | null; canChangePlan: boolean; scheduledChange: ScheduledPlanChange | null;
   planChangeUnavailable?: boolean;
 }
 export interface SubscriptionAccount extends PlanAccess { canOpenBillingPortal: boolean }
-export interface PlanAccount extends PlanAccess { plans: PlanOffer[] }
+export interface PlanAccount extends PlanAccess { plans: PlanOffer[]; trialEligible: boolean }
 export interface Evaluation {
   id: string; setId: string; typeSlot: number; status: "processing" | "succeeded" | "failed";
   totalScore: number | null; maxScore: number; creditCost: number; chargedCredits: number;
@@ -128,7 +133,23 @@ export function cancelPlanChange({ id, months, effectiveAt }: ScheduledPlanChang
 }
 
 export function startPlanPurchase(attemptId: string, priceId: string, months: number, signal: AbortSignal) {
-  return mutateJson<CreditPurchaseStatus & { checkoutUrl: string | null }>("POST", "/api/plans/purchases/", { attemptId, priceId, months }, signal);
+  const body = months === 1 ? { attemptId, priceId, months, offer: "monthly_trial" } : { attemptId, priceId, months };
+  return mutateJson<CreditPurchaseStatus & { checkoutUrl: string | null }>("POST", "/api/plans/purchases/", body, signal);
+}
+
+export interface TrialQuote { endsAt: string; consentVersion: string; priceId: string; amount: number; currency: string }
+
+export function trialQuote(trial: TrialProgress): TrialQuote | null {
+  const { endsAt, consentVersion, priceId, amount, currency } = trial;
+  if (trial.status !== "awaiting_consent" || !endsAt || !Number.isFinite(Date.parse(endsAt)) || !consentVersion
+    || !priceId || typeof amount !== "number" || !Number.isSafeInteger(amount) || amount <= 0 || currency !== "krw") return null;
+  return { endsAt, consentVersion, priceId, amount, currency };
+}
+
+export function confirmMonthlyTrial(purchaseId: string, quote: TrialQuote, signal: AbortSignal) {
+  return mutateJson<CreditPurchaseStatus>("POST", "/api/plans/purchases/", {
+    action: "confirm_trial", purchaseId, priceId: quote.priceId, consentVersion: quote.consentVersion, trialEndsAt: quote.endsAt,
+  }, signal);
 }
 
 type BillingPage = "credits" | "plans" | "settings/subscription" | `${Exclude<Language, "ko">}/settings/subscription`;

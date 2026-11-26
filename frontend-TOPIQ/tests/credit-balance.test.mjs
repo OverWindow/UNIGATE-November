@@ -43,6 +43,7 @@ const { default: SiteHeader } = load("components/SiteHeader.tsx");
 imports["./PlanOffers"] = load("components/credits/PlanOffers.tsx");
 imports["./PlanChangeControls"] = load("components/credits/PlanChangeControls.tsx");
 imports["@/components/credits/PlanChangeControls"] = imports["./PlanChangeControls"];
+imports["./TrialConsent"] = load("components/credits/TrialConsent.tsx");
 const { default: CreditPurchase } = load("components/credits/CreditPurchase.tsx");
 imports["./CreditPurchase"] = { default: CreditPurchase };
 imports["./BillingContactDialog"] = load("components/credits/BillingContactDialog.tsx");
@@ -71,15 +72,16 @@ beforeEach(() => {
   search = new URLSearchParams();
   requests = [];
   globalThis.window = new EventTarget();
+  globalThis.document = new EventTarget();
   globalThis.fetch = async (url, options) => {
     requests.push({ url, method: options.method });
     if (url === "/api/credits/price/") return Response.json(price);
     return Response.json(url === "/api/credits/" ? balance : { transactions: [], nextPage: null });
   };
-  session = { user: { id: 1 }, status: "authenticated", language: "ko", creditBalance: balance,
+  session = { user: { id: 1 }, status: "authenticated", language: "ko", setLanguage() {}, creditBalance: balance,
     refreshCredits: signal => writingApi.creditsRequest("", signal) };
 });
-afterEach(() => { delete globalThis.window; globalThis.fetch = originalFetch; });
+afterEach(() => { delete globalThis.document; delete globalThis.window; globalThis.fetch = originalFetch; });
 
 test("only signed-in users request the price; returning guests keep their order when signing in", () => {
   const wallet = mount(CreditsAccount);
@@ -150,7 +152,7 @@ test("credit and Plus pages each display one shared billing notice", () => {
 
 test("Each Plus card lists benefits and savings and the selected purchase starts once", async () => {
   const plans = [[1, 9900], [3, 23900], [6, 43900]].map(([months, amount]) => ({
-    months, amount, currency: "krw", priceId: `price_plan_${months}`, bonusCredits: 400,
+    months, amount, currency: "krw", priceId: `price_plan_${months}`, bonusCredits: 400, trialDays: months === 1 ? 7 : 0,
   }));
   const posts = [];
   window.location = { assign() {} };
@@ -161,7 +163,7 @@ test("Each Plus card lists benefits and savings and the selected purchase starts
   };
   let buy;
   const tree = mount(() => {
-    const ui = CreditPurchase({ planAccount: { plans, active: false, currentPlanMonths: null }, userId: 1, returnId: null, onFulfilled() {} });
+    const ui = CreditPurchase({ planAccount: { plans, active: false, currentPlanMonths: null, trialEligible: true }, userId: 1, returnId: null, onFulfilled() {} });
     const [offers] = React.Children.toArray(ui.props.children);
     const controls = offers.props.renderAction(plans[2]);
     buy = React.Children.toArray(controls.props.children).find(item => item.type === "button").props.onClick;
@@ -181,8 +183,8 @@ test("Each Plus card lists benefits and savings and the selected purchase starts
     const card = cards[index];
     assert.ok(card.includes(`<h2>Plus ${months}개월</h2>`));
     assert.ok(card.includes(amount.toLocaleString("ko")));
-    assert.doesNotMatch(card, /개월마다/);
-    assert.ok(card.includes(`aria-label="Plus ${months}개월 · 구독하기"`));
+    const price = new Intl.NumberFormat("ko", { style: "currency", currency: "KRW" }).format(amount);
+    assert.ok(card.includes(`aria-label="Plus ${months}개월 · ${months === 1 ? "7일 무료 체험 시작" : price + " 결제하고 시작"}"`));
     assert.equal((card.match(/<li>/g) ?? []).length, 3);
     if (months > 1) assert.ok(card.includes(`월간 결제 대비 ${months === 3 ? 20 : 26}% 절약`));
     else assert.doesNotMatch(card, /월간 결제 대비/);
@@ -220,7 +222,8 @@ test("settings follows plans in the account menu", () => {
 test("guests can browse all plans and each Plus card returns them to plans after login", () => {
   session.user = null;
   session.status = "anonymous";
-  for (const [language, login] of [["ko", "로그인하기"], ["en", "Log in"], ["id", "Masuk"]]) {
+  const { plansContent } = require("../src/lib/plans-content.ts");
+  for (const language of ["ko", "en", "id"]) {
     session.language = language;
     const page = mount(PlansAccount);
     const [free, ...offers] = page.html.match(/<article\b[\s\S]*?<\/article>/g) ?? [];
@@ -232,7 +235,9 @@ test("guests can browse all plans and each Plus card returns them to plans after
       const price = new Intl.NumberFormat(language, { style: "currency", currency: "KRW" }).format(amounts[index]);
       assert.ok(card.includes(price));
       assert.equal((card.match(/<li>/g) ?? []).length, 3);
-      assert.ok(card.includes(`href="/login?next=%2Fplans">${login}</a>`));
+      const prefix = language === "ko" ? "" : `/${language}`;
+      const label = index === 0 ? plansContent[language].trial.start : plansContent[language].trial.pay(price);
+      assert.ok(card.includes(`href="${prefix}/login?next=${encodeURIComponent(prefix + "/plans")}">${label}</a>`));
     }
     assert.doesNotMatch(page.html, /aria-current="true"|<button/);
     page.unmount();
@@ -252,6 +257,51 @@ test("Plus links subscribers to their separate settings page below the offers", 
   assert.doesNotMatch(page.html, /내 구독|<time|다음 결제 예정|만료 일시/);
   assert.ok(page.html.slice(page.html.lastIndexOf("</article>")).includes('href="/settings/subscription">구독 관리'));
   page.unmount();
+});
+
+test("new monthly signups require an explicit trial offer and account eligibility; longer terms stay available", () => {
+  const { publicPlans } = require("../src/lib/plans-content.ts");
+  for (const [trialEligible, trialDays] of [[false, 7], [true, undefined]]) {
+    const plans = publicPlans.map(offer => ({ ...offer, priceId: "price-" + offer.months, trialDays: offer.months === 1 ? trialDays : 0 }));
+    const page = mount(() => React.createElement(CreditPurchase, { userId: 1, planAccount: { plans, active: false, trialEligible } }));
+    const [, monthly, quarterly, semiannual] = page.html.match(/<article\b[\s\S]*?<\/article>/g);
+    assert.match(monthly, /<button[^>]*disabled/);
+    assert.equal(monthly.includes("이미 월간 무료 체험을 사용"), !trialEligible);
+    for (const term of [quarterly, semiannual]) assert.doesNotMatch(term, /<button[^>]*disabled/);
+    page.unmount();
+  }
+});
+
+test("trial consent is explicit and shows the quoted instant, amount, payment method and cancellation terms in every language", () => {
+  const { plansContent, billingTime, planAmount } = require("../src/lib/plans-content.ts");
+  const quote = { endsAt: "2099-09-20T01:45:16Z", consentVersion: "v1", priceId: "price-monthly", amount: 9900, currency: "krw" };
+  for (const language of ["ko", "en", "id"]) {
+    session.language = language;
+    const page = mount(() => React.createElement(imports["./TrialConsent"].default, { quote, busy: false, onConfirm() {} }));
+    assert.ok(page.html.includes(billingTime(language, quote.endsAt)));
+    assert.ok(page.html.includes(planAmount(language, quote.amount)));
+    assert.ok(page.html.includes(plansContent[language].trial.card));
+    assert.ok(page.html.includes(plansContent[language].trial.cancel));
+    assert.match(page.html, /type="checkbox"[^>]*required/);
+    assert.doesNotMatch(page.html, /type="checkbox"[^>]*checked/);
+    assert.match(page.html, /type="submit"[^>]*disabled/);
+    page.unmount();
+  }
+});
+
+test("trial subscribers see their first charge or scheduled cancellation until the same access deadline", () => {
+  const trialEndsAt = "2099-09-20T01:45:16Z";
+  for (const state of ["trialing", "ending"]) {
+    const account = { active: true, endsAt: trialEndsAt, trialEndsAt, firstChargeAmount: 9900, currentPlanMonths: 1,
+      subscription: { state, months: 1 }, canOpenBillingPortal: true };
+    const page = mount(() => React.createElement(SubscriptionSummary, { account }));
+    assert.ok(page.html.includes(trialEndsAt));
+    assert.equal(page.html.includes("첫 유료 전환 예정 일시"), state === "trialing");
+    assert.equal(page.html.includes("9,900"), state === "trialing");
+    assert.equal(page.html.includes("자동 결제 없음"), state === "ending");
+    assert.ok(page.html.includes("결제 관리"));
+    page.unmount();
+  }
 });
 
 test("subscription details distinguish renewal, cancellation, overdue payment, prepaid and free access", () => {

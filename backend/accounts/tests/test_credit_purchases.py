@@ -4,17 +4,19 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
+from io import StringIO
 from threading import Barrier
 from unittest.mock import Mock, patch
 
 import stripe
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.db import DatabaseError, close_old_connections, connection
 from django.test import Client, TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 
 from accounts.credits import account_with_monthly_credits
-from accounts.models import PLAN_AMOUNTS, CreditAccount, CreditPurchase, CreditTransaction
+from accounts.models import PLAN_AMOUNTS, CreditAccount, CreditPurchase, CreditTransaction, PlusFreeTrial
 from accounts.payments import checkout, checkout_customer
 from accounts.plans import current_plan
 
@@ -32,6 +34,7 @@ AMOUNT = 7500
 TEST_SETTINGS = {
     "STRIPE_SECRET_KEY": "local-unit-test-api-value",
     "STRIPE_WEBHOOK_SECRET": SIGNING_SECRET,
+    "STRIPE_TRIAL_FINGERPRINT_KEY": "test-only-card-digest-key",
     "STRIPE_PRICE_ID": PRICE_ID,
     "STRIPE_PLAN_PRICE_IDS": {1: "price_one", 3: "price_three", 6: "price_six"},
     "TOPIQ_PUBLIC_URL": "https://topiq.example.invalid",
@@ -131,7 +134,10 @@ class CreditPurchaseTests(TestCase):
         self.assertEqual(CreditTransaction.objects.filter(account=self.wallet, kind="purchase").count(), entries)
 
     def post_plan(self, months, price_id):
-        return self.client.post("/api/plans/purchases/", {"months": months, "priceId": price_id, "attemptId": self.attempt_id},
+        payload = {"months": months, "priceId": price_id, "attemptId": self.attempt_id}
+        if months == 1:
+            payload["offer"] = "monthly_trial"
+        return self.client.post("/api/plans/purchases/", payload,
                                 content_type="application/json", HTTP_X_CSRFTOKEN=self.csrf)
 
     def test_plan_catalog_and_each_checkout_match_the_advertised_price(self):
@@ -159,11 +165,16 @@ class CreditPurchaseTests(TestCase):
             order = CreditPurchase.objects.get(pk=result.json()["id"])
             self.assertEqual((order.plan_months, order.amount, order.credits, order.plan_starts_at), (months, amount, 400, None))
             params = self.sessions.create.call_args.args[0]
-            self.assertEqual(params["mode"], "subscription")
-            self.assertNotIn("payment_method_types", params)
-            self.assertEqual(params["subscription_data"]["metadata"], {"credit_purchase_id": str(order.pk)})
+            if months == 1:
+                self.assertEqual(params["mode"], "setup")
+                self.assertNotIn("line_items", params)
+                self.assertEqual(params["setup_intent_data"]["metadata"], {"credit_purchase_id": str(order.pk)})
+            else:
+                self.assertEqual(params["mode"], "subscription")
+                self.assertNotIn("payment_method_types", params)
+                self.assertEqual(params["line_items"], [{"price": price_id, "quantity": 1}])
+                self.assertEqual(params["subscription_data"]["metadata"], {"credit_purchase_id": str(order.pk)})
             self.assertNotIn("invoice_creation", params)
-            self.assertEqual(params["line_items"], [{"price": price_id, "quantity": 1}])
             self.assertEqual(params["success_url"], f"https://topiq.example.invalid/plans?purchase={order.pk}")
             self.assertEqual(self.post_plan(months, price_id).status_code, 200)
             self.assertEqual(self.post_attempt(price_id).status_code, 409)
@@ -188,6 +199,14 @@ class CreditPurchaseTests(TestCase):
             self.assertIsNone(self.client.get("/api/plans/").json()["plans"][0]["priceId"])
         self.sessions.create.assert_not_called()
         self.assertFalse(CreditPurchase.objects.exists())
+
+    @override_settings(STRIPE_TRIAL_FINGERPRINT_KEY="")
+    def test_missing_card_comparison_key_disables_only_monthly_checkout(self):
+        offers = self.client.get("/api/plans/").json()["plans"]
+        self.assertEqual([offer["priceId"] for offer in offers], [None, "price_three", "price_six"])
+        self.prices.retrieve.return_value = plan_price(1, 9900, "price_one")
+        self.assertEqual(self.post_plan(1, "price_one").status_code, 503)
+        self.sessions.create.assert_not_called()
 
     def test_subscription_details_are_private_and_separate_from_plan_offers(self):
         self.assertEqual(Client().get(MY_SUBSCRIPTION).status_code, 401)
@@ -214,12 +233,15 @@ class CreditPurchaseTests(TestCase):
         self.assertEqual(self.client.get(MY_SUBSCRIPTION, {"user_id": self.user.pk}).json(), free)
 
     def test_subscription_renewals_and_cancellation_with_reordered_webhooks(self):
+        # This monthly subscription predates mandatory trials.
         self.prices.retrieve.return_value = plan_price(1, 9900, "price_one")
-        order_id = self.post_plan(1, "price_one").json()["id"]
+        order = self.pending_subscription()
+        self.wallet.stripe_customer_id = "cus_fixture_owner"
+        self.wallet.save(update_fields=["stripe_customer_id"])
+        order.stripe_session_id = SESSION_ID
+        order.save(update_fields=["stripe_session_id"])
+        order_id = str(order.pk)
         self.attempt_id = str(uuid.uuid4())
-        self.assertEqual(self.post_plan(1, "price_one").json()["id"], order_id)
-        self.sessions.create.assert_called_once()
-        order = CreditPurchase.objects.get(pk=order_id)
         metadata = {"credit_purchase_id": order_id}
         sub = {"id": "sub_fixture", "object": "subscription", "metadata": metadata, "customer": "cus_fixture_owner"}
         now = int(time.time())
@@ -295,9 +317,10 @@ class CreditPurchaseTests(TestCase):
             self.assertIsNone(self.client.get("/api/plans/").json()["currentPlanMonths"])
         self.assertEqual(list(CreditPurchase.objects.values_list("credited_months", flat=True)), [3, 3])
 
-    def pending_subscription(self):
-        return CreditPurchase.objects.create(user=self.user, attempt_id=self.attempt_id, amount=9900, credits=400,
-            plan_months=1, stripe_price_id="price_one", subscription_state="checkout")
+    def pending_subscription(self, months=1):
+        return CreditPurchase.objects.create(user=self.user, attempt_id=self.attempt_id, amount=PLAN_AMOUNTS[months],
+            credits=400, plan_months=months, stripe_price_id=TEST_SETTINGS["STRIPE_PLAN_PRICE_IDS"][months],
+            subscription_state="checkout")
 
     def test_changed_interval_uses_each_invoices_booked_terms_and_monthly_credits(self):
         order = self.pending_subscription()
@@ -365,7 +388,7 @@ class CreditPurchaseTests(TestCase):
         self.schedules.release.assert_called_once_with(schedule["id"], {"preserve_cancel_date": True})
 
     def test_subscription_key_conflict_recovers_matching_open_complete_or_expired_session(self):
-        order = self.pending_subscription()
+        order = self.pending_subscription(months=3)
         self.sessions.create.side_effect = stripe.IdempotencyError("fixture parameter mismatch", http_status=400)
         other = stripe.checkout.Session.construct_from({"metadata": {"credit_purchase_id": str(uuid.uuid4())}}, None)
         for status, expected_url in (("open", CHECKOUT_URL), ("complete", None), ("expired", None)):
@@ -375,7 +398,7 @@ class CreditPurchaseTests(TestCase):
                     "metadata": {"credit_purchase_id": str(order.pk)}}, None)
                 self.sessions.list.return_value.auto_paging_iter.return_value = [other, session]
                 self.sessions.create.reset_mock()
-                response = self.post_plan(1, "price_one")
+                response = self.post_plan(3, "price_three")
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.json()["checkoutUrl"], expected_url)
                 self.assertEqual(self.sessions.list.call_args.args[0]["customer"], "cus_fixture_owner")
@@ -385,57 +408,57 @@ class CreditPurchaseTests(TestCase):
                 self.assertEqual(order.status, "expired" if status == "expired" else "pending")
 
     def test_missing_subscription_session_reuses_replacement_key_after_lost_response(self):
-        order = self.pending_subscription()
+        order = self.pending_subscription(months=3)
         mismatch = stripe.APIError("fixture parameter mismatch", http_status=409,
                                    json_body={"error": {"type": "idempotency_error"}})
         self.sessions.list.return_value.auto_paging_iter.return_value = []
         self.sessions.create.side_effect = [mismatch, stripe.APIConnectionError("fixture lost response"),
                                             mismatch, self.sessions.create.return_value]
-        self.assertEqual(self.post_plan(1, "price_one").status_code, 503)
-        self.assertEqual(self.post_plan(1, "price_one").json()["checkoutUrl"], CHECKOUT_URL)
+        self.assertEqual(self.post_plan(3, "price_three").status_code, 503)
+        self.assertEqual(self.post_plan(3, "price_three").json()["checkoutUrl"], CHECKOUT_URL)
         original, replacement, original_retry, replacement_retry = self.sessions.create.call_args_list
         self.assertEqual(original.kwargs["options"]["idempotency_key"], str(order.pk))
         self.assertNotEqual(original.kwargs, replacement.kwargs)
         self.assertEqual(original.args, replacement.args)
         self.assertEqual((original, replacement), (original_retry, replacement_retry))
-        self.assertEqual(self.post_plan(1, "price_one").json()["checkoutUrl"], CHECKOUT_URL)
+        self.assertEqual(self.post_plan(3, "price_three").json()["checkoutUrl"], CHECKOUT_URL)
         self.sessions.retrieve.assert_called_once_with(SESSION_ID)
         self.assertEqual(self.sessions.create.call_count, 4)
         self.assertEqual(CreditPurchase.objects.count(), 1)
 
     def test_subscription_lookup_failure_or_busy_key_never_creates_a_replacement(self):
-        order = self.pending_subscription()
+        order = self.pending_subscription(months=3)
         self.sessions.create.side_effect = stripe.IdempotencyError("fixture parameter mismatch", http_status=400)
         self.sessions.list.side_effect = stripe.APIConnectionError("fixture lookup unavailable")
-        self.assertEqual(self.post_plan(1, "price_one").status_code, 503)
+        self.assertEqual(self.post_plan(3, "price_three").status_code, 503)
         self.sessions.list.assert_called_once()
         self.sessions.create.assert_called_once()
         self.sessions.list.reset_mock()
         self.sessions.create.side_effect = stripe.IdempotencyError("fixture concurrent request", http_status=400,
             json_body={"error": {"type": "idempotency_error", "code": "idempotency_key_in_use"}})
-        self.assertEqual(self.post_plan(1, "price_one").status_code, 503)
+        self.assertEqual(self.post_plan(3, "price_three").status_code, 503)
         self.sessions.list.assert_not_called()
         self.assertEqual(self.sessions.create.call_count, 2)
         order.refresh_from_db()
         self.assertEqual((order.status, order.stripe_session_id), ("pending", None))
 
     def test_subscription_recovers_completed_checkout_after_lost_creation_response(self):
-        self.prices.retrieve.return_value = plan_price(1, 9900, "price_one")
+        self.prices.retrieve.return_value = plan_price(3, 23900, "price_three")
         self.wallet.stripe_customer_id = "cus_fixture_owner"
         self.wallet.save(update_fields=["stripe_customer_id"])
-        order = self.pending_subscription()
+        order = self.pending_subscription(months=3)
         CreditPurchase.objects.filter(pk=order.pk).update(created_at=timezone.now() - timedelta(days=2))
         recovered = stripe.checkout.Session.construct_from({"id": SESSION_ID, "status": "complete",
             "metadata": {"credit_purchase_id": str(order.pk)}}, None)
         self.sessions.list.return_value.auto_paging_iter.return_value = [recovered]
-        response = self.post_plan(1, "price_one")
+        response = self.post_plan(3, "price_three")
         self.assertEqual(response.json(), {"id": str(order.pk), "status": "pending", "checkoutUrl": None})
         order.refresh_from_db()
         self.assertEqual(order.stripe_session_id, SESSION_ID)
         self.attempt_id = str(uuid.uuid4())
-        self.prices.retrieve.return_value = plan_price(3, 23900, "price_three")
+        self.prices.retrieve.return_value = plan_price(6, 43900, "price_six")
         self.sessions.retrieve.return_value = recovered
-        self.assertEqual(self.post_plan(3, "price_three").json()["error"], "plan_in_use")
+        self.assertEqual(self.post_plan(6, "price_six").json()["error"], "plan_in_use")
         self.sessions.create.assert_not_called()
 
     def test_subscription_closes_open_legacy_checkout(self):
@@ -447,6 +470,31 @@ class CreditPurchaseTests(TestCase):
         self.sessions.expire.assert_called_once_with("cs_legacy")
         legacy.refresh_from_db()
         self.assertEqual(legacy.status, "expired")
+
+    def test_rollout_command_expires_only_uncompleted_legacy_monthly_checkouts(self):
+        def order_for(suffix, months):
+            user = get_user_model().objects.create_user(username=f"rollout-{suffix}")
+            return CreditPurchase.objects.create(user=user, attempt_id=uuid.uuid4(), amount=PLAN_AMOUNTS[months],
+                credits=400, plan_months=months, subscription_state="checkout", stripe_session_id=f"cs_{suffix}")
+
+        legacy = order_for("open", 1)
+        paid = order_for("complete", 1)
+        long_term = order_for("quarterly", 3)
+        monthly_trial = order_for("trial", 1)
+        PlusFreeTrial.objects.create(purchase=monthly_trial, user=monthly_trial.user)
+        self.sessions.retrieve.side_effect = lambda session_id: stripe.checkout.Session.construct_from({
+            "id": session_id, "status": "complete" if session_id == paid.stripe_session_id else "open",
+        }, None)
+        path = "accounts.management.commands.expire_legacy_monthly_checkouts.stripe_client"
+        with patch(path) as billing:
+            billing.return_value.v1.checkout.sessions = self.sessions
+            for _ in range(2):
+                call_command("expire_legacy_monthly_checkouts", stdout=StringIO())
+        self.sessions.expire.assert_called_once_with(legacy.stripe_session_id)
+        self.assertEqual(set(CreditPurchase.objects.filter(status="pending").values_list("pk", flat=True)),
+                         {paid.pk, long_term.pk, monthly_trial.pk})
+        legacy.refresh_from_db()
+        self.assertEqual((legacy.status, legacy.subscription_state), ("expired", "ended"))
 
     def test_legacy_plan_webhooks_calendar_renewal_and_expiry(self):
         # Jan 31, 00:30 in Seoul is still Jan 30 in UTC.

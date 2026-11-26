@@ -31,6 +31,8 @@ export default function Providers({ children, initialLanguage }: { children: Rea
   const updatePlan = useCallback((userId: number, endsAt: string | null) => {
     setUser(current => current?.id === userId && current.plusEndsAt !== endsAt ? { ...current, plusEndsAt: endsAt } : current);
   }, []);
+  const generation = useRef(0);
+  const creditRequest = useRef(0);
 
   useEffect(() => {
     if (!user?.plusEndsAt) return;
@@ -39,13 +41,19 @@ export default function Providers({ children, initialLanguage }: { children: Rea
     function checkExpiry() {
       const remaining = end - Date.now();
       if (remaining > 0) timer = setTimeout(checkExpiry, Math.min(remaining, 2_147_483_647));
-      else setUser(current => current && current === user ? { ...current, plusEndsAt: null } : current);
+      else {
+        const session = generation.current;
+        setUser(current => current && current === user ? { ...current, plusEndsAt: null } : current);
+        // A payment webhook may already have extended access beyond the local deadline.
+        void getSession().then(next => {
+          if (generation.current !== session || next?.id !== user?.id || !next?.plusEndsAt || Date.parse(next.plusEndsAt) <= Date.now()) return;
+          setUser(current => current?.id === next.id && !current.plusEndsAt ? { ...current, plusEndsAt: next.plusEndsAt } : current);
+        }).catch(() => {});
+      }
     }
     checkExpiry();
     return () => clearTimeout(timer);
   }, [user]);
-  const generation = useRef(0);
-  const creditRequest = useRef(0);
 
   useEffect(() => {
     // Keep the saved language and URL in sync after the initial server render.

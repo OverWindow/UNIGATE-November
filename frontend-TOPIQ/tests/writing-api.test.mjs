@@ -60,6 +60,30 @@ test("evaluation sends original answers and retries only a rejected CSRF request
   assert.deepEqual(calls, ["/api/csrf/", "/api/writing/evaluations/", "/api/csrf/", "/api/writing/evaluations/"]);
 });
 
+test("monthly signup explicitly requests card setup; only a separate consent request confirms an exact quote", async () => {
+  const posts = [];
+  const signal = new AbortController().signal;
+  const data = { status: "awaiting_consent", endsAt: "2099-09-20T01:45:16Z", priceId: "price-monthly",
+    amount: 9900, currency: "krw", consentVersion: "trial-1" };
+  globalThis.fetch = async (url, options) => {
+    if (url === "/api/csrf/") return Response.json({ csrfToken: "test" });
+    assert.equal(url, "/api/plans/purchases/");
+    posts.push(JSON.parse(options.body));
+    return Response.json({ id: "order", status: "pending" });
+  };
+  await api.startPlanPurchase("attempt", data.priceId, 1, signal);
+  const quote = api.trialQuote(data);
+  assert.ok(quote);
+  await api.confirmMonthlyTrial("order", quote, signal);
+  assert.deepEqual(posts, [
+    { months: 1, priceId: data.priceId, attemptId: "attempt", offer: "monthly_trial" },
+    { action: "confirm_trial", purchaseId: "order", priceId: data.priceId, trialEndsAt: data.endsAt, consentVersion: data.consentVersion },
+  ]);
+  for (const invalid of [{ status: "awaiting_card" }, { priceId: null }, { currency: "usd" }, { endsAt: "" }, { amount: 0 }]) {
+    assert.equal(api.trialQuote({ ...data, ...invalid }), null);
+  }
+});
+
 test("ambiguous failures never automatically repeat an evaluation", async () => {
   for (const failure of [new Error("network"), Response.json({ error: "writing_unavailable" }, { status: 503 })]) {
     let posts = 0;

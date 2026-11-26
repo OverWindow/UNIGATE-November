@@ -8,6 +8,7 @@ from django.core import signing
 from django.core.exceptions import PermissionDenied
 from django.db import DatabaseError, transaction
 from django.db.models import OuterRef, Prefetch, Subquery
+from django.db.models.functions import Coalesce
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.urls import path
@@ -15,7 +16,7 @@ from django.utils import timezone
 
 from .credits import CreditError, grant
 from .models import CreditAccount, CreditTransaction
-from .plans import active_plans, extend_plan_end, paid_plans
+from .plans import active_plans, active_trials, extend_plan_end, paid_plans
 
 
 class GrantForm(forms.Form):
@@ -77,10 +78,11 @@ class CreditAccountAdmin(ReadOnlyAdmin):
     def get_queryset(self, request):
         now = timezone.now()
         active = active_plans(OuterRef("user_id"), now).order_by("-plan_ends_at")
+        trial = active_trials(OuterRef("user_id"), now)
         extensions = (paid_plans().filter(plan_starts_at__gt=now).order_by("plan_starts_at")
                       .only("user_id", "plan_starts_at", "plan_ends_at"))
         return super().get_queryset(request).annotate(
-            active_until=Subquery(active.values("plan_ends_at")[:1]),
+            active_until=Coalesce(Subquery(active.values("plan_ends_at")[:1]), Subquery(trial.values("ends_at")[:1])),
         ).prefetch_related(Prefetch("user__creditpurchase_set", queryset=extensions, to_attr="paid_extensions"))
 
     @admin.display(description="현재 플랜")

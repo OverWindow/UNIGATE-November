@@ -19,7 +19,16 @@
   .plan-free .plan-benefits { grid-area: auto; margin-top: 6px; }
 }
 
-.plan-offer:not(.plan-free) { grid-template-rows: 56px 44px 20px minmax(56px, auto) 1fr; }
+.plan-billing-terms { display: grid; align-content: start; gap: 4px; color: #405370; font-size: 14px; }
+.plan-offer:not(.plan-free) { grid-template-rows: minmax(30px, auto) auto minmax(46px, auto); }
 .plan-action { display: flex; flex-direction: column; align-items: start; gap: 6px; }
 .plan-action > .button { width: 100%; }
 .plan-heading h2 { margin: 0; }
+.trial-consent { display: grid; gap: 16px; width: 100%; max-width: 600px; padding: clamp(16px, 4vw, 28px); border: 1px solid #adc1e7; border-radius: 16px; background: white; }
+.trial-consent h2 { font-size: 1.2rem; font-weight: 650; }
+.trial-consent dl { display: grid; gap: 8px; background: #f4f7fc; padding: 14px; border-radius: 10px; }
+.trial-consent dl div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 16px; }
+.trial-consent dt { color: #52647e; }
+.trial-consent dd { font-weight: 600; }
+.trial-consent label { display: flex; align-items: baseline; gap: 8px; }
+.trial-consent input { flex-shrink: 0; }

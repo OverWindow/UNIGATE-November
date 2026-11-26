@@ -3,7 +3,7 @@ from calendar import monthrange
 from django.db.models import Max
 from django.utils import timezone
 
-from .models import OPEN_SUBSCRIPTION_STATES, CreditPurchase
+from .models import OPEN_SUBSCRIPTION_STATES, CreditPurchase, PlusFreeTrial
 
 
 def paid_plans():
@@ -14,8 +14,16 @@ def active_plans(user_id, at):
     return paid_plans().filter(user_id=user_id, plan_starts_at__lte=at, plan_ends_at__gt=at)
 
 
+def active_trials(user_id, at):
+    return PlusFreeTrial.objects.filter(user_id=user_id, status="started", started_at__lte=at, ends_at__gt=at,
+                                        purchase__subscription_state__in=("trialing", "ending"))
+
+
 def has_active_plan(user_id):
-    return active_plans(user_id, timezone.now()).exists()
+    now = timezone.now()
+    paid = active_plans(user_id, now).values_list("pk")
+    trials = active_trials(user_id, now).values_list("pk")
+    return paid.union(trials, all=True).exists()
 
 
 def extend_plan_end(until, periods):
@@ -30,12 +38,13 @@ def extend_plan_end(until, periods):
 def current_plan(user_id):
     now = timezone.now()
     periods = paid_plans().filter(user_id=user_id, plan_ends_at__gt=now).order_by("plan_starts_at", "pk")
-    rows = iter(periods.values_list("plan_starts_at", "plan_ends_at", "plan_months"))
-    first = next(rows, None)
-    if first is None or first[0] > now:
+    rows = list(periods.values_list("plan_starts_at", "plan_ends_at", "plan_months"))
+    if rows and rows[0][0] <= now:
+        return rows[0][2], extend_plan_end(rows[0][1], ((start, end) for start, end, _ in rows[1:]))
+    trial_end = active_trials(user_id, now).values_list("ends_at", flat=True).first()
+    if trial_end is None:
         return None, None
-    _, first_end, months = first
-    return months, extend_plan_end(first_end, ((start, end) for start, end, _ in rows))
+    return 1, extend_plan_end(trial_end, ((start, end) for start, end, _ in rows))
 
 
 def current_plan_end(user_id):

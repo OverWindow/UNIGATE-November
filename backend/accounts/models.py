@@ -7,7 +7,7 @@ from django.db import models
 CREDIT_PURCHASE_QUANTITY = 1000
 PLAN_BONUS = 400
 PLAN_AMOUNTS = {1: 9900, 3: 23900, 6: 43900}
-OPEN_SUBSCRIPTION_STATES = ("checkout", "active", "ending", "past_due")
+OPEN_SUBSCRIPTION_STATES = ("checkout", "trialing", "active", "ending", "past_due")
 
 
 class GoogleIdentity(models.Model):
@@ -124,6 +124,37 @@ class CreditPurchase(models.Model):
                            transaction__isnull=True, credited_months__isnull=False, credited_months=0)
                 | models.Q(status__in=["pending", "expired"], transaction__isnull=True)
             ), name="credit_purchase_fulfillment"),
+        ]
+
+
+class PlusFreeTrial(models.Model):
+    purchase = models.OneToOneField(CreditPurchase, models.PROTECT, primary_key=True, related_name="free_trial")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, models.PROTECT)
+    card_fingerprint_digest = models.CharField(max_length=64, blank=True, default="")
+    status = models.CharField(max_length=12, default="setup", choices=[
+        ("setup", "카드 등록 대기"), ("consent", "동의 대기"), ("reserved", "구독 생성 중"),
+        ("started", "체험 시작"), ("rejected", "중복 거절"), ("closed", "신청 종료"),
+    ])
+    consented_at = models.DateTimeField(null=True)
+    consent_version = models.CharField(max_length=64, blank=True, default="")
+    agreed_trial_ends_at = models.DateTimeField(null=True)
+    started_at = models.DateTimeField(null=True)
+    ends_at = models.DateTimeField(null=True)
+
+    class Meta:
+        db_table = "plus_free_trials"
+        constraints = [
+            models.UniqueConstraint(fields=["user"], condition=models.Q(status__in=["reserved", "started"]),
+                                    name="plus_trial_user_once"),
+            models.UniqueConstraint(fields=["card_fingerprint_digest"], condition=models.Q(status__in=["reserved", "started"]),
+                                    name="plus_trial_card_once"),
+            models.CheckConstraint(condition=~models.Q(status__in=["reserved", "started"]) | (
+                ~models.Q(card_fingerprint_digest="") & ~models.Q(consent_version="") &
+                models.Q(consented_at__isnull=False, agreed_trial_ends_at__gt=models.F("consented_at"),
+                         agreed_trial_ends_at__isnull=False)), name="plus_trial_consent"),
+            models.CheckConstraint(condition=~models.Q(status="started") | models.Q(
+                started_at__isnull=False, ends_at__isnull=False, ends_at__gt=models.F("started_at"),
+                ends_at=models.F("agreed_trial_ends_at")), name="plus_trial_period"),
         ]
 
 

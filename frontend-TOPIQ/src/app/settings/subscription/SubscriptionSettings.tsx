@@ -6,7 +6,7 @@ import { useApp } from "@/app/providers";
 import PlanChangeControls, { usePlanRefresh } from "@/components/credits/PlanChangeControls";
 import { authContent } from "@/lib/auth/auth-content";
 import { localizedPath } from "@/lib/locale-path";
-import { plansContent } from "@/lib/plans-content";
+import { billingTime, planAmount, plansContent } from "@/lib/plans-content";
 import { getMySubscription, openBillingPortal, WritingError, type ScheduledPlanChange, type SubscriptionAccount } from "@/lib/writing/writing-api";
 
 export default function SubscriptionSettings() {
@@ -62,15 +62,20 @@ export function SubscriptionSummary({ account, onRefresh }: {
 }) {
   const { language } = useApp();
   const p = plansContent[language];
-  const { subscription, currentPlanMonths, endsAt, canOpenBillingPortal } = account;
+  const { subscription, currentPlanMonths, endsAt, canOpenBillingPortal, trialEndsAt, firstChargeAmount } = account;
   const months = currentPlanMonths ?? subscription?.months;
-  const renewalStatus = { active: p.details.renewing, ending: p.ending, past_due: p.pastDue };
+  const inTrial = Boolean(trialEndsAt && Date.parse(trialEndsAt) > Date.now());
+  const endingTrial = inTrial && subscription?.state === "ending";
+  const renewalStatus = { active: p.details.renewing, trialing: inTrial ? p.trial.active : p.trial.billingPending,
+    ending: endingTrial ? p.trial.noCharge : p.ending, past_due: p.pastDue };
   const rows = [
     { label: p.details.status, value: subscription ? renewalStatus[subscription.state] : p.details.nonrenewing },
     ...(subscription ? [{ label: p.details.cycle, value: p.interval(subscription.months) }] : []),
-    { label: p.until, value: endsAt ? <time dateTime={endsAt}>{new Intl.DateTimeFormat(language, {
-      year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short",
-    }).format(new Date(endsAt))}</time> : p.details.noPaidPeriod },
+    { label: inTrial ? p.trial.accessEnds : p.until, value: endsAt ? <time dateTime={endsAt}>{billingTime(language, endsAt)}</time> : p.details.noPaidPeriod },
+    ...(inTrial && !endingTrial && trialEndsAt && firstChargeAmount != null ? [
+      { label: p.trial.firstCharge, value: <time dateTime={trialEndsAt}>{billingTime(language, trialEndsAt)}</time> },
+      { label: p.change.nextCharge, value: `${planAmount(language, firstChargeAmount)} · ${p.interval(1)}` },
+    ] : []),
   ];
   return <section aria-labelledby="subscription-plan" className="max-w-2xl rounded-xl border border-slate-200 p-5 sm:p-7">
     <p className="text-sm text-muted">{p.details.myPlan}</p>

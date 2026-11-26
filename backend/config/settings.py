@@ -28,6 +28,7 @@ DEBUG = DJANGO_ENV == "development"
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "").strip()
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "").strip()
+STRIPE_TRIAL_FINGERPRINT_KEY = os.environ.get("STRIPE_TRIAL_FINGERPRINT_KEY", "").strip()
 STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID", "").strip()
 STRIPE_PLAN_PRICE_IDS = {
     months: os.environ.get(f"STRIPE_PLAN_PRICE_ID_{months}M", "").strip() for months in (1, 3, 6)

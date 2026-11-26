@@ -3,13 +3,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
 import { creditsContent } from "@/lib/credits-content";
 import { localizedPath } from "@/lib/locale-path";
-import { plansContent } from "@/lib/plans-content";
-import { creditsRequest, startCreditPurchase, startPlanPurchase, WritingError, type CreditPrice, type CreditPurchaseStatus,
-  type PlanAccount, type ScheduledPlanChange } from "@/lib/writing/writing-api";
+import { planAmount, plansContent } from "@/lib/plans-content";
+import { confirmMonthlyTrial, creditsRequest, startCreditPurchase, startPlanPurchase, trialQuote, WritingError, type CreditPrice,
+  type CreditPurchaseStatus, type PlanAccount, type ScheduledPlanChange, type TrialQuote } from "@/lib/writing/writing-api";
 import PlanChangeControls from "./PlanChangeControls";
 import PlanOffers from "./PlanOffers";
+import TrialConsent from "./TrialConsent";
 
-type Notice = keyof typeof creditsContent.ko.checkout | "planInUse";
+type Notice = keyof typeof creditsContent.ko.checkout | "planInUse" | "cardUsed" | "accountUsed" | "cardUnavailable" |
+  "trialChecking" | "trialCreating" | "trialStarted" | "trialEnded" | "trialExit" | "trialDelayed";
 type CheckoutPrice = CreditPrice & { months?: number };
 interface Attempt { attemptId: string; price: CheckoutPrice; orderId?: string }
 
@@ -27,7 +29,7 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
   userId: number; returnId: string | null; cancelled: boolean; onFulfilled: (signal: AbortSignal) => void;
 } & ({ planAccount: PlanAccount | null; onPlanRefresh: (change?: ScheduledPlanChange | null) => void }
   | { planAccount?: undefined; onPlanRefresh?: undefined })) {
-  const { language, refreshSession } = useApp();
+  const { language, setLanguage, refreshSession } = useApp();
   const t = creditsContent[language];
   const p = plansContent[language];
   const isPlan = planAccount !== undefined;
@@ -38,6 +40,8 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
   const [price, setPrice] = useState<CreditPrice | "unavailable" | null>(initialAttempt?.price ?? null);
   const [priceRevision, setPriceRevision] = useState(0);
   const [checkCount, setCheckCount] = useState(0);
+  const [consent, setConsent] = useState<{ id: string; quote: TrialQuote } | null>(null);
+  const [consentNotice, setConsentNotice] = useState<"termsChanged" | "confirmAgain" | null>(null);
   const operation = useRef<AbortController | null>(null);
 
   const remember = useCallback((value: Attempt | null) => {
@@ -68,16 +72,37 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
     setPriceRevision(value => value + 1);
   }, []);
 
-  const finish = useCallback((order: CreditPurchaseStatus, signal: AbortSignal) => {
+  const finish = useCallback((order: CreditPurchaseStatus, result: Notice, signal: AbortSignal) => {
     if (attempt.current?.orderId === order.id) {
       remember(null);
       reloadPrice();
     }
-    if (order.status === "fulfilled") onFulfilled(signal);
-    setNotice(order.status === "fulfilled" ? "fulfilled" : "expired");
-  }, [remember, reloadPrice, onFulfilled]);
+    if (isPlan || order.status === "fulfilled") onFulfilled(signal);
+    setConsent(null);
+    setConsentNotice(null);
+    setNotice(result);
+  }, [remember, reloadPrice, onFulfilled, isPlan]);
+
+  const applyOrder = useCallback((order: CreditPurchaseStatus, signal: AbortSignal) => {
+    const trial = order.trial;
+    if (order.status === "fulfilled") finish(order, "fulfilled", signal);
+    else if (trial?.status === "card_used") finish(order, "cardUsed", signal);
+    else if (trial?.status === "card_unavailable") finish(order, "cardUnavailable", signal);
+    else if (trial?.status === "account_used") finish(order, "accountUsed", signal);
+    else if (order.status === "expired" || trial?.status === "ended") finish(order, trial ? "trialEnded" : "expired", signal);
+    else if (trial?.status === "started") {
+      const active = trial.endsAt && Date.parse(trial.endsAt) > Date.now();
+      finish(order, active ? "trialStarted" : "trialEnded", signal);
+    } else if (trial?.status === "awaiting_consent") {
+      const quote = trialQuote(trial);
+      setConsent(quote ? { id: order.id, quote } : null);
+      setNotice(quote ? null : "checkError");
+    } else return false;
+    return true;
+  }, [finish]);
 
   useEffect(() => {
+    setConsent(null);
     if (!returnId) return;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
@@ -87,10 +112,16 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
       try {
         const order = await creditsRequest<CreditPurchaseStatus>(`purchases/${returnId}/?product=${isPlan ? "plan" : "credit"}`, controller.signal);
         if (controller.signal.aborted) return;
-        if (order.status !== "pending") finish(order, controller.signal);
-        else if (cancelled) setNotice("cancelled");
-        else if (++polls < 12) timer = setTimeout(check, 2500);
-        else setNotice("delayed");
+        if (applyOrder(order, controller.signal)) return;
+        if (cancelled && order.trial?.status !== "creating") {
+          setNotice(order.trial ? "trialExit" : "cancelled");
+          return;
+        }
+        if (++polls >= 12) setNotice(order.trial ? "trialDelayed" : "delayed");
+        else {
+          setNotice(order.trial?.status === "creating" ? "trialCreating" : order.trial ? "trialChecking" : "checking");
+          timer = setTimeout(check, 2500);
+        }
       } catch (cause) {
         if (controller.signal.aborted) return;
         setNotice(cause instanceof WritingError && cause.status === 404 ? "unavailable" : "checkError");
@@ -99,7 +130,29 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
     }
     void check();
     return () => { controller.abort(); clearTimeout(timer); };
-  }, [returnId, cancelled, checkCount, finish, refreshSession, isPlan]);
+  }, [returnId, cancelled, checkCount, applyOrder, refreshSession, isPlan]);
+
+  async function confirmTrial() {
+    if (!consent || operation.current) return;
+    const controller = new AbortController();
+    operation.current = controller;
+    setNotice("trialCreating");
+    setConsentNotice(null);
+    try {
+      const result = await confirmMonthlyTrial(consent.id, consent.quote, controller.signal);
+      if (!controller.signal.aborted && !applyOrder(result, controller.signal)) setCheckCount(count => count + 1);
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      if (error instanceof WritingError && error.status === 401) void refreshSession();
+      else {
+        // A lost response can follow successful creation. Reconcile this order before offering another action.
+        setConsentNotice(error instanceof WritingError && error.code === "trial_terms_changed" ? "termsChanged" : "confirmAgain");
+        setCheckCount(count => count + 1);
+      }
+    } finally {
+      operation.current = null;
+    }
+  }
 
   async function buy(offer?: CheckoutPrice) {
     if (operation.current) return;
@@ -108,6 +161,7 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
     const controller = new AbortController();
     operation.current = controller;
     setNotice("opening");
+    setConsentNotice(null);
     try {
       const prior = attempt.current;
       const current = prior && prior.price.priceId === selected.priceId && prior.price.months === offer?.months
@@ -119,8 +173,10 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
         : await startCreditPurchase(current.attemptId, selected.priceId, controller.signal);
       if (controller.signal.aborted) return;
       remember({ ...current, orderId: order.id });
-      if (order.status !== "pending") finish(order, controller.signal);
+      if (order.status !== "pending") applyOrder(order, controller.signal);
       else if (order.checkoutUrl) {
+        // Stripe's shared return URL has no locale prefix.
+        if (isPlan) setLanguage(language);
         window.location.assign(order.checkoutUrl);
         setNotice(null);
       } else {
@@ -133,14 +189,14 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
       }
     } catch (cause) {
       if (controller.signal.aborted) return;
-      if (cause instanceof WritingError && cause.status === 409 && cause.code === "price_changed") {
+      if (cause instanceof WritingError && ["price_changed", "trial_offer_changed"].includes(cause.code)) {
         remember(null);
         setNotice("priceChanged");
         reloadPrice();
         onPlanRefresh?.();
-      } else if (cause instanceof WritingError && cause.code === "plan_in_use") {
+      } else if (cause instanceof WritingError && ["plan_in_use", "trial_account_used"].includes(cause.code)) {
         remember(null);
-        setNotice("planInUse");
+        setNotice(cause.code === "trial_account_used" ? "accountUsed" : "planInUse");
         onPlanRefresh?.();
       } else {
         setNotice("startError");
@@ -151,19 +207,30 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
     }
   }
 
-  const retryCheck = notice === "delayed" || notice === "checkError";
-  const blocked = notice === "opening" || notice === "checking" || retryCheck;
+  const retryCheck = notice === "delayed" || notice === "trialDelayed" || notice === "checkError";
+  const blocked = notice === "opening" || notice === "checking" || notice === "trialChecking" || notice === "trialCreating" || retryCheck;
   const canSubscribe = planAccount && !planAccount.active && !planAccount.subscription;
+  const trialNotices = { trialChecking: p.trial.checking, trialCreating: p.trial.creating, trialDelayed: p.trial.delayed,
+    trialStarted: p.trial.started, trialEnded: p.trial.ended, cardUsed: p.trial.cardUsed, accountUsed: p.trial.accountUsed,
+    cardUnavailable: p.trial.cardUnavailable, trialExit: p.trial.exit, planInUse: p.inUse };
+  const messages = { ...t.checkout, ...(isPlan ? p.checkout : {}), ...trialNotices };
   return <div className="credits-purchase">
-    {isPlan ? planAccount && (canSubscribe ? <PlanOffers language={language} account={planAccount}
-      renderAction={({ months, priceId, currency, amount, bonusCredits }) => <>
-        <button type="button" className="button button-primary" disabled={blocked || !priceId}
-          aria-label={`${p.term(months)} · ${priceId ? p.buy : p.unavailable}`}
-          aria-describedby="plan-card-notice"
-          onClick={() => priceId && void buy({ priceId, currency, amount, credits: bonusCredits, months })}>
-          {priceId ? p.buy : p.unavailable}
-        </button>
-      </>} /> : <PlanChangeControls account={planAccount} onRefresh={onPlanRefresh} />) : price === "unavailable" ? <>
+    {isPlan && notice && <p className="w-full" role="status">{messages[notice]}</p>}
+    {consent && consentNotice && <p className="w-full" role="alert">{p.trial[consentNotice]}</p>}
+    {consent && <TrialConsent key={JSON.stringify([consent.id, consent.quote, language])} quote={consent.quote}
+      busy={notice === "trialCreating"} onConfirm={() => void confirmTrial()} />}
+    {isPlan ? planAccount && !consent && (canSubscribe ? <PlanOffers language={language} account={planAccount}
+      renderAction={({ months, priceId, currency, amount, bonusCredits, trialDays }) => {
+        const used = months === 1 && planAccount.trialEligible === false;
+        const available = priceId && (months !== 1 || trialDays === 7 && planAccount.trialEligible === true);
+        const label = used || !available ? p.unavailable : months === 1 ? p.trial.start : p.trial.pay(planAmount(language, amount));
+        return <>
+          <button type="button" className="button button-primary" disabled={blocked || !available}
+            aria-label={`${p.term(months)} · ${label}`} aria-describedby="plan-card-notice"
+            onClick={() => priceId && void buy({ priceId, currency, amount, credits: bonusCredits, months })}>{label}</button>
+          {used && <p className="text-sm">{p.trial.accountUsed}</p>}
+        </>;
+      }} /> : <PlanChangeControls account={planAccount} onRefresh={onPlanRefresh} />) : price === "unavailable" ? <>
       <p role="status">{t.priceUnavailable}</p>
       <button type="button" className="button credits-secondary" onClick={reloadPrice}>{t.retry}</button>
     </> : price ? <>
@@ -173,6 +240,7 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
     </> : <p role="status">{t.priceLoading}</p>}
     {(planAccount?.active || planAccount?.subscription) && <Link className="button credits-secondary"
       href={localizedPath("/settings/subscription", language)}>{p.settingsTitle}</Link>}
-    {retryCheck && <button type="button" className="button credits-secondary" onClick={() => setCheckCount(count => count + 1)}>{t.checkAgain}</button>}
+    {retryCheck && <button type="button" className="button credits-secondary" onClick={() => setCheckCount(count => count + 1)}>
+      {notice === "trialDelayed" ? p.trial.retry : t.checkAgain}</button>}
   </div>;
 }

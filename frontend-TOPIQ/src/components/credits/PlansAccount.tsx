@@ -7,7 +7,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useApp } from "@/app/providers";
 import { authContent } from "@/lib/auth/auth-content";
 import { creditsContent } from "@/lib/credits-content";
-import { plansContent } from "@/lib/plans-content";
+import { planAmount, plansContent } from "@/lib/plans-content";
+import { localizedPath } from "@/lib/locale-path";
 import { getPlans, WritingError, type PlanAccount, type ScheduledPlanChange } from "@/lib/writing/writing-api";
 import CreditPurchase from "./CreditPurchase";
 import { usePlanRefresh } from "./PlanChangeControls";
@@ -30,10 +31,11 @@ export default function PlansAccount() {
     {status === "loading" ? <p className="catalog-status" role="status">{a.loading}</p>
       : status === "error" ? <div className="catalog-status" role="alert">{a.network} <button className="button credits-secondary" onClick={() => void refreshSession()}>{a.retry}</button></div>
       : !user ? <div className="credits-purchase">
-        <PlanOffers language={language} renderAction={({ months }) =>
-          <Link className="button button-primary" href={`/login?next=${encodeURIComponent(next)}`}
-            aria-label={`${p.term(months)} · ${p.login}`}>{p.login}</Link>
-        } />
+        <PlanOffers language={language} renderAction={({ months, amount }) => {
+          const label = months === 1 ? p.trial.start : p.trial.pay(planAmount(language, amount));
+          return <Link className="button button-primary" href={`${localizedPath("/login", language)}?next=${encodeURIComponent(localizedPath(next, language))}`}
+            aria-label={`${label} · ${p.login}`}>{label}</Link>;
+        }} />
       </div>
       : <MemberPlans key={user.id} userId={user.id} returnId={returnId} cancelled={cancelled} />}
     <div className="billing-notice" id="plan-card-notice"><Info size={16} aria-hidden="true" /><p>{creditsContent[language].cardIssuerNotice}</p></div>

@@ -9,13 +9,19 @@ import PlanOffers from "./PlanOffers";
 export function usePlanRefresh(account: SubscriptionAccount | PlanAccount | null, reload: () => void) {
   useEffect(() => {
     const now = Date.now();
-    const upcoming = [account?.endsAt, account?.nextBillingAt, account?.scheduledChange?.effectiveAt]
+    const upcoming = [account?.endsAt, account?.trialEndsAt, account?.nextBillingAt, account?.scheduledChange?.effectiveAt]
       .map(value => value ? Date.parse(value) : 0).filter(time => time > now);
     // Browsers accept at most a signed 32-bit timeout for long billing cycles.
     const timer = upcoming.length ? setTimeout(reload, Math.min(Math.min(...upcoming) - now, 2_147_483_647)) : undefined;
     const onPageShow = (event: PageTransitionEvent) => { if (event.persisted) reload(); };
+    const onVisible = () => { if (document.visibilityState === "visible") reload(); };
     window.addEventListener("pageshow", onPageShow);
-    return () => { clearTimeout(timer); window.removeEventListener("pageshow", onPageShow); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("pageshow", onPageShow);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [account, reload]);
 }
 
@@ -75,7 +81,7 @@ export default function PlanChangeControls({ account, onRefresh }: {
           effectiveAt={nextBillingAt} date={date.format(new Date(nextBillingAt))} today={money.format(0)} amount={money.format(amount)}
           onConfirm={() => void submit(nextBillingAt, signal => schedulePlanChange(months, priceId, nextBillingAt, signal))} />;
       }
-      const status = { active: priceId ? p.change.cannotSchedule : p.unavailable, ending: p.ending, past_due: p.pastDue };
+      const status = { active: priceId ? p.change.cannotSchedule : p.unavailable, trialing: p.trial.changeAfter, ending: p.ending, past_due: p.pastDue };
       const reason = account.planChangeUnavailable ? p.change.unavailable : scheduledChange ? p.change.alreadyScheduled
         : subscription ? status[subscription.state] : p.prepaid;
       const description = `${reasonId}-${months}`;
