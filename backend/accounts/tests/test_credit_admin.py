@@ -1,3 +1,4 @@
+import re
 import uuid
 from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
@@ -48,9 +49,11 @@ class CreditPlanAdminTests(TestCase):
         self.assertContains(listing, "현재 플랜")
         self.assertContains(listing, "이용 만료 일시 (한국시간)")
         self.assertContains(listing, "현재 Plus만 보기")
-        self.assertContains(listing, '<td class="field-current_plan">Plus</td>', count=2)
-        self.assertContains(listing, '<td class="field-current_plan">Free</td>', count=4)
-        self.assertContains(listing, '<td class="field-plan_expiry">—</td>', count=4)
+        html = listing.content.decode()
+        plans = re.findall(r'<td class="[^"]*\bfield-current_plan\b[^"]*">(Free|Plus)</td>', html)
+        self.assertCountEqual(plans, ["Plus"] * 2 + ["Free"] * 4)
+        empty_expiries = re.findall(r'<td class="[^"]*\bfield-plan_expiry\b[^"]*">—</td>', html)
+        self.assertEqual(len(empty_expiries), 4)
 
         filtered = self.client.get(url, {"plan": "plus"})
         changelist = filtered.context["cl"]

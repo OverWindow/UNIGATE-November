@@ -1,35 +1,55 @@
 {% extends "admin/base_site.html" %}
+{% load unfold %}
+
 {% block content %}
-<div class="module">
-  <h2>지급 대상: {{ accounts|length }}명</h2>
-  <table>
-    <thead><tr><th scope="col">사용자 번호</th><th scope="col">이메일</th><th scope="col">닉네임</th></tr></thead>
-    <tbody>
-      {% for account in accounts %}
-      <tr><td>{{ account.user_id }}</td><td>{{ account.user.email }}</td><td>{{ account.user.first_name }}</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-<form method="post">
-  {% csrf_token %}
-  <input type="hidden" name="action" value="grant_selected">
-  <input type="hidden" name="select_across" value="0">
-  {% for account in accounts %}
-  <input type="hidden" name="_selected_action" value="{{ account.user_id }}">
-  {% endfor %}
-  {% if confirmation %}
-    {{ form.non_field_errors }}
-    <p>1인당 지급 크레딧: <strong>{{ form.cleaned_data.amount }}</strong></p>
-    <p>지급 사유: {{ form.cleaned_data.reason }}</p>
-    <p>총 지급 크레딧: <strong>{{ total }}</strong></p>
-    <p>위 사용자 모두에게 같은 크레딧을 지급합니다. 대상과 지급량을 확인해 주세요.</p>
-    <input type="hidden" name="confirmation" value="{{ confirmation }}">
-    <input type="submit" value="지급 확정">
-  {% else %}
-    {{ form.as_p }}
-    <button type="submit" name="preview" value="1">지급 내용 확인</button>
-  {% endif %}
-  <a href="{% url 'admin:accounts_creditaccount_changelist' %}">취소</a>
-</form>
+  {% url "admin:accounts_creditaccount_changelist" as list_url %}
+  <form method="post" class="flex flex-col gap-4 max-w-2xl">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="grant_selected">
+    <input type="hidden" name="select_across" value="0">
+    {% for account in accounts %}
+      <input type="hidden" name="_selected_action" value="{{ account.user_id }}">
+    {% endfor %}
+
+    <h2 class="font-semibold text-important" id="recipient-heading">지급 대상 {{ accounts|length }}명</h2>
+    <div class="overflow-x-auto rounded-default border border-base-200 dark:border-base-800">
+      <table class="w-full text-left" aria-labelledby="recipient-heading">
+        <thead class="bg-base-50 text-important dark:bg-base-900">
+          <tr><th class="px-3 py-2" scope="col">사용자 번호</th><th class="px-3 py-2" scope="col">이메일</th><th class="px-3 py-2" scope="col">닉네임</th></tr>
+        </thead>
+        <tbody class="divide-y divide-base-200 dark:divide-base-800">
+          {% for account in accounts %}
+            <tr>
+              <td class="px-3 py-2">{{ account.user_id }}</td>
+              <td class="px-3 py-2">{{ account.user.email }}</td>
+              <td class="px-3 py-2">{{ account.user.first_name }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% component "unfold/components/card.html" %}
+      {% if confirmation %}
+        {% include "unfold/helpers/form_errors.html" with errors=form.non_field_errors %}
+        <dl class="grid gap-3 mb-4">
+          <div><dt>1인당 지급 크레딧</dt><dd class="font-semibold text-important">{{ form.cleaned_data.amount }}</dd></div>
+          <div><dt>지급 사유</dt><dd class="text-important">{{ form.cleaned_data.reason }}</dd></div>
+          <div><dt>총 지급 크레딧</dt><dd class="font-semibold text-important">{{ total }}</dd></div>
+        </dl>
+        <p class="mb-4">위 사용자 모두에게 같은 크레딧을 지급합니다. 대상과 지급량을 확인해 주세요.</p>
+        <input type="hidden" name="confirmation" value="{{ confirmation }}">
+      {% else %}
+        {% include "admin/accounts/grant_fields.html" %}
+      {% endif %}
+      <div class="flex flex-wrap gap-2">
+        {% if confirmation %}
+          {% component "unfold/components/button.html" with submit=1 %}지급 확정{% endcomponent %}
+        {% else %}
+          {% component "unfold/components/button.html" with submit=1 name="preview" value="1" %}지급 내용 확인{% endcomponent %}
+        {% endif %}
+        {% component "unfold/components/button.html" with href=list_url variant="default" %}취소{% endcomponent %}
+      </div>
+    {% endcomponent %}
+  </form>
 {% endblock %}

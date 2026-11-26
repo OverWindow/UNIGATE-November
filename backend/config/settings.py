@@ -68,6 +68,7 @@ if not DEBUG and (not ALLOWED_HOSTS or "*" in ALLOWED_HOSTS):
     raise ImproperlyConfigured("Set explicit DJANGO_ALLOWED_HOSTS in production.")
 
 INSTALLED_APPS = [
+    "unfold",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -81,6 +82,13 @@ INSTALLED_APPS = [
     "vocabulary.apps.VocabularyConfig",
     "writing.apps.WritingConfig",
 ]
+UNFOLD = {
+    "SITE_TITLE": "UNIGATE 관리",
+    "SITE_HEADER": "UNIGATE 관리",
+    "SITE_SYMBOL": "school",
+    "SIDEBAR": {"navigation": "config.admin_navigation.sidebar"},
+    "DASHBOARD_CALLBACK": "config.admin_navigation.dashboard",
+}
 MIGRATION_MODULES = {"surveys": "migration.surveys", "accounts": "migration.accounts", "question_bank": "migration.question_bank", "pbt": "migration.pbt", "vocabulary": "migration.vocabulary", "writing": "migration.writing"}
 
 # Evaluations are included in purchased sets; provider configuration controls availability.
@@ -123,7 +131,7 @@ if any(origin in CSRF_TRUSTED_ORIGINS for origin in landing_origins):
 
 TEMPLATES = [{
     "BACKEND": "django.template.backends.django.DjangoTemplates",
-    "DIRS": [],
+    "DIRS": [BASE_DIR / "templates"],
     "APP_DIRS": True,
     "OPTIONS": {"context_processors": [
         "django.template.context_processors.request",

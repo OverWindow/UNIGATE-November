@@ -4,6 +4,9 @@ from zoneinfo import ZoneInfo
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
+from django.contrib.auth.admin import GroupAdmin as DjangoGroupAdmin
+from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
+from django.contrib.auth.models import Group, User
 from django.core import signing
 from django.core.exceptions import PermissionDenied
 from django.db import DatabaseError, transaction
@@ -13,16 +16,37 @@ from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.urls import path
 from django.utils import timezone
+from unfold.admin import ModelAdmin
+from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
+from unfold.widgets import UnfoldAdminIntegerFieldWidget, UnfoldAdminTextInputWidget
 
 from .credits import CreditError, grant
 from .models import CreditAccount, CreditTransaction
 from .plans import active_plans, active_trials, extend_plan_end, paid_plans
 
 
+admin.site.unregister([User, Group])
+
+
+@admin.register(User)
+class UserAdmin(DjangoUserAdmin, ModelAdmin):
+    form = UserChangeForm
+    add_form = UserCreationForm
+    change_password_form = AdminPasswordChangeForm
+    change_user_password_template = "admin/accounts/user_change_password.html"
+
+
+@admin.register(Group)
+class GroupAdmin(DjangoGroupAdmin, ModelAdmin):
+    pass
+
+
 class GrantForm(forms.Form):
-    user_id = forms.IntegerField(min_value=1, label="사용자 ID")
-    amount = forms.IntegerField(min_value=1, max_value=1_000_000, label="지급 크레딧")
-    reason = forms.CharField(max_length=200, label="지급 사유")
+    user_id = forms.IntegerField(min_value=1, label="사용자 ID", widget=UnfoldAdminIntegerFieldWidget)
+    amount = forms.IntegerField(
+        min_value=1, max_value=1_000_000, label="지급 크레딧", widget=UnfoldAdminIntegerFieldWidget,
+    )
+    reason = forms.CharField(max_length=200, label="지급 사유", widget=UnfoldAdminTextInputWidget)
     grant_id = forms.UUIDField(widget=forms.HiddenInput)
 
     def clean_user_id(self):
@@ -33,12 +57,14 @@ class GrantForm(forms.Form):
 
 
 class BulkGrantForm(forms.Form):
-    amount = forms.IntegerField(min_value=1, max_value=1_000_000, label="1인당 지급 크레딧")
-    reason = forms.CharField(max_length=200, label="지급 사유")
+    amount = forms.IntegerField(
+        min_value=1, max_value=1_000_000, label="1인당 지급 크레딧", widget=UnfoldAdminIntegerFieldWidget,
+    )
+    reason = forms.CharField(max_length=200, label="지급 사유", widget=UnfoldAdminTextInputWidget)
     grant_id = forms.UUIDField(widget=forms.HiddenInput)
 
 
-class ReadOnlyAdmin(admin.ModelAdmin):
+class ReadOnlyAdmin(ModelAdmin):
     def get_readonly_fields(self, request, obj=None):
         return [field.name for field in self.model._meta.fields]
 

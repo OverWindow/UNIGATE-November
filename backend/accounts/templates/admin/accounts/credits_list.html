@@ -1,5 +1,10 @@
 {% extends "admin/change_list.html" %}
+{% load unfold %}
+
 {% block object-tools-items %}
-{% if perms.accounts.add_credittransaction %}<li><a href="{% url 'admin:accounts_creditaccount_grant' %}">크레딧 지급</a></li>{% endif %}
-{{ block.super }}
+  {% if perms.accounts.add_credittransaction %}
+    {% url "admin:accounts_creditaccount_grant" as grant_url %}
+    {% component "unfold/components/button.html" with href=grant_url icon="add" %}크레딧 지급{% endcomponent %}
+  {% endif %}
+  {{ block.super }}
 {% endblock %}

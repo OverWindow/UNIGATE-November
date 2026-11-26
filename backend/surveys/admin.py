@@ -6,6 +6,7 @@ from django.urls import path
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_GET
+from unfold.admin import ModelAdmin
 
 from .csv_export import SEOUL, write_survey_csv
 from .admin_export import CsvExportAdminMixin
@@ -14,7 +15,7 @@ from .models import SignupSurveyResponse, SurveyResponse
 
 
 @admin.register(SurveyResponse)
-class SurveyResponseAdmin(admin.ModelAdmin):
+class SurveyResponseAdmin(ModelAdmin):
     list_display = ("id", "email", "age", "education_type", "desired_university", "created_at")
     search_fields = ("email", "desired_university")
     list_filter = ("education_type", "created_at")
@@ -53,7 +54,7 @@ class SurveyResponseAdmin(admin.ModelAdmin):
 
 
 @admin.register(SignupSurveyResponse)
-class SignupSurveyResponseAdmin(CsvExportAdminMixin, admin.ModelAdmin):
+class SignupSurveyResponseAdmin(CsvExportAdminMixin, ModelAdmin):
     csv_filename_prefix = "signup_survey_responses"
     csv_writer = staticmethod(write_signup_survey_csv)
     list_display = ("user_id", "email", "nickname", "nationality_code", "target_topik_level", "language", "survey_completed_at")

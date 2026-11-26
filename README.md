@@ -795,6 +795,15 @@ Google Analytics 4 측정 ID `G-S2TDPYEQ93`을 랜딩페이지에 삽입했습�
 
 ### 관리자와 수동 발송
 
+관리자 화면은 Django Unfold를 사용합니다. Windows 로컬 환경에서는 테마를 처음 적용할 때 `backend/`에서 다음 명령으로 패키지를 설치하고 개발 서버를 시작합니다.
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe manage.py runserver
+```
+
+`http://localhost:8000/admin/`에 로그인하면 관리 권한에 따라 회원·크레딧, 신청·설문, 시험·피드백, 쓰기 평가 메뉴가 표시됩니다. 테마 적용에 필요한 DB 마이그레이션은 없습니다. 운영에서는 기존 백엔드 이미지 빌드 시 패키지를 설치하고 시작 시 `collectstatic`으로 테마 정적 파일을 자동 수집합니다.
+
 백엔드에서 `manage.py createsuperuser`로 운영자 계정을 대화형으로 만든 후 백엔드 도메인의 `/admin/`에 접속합니다.
 신청 목록을 검색·필터링하고 관리자의 **CSV 다운로드** 버튼으로 현재 필터에 맞는 전체 신청을 내려받아 PDF를 수동 발송합니다. CSV 다운로드는 신청 조회 권한이 있는 운영자만 사용할 수 있습니다. 관리자에서 신청을 삭제하면 실제 데이터가 삭제됩니다.
 운영자 계정·신청자 개인정보·내보낸 CSV는 Git이나 공개 공유 경로에 올리지 않습니다.

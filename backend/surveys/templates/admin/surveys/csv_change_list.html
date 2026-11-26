@@ -2,8 +2,8 @@
 {% load admin_urls %}
 
 {% block object-tools-items %}
-  <li>
-    <a href="{% url opts|admin_urlname:'export_csv' %}?{{ request.GET.urlencode }}">CSV 다운로드</a>
-  </li>
+  {% url opts|admin_urlname:"export_csv" as csv_url %}
+  {% querystring as list_query %}
+  {% include "unfold/components/button.html" with href=csv_url|add:list_query variant="default" icon="download" children="CSV 다운로드" only %}
   {{ block.super }}
 {% endblock %}

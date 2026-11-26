@@ -1,4 +1,16 @@
 {% extends "admin/base_site.html" %}
+{% load unfold %}
+
 {% block content %}
-<form method="post">{% csrf_token %}{{ form.as_p }}<input type="submit" value="크레딧 지급"></form>
+  {% url "admin:accounts_creditaccount_changelist" as list_url %}
+  <form method="post" class="max-w-2xl">
+    {% csrf_token %}
+    {% component "unfold/components/card.html" %}
+      {% include "admin/accounts/grant_fields.html" %}
+      <div class="flex flex-wrap gap-2">
+        {% component "unfold/components/button.html" with submit=1 %}크레딧 지급{% endcomponent %}
+        {% component "unfold/components/button.html" with href=list_url variant="default" %}취소{% endcomponent %}
+      </div>
+    {% endcomponent %}
+  </form>
 {% endblock %}
