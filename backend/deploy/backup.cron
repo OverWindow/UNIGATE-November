@@ -1,0 +1,2 @@
+CRON_TZ=Asia/Seoul
+0 3 * * * exec /app/backend/deploy/backup-db.sh daily

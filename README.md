@@ -971,11 +971,53 @@ Gunicorn 요청 로그는 `backend/deploy/gunicorn.conf.py`에서 설정하며 �
 이 로그 설정 변경은 API·DB 테이블·컬럼·migration을 추가하거나 변경하지 않습니다.
 
 기존 배포의 단일 레플리카 / Recreate 구성을 유지하고, 동일한 PostgreSQL 서비스·볼륨·연결값을 사용합니다.
-마이그레이션 전 백업은 운영자가 별도로 수행합니다. 코드 교체가 DB 백업이나 복원을 대신하지 않습니다.
+백업 기능 배포 후에는 운영 마이그레이션이나 대량 변경 직전에 **현재 백엔드**의 `/app/backend`에서 `/app/backend/deploy/backup-db.sh manual`을 실행합니다. 업로드 성공을 확인한 뒤 배포를 시작합니다.
 DB 비밀번호·이메일 발송 키를 프론트 빌드 인자에 넣지 않습니다. 랜딩페이지 신청에는 Brevo가 필요 없지만 TOPIQ 이메일 인증에는 앞 절의 Brevo 설정이 필요합니다.
 
 배포 후 별도 검증 환경에서 HTTPS, 상태 검사, CSRF를 포함한 신청 저장, 관리자 조회와 CSV 내보내기를 확인하세요.
 Docker 실행 환경이나 운영 도메인에서 확인하지 못한 항목은 로컬 코드 검사 통과만으로 검증된 것으로 취급하지 않습니다.
+
+### Cloudtype PostgreSQL 전체 백업과 S3 복구
+
+백엔드 컨테이너가 `DB_NAME`에 지정된 DB 전체를 `pg_dump -Fc`로 백업합니다. 하나의 일관된 스냅샷에 `public`, `topik_bank` 등 DB 안의 스키마·테이블·데이터·시퀀스·인덱스가 포함됩니다. PostgreSQL 클러스터 역할·테이블스페이스 정의, 서버 설정, 별도 DB 및 S3 미디어 원본은 따로 관리합니다. 복구 시점은 성공한 덤프의 스냅샷 시각이며, 하루 한 번 정상 백업하면 그 이후 최대 약 하루의 변경분을 잃을 수 있습니다. 실패가 지속되면 이 간격은 길어집니다.
+
+**1. S3를 1회 준비합니다.**
+
+- AWS 콘솔 **S3 → 범용 버킷 → 버킷 만들기**에서 백업 전용 새 버킷과 리전을 선택합니다. 객체 소유권은 *버킷 소유자 적용*, 퍼블릭 액세스 차단은 네 항목 모두 켜고, 버전 관리는 비활성, 기본 암호화는 *Amazon S3 관리형 키(SSE-S3)*로 생성합니다. 미디어 공개 정책·CloudFront 접근 권한을 연결하지 않습니다. [AWS 버킷 생성 안내](https://docs.aws.amazon.com/AmazonS3/latest/userguide/create-bucket-overview.html)
+- **해당 버킷 → 관리 → 수명 주기 규칙 생성**에서 이름을 입력하고 범위 필터에 접두사 `unigate/prod/`를 지정합니다. **객체의 현재 버전 만료**에 생성 후 `30`일, **만료된 객체 삭제 마커 또는 불완전한 멀티파트 업로드 삭제 → 불완전한 멀티파트 업로드 삭제**에 시작 후 `1`일을 지정하고 저장합니다. 규칙이 활성 상태인지 확인합니다. 사용자 지정 접두사를 쓰면 규칙과 IAM 정책에도 같은 값을 사용합니다. 만료된 객체는 S3가 비동기로 정리합니다. [AWS 수명 주기 설정](https://docs.aws.amazon.com/AmazonS3/latest/userguide/how-to-set-lifecycle-configuration-intro.html) · [미완료 업로드 정리](https://docs.aws.amazon.com/AmazonS3/latest/userguide/mpu-abort-incomplete-mpu-lifecycle-config.html)
+- 백엔드의 전용 IAM 자격에는 `arn:aws:s3:::<버킷>/unigate/prod/daily/*`, `arn:aws:s3:::<버킷>/unigate/prod/manual/*`에 `s3:PutObject`, `s3:AbortMultipartUpload`를 허용합니다. 버킷 ARN에는 `s3:ListBucket`을 허용하고 `StringLike` 조건의 `s3:prefix`를 `unigate/prod/daily/*`로 제한합니다. 복구 운영자의 별도 자격에만 백업 객체의 `s3:GetObject`를 부여하고, 콘솔에서 객체를 찾을 때는 해당 백업 접두사의 목록 권한도 부여합니다. 버킷 관리·삭제 권한은 백엔드에서 사용하지 않습니다.
+
+**2. 수동 백업과 복구를 확인한 뒤 예약을 켭니다.**
+
+1. Cloudtype에서 백엔드와 DB가 03:00 KST에 실행되는 구독 리소스인지, 백엔드가 **단일 레플리카 / Recreate**인지 확인합니다. 기존 `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_SSLMODE`를 사용하며, DB 계정이 `topik_bank`를 포함한 모든 대상 객체를 읽을 수 있어야 합니다. 백엔드에서 압축 덤프 한 개를 작성할 임시 디스크 여유와 작업 중 CPU·디스크 부하를 확인합니다. [Cloudtype 리소스 유형](https://docs.cloudtype.dev/ko/developers/resource)
+2. 백엔드의 **런타임**에 `DB_BACKUP_SCHEDULE_ENABLED=0`, `DB_BACKUP_S3_BUCKET`(버킷 이름), `DB_BACKUP_S3_PREFIX=unigate/prod`, `AWS_DEFAULT_REGION`(버킷 리전)을 설정합니다. AWS 자격은 런타임 시크릿에만 등록합니다. 키 방식이면 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`를 사용하며 임시 자격은 `AWS_SESSION_TOKEN`과 유효기간 내 갱신도 필요합니다. PostgreSQL 클라이언트의 빌드 인자 `POSTGRES_CLIENT_MAJOR`는 기본 `16`입니다. 운영 서버 메이저와 맞춰 Dockerfile 컨텍스트 `backend/`를 재빌드·배포합니다.
+3. 배포 후 **백엔드 컨테이너**의 `/app/backend`에서 `/app/backend/deploy/backup-db.sh manual`을 수동 실행합니다. `pg_restore --list` 검사를 통과한 덤프가 CRC32 체크섬과 함께 업로드됩니다. 종료 코드 `0`, 로그의 `completed: archive uploaded`, S3의 `<접두사>/manual/YYYY/MM/DD/HHMMSS-<고유 ID>.dump`를 확인하고 아래 복구 검증을 수행합니다. 수동 백업은 예약을 끈 상태에서도 가능합니다.
+4. 검증 후 `DB_BACKUP_SCHEDULE_ENABLED=1`로 바꿔 백엔드를 재배포합니다. 매일 **03:00 KST**에 `<접두사>/daily/YYYY/MM/DD/database.dump`를 생성합니다. 일일 실행 실패 시 10분 뒤, 다시 실패하면 그로부터 30분 뒤 재시도합니다. 재기동 시에는 03:00 이후 당일 일일 객체가 없을 때 한 번 보충합니다. 과거 날짜의 스냅샷은 소급 생성할 수 없습니다. 예약을 끌 때는 값을 `0`으로 바꿔 재배포합니다.
+5. 첫 예약 실행 다음 아침과 이후 매일 Cloudtype 백엔드 로그와 S3에서 **당일 일일 객체의 날짜·크기**를 확인합니다. 누락 시 DB 접근, S3 권한, 자격 만료, 디스크 여유를 확인한 뒤 운영 컨테이너에서 `/app/backend/deploy/backup-db.sh catch-up`을 실행합니다. 별도 외부 알림은 구성하지 않습니다. 백업은 운영 DB를 읽으며 신규 HTTP API·테이블·컬럼·마이그레이션은 없습니다.
+
+**3. 최초 수동 백업과 이후 매월 1회 실제 복구를 검증합니다.**
+
+운영 DB에 접근할 수 없는 격리된 복구 호스트의 POSIX 셸에서 실행합니다. 원본과 같은 PostgreSQL 메이저·필요 확장·로캘을 준비하고 `createdb`, `pg_restore`, `psql`, AWS CLI v2를 설치합니다. 읽기 전용 S3 자격으로 `BACKUP_URI`에 확인할 `.dump`의 전체 S3 URI를 지정합니다. `RESTORE_TEST_HOST`, `RESTORE_TEST_PORT`, `RESTORE_TEST_USER`는 **격리 PostgreSQL 서버** 전용 값이며, 해당 사용자는 그 서버에서 DB를 생성할 수 있어야 합니다. 인증은 권한 `0600`의 테스트 전용 `.pgpass` 등에 설정하고 테스트 서버의 TLS 정책을 적용합니다. 작업 디스크와 DB 볼륨은 개인정보를 처리할 수 있는 암호화된 저장소를 사용합니다.
+
+```sh
+(
+  set -eu
+  umask 077
+  unset PGSERVICE PGSERVICEFILE PGHOSTADDR PGDATABASE PGPASSWORD
+  export PGHOST="${RESTORE_TEST_HOST:?}" PGPORT="${RESTORE_TEST_PORT:?}" PGUSER="${RESTORE_TEST_USER:?}"
+  restore_dir=$(mktemp -d)
+  trap 'rm -f -- "$restore_dir/database.dump"; rmdir -- "$restore_dir"' EXIT
+  restore_db="unigate_restore_$(date -u +%Y%m%d%H%M%S)"
+  aws s3 cp "${BACKUP_URI:?}" "$restore_dir/database.dump" --checksum-mode ENABLED --only-show-errors
+  pg_restore --list "$restore_dir/database.dump" >/dev/null
+  createdb --maintenance-db=postgres --template=template0 "$restore_db"
+  pg_restore --dbname="$restore_db" --single-transaction --exit-on-error --no-owner --no-privileges "$restore_dir/database.dump"
+  psql -X --set=ON_ERROR_STOP=1 --dbname="$restore_db" \
+    -c 'SELECT current_database(), (SELECT count(*) FROM public.django_migrations) AS migrations, (SELECT count(*) FROM public.survey_responses) AS surveys, (SELECT count(*) FROM public.pbt_attempts) AS attempts, (SELECT count(*) FROM topik_bank.items) AS items;'
+)
+```
+
+백업 URI·덤프 시각·복구 소요 시간과 집계 결과를 기록하고, 백업 시점에 예상한 규모·마이그레이션 이력과 비교합니다. 점검 후 격리 DB를 폐기합니다. 이 명령은 새 검증 DB에 스키마와 데이터를 작성하며 테스트 계정이 복구 객체를 소유합니다. 실제 서비스 전환에는 운영 역할·소유권·권한을 별도로 준비하고 애플리케이션 접근을 검증해야 합니다. [PostgreSQL 복구 옵션](https://www.postgresql.org/docs/16/app-pgrestore.html) · [AWS CLI 체크섬 검증](https://docs.aws.amazon.com/cli/latest/reference/s3/cp.html)
 
 ## 배포 전 검증 기록 (2026-11-02)
 
@@ -1029,7 +1071,7 @@ PBT는 `item_id`로 현재 연결을 조회하고 문항 해시 일치·음원 �
 구형 DB 적용 전에는 대상 DB의 전체 백업과 복원 가능 여부를 확인하고, Hub 전송·음원 편집 및 웹 요청을 중지합니다.
 `0004`는 관련 테이블 쓰기를 잠그고 이관·이력 검증·테이블 제거를 하나의 트랜잭션으로 수행합니다.
 문항 없는 연결, 이력 검증 실패 또는 제거 대상 테이블을 참조하는 외부 객체가 있으면 전체 이관을 롤백합니다.
-자동 백업이나 역방향 migration은 제공하지 않으며, 적용 후 이전 구조로 돌아가려면 적용 전 백업을 복원해야 합니다.
+이 migration은 자체 백업이나 역방향 migration을 제공하지 않습니다. 이전 구조로 돌아가려면 적용 전에 만든 백업을 복원해야 합니다.
 
 로컬에서는 사용자가 백업을 확인한 뒤 아래 명령을 `backend/`에서 수동 실행합니다.
 `migrate`는 구형 DB의 구조·음원 연결 데이터를 변경하며, 이미 전환된 DB에서는 검증과 Django 적용 이력 기록만 수행합니다.
