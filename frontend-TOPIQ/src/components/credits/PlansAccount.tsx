@@ -1,6 +1,6 @@
 "use client";
 
-import { Info, X } from "lucide-react";
+import { Info } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
@@ -31,6 +31,7 @@ export default function PlansAccount() {
         <PlanOffers language={language} renderAction={({ months }) => {
           const label = months === 1 ? p.trial.start : p.trial.pay;
           return <Link className={`button ${months === 1 ? "button-primary" : "plan-pay-button"}`} href={`${localizedPath("/login", language)}?next=${encodeURIComponent(localizedPath(next, language))}`}
+            data-plans-checkout
             aria-label={`${label} · ${p.login}`}>{label}</Link>;
         }} />
       </div>
@@ -46,22 +47,20 @@ function PlansHeading({ confirmExit, checkout }: { confirmExit: boolean; checkou
   const dialog = useRef<HTMLDialogElement>(null);
   const stayButton = useRef<HTMLButtonElement>(null);
   const leaving = useRef(false);
-  const showDialog = useCallback(() => {
-    dialog.current?.showModal();
+  const pendingExit = useRef<() => void>(undefined);
+  const requestExit = useCallback((action: () => void) => {
+    if (!dialog.current || dialog.current.open) return;
+    pendingExit.current = action;
+    dialog.current.showModal();
     stayButton.current?.focus();
   }, []);
 
   function leave() {
+    const action = pendingExit.current;
+    if (!action) return;
     leaving.current = true;
     dialog.current?.close();
-    const steps = window.history.state?.topiqPlansExit ? 2 : 1;
-    if (window.history.length > steps) window.history.go(-steps);
-    else router.replace(localizedPath("/", language));
-  }
-
-  function requestExit() {
-    if (confirmExit) showDialog();
-    else leave();
+    action();
   }
 
   useEffect(() => {
@@ -70,11 +69,28 @@ function PlansHeading({ confirmExit, checkout }: { confirmExit: boolean; checkou
     const pushGuard = () => window.history.pushState({ topiqPlansExit: true }, "", plansUrl);
     if (!window.history.state?.topiqPlansExit) pushGuard();
 
+    function followLink(event: MouseEvent) {
+      if (leaving.current || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[href]") : null;
+      if (!link || (link.target && link.target !== "_self") || link.hasAttribute("download") || link.hasAttribute("data-plans-checkout")) return;
+      const current = new URL(window.location.href);
+      const target = new URL(link.href);
+      if (target.protocol !== "http:" && target.protocol !== "https:") return;
+      if (target.origin === current.origin && target.pathname === current.pathname) return;
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      requestExit(() => link.click());
+    }
+
     function back(event: PopStateEvent) {
       if (leaving.current || window.location.href !== plansUrl || event.state?.topiqPlansExit) return;
       event.stopImmediatePropagation();
       pushGuard();
-      showDialog();
+      requestExit(() => {
+        if (window.history.length > 2) window.history.go(-2);
+        else router.replace(localizedPath("/", language));
+      });
     }
 
     function unload(event: BeforeUnloadEvent) {
@@ -89,25 +105,23 @@ function PlansHeading({ confirmExit, checkout }: { confirmExit: boolean; checkou
       if (checkout) checkout.current = false;
     }
 
+    document.addEventListener("click", followLink, true);
     window.addEventListener("popstate", back, true);
     window.addEventListener("beforeunload", unload);
     window.addEventListener("pageshow", restore);
     return () => {
+      document.removeEventListener("click", followLink, true);
       window.removeEventListener("popstate", back, true);
       window.removeEventListener("beforeunload", unload);
       window.removeEventListener("pageshow", restore);
     };
-  }, [confirmExit, checkout, showDialog]);
+  }, [confirmExit, checkout, language, requestExit, router]);
 
   return <header>
-    <div className="plans-title-row">
-      <h1 className="catalog-title">{p.title}</h1>
-      <button type="button" className="button credits-secondary plans-close" aria-label={p.exit.close} onClick={requestExit}>
-        <X size={20} aria-hidden="true" />
-      </button>
-    </div>
+    <h1 className="catalog-title">{p.title}</h1>
     <p className="catalog-description">{p.intro}</p>
-    {confirmExit && <dialog ref={dialog} className="plans-exit-dialog" aria-labelledby="plans-exit-title" aria-describedby="plans-exit-description">
+    {confirmExit && <dialog ref={dialog} className="plans-exit-dialog" aria-labelledby="plans-exit-title" aria-describedby="plans-exit-description"
+      onClose={() => { pendingExit.current = undefined; }}>
       <h2 id="plans-exit-title">{p.exit.title}</h2>
       <p id="plans-exit-description">{p.exit.description}</p>
       <div className="plans-exit-actions">

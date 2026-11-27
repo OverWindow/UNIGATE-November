@@ -23,7 +23,7 @@ const imports = {
   },
   "next/navigation": { usePathname: () => path, useSearchParams: () => search, useRouter: () => ({}) },
   "next/image": { default: () => null },
-  "next/link": { default: ({ href, children }) => React.createElement("a", { href }, children) },
+  "next/link": { default: ({ href, children, "data-plans-checkout": checkout }) => React.createElement("a", { "data-plans-checkout": checkout, href }, children) },
   "@/app/providers": { useApp: () => session },
   "@/lib/seo": { requestLanguage: async () => session.language },
   "@/lib/use-navigation-router": { default: () => ({}) },
@@ -162,7 +162,8 @@ test("Each Plus card lists benefits and savings and the selected purchase starts
     months, amount, currency: "krw", priceId: `price_plan_${months}`, bonusCredits: 400, trialDays: months === 1 ? 7 : 0,
   }));
   const posts = [];
-  window.location = { assign() {} };
+  const checkoutSteps = [];
+  window.location = { assign(url) { checkoutSteps.push(url); } };
   globalThis.fetch = async (url, options) => {
     if (url === "/api/csrf/") return Response.json({ csrfToken: "synthetic" });
     posts.push([url, JSON.parse(options.body)]);
@@ -170,7 +171,8 @@ test("Each Plus card lists benefits and savings and the selected purchase starts
   };
   let buy;
   const tree = mount(() => {
-    const ui = CreditPurchase({ planAccount: { plans, active: false, currentPlanMonths: null, trialEligible: true }, userId: 1, returnId: null, onFulfilled() {} });
+    const ui = CreditPurchase({ planAccount: { plans, active: false, currentPlanMonths: null, trialEligible: true }, userId: 1, returnId: null, onFulfilled() {},
+      onCheckout() { checkoutSteps.push("checkout"); } });
     const [offers] = React.Children.toArray(ui.props.children);
     buy = offers.props.renderAction(plans[2]).props.onClick;
     return ui;
@@ -202,6 +204,7 @@ test("Each Plus card lists benefits and savings and the selected purchase starts
   buy();
   await setImmediate();
   assert.equal(posts.length, 1);
+  assert.deepEqual(checkoutSteps, ["checkout", "https://checkout.stripe.com/example"]);
   assert.equal(posts[0][0], "/api/plans/purchases/");
   assert.deepEqual(posts[0][1], { attemptId: posts[0][1].attemptId, months: 6, priceId: "price_plan_6" });
   assert.match(posts[0][1].attemptId, /^[\da-f-]{36}$/);
@@ -248,6 +251,8 @@ test("guests can browse all plans and each Plus card returns them to plans after
       assert.ok(card.includes(`href="${prefix}/login?next=${encodeURIComponent(prefix + "/plans")}">${label}</a>`));
     }
     assert.doesNotMatch(page.html, /aria-current="true"/);
+    assert.doesNotMatch(page.html, /plans-close/);
+    assert.equal((page.html.match(/data-plans-checkout=/g) ?? []).length, offers.length);
     assert.ok(page.html.includes(plansContent[language].exit.title));
     page.unmount();
   }

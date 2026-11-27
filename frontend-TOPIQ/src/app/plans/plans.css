@@ -27,8 +27,6 @@
 .plan-action > .plan-pay-button { background: #5b6574; color: #fff; }
 .plan-action > .plan-pay-button:hover:not(:disabled) { background: #47515f; }
 .plan-action > .plan-pay-button:disabled { opacity: .5; }
-.plans-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.button.plans-close { flex: none; min-height: 40px; padding: 9px; }
 .plans-exit-dialog { position: fixed; inset: 0; width: min(440px, calc(100% - 32px)); margin: auto; padding: 24px; border: 1px solid #dfe6f1; border-radius: 16px; background: #fff; color: var(--color-ink); }
 .plans-exit-dialog::backdrop { background: #17294480; }
 .plans-exit-dialog h2 { font-size: 1.2rem; font-weight: 650; }

@@ -28,7 +28,7 @@ interface PlanCopy {
   login: string; current: string; until: string; freeBenefits: string[];
   term: (months: number) => string; benefits: string[]; unavailable: string;
   paymentStartsNow: string; trialStartsNow: string; unlimitedAccess: string;
-  exit: { close: string; title: string; description: string; yes: string; no: string };
+  exit: { title: string; description: string; yes: string; no: string };
   savings: (percent: number) => string;
   trial: {
     start: string; pay: string; after: (amount: string) => string;
@@ -99,7 +99,7 @@ export const plansContent: Record<Language, PlanCopy> = {
     paymentStartsNow: "지금 바로 결제 후 사용 시작",
     trialStartsNow: "카드 등록 후 결제 없이 사용 시작, 7일 뒤 자동 결제",
     unlimitedAccess: "모든 모의고사 및 단어장 무제한 열람",
-    exit: { close: "요금제 닫기", title: "7일 무료 이용 혜택을 포기하시겠습니까?",
+    exit: { title: "7일 무료 이용 혜택을 포기하시겠습니까?",
       description: "서비스를 무제한으로 이용할 기회를 놓치지 마세요.", yes: "예", no: "아니오" },
     benefits: ["공개된 PBT·IBT 읽기·듣기 모의고사 무제한 응시", "모든 단어장 및 단어 퀴즈 무제한 열람"],
     checkout: {
@@ -155,7 +155,7 @@ export const plansContent: Record<Language, PlanCopy> = {
     paymentStartsNow: "Pay now to get started",
     trialStartsNow: "Register a card to start without paying. You’ll be charged automatically after 7 days.",
     unlimitedAccess: "Unlimited access to all practice tests and vocabulary lists",
-    exit: { close: "Close plans", title: "Give up your 7-day free trial?",
+    exit: { title: "Give up your 7-day free trial?",
       description: "Don’t miss your chance to get unlimited access.", yes: "Yes", no: "No" },
     benefits: ["Unlimited access to published PBT and IBT reading and listening exams", "Unlimited access to all vocabulary lists and quizzes"],
     checkout: {
@@ -211,7 +211,7 @@ export const plansContent: Record<Language, PlanCopy> = {
     paymentStartsNow: "Bayar sekarang untuk mulai menggunakan layanan",
     trialStartsNow: "Daftarkan kartu untuk mulai tanpa biaya. Tagihan otomatis dilakukan setelah 7 hari.",
     unlimitedAccess: "Akses tanpa batas ke semua simulasi ujian dan daftar kosakata",
-    exit: { close: "Tutup paket", title: "Lewatkan uji coba gratis 7 hari?",
+    exit: { title: "Lewatkan uji coba gratis 7 hari?",
       description: "Jangan lewatkan kesempatan untuk mendapatkan akses tanpa batas.", yes: "Ya", no: "Tidak" },
     benefits: ["Akses tanpa batas ke semua simulasi membaca dan menyimak PBT dan IBT yang tersedia", "Akses tanpa batas ke semua daftar kosakata dan kuis kosakata"],
     checkout: {
