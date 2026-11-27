@@ -167,10 +167,12 @@ class CreditPurchaseTests(TestCase):
             params = self.sessions.create.call_args.args[0]
             if months == 1:
                 self.assertEqual(params["mode"], "setup")
+                self.assertNotIn("allow_promotion_codes", params)
                 self.assertNotIn("line_items", params)
                 self.assertEqual(params["setup_intent_data"]["metadata"], {"credit_purchase_id": str(order.pk)})
             else:
                 self.assertEqual(params["mode"], "subscription")
+                self.assertIs(params["allow_promotion_codes"], True)
                 self.assertNotIn("payment_method_types", params)
                 self.assertEqual(params["line_items"], [{"price": price_id, "quantity": 1}])
                 self.assertEqual(params["subscription_data"]["metadata"], {"credit_purchase_id": str(order.pk)})
@@ -231,6 +233,21 @@ class CreditPurchaseTests(TestCase):
         })
         self.client.force_login(get_user_model().objects.create_user(username="another-subscription-owner"))
         self.assertEqual(self.client.get(MY_SUBSCRIPTION, {"user_id": self.user.pk}).json(), free)
+
+    def test_discounted_subscription_records_actual_charge_and_accepts_undiscounted_renewal(self):
+        self.prices.retrieve.return_value = plan_price(3, 23900, "price_three")
+        order = CreditPurchase.objects.get(pk=self.post_plan(3, "price_three").json()["id"])
+        now = int(time.time())
+        first = plan_invoice(order, "in_discounted", "subscription_create", now - 60, now + 3600)
+        renewal = plan_invoice(order, "in_regular_renewal", "subscription_cycle", now + 3600, now + 7200)
+        first.update(amount_paid=11950, total_discount_amounts=[{"amount": 11950}])
+        self.assertEqual(signed_event(self.client, "invoice.paid", first | {"amount_paid": 1}).status_code, 400)
+        for bill in (first, first, renewal):
+            self.assertEqual(signed_event(self.client, "invoice.paid", bill).status_code, 200)
+        order.refresh_from_db()
+        self.assertEqual((order.amount, order.status, order.subscription_state), (11950, "fulfilled", "active"))
+        self.assertEqual(CreditPurchase.objects.get(stripe_invoice_id=renewal["id"]).amount, 23900)
+        self.assertEqual(self.client.get("/api/credits/").json()["balance"], 550)
 
     def test_subscription_renewals_and_cancellation_with_reordered_webhooks(self):
         # This monthly subscription predates mandatory trials.
@@ -600,6 +617,7 @@ class CreditPurchaseTests(TestCase):
         self.assertNotIn("payment_method_types", params)
         self.assertEqual(params["currency"], "krw")
         self.assertEqual(params["customer"], "cus_fixture_owner")
+        self.assertIs(params["allow_promotion_codes"], True)
         self.assertEqual(params["invoice_creation"], {"enabled": True})
         self.assertEqual(params["line_items"], [{"price": PRICE_ID, "quantity": 1}])
         self.assertEqual(params["success_url"], f"https://topiq.example.invalid/credits?purchase={order.pk}")
@@ -632,11 +650,16 @@ class CreditPurchaseTests(TestCase):
         order = CreditPurchase.objects.create(user=self.user, attempt_id=self.attempt_id, amount=AMOUNT,
                                               stripe_price_id=PRICE_ID)
         self.sessions.create.side_effect = [
+            stripe.APIError("fixture parameter mismatch", http_status=409,
+                            json_body={"error": {"type": "idempotency_error"}}),
             stripe.IdempotencyError("fixture parameter mismatch", http_status=400), self.sessions.create.return_value,
         ]
         self.assertEqual(self.post_attempt().json()["checkoutUrl"], CHECKOUT_URL)
-        modern, legacy = self.sessions.create.call_args_list
-        self.assertEqual(modern.kwargs, legacy.kwargs)
+        current, previous, legacy = self.sessions.create.call_args_list
+        self.assertEqual(current.kwargs, previous.kwargs)
+        self.assertEqual(previous.kwargs, legacy.kwargs)
+        self.assertEqual(current.args[0], previous.args[0] | {"allow_promotion_codes": True})
+        self.assertEqual(previous.args[0], legacy.args[0] | {"customer": "cus_fixture_owner", "invoice_creation": {"enabled": True}})
         self.assertEqual(legacy.kwargs["options"]["idempotency_key"], str(order.pk))
         self.assertNotIn("invoice_creation", legacy.args[0])
         self.assertNotIn("customer", legacy.args[0])

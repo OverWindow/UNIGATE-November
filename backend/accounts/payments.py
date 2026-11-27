@@ -19,7 +19,9 @@ from .credits import locked_account, reconcile_purchase_refunds, record
 from .models import CREDIT_PURCHASE_QUANTITY, PLAN_AMOUNTS, PLAN_BONUS, CreditAccount, CreditPurchase, PlusFreeTrial
 from .plan_changes import InvalidBillingState, PlanChangeConflict, can_schedule, next_change, plan_item, read_subscription, update_change
 from .plans import assign_plan_period, current_plan, current_plan_end, open_subscription
-from .refunds import RefundOrderNotReady, apply_refund, refund_state, reserve_refund, reserved_orders, submit_refund, topups
+from .refunds import (
+    RefundOrderNotReady, apply_refund, matches_checkout_amount, refund_state, reserve_refund, reserved_orders, submit_refund, topups,
+)
 from .subscriptions import apply_paid_invoice, cancel_order_subscription, close_revoked_checkout, matching_checkout, sync_subscription
 from . import trial_checkout
 from .views import api_response, read_payload
@@ -221,14 +223,18 @@ def recover_plan_session(purchase, sessions, *, customer_id=None):
     return session
 
 
+def checkout_parameter_mismatch(exc):
+    # The SDK exposes a 409 as APIError and can leave the Stripe code on its nested error.
+    code = exc.code or getattr(exc.error, "code", None)
+    key_mismatch = isinstance(exc, stripe.IdempotencyError) or getattr(exc.error, "type", None) == "idempotency_error"
+    return exc.http_status in (400, 409) and key_mismatch and code != "idempotency_key_in_use"
+
+
 def create_subscription_session(purchase, sessions, params, *, retry):
     try:
         return sessions.create(params, options={"idempotency_key": str(purchase.pk)})
     except (stripe.IdempotencyError, stripe.APIError) as exc:
-        # The SDK exposes a 409 as APIError and can leave the Stripe code on its nested error.
-        code = exc.code or getattr(exc.error, "code", None)
-        key_mismatch = isinstance(exc, stripe.IdempotencyError) or getattr(exc.error, "type", None) == "idempotency_error"
-        if not retry or exc.http_status not in (400, 409) or not key_mismatch or code == "idempotency_key_in_use":
+        if not retry or not checkout_parameter_mismatch(exc):
             raise
 
     session = recover_plan_session(purchase, sessions, customer_id=params["customer"])
@@ -302,20 +308,28 @@ def checkout_session(purchase, client, *, retry, setup=False):
                 return None
         elif purchase.subscription_state:
             session = create_subscription_session(purchase, sessions, {
-                **params, "customer": customer_id, "subscription_data": {"metadata": params["metadata"]},
+                **params, "allow_promotion_codes": True, "customer": customer_id,
+                "subscription_data": {"metadata": params["metadata"]},
                 "expires_at": int((purchase.created_at + timedelta(hours=24)).timestamp()),
             }, retry=retry)
             if session is None:
                 return None
         else:
             options = {"idempotency_key": str(purchase.pk)}
+            customer_params = {**params, "customer": customer_id, "invoice_creation": {"enabled": True}}
+            checkout_params = customer_params if purchase.plan_months else {**customer_params, "allow_promotion_codes": True}
             try:
-                session = sessions.create({**params, "customer": customer_id, "invoice_creation": {"enabled": True}}, options=options)
-            except stripe.IdempotencyError as exc:
-                if purchase.plan_months or not retry or exc.http_status != 400 or exc.code == "idempotency_key_in_use":
+                session = sessions.create(checkout_params, options=options)
+            except (stripe.IdempotencyError, stripe.APIError) as exc:
+                if purchase.plan_months or not retry or not checkout_parameter_mismatch(exc):
                     raise
-                # Recover a pre-portal Checkout using its original parameters and key.
-                session = sessions.create(params, options=options)
+                # Replay older Checkouts with the original parameters and key.
+                try:
+                    session = sessions.create(customer_params, options=options)
+                except (stripe.IdempotencyError, stripe.APIError) as legacy_exc:
+                    if not checkout_parameter_mismatch(legacy_exc):
+                        raise
+                    session = sessions.create(params, options=options)
         CreditPurchase.objects.filter(pk=purchase.pk, stripe_session_id__isnull=True).update(stripe_session_id=session.id)
 
     if session.status == "expired":
@@ -642,7 +656,7 @@ def apply_checkout_event(event_type, session, event_created=None):
     if not purchase.stripe_session_id:
         return 503  # Retry after session creation has committed.
     if (session["id"] != purchase.stripe_session_id or session["mode"] != "payment"
-            or session["currency"] != purchase.currency or session["amount_total"] != purchase.amount):
+            or session["currency"] != purchase.currency or not matches_checkout_amount(purchase, session)):
         return 400
     if revoked_legacy:
         if purchase.stripe_subscription_id or purchase.stripe_invoice_id or (
@@ -656,11 +670,13 @@ def apply_checkout_event(event_type, session, event_created=None):
         if session["status"] == "expired" and purchase.status == "pending":
             purchase.status = "expired"
             purchase.save(update_fields=["status"])
-    elif session["payment_status"] == "paid" and session["status"] == "complete":
+    elif session["status"] == "complete" and (session["payment_status"] == "paid" or (
+            session["payment_status"] == "no_payment_required" and session["amount_total"] == 0)):
         intent_id = session.get("payment_intent")
         if purchase.stripe_payment_intent_id and purchase.stripe_payment_intent_id != intent_id:
             return 400
         purchase.stripe_payment_intent_id = intent_id
+        purchase.amount = session["amount_total"]
         if purchase.plan_months:
             assign_plan_period(purchase, datetime.fromtimestamp(event_created, UTC))
             purchase.credited_months = 1
@@ -669,7 +685,7 @@ def apply_checkout_event(event_type, session, event_created=None):
         if purchase.plan_months is None:
             purchase.remaining_credits = purchase.credits
         purchase.status = "fulfilled"
-        purchase.save(update_fields=["transaction", "status", "plan_starts_at", "plan_ends_at", "credited_months",
+        purchase.save(update_fields=["transaction", "status", "amount", "plan_starts_at", "plan_ends_at", "credited_months",
                                      "stripe_payment_intent_id", "remaining_credits"])
         reconcile_purchase_refunds(account, purchase, previous_refunded=0 if purchase.plan_months is None else None)
     return 200

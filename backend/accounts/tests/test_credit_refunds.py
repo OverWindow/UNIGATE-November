@@ -199,14 +199,16 @@ class CreditRefundTests(TestCase):
         self.assertEqual([(e["kind"], e["amount"]) for e in history], [("refund", 999), ("refund", 1), ("purchase", 1000)])
 
     def test_early_refund_is_saved_and_reconciled_on_fulfillment(self):
-        self.api.checkout.sessions.list.return_value.data = [topup_session(self.order)]
-        refund = refund_object("re_early", AMOUNT)
+        discounted = {"amount_subtotal": AMOUNT, "amount_total": 3000, "total_details": {"amount_discount": AMOUNT - 3000}}
+        session = topup_session(self.order).to_dict() | discounted
+        self.api.checkout.sessions.list.return_value.data = [stripe.checkout.Session.construct_from(session, None)]
+        refund = refund_object("re_early", 3000)
         self.notify(refund)
         self.notify(refund, "refund.updated")
         self.wallet(0)
         self.assertFalse(CreditTransaction.objects.exists())
-        self.paid()
-        self.paid()
+        for _ in range(2):
+            self.assertEqual(post_webhook(self.client, self.order, payment_intent="pi_topup", **discounted).status_code, 200)
         self.notify(refund)
         self.wallet(0)
         self.assertEqual(self.states()[str(self.order.pk)], (0, "refunded"))
@@ -227,6 +229,27 @@ class CreditRefundTests(TestCase):
         self.wallet(900)
         self.assertEqual(self.states()[str(self.order.pk)], (900, "contact"))
         self.assertCountEqual(self.order.refund_entries.values_list("kind", "amount"), [("refund", 300), ("restore", 300)])
+
+    def test_discounted_topup_refunds_the_amount_charged(self):
+        discounted = {"amount_subtotal": AMOUNT, "amount_total": 3000, "total_details": {"amount_discount": AMOUNT - 3000}}
+        self.assertEqual(post_webhook(self.client, self.order, amount_total=3000).status_code, 400)
+        for _ in range(2):
+            self.assertEqual(post_webhook(self.client, self.order, payment_intent="pi_topup", **discounted).status_code, 200)
+        self.wallet(1000)
+        self.assertEqual(self.client.get("/api/credits/purchases/").json()["purchases"][0]["amount"], 3000)
+        self.configure_refund("succeeded")
+        self.assertEqual(self.request_refund(self.order).json()["refundState"], "refunded")
+        self.assertEqual(self.api.refunds.create.call_args.args[0]["amount"], 3000)
+        self.wallet(0)
+
+    def test_fully_discounted_topup_grants_credits_without_a_refund_action(self):
+        response = post_webhook(self.client, self.order, amount_subtotal=AMOUNT, amount_total=0,
+                                total_details={"amount_discount": AMOUNT}, payment_status="no_payment_required")
+        self.assertEqual(response.status_code, 200)
+        self.wallet(1000)
+        self.assertEqual(self.states()[str(self.order.pk)], (1000, "no_payment"))
+        self.assertEqual(self.request_refund(self.order).json()["refundState"], "no_payment")
+        self.api.refunds.create.assert_not_called()
 
     def test_invalid_or_unrelated_events_and_atomic_retry(self):
         self.paid()

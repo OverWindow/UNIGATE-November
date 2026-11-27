@@ -7,7 +7,7 @@ export const paymentHistoryContent = {
     refundTitle: "일회성 크레딧 환불", orders: "내 충전 주문", loginForOrders: "로그인하고 내 주문 보기",
     policy: "일회성으로 충전한 크레딧이 해당 주문에 모두 남아 있으면 결제 금액 전액을 환불받을 수 있습니다. 일부를 사용했다면 해당 주문의 ‘고객 문의’로 남은 유료 크레딧의 환불을 문의해 주세요.",
     back: "크레딧으로 돌아가기", receipts: "Stripe 영수증", empty: "아직 일회성 충전 결제가 없습니다.", refund: "전액 환불", contact: "고객 문의",
-    remaining: "잔여", held: "크레딧 보류 중", processing: "환불 처리 중", refunded: "전액 환불 완료",
+    remaining: "잔여", held: "크레딧 보류 중", processing: "환불 처리 중", refunded: "전액 환불 완료", no_payment: "결제 금액 없음",
     confirming: "환불 접수 확인", error: "환불 상태를 확인하지 못했습니다. 내역을 다시 확인해 주세요.",
     failed: "환불이 완료되지 않았습니다. 다시 시도하거나 결제 문의를 이용해 주세요.",
     inquiry: {
@@ -22,7 +22,7 @@ export const paymentHistoryContent = {
     refundTitle: "One-time credit refunds", orders: "My top-ups", loginForOrders: "Sign in to view my top-ups",
     policy: "You can get a full refund for a one-time top-up if all the credits from that order are unused. If you’ve used some, select “Contact billing” on the order to ask about a refund for the remaining paid credits.",
     back: "Back to credits", receipts: "Stripe receipts", empty: "No one-time top-ups yet.", refund: "Full refund", contact: "Contact billing",
-    remaining: "Remaining", held: "Credits on hold", processing: "Refund processing", refunded: "Fully refunded",
+    remaining: "Remaining", held: "Credits on hold", processing: "Refund processing", refunded: "Fully refunded", no_payment: "No payment",
     confirming: "Check refund request", error: "Couldn’t confirm the refund status. Refresh your payment history.",
     failed: "The refund did not complete. Try again or contact billing.",
     inquiry: {
@@ -37,7 +37,7 @@ export const paymentHistoryContent = {
     refundTitle: "Pengembalian dana isi ulang satu kali", orders: "Pesanan isi ulang saya", loginForOrders: "Masuk untuk melihat pesanan saya",
     policy: "Kamu bisa meminta pengembalian dana penuh jika semua kredit dari pesanan isi ulang satu kali masih tersisa. Jika sebagian sudah digunakan, pilih “Hubungi layanan pembayaran” pada pesanan tersebut untuk menanyakan pengembalian dana atas sisa kredit berbayar.",
     back: "Kembali ke kredit", receipts: "Kuitansi Stripe", empty: "Belum ada pembayaran isi ulang satu kali.", refund: "Pengembalian dana penuh", contact: "Hubungi layanan pembayaran",
-    remaining: "Sisa", held: "Kredit ditahan", processing: "Pengembalian dana diproses", refunded: "Dana dikembalikan penuh",
+    remaining: "Sisa", held: "Kredit ditahan", processing: "Pengembalian dana diproses", refunded: "Dana dikembalikan penuh", no_payment: "Tidak ada pembayaran",
     confirming: "Periksa permintaan", error: "Status pengembalian dana belum terkonfirmasi. Muat ulang riwayat pembayaran.",
     failed: "Pengembalian dana belum selesai. Coba lagi atau hubungi layanan pembayaran.",
     inquiry: {
@@ -58,7 +58,7 @@ interface Copy {
   loginRequired: string; previous: string; next: string; page: string;
   topup: string; buy: (credits: string) => string; checkAgain: string; priceLoading: string; priceUnavailable: string;
   cardIssuerNotice: string; paymentHistory: string; portal: Record<"opening" | "empty" | "error", string>;
-  checkout: Record<"opening" | "checking" | "delayed" | "cancelled" | "fulfilled" | "expired" | "startError" | "checkError" | "unavailable" | "priceChanged", string>;
+  checkout: Record<"opening" | "checking" | "delayed" | "fulfilled" | "expired" | "startError" | "checkError" | "unavailable" | "priceChanged", string>;
   kinds: Record<CreditEntry["kind"], string>;
 }
 
@@ -82,7 +82,6 @@ export const creditsContent: Record<Language, Copy> = {
     checkout: {
       opening: "Stripe 결제창을 여는 중입니다.", checking: "결제 확인 중입니다.",
       delayed: "결제 확인에 시간이 걸리고 있습니다. 잠시 후 상태를 다시 확인해 주세요.",
-      cancelled: "결제창에서 돌아왔습니다. 충전 버튼을 눌러 다시 결제할 수 있습니다.",
       fulfilled: "1,000크레딧을 충전했습니다.", expired: "결제 시간이 만료되었습니다. 새로 충전할 수 있습니다.",
       startError: "결제창을 열지 못했습니다. 잠시 후 충전 버튼을 다시 눌러 주세요.",
       checkError: "결제 상태를 불러오지 못했습니다.", unavailable: "이 주문을 찾을 수 없습니다.",
@@ -109,7 +108,6 @@ export const creditsContent: Record<Language, Copy> = {
     checkout: {
       opening: "Opening Stripe Checkout…", checking: "Confirming your payment…",
       delayed: "Your payment is still being confirmed. Check its status again shortly.",
-      cancelled: "You left checkout. Use the purchase button to return to checkout.",
       fulfilled: "1,000 credits added.", expired: "Checkout expired. You can start a new purchase.",
       startError: "Couldn’t open checkout. Try the purchase button again shortly.",
       checkError: "Couldn’t load the payment status.", unavailable: "Order not found.",
@@ -136,7 +134,6 @@ export const creditsContent: Record<Language, Copy> = {
     checkout: {
       opening: "Membuka halaman pembayaran Stripe…", checking: "Mengonfirmasi pembayaran…",
       delayed: "Pembayaran masih diproses. Periksa kembali statusnya sebentar lagi.",
-      cancelled: "Anda telah keluar dari halaman pembayaran. Tekan tombol pembelian untuk melanjutkan.",
       fulfilled: "1.000 kredit telah ditambahkan.", expired: "Sesi pembayaran berakhir. Anda dapat memulai pembelian baru.",
       startError: "Halaman pembayaran tidak dapat dibuka. Coba lagi sebentar.",
       checkError: "Status pembayaran tidak dapat dimuat.", unavailable: "Pesanan tidak ditemukan.",

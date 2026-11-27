@@ -128,6 +128,28 @@ test("a return from Checkout checks the order before refreshing the wallet, even
   }
 });
 
+test("returning from card setup or Plus Checkout checks the order silently", async () => {
+  const id = crypto.randomUUID();
+  for (const language of ["ko", "en", "id"]) {
+    session.language = language;
+    for (const trial of [undefined, { status: "awaiting_card" }]) {
+      const calls = [];
+      globalThis.fetch = async url => {
+        calls.push(url);
+        return Response.json({ id, status: "pending", trial });
+      };
+      const page = mount(() => React.createElement(CreditPurchase, {
+        userId: 1, returnId: id, cancelled: true, planAccount: null, onPlanRefresh() {},
+        onFulfilled: () => assert.fail("An incomplete order should remain pending"),
+      }));
+      await setImmediate();
+      assert.doesNotMatch(page.html, /role="status"/);
+      assert.deepEqual(calls, [`/api/credits/purchases/${id}/?product=plan`]);
+      page.unmount();
+    }
+  }
+});
+
 function savedCheckout(t, attemptId) {
   const key = "topiq-credit-purchase:1";
   const storage = new Map([[key, JSON.stringify({ attemptId, price })]]);

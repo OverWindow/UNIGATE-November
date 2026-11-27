@@ -151,7 +151,8 @@ def apply_paid_invoice(invoice, *, get_api=None):
     line = lines["data"][0]
     price_id = ((line.get("pricing") or {}).get("price_details") or {}).get("price") or (line.get("price") or {}).get("id")
     item = (line.get("parent") or {}).get("subscription_item_details") or line
-    months, expected_price, amount = order.plan_months, order.stripe_price_id, order.amount
+    months, expected_price = order.plan_months, order.stripe_price_id
+    amount = PLAN_AMOUNTS[months] if order.stripe_invoice_id else order.amount
     if reason != "subscription_create" and metadata.get("topiq_change_at"):
         # Finalized invoices snapshot the terms set on the booked phase, including retired prices.
         months = int(metadata["topiq_plan_months"])
@@ -163,7 +164,10 @@ def apply_paid_invoice(invoice, *, get_api=None):
     free_invoice = trial is not None and reason == "subscription_create" and invoice["amount_paid"] == 0
     if free_invoice:
         amount = 0
-    if (invoice["status"] != "paid" or invoice["currency"] != order.currency or invoice["amount_paid"] != amount
+    discount = sum(item["amount"] for item in (invoice.get("total_discount_amounts") or [])) if trial is None else 0
+    paid_amount = invoice["amount_paid"]
+    if (invoice["status"] != "paid" or invoice["currency"] != order.currency or not 0 <= discount <= amount
+            or paid_amount != amount - discount
             or line["amount"] != amount or price_id != expected_price or line["quantity"] != 1
             or item.get("proration") or item.get("subscription") != subscription_id):
         raise ValueError("Unexpected subscription charge")
@@ -199,11 +203,12 @@ def apply_paid_invoice(invoice, *, get_api=None):
         # A renewal can arrive early. Its first month is due when the new period starts.
         receipt = CreditPurchase(user_id=order.user_id, attempt_id=uuid4(), plan_months=months,
                                  stripe_price_id=price_id, currency=order.currency,
-                                 amount=amount, credits=order.credits, credited_months=0)
+                                 credits=order.credits, credited_months=0)
     if order.subscription_state == "checkout" or (first_payment and order.subscription_state in ("trialing", "past_due")):
         order.subscription_state = "active"
         order.save(update_fields=["subscription_state"])
     receipt.stripe_invoice_id = invoice["id"]
+    receipt.amount = paid_amount
     receipt.plan_starts_at, receipt.plan_ends_at = start, end
     if order.subscription_state == "revoked":
         receipt.subscription_state = "revoked"

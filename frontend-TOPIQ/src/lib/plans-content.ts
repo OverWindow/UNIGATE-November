@@ -36,7 +36,7 @@ interface PlanCopy {
     firstCharge: string; method: string; card: string; active: string; noCharge: string; accessEnds: string;
     checking: string; creating: string; started: string; cardUsed: string; accountUsed: string;
     cardUnavailable: string; termsChanged: string; delayed: string; retry: string; ended: string;
-    changeAfter: string; exit: string; billingPending: string; confirmAgain: string;
+    changeAfter: string; billingPending: string; confirmAgain: string;
   };
   settingsTitle: string; portalUnavailable: string;
   change: {
@@ -48,7 +48,7 @@ interface PlanCopy {
   details: { myPlan: string; status: string; cycle: string; renewing: string; nonrenewing: string;
     noPaidPeriod: string; free: string; seePlans: string };
   interval: (months: number) => string; manage: string; renewal: string; ending: string; pastDue: string; prepaid: string; inUse: string;
-  checkout: Record<"fulfilled" | "cancelled" | "expired" | "startError" | "priceChanged", string>;
+  checkout: Record<"fulfilled" | "expired" | "startError" | "priceChanged", string>;
 }
 
 export const plansContent: Record<Language, PlanCopy> = {
@@ -70,7 +70,6 @@ export const plansContent: Record<Language, PlanCopy> = {
       termsChanged: "유료 전환 조건이 갱신되었습니다. 새 일시와 금액을 확인하고 다시 동의해 주세요.",
       delayed: "체험 신청 결과를 확인하는 중입니다. 잠시 후 다시 확인해 주세요.", retry: "신청 상태 다시 확인",
       ended: "이 체험 신청은 종료되었습니다.", changeAfter: "유료 이용 기간이 시작된 후 결제 주기를 변경할 수 있습니다.",
-      exit: "카드 등록을 마치지 않았습니다. 체험 기회는 그대로입니다.",
       billingPending: "첫 결제 확인 중", confirmAgain: "체험 시작이 확인되지 않았습니다. 표시된 조건을 다시 확인해 주세요.",
     },
     savings: percent => `월간 결제 대비 ${percent}% 절약`,
@@ -104,7 +103,7 @@ export const plansContent: Record<Language, PlanCopy> = {
     benefits: ["공개된 PBT·IBT 읽기·듣기 모의고사 무제한 응시", "모든 단어장 및 단어 퀴즈 무제한 열람"],
     checkout: {
       fulfilled: "이용권이 적용되고 400크레딧이 지급되었습니다.",
-      cancelled: "결제창에서 돌아왔습니다. 이용권을 선택해 다시 결제할 수 있습니다.", expired: "이 결제는 종료되었습니다. 이용권을 다시 선택해 주세요.",
+      expired: "이 결제는 종료되었습니다. 이용권을 다시 선택해 주세요.",
       startError: "결제창을 열지 못했습니다. 잠시 후 다시 시도해 주세요.", priceChanged: "가격이 변경되었습니다. 갱신된 플랜을 확인해 주세요.",
     },
   },
@@ -126,7 +125,6 @@ export const plansContent: Record<Language, PlanCopy> = {
       termsChanged: "The payment terms have been updated. Review the new date, time and amount before agreeing again.",
       delayed: "Your trial request is being confirmed. Check again shortly.", retry: "Check trial status",
       ended: "This trial request has ended.", changeAfter: "You can change the billing cycle once your paid period starts.",
-      exit: "Card registration was not completed. You can still start your trial.",
       billingPending: "Confirming your first payment", confirmAgain: "Your trial has not started. Please review the terms and confirm again.",
     },
     savings: percent => `Save ${percent}% compared with monthly billing`,
@@ -160,7 +158,7 @@ export const plansContent: Record<Language, PlanCopy> = {
     benefits: ["Unlimited access to published PBT and IBT reading and listening exams", "Unlimited access to all vocabulary lists and quizzes"],
     checkout: {
       fulfilled: "Your pass was applied and 400 credits were added.",
-      cancelled: "You left checkout. Select a pass to resume.", expired: "This checkout has ended. Select a pass to try again.",
+      expired: "This checkout has ended. Select a pass to try again.",
       startError: "Couldn’t open checkout. Please try again.", priceChanged: "The price changed. Review the updated plans.",
     },
   },
@@ -182,7 +180,6 @@ export const plansContent: Record<Language, PlanCopy> = {
       termsChanged: "Ketentuan pembayaran diperbarui. Periksa tanggal, waktu, dan jumlah terbaru sebelum menyetujui kembali.",
       delayed: "Permintaan uji coba sedang dikonfirmasi. Periksa lagi sebentar lagi.", retry: "Periksa status uji coba",
       ended: "Permintaan uji coba ini telah berakhir.", changeAfter: "Siklus tagihan dapat diubah setelah masa berbayar dimulai.",
-      exit: "Pendaftaran kartu belum selesai. Kamu masih bisa memulai uji coba.",
       billingPending: "Mengonfirmasi pembayaran pertama", confirmAgain: "Uji coba belum dimulai. Periksa ketentuannya lalu konfirmasikan kembali.",
     },
     savings: percent => `Hemat ${percent}% dibanding tagihan bulanan`,
@@ -216,7 +213,7 @@ export const plansContent: Record<Language, PlanCopy> = {
     benefits: ["Akses tanpa batas ke semua simulasi membaca dan menyimak PBT dan IBT yang tersedia", "Akses tanpa batas ke semua daftar kosakata dan kuis kosakata"],
     checkout: {
       fulfilled: "Paket sudah diterapkan dan 400 kredit telah ditambahkan.",
-      cancelled: "Anda keluar dari pembayaran. Pilih paket untuk melanjutkan.", expired: "Sesi pembayaran ini telah berakhir. Pilih paket untuk mencoba lagi.",
+      expired: "Sesi pembayaran ini telah berakhir. Pilih paket untuk mencoba lagi.",
       startError: "Pembayaran tidak dapat dibuka. Silakan coba lagi.", priceChanged: "Harga telah berubah. Periksa kembali paket yang tersedia.",
     },
   },

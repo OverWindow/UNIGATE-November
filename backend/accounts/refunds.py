@@ -22,6 +22,17 @@ def refunds_enabled_at():
     return int(applied.timestamp())
 
 
+def matches_checkout_amount(purchase, session):
+    total = session["amount_total"]
+    if total == purchase.amount:
+        return True
+    if (purchase.plan_months is not None or purchase.status == "fulfilled" or type(total) is not int
+            or not 0 <= total < purchase.amount):
+        return False
+    discount = (session.get("total_details") or {}).get("amount_discount")
+    return session.get("amount_subtotal") == purchase.amount and discount == purchase.amount - total
+
+
 def resolve_refund_purchase(api, intent_id):
     purchase = CreditPurchase.objects.filter(stripe_payment_intent_id=intent_id).first()
     if purchase and not purchase.stripe_invoice_id:
@@ -38,7 +49,7 @@ def resolve_refund_purchase(api, intent_id):
         if not purchase or not purchase.stripe_session_id:
             raise RefundOrderNotReady
         if (purchase.stripe_session_id != data["id"] or data["payment_intent"] != intent_id
-                or data["amount_total"] != purchase.amount or data["currency"] != purchase.currency):
+                or not matches_checkout_amount(purchase, data) or data["currency"] != purchase.currency):
             raise ValueError("Checkout does not match refund")
         return purchase, None
 
@@ -216,6 +227,8 @@ def reserved_orders(account):
 
 
 def refund_state(order, account, reserved):
+    if order.amount == 0:
+        return "no_payment"
     refunds = list(order.refunds.all())
     succeeded = sum(r.amount for r in refunds if r.status == "succeeded")
     if succeeded == order.amount:

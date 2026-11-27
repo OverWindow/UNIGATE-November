@@ -11,7 +11,7 @@ import PlanOffers from "./PlanOffers";
 import TrialConsent from "./TrialConsent";
 
 type Notice = keyof typeof creditsContent.ko.checkout | "planInUse" | "cardUsed" | "accountUsed" | "cardUnavailable" |
-  "trialChecking" | "trialCreating" | "trialStarted" | "trialEnded" | "trialExit" | "trialDelayed";
+  "trialChecking" | "trialCreating" | "trialStarted" | "trialEnded" | "trialDelayed";
 type CheckoutPrice = CreditPrice & { months?: number; monthlyOffer?: MonthlyPlanOffer };
 interface Attempt { attemptId: string; price: CheckoutPrice; orderId?: string }
 
@@ -115,7 +115,7 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
         if (controller.signal.aborted) return;
         if (applyOrder(order, controller.signal)) return;
         if (cancelled && order.trial?.status !== "creating") {
-          setNotice(order.trial ? "trialExit" : "cancelled");
+          setNotice(null);
           return;
         }
         if (++polls >= 12) setNotice(order.trial ? "trialDelayed" : "delayed");
@@ -216,10 +216,10 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
   const canSubscribe = planAccount && !planAccount.active && !planAccount.subscription;
   const trialNotices = { trialChecking: p.trial.checking, trialCreating: p.trial.creating, trialDelayed: p.trial.delayed,
     trialStarted: p.trial.started, trialEnded: p.trial.ended, cardUsed: p.trial.cardUsed, accountUsed: p.trial.accountUsed,
-    cardUnavailable: p.trial.cardUnavailable, trialExit: p.trial.exit, planInUse: p.inUse };
+    cardUnavailable: p.trial.cardUnavailable, planInUse: p.inUse };
   const messages = { ...t.checkout, ...(isPlan ? p.checkout : {}), ...trialNotices };
   return <div className="credits-purchase">
-    {isPlan && notice && <p className="w-full" role="status">{messages[notice]}</p>}
+    {isPlan && notice && !(cancelled && notice === "checking") && <p className="w-full" role="status">{messages[notice]}</p>}
     {consent && consentNotice && <p className="w-full" role="alert">{p.trial[consentNotice]}</p>}
     {consent && <TrialConsent key={JSON.stringify([consent.id, consent.quote, language])} quote={consent.quote}
       busy={notice === "trialCreating"} onConfirm={() => void confirmTrial()} />}

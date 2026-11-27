@@ -51,7 +51,7 @@ export interface TrialProgress {
   endsAt?: string | null; consentVersion?: string | null; priceId?: string | null; amount?: number; currency?: string;
 }
 export interface CreditPurchaseStatus { id: string; status: "pending" | "fulfilled" | "expired"; trial?: TrialProgress | null }
-export type RefundState = "eligible" | "contact" | "held" | "confirming" | "processing" | "refunded";
+export type RefundState = "eligible" | "contact" | "held" | "confirming" | "processing" | "refunded" | "no_payment";
 export interface TopupOrder {
   id: string; paidAt: string; amount: number; currency: string; credits: number;
   remainingCredits: number | null; refundState: RefundState;
