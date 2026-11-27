@@ -2,6 +2,7 @@ export const passwordContent = {
   ko: {
     forgot: "비밀번호를 잊으셨나요?", reset: "비밀번호 재설정", change: "비밀번호 변경",
     resetHelp: "TOPIQ에 가입한 이메일 주소를 입력해 주세요.",
+    googleResetHint: "Google로만 가입한 계정에는 비밀번호 재설정 메일이 발송되지 않아요. Google로 로그인해 주세요.",
     changeHelp: "현재 비밀번호를 확인하면 계정에 등록된 이메일로 변경 링크를 보내요.",
     resetSent: "입력한 주소로 비밀번호를 재설정할 수 있는 계정이 있다면 메일을 보내 드려요. 메일함과 스팸함을 확인해 주세요.",
     changeSent: "변경 링크를 보냈어요. 요청할 때 사용한 브라우저에서 로그인 상태로 링크를 열어 주세요.",
@@ -21,6 +22,7 @@ export const passwordContent = {
   en: {
     forgot: "Forgot your password?", reset: "Reset password", change: "Change password",
     resetHelp: "Enter the email address you used to sign up for TOPIQ.",
+    googleResetHint: "If Google is your only sign-in method, you won’t receive a password reset email. Sign in with Google.",
     changeHelp: "Enter your current password to receive a link at your account email address.",
     resetSent: "If an account at that address can reset its password, we'll send a link. Check your inbox and spam folder.",
     changeSent: "We sent your change link. Open it in the browser where you requested it, while still signed in.",
@@ -40,6 +42,7 @@ export const passwordContent = {
   id: {
     forgot: "Lupa kata sandi?", reset: "Atur ulang kata sandi", change: "Ubah kata sandi",
     resetHelp: "Masukkan alamat email yang kamu gunakan saat mendaftar di TOPIQ.",
+    googleResetHint: "Jika Google adalah satu-satunya cara masuk ke akunmu, kamu tidak akan menerima email untuk mengatur ulang kata sandi. Silakan masuk dengan Google.",
     changeHelp: "Masukkan kata sandi saat ini untuk menerima tautan di alamat email akunmu.",
     resetSent: "Jika akun dengan alamat tersebut dapat mengatur ulang kata sandi, kami akan mengirim tautan. Periksa kotak masuk dan folder spam.",
     changeSent: "Tautan perubahan sudah dikirim. Buka di browser tempat kamu memintanya selagi masih masuk.",

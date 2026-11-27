@@ -114,11 +114,12 @@ function RequestFields({ purpose, email }: { purpose: Purpose; email?: string })
           <input ref={input} name={field} id={field} type={change ? "password" : "email"}
             autoComplete={change ? "current-password" : "email"} maxLength={change ? 4096 : 254} required
             placeholder={change ? undefined : a.emailPlaceholder} aria-invalid={!!fieldError}
-            aria-describedby={fieldError ? "request-field-error" : undefined}
+            aria-describedby={fieldError ? "request-field-error" : change ? undefined : "google-reset-hint"}
             onChange={() => { setFieldError(""); setError(""); if (!change) setSent(false); }} />
           {fieldError && <p id="request-field-error" className="field-error" role="alert">
             {fieldError === "invalid_credentials" ? p.wrongPassword : a.errors[fieldError] || a.errors.invalid}
           </p>}
+          {!change && <p id="google-reset-hint" className="field-hint">{p.googleResetHint}</p>}
         </div>
         {error && <p className="auth-error" role="alert">{error === "password_unavailable" ? p.unavailable : error === "network_error" ? a.network : a.errors[error] || a.errors.server_error}</p>}
         <button type="submit" className="button button-primary auth-submit" disabled={pending || remaining > 0} aria-busy={pending}>
