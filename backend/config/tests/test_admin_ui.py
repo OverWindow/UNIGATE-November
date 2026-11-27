@@ -4,9 +4,9 @@ from urllib.parse import urlsplit
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-from django.contrib.auth import get_user_model
+from django.contrib.auth import SESSION_KEY, get_user_model
 from django.contrib.auth.models import Group, Permission
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils.html import escape
 
@@ -14,6 +14,74 @@ from accounts.models import RateLimit
 from pbt.models import Attempt, Exam
 from surveys.models import SurveyResponse
 from writing.models import Evaluation
+
+
+@override_settings(PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"])
+class AdminEmailLoginTests(TestCase):
+    password = "Synthetic-admin-form-password42!"
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = get_user_model().objects.create_user(
+            username="operator", email="operator@example.invalid", password=cls.password, is_staff=True,
+        )
+
+    def test_registered_email_opens_dashboard_with_staff_session(self):
+        # Valid emails can exceed the Django username field's 150-character limit.
+        email = f"Operator@{'a' * 55}.{'b' * 55}.{'c' * 55}.invalid"
+        get_user_model().objects.filter(pk=self.staff.pk).update(email=f" {email} ")
+        index = reverse("admin:index")
+        login_url = self.client.get(index).url
+        page = self.client.get(login_url)
+        self.assertContains(page, 'type="email"')
+        self.assertIn('maxlength="254"', str(page.context["form"]["username"]))
+        self.assertContains(page, "이메일")
+
+        response = self.client.post(login_url, {"username": f" {email.upper()} ", "password": self.password})
+        self.assertRedirects(response, index)
+        self.assertEqual(self.client.session[SESSION_KEY], str(self.staff.pk))
+
+    def test_usernames_and_accounts_without_admin_access_are_rejected(self):
+        users = get_user_model().objects
+        users.create_user(username="old-id@example.invalid", password=self.password, is_staff=True)
+        users.create_user(username="member", email="member@example.invalid", password=self.password)
+        users.create_user(
+            username="inactive", email="inactive@example.invalid", password=self.password,
+            is_staff=True, is_active=False,
+        )
+        login_url = reverse("admin:login")
+        bad_password = self.client.post(login_url, {"username": self.staff.email, "password": "wrong"})
+        self.assertEqual(bad_password.status_code, 200)
+        generic_error = bad_password.context["form"].non_field_errors()
+        self.assertTrue(generic_error)
+        self.assertNotIn(SESSION_KEY, self.client.session)
+        rejected_emails = (
+            "old-id@example.invalid", "missing@example.invalid", "member@example.invalid", "inactive@example.invalid",
+        )
+        for email in rejected_emails:
+            with self.subTest(email=email):
+                response = self.client.post(login_url, {"username": email, "password": self.password})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.context["form"].non_field_errors(), generic_error)
+                self.assertNotIn(SESSION_KEY, self.client.session)
+
+        response = self.client.post(login_url, {"username": self.staff.username, "password": self.password})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["form"].errors)
+        self.assertNotIn(SESSION_KEY, self.client.session)
+
+    def test_ambiguous_email_lookup_does_not_create_a_session(self):
+        users = get_user_model().objects
+        second = users.create_user(username="other", email="other@example.invalid", password=self.password)
+        # The production index prevents storing duplicate normalized emails.
+        matches = users.filter(pk__in=[self.staff.pk, second.pk])
+        with patch("accounts.forms.users_for_email", return_value=matches):
+            response = self.client.post(
+                reverse("admin:login"), {"username": self.staff.email, "password": self.password},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["form"].non_field_errors())
+        self.assertNotIn(SESSION_KEY, self.client.session)
 
 
 class AdminUiTests(TestCase):

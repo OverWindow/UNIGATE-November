@@ -19,7 +19,7 @@ class SurveyAdminTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.admin = get_user_model().objects.create_superuser(
-            username="test-admin", password="Synthetic-admin-password-47!",
+            username="test-admin", email="survey-admin@example.invalid", password="Synthetic-admin-password-47!",
         )
         cls.viewer = get_user_model().objects.create_user(username="viewer", is_staff=True)
         cls.viewer.user_permissions.add(Permission.objects.get(codename="view_surveyresponse"))
@@ -47,7 +47,7 @@ class SurveyAdminTests(TestCase):
         client = Client(enforce_csrf_checks=True)
         login_url = reverse("admin:login")
         client.get(login_url)
-        credentials = {"username": "test-admin", "password": "Synthetic-admin-password-47!",
+        credentials = {"username": self.admin.email, "password": "Synthetic-admin-password-47!",
                        "next": self.list_url}
         self.assertEqual(client.post(login_url, credentials).status_code, 403)
         credentials["csrfmiddlewaretoken"] = client.cookies["csrftoken"].value

@@ -189,12 +189,12 @@ class AccountApiTests(AuthClientMixin, TestCase):
         for path in ("login", "signup", "logout"):
             self.assertEqual(self.client.get(f"/api/auth/{path}/").status_code, 405)
 
-    def test_existing_admin_username_login_remains_available(self):
+    def test_existing_admin_email_login_shares_the_api_session(self):
         admin = get_user_model().objects.create_superuser(
             username="existing-admin", email="admin@example.invalid", password=PASSWORD,
         )
         response = self.client.post("/admin/login/", {
-            "username": admin.username, "password": PASSWORD,
+            "username": admin.email, "password": PASSWORD,
             "csrfmiddlewaretoken": self.token, "next": "/admin/",
         })
         self.assertRedirects(response, "/admin/")
