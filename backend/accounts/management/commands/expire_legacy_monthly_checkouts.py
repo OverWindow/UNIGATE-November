@@ -4,7 +4,7 @@ from django.db import transaction
 from django.db.models import Q
 
 from accounts.credits import locked_account
-from accounts.models import CreditPurchase
+from accounts.models import CreditPurchase, PlusFreeTrial
 from accounts.payments import PaymentsUnavailable, PlanConflict, close_old_plan_checkout, stripe_client
 
 
@@ -15,6 +15,9 @@ class Command(BaseCommand):
         candidates = CreditPurchase.objects.filter(
             Q(subscription_state="checkout") | Q(subscription_state__isnull=True),
             plan_months=1, status="pending", free_trial__isnull=True, stripe_subscription_id__isnull=True,
+        ).exclude(
+            subscription_state="checkout",
+            user_id__in=PlusFreeTrial.objects.filter(status="started").values("user_id"),
         )
         closed = completed = 0
         try:

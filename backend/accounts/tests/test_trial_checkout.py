@@ -1,11 +1,13 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from io import StringIO
 from threading import Barrier
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
 import stripe
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.db import close_old_connections, connection
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
@@ -13,7 +15,7 @@ from django.utils import timezone
 from accounts.models import CreditAccount, CreditPurchase, PlusFreeTrial
 from accounts.plans import has_active_plan
 from accounts.trial_checkout import CONSENT_VERSION, activate_reserved, prepare_confirmation
-from .test_credit_purchases import TEST_SETTINGS, plan_price, signed_event
+from .test_credit_purchases import TEST_SETTINGS, plan_invoice, plan_price, signed_event
 
 
 PLANS = "/api/plans/purchases/"
@@ -156,9 +158,10 @@ class TrialCheckoutTests(TestCase):
         self.api.subscriptions.create.assert_called_once()
 
     def test_stale_client_cannot_create_an_immediate_monthly_charge(self):
-        result = self.client.post(PLANS, {"months": 1, "priceId": "price_one", "attemptId": str(uuid4())},
-                                  content_type="application/json")
-        self.assertEqual((result.status_code, result.json()["error"]), (409, "trial_offer_changed"))
+        for offer in ({}, {"offer": "monthly_paid"}):
+            result = self.client.post(PLANS, {"months": 1, "priceId": "price_one", "attemptId": str(uuid4()), **offer},
+                                      content_type="application/json")
+            self.assertEqual((result.status_code, result.json()["error"]), (409, "trial_offer_changed"))
         self.assertFalse(CreditPurchase.objects.exists())
         self.api.checkout.sessions.create.assert_not_called()
 
@@ -186,7 +189,7 @@ class TrialCheckoutTests(TestCase):
                 self.assertEqual(self.confirm(quote).json()["trial"]["status"], "started")
                 self.assertTrue(has_active_plan(self.user.pk))
 
-    def test_used_account_cannot_apply_again_even_with_another_card(self):
+    def test_used_account_can_rejoin_at_full_price_but_cannot_start_another_trial(self):
         self.setup_order()
         quote = self.client.get(self.details).json()["trial"]
         self.assertEqual(self.confirm(quote).json()["trial"]["status"], "started")
@@ -194,12 +197,56 @@ class TrialCheckoutTests(TestCase):
                         "metadata": self.metadata, "status": "canceled"}
         self.assertEqual(signed_event(self.client, "customer.subscription.deleted", subscription).status_code, 200)
         self.method["card"]["fingerprint"] = "previously-unused-card"
-        self.assertFalse(self.client.get("/api/plans/").json()["trialEligible"])
+        with self.settings(STRIPE_TRIAL_FINGERPRINT_KEY=""):
+            catalog = self.client.get("/api/plans/").json()
+        self.assertFalse(catalog["trialEligible"])
+        monthly = next(offer for offer in catalog["plans"] if offer["months"] == 1)
+        self.assertEqual((monthly["priceId"], monthly["trialDays"], monthly["amount"]), ("price_one", 0, 9900))
         retry = self.client.post(PLANS, {"attemptId": str(uuid4()), "priceId": "price_one", "months": 1,
                                         "offer": "monthly_trial"}, content_type="application/json")
         self.assertEqual((retry.status_code, retry.json()["error"]), (409, "trial_account_used"))
         self.api.checkout.sessions.create.assert_called_once()
         self.api.subscriptions.create.assert_called_once()
+
+        session = stripe.checkout.Session.construct_from({
+            "id": "cs_paid_monthly", "status": "open", "mode": "subscription", "url": "https://checkout.stripe.com/c/paid",
+        }, None)
+        self.api.checkout.sessions.create.return_value = session
+        self.api.checkout.sessions.retrieve.return_value = session
+        payload = {"attemptId": str(uuid4()), "priceId": "price_one", "months": 1, "offer": "monthly_paid"}
+        with self.settings(STRIPE_TRIAL_FINGERPRINT_KEY=""):
+            result = self.client.post(PLANS, payload, content_type="application/json")
+            self.assertEqual(result.status_code, 201)
+            self.assertEqual(result.json()["checkoutUrl"], session.url)
+            self.assertNotIn("trial", result.json())
+            for attempt in (payload, {**payload, "attemptId": str(uuid4())}):
+                result_again = self.client.post(PLANS, attempt, content_type="application/json")
+                self.assertEqual((result_again.status_code, result_again.json()["id"]), (200, result.json()["id"]))
+        self.assertEqual(self.api.checkout.sessions.create.call_count, 2)
+        params = self.api.checkout.sessions.create.call_args.args[0]
+        self.assertEqual((params["mode"], params["line_items"]), ("subscription", [{"price": "price_one", "quantity": 1}]))
+        self.assertNotIn("trial_period_days", params["subscription_data"])
+        self.assertNotIn("trial_end", params["subscription_data"])
+
+        stale = self.client.post(PLANS, {**payload, "offer": "monthly_trial"}, content_type="application/json")
+        self.assertEqual((stale.status_code, stale.json()["error"]), (409, "trial_offer_changed"))
+        command_client = "accounts.management.commands.expire_legacy_monthly_checkouts.stripe_client"
+        with patch(command_client) as billing:
+            billing.return_value.v1 = self.api
+            call_command("expire_legacy_monthly_checkouts", stdout=StringIO())
+        self.api.checkout.sessions.expire.assert_not_called()
+
+        order = CreditPurchase.objects.get(pk=result.json()["id"])
+        self.assertEqual((order.amount, order.plan_months), (9900, 1))
+        self.assertFalse(has_active_plan(self.user.pk))
+        start = timezone.now()
+        invoice = plan_invoice(order, "in_paid_monthly", "subscription_create",
+                               int(start.timestamp()), int((start + timedelta(days=30)).timestamp()))
+        invoice["customer"] = self.customer
+        self.assertEqual(signed_event(self.client, "invoice.paid", invoice).status_code, 200)
+        self.assertTrue(has_active_plan(self.user.pk))
+        self.assertEqual(CreditAccount.objects.get(user=self.user).balance, 400)
+        self.assertEqual(PlusFreeTrial.objects.filter(user=self.user, status="started").count(), 1)
 
     def test_revoked_reservation_never_creates_a_subscription_and_releases_after_reconciliation(self):
         self.setup_order()

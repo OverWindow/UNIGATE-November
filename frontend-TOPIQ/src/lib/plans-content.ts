@@ -27,9 +27,11 @@ interface PlanCopy {
   intro: string;
   login: string; current: string; until: string; freeBenefits: string[];
   term: (months: number) => string; benefits: string[]; unavailable: string;
+  paymentStartsNow: string; trialStartsNow: string; unlimitedAccess: string;
+  exit: { close: string; title: string; description: string; yes: string; no: string };
   savings: (percent: number) => string;
   trial: {
-    start: string; pay: (amount: string) => string; after: (amount: string) => string;
+    start: string; pay: string; after: (amount: string) => string;
     cancel: string; bonus: (credits: number) => string; confirm: string; agree: string;
     firstCharge: string; method: string; card: string; active: string; noCharge: string; accessEnds: string;
     checking: string; creating: string; started: string; cardUsed: string; accountUsed: string;
@@ -55,7 +57,7 @@ export const plansContent: Record<Language, PlanCopy> = {
     intro: "읽기, 듣기 모의고사를 무제한으로 풀고, AI 튜터와 함께 쓰기를 연습하세요.",
     login: "로그인하기",
     trial: {
-      start: "7일 무료 체험 시작", pay: amount => `${amount} 결제하고 시작`, after: amount => `7일 동안 0원, 이후 매월 ${amount}`,
+      start: "7일 무료 체험 시작", pay: "결제하고 시작", after: amount => `7일 동안 0원, 이후 매월 ${amount}`,
       cancel: "첫 결제 전에 설정의 구독 관리에서 해지하면 체험 종료일까지 이용할 수 있고 구독료가 청구되지 않습니다.",
       bonus: credits => `첫 결제 성공 후부터 유료 이용 기간에 매월 쓰기용 ${credits}크레딧 지급`,
       confirm: "무료 체험과 자동결제 확인", agree: "표시된 일시부터 등록 카드로 매월 자동 결제되는 데 동의합니다.",
@@ -63,7 +65,7 @@ export const plansContent: Record<Language, PlanCopy> = {
       noCharge: "해지 예약됨 · 자동 결제 없음", accessEnds: "무료 체험 이용 종료", checking: "등록한 카드를 확인하고 있습니다.",
       creating: "무료 체험 시작을 확인하고 있습니다.", started: "무료 체험이 시작되었습니다. 지금 Plus 콘텐츠를 이용할 수 있습니다.",
       cardUsed: "이미 무료 체험에 사용한 카드입니다. 다른 카드로 다시 신청할 수 있습니다.",
-      accountUsed: "이 계정은 이미 월간 무료 체험을 사용했습니다. 3개월 또는 6개월 플랜을 선택할 수 있습니다.",
+      accountUsed: "이 계정은 이미 월간 무료 체험을 사용했습니다. 월간 요금제를 지금 결제하고 이용할 수 있습니다.",
       cardUnavailable: "이 카드를 확인할 수 없습니다. 체험을 다시 선택한 뒤 Stripe에서 카드 정보를 직접 입력해 주세요.",
       termsChanged: "유료 전환 조건이 갱신되었습니다. 새 일시와 금액을 확인하고 다시 동의해 주세요.",
       delayed: "체험 신청 결과를 확인하는 중입니다. 잠시 후 다시 확인해 주세요.", retry: "신청 상태 다시 확인",
@@ -94,6 +96,11 @@ export const plansContent: Record<Language, PlanCopy> = {
     current: "내 플랜", until: "이용 가능 기한",
     freeBenefits: ["PBT 읽기·듣기 첫 세트 각 1개", "IBT 읽기·듣기 첫 세트 각 1개", "단어장 및 단어 퀴즈 급수별 첫 3세트 열람", "AI 쓰기 튜터용 100크레딧 지급"],
     term: n => `Plus ${n}개월`, unavailable: "신청 불가",
+    paymentStartsNow: "지금 바로 결제 후 사용 시작",
+    trialStartsNow: "카드 등록 후 결제 없이 사용 시작, 7일 뒤 자동 결제",
+    unlimitedAccess: "모든 모의고사 및 단어장 무제한 열람",
+    exit: { close: "요금제 닫기", title: "7일 무료 이용 혜택을 포기하시겠습니까?",
+      description: "서비스를 무제한으로 이용할 기회를 놓치지 마세요.", yes: "예", no: "아니오" },
     benefits: ["공개된 PBT·IBT 읽기·듣기 모의고사 무제한 응시", "모든 단어장 및 단어 퀴즈 무제한 열람"],
     checkout: {
       fulfilled: "이용권이 적용되고 400크레딧이 지급되었습니다.",
@@ -106,7 +113,7 @@ export const plansContent: Record<Language, PlanCopy> = {
     intro: "Take unlimited reading and listening practice tests and practice writing with the AI tutor.",
     login: "Log in",
     trial: {
-      start: "Start 7-day free trial", pay: amount => `Pay ${amount} and subscribe`, after: amount => `Free for 7 days, then ${amount} a month`,
+      start: "Start 7-day free trial", pay: "Pay and get started", after: amount => `Free for 7 days, then ${amount} a month`,
       cancel: "Cancel in Settings → Manage subscription before the first charge to keep access until the trial ends and pay nothing.",
       bonus: credits => `${credits} writing credits each paid month, starting with the first successful payment`,
       confirm: "Confirm your trial and automatic payments", agree: "I agree to monthly charges to my registered card starting at the date and time shown.",
@@ -114,7 +121,7 @@ export const plansContent: Record<Language, PlanCopy> = {
       noCharge: "Cancellation scheduled · No automatic charge", accessEnds: "Trial access ends", checking: "Checking your registered card…",
       creating: "Confirming the start of your trial…", started: "Your free trial has started. You can use Plus now.",
       cardUsed: "This card has already been used for a free trial. You can try again with another card.",
-      accountUsed: "This account has already used its monthly trial. You can choose a 3- or 6-month plan.",
+      accountUsed: "This account has already used its monthly trial. You can pay now to start the monthly plan.",
       cardUnavailable: "We couldn’t verify this card. Select the trial again and enter your card details directly in Stripe.",
       termsChanged: "The payment terms have been updated. Review the new date, time and amount before agreeing again.",
       delayed: "Your trial request is being confirmed. Check again shortly.", retry: "Check trial status",
@@ -145,6 +152,11 @@ export const plansContent: Record<Language, PlanCopy> = {
     current: "My plan", until: "Access until",
     freeBenefits: ["First PBT reading and listening sets", "First IBT reading and listening sets", "First 3 vocabulary sets and quizzes per level", "100 credits for the AI Writing Tutor"],
     term: n => `Plus ${n} ${n === 1 ? "month" : "months"}`, unavailable: "Unavailable",
+    paymentStartsNow: "Pay now to get started",
+    trialStartsNow: "Register a card to start without paying. You’ll be charged automatically after 7 days.",
+    unlimitedAccess: "Unlimited access to all practice tests and vocabulary lists",
+    exit: { close: "Close plans", title: "Give up your 7-day free trial?",
+      description: "Don’t miss your chance to get unlimited access.", yes: "Yes", no: "No" },
     benefits: ["Unlimited access to published PBT and IBT reading and listening exams", "Unlimited access to all vocabulary lists and quizzes"],
     checkout: {
       fulfilled: "Your pass was applied and 400 credits were added.",
@@ -157,7 +169,7 @@ export const plansContent: Record<Language, PlanCopy> = {
     intro: "Kerjakan simulasi ujian membaca dan menyimak tanpa batas serta berlatihlah menulis bersama tutor AI.",
     login: "Masuk",
     trial: {
-      start: "Mulai uji coba gratis 7 hari", pay: amount => `Bayar ${amount} dan mulai`, after: amount => `Gratis 7 hari, lalu ${amount} per bulan`,
+      start: "Mulai uji coba gratis 7 hari", pay: "Bayar dan mulai", after: amount => `Gratis 7 hari, lalu ${amount} per bulan`,
       cancel: "Batalkan di Pengaturan → Kelola langganan sebelum tagihan pertama. Akses tetap berlaku hingga uji coba berakhir tanpa biaya langganan.",
       bonus: credits => `${credits} kredit menulis setiap bulan berbayar, mulai dari pembayaran pertama yang berhasil`,
       confirm: "Konfirmasi uji coba dan pembayaran otomatis", agree: "Saya menyetujui tagihan bulanan otomatis pada kartu terdaftar mulai tanggal dan waktu yang tertera.",
@@ -165,7 +177,7 @@ export const plansContent: Record<Language, PlanCopy> = {
       noCharge: "Pembatalan dijadwalkan · Tanpa tagihan otomatis", accessEnds: "Akhir akses uji coba", checking: "Memeriksa kartu terdaftar…",
       creating: "Mengonfirmasi awal uji coba…", started: "Uji coba gratis sudah dimulai. Kamu bisa menggunakan Plus sekarang.",
       cardUsed: "Kartu ini sudah digunakan untuk uji coba gratis. Coba lagi dengan kartu lain.",
-      accountUsed: "Akun ini sudah menggunakan uji coba bulanan. Kamu bisa memilih paket 3 atau 6 bulan.",
+      accountUsed: "Akun ini sudah menggunakan uji coba bulanan. Kamu bisa membayar sekarang untuk mulai menggunakan paket bulanan.",
       cardUnavailable: "Kartu tidak dapat diverifikasi. Pilih uji coba lagi dan masukkan informasi kartu langsung di Stripe.",
       termsChanged: "Ketentuan pembayaran diperbarui. Periksa tanggal, waktu, dan jumlah terbaru sebelum menyetujui kembali.",
       delayed: "Permintaan uji coba sedang dikonfirmasi. Periksa lagi sebentar lagi.", retry: "Periksa status uji coba",
@@ -196,6 +208,11 @@ export const plansContent: Record<Language, PlanCopy> = {
     current: "Paket saya", until: "Akses hingga",
     freeBenefits: ["Set pertama membaca dan menyimak PBT", "Set pertama membaca dan menyimak IBT", "3 set kosakata dan kuis pertama per tingkat", "100 kredit untuk Tutor Menulis AI"],
     term: n => `Plus ${n} bulan`, unavailable: "Tidak tersedia",
+    paymentStartsNow: "Bayar sekarang untuk mulai menggunakan layanan",
+    trialStartsNow: "Daftarkan kartu untuk mulai tanpa biaya. Tagihan otomatis dilakukan setelah 7 hari.",
+    unlimitedAccess: "Akses tanpa batas ke semua simulasi ujian dan daftar kosakata",
+    exit: { close: "Tutup paket", title: "Lewatkan uji coba gratis 7 hari?",
+      description: "Jangan lewatkan kesempatan untuk mendapatkan akses tanpa batas.", yes: "Ya", no: "Tidak" },
     benefits: ["Akses tanpa batas ke semua simulasi membaca dan menyimak PBT dan IBT yang tersedia", "Akses tanpa batas ke semua daftar kosakata dan kuis kosakata"],
     checkout: {
       fulfilled: "Paket sudah diterapkan dan 400 kredit telah ditambahkan.",

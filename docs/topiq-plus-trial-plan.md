@@ -10,7 +10,7 @@
 | 3개월 Plus | 23,900원 결제 | 이후 3개월마다 23,900원 | 23,900원 결제하고 시작 |
 | 6개월 Plus | 43,900원 결제 | 이후 6개월마다 43,900원 | 43,900원 결제하고 시작 |
 
-- **계정당 1회, 카드당 1회.** 계정과 카드가 모두 처음 체험할 때 월간 가입을 허용한다. 체험이 시작됐다면 첫 결제 전에 해지해도 사용 이력이 남는다. 체험을 사용한 계정이 해지 후 다시 가입할 수 있는 상품은 3·6개월권이다.
+- **계정당 1회, 카드당 1회.** 계정과 카드가 모두 처음 체험할 때 무료 체험을 허용한다. 체험이 시작됐다면 첫 결제 전에 해지해도 사용 이력이 남는다. 체험을 사용한 계정은 기존 구독과 이용 기간이 끝나면 월 9,900원을 즉시 결제하거나 3·6개월권을 선택할 수 있다.
 - **기존 유료 회원도 신청 가능하다.** 3·6개월권 결제 이력은 체험 사용 이력에 포함하지 않는다. 해당 이용 기간이 끝나고 열린 구독이 없으면, 체험 이력이 없는 계정과 카드로 월간 체험을 시작할 수 있다. 기존 월간 구독의 정기 갱신에는 체험을 다시 부여하지 않는다.
 - **체험 혜택은 즉시 이용할 수 있는 Plus 콘텐츠다.** 공개 PBT·IBT 모의시험과 Plus 단어장을 연다. 쓰기 세트는 기존 크레딧으로 이용한다. 월 400크레딧은 첫 9,900원 결제가 성공했을 때 한 번 지급하고 이후 유료 기간에는 기존 월별 기준을 따른다.
 
@@ -25,7 +25,7 @@
 | ③ 체험 시작 | 처음 유료로 전환되는 예정 일시, 0원 → 월 9,900원, 등록 카드 자동결제, 해지 방법을 확인하고 동의한다. | 사용자에게 제시한 조건을 주문에 연결한다. 계정과 카드 자격을 다시 확인해 한 주문만 확보하고 해당 카드로 월간 Stripe 구독을 생성한다. 성공하면 실제 체험 기간을 기록하고 Plus를 연다. |
 | ④ 종료 또는 전환 | 구독 관리에서 첫 결제 예정일과 해지 버튼을 확인한다. 해지 예약 후에는 ‘자동 결제 없음’과 이용 종료일을 표시한다. | 체험 종료 시각이 지나면 체험 권한은 만료된다. 정가 결제 성공 알림이 확인되면 해당 청구 기간의 유료 권한과 첫 400크레딧을 반영한다. 실패 후 재결제가 성공한 경우도 동일하게 처리한다. |
 
-**카드 판정 범위.** 월간 체험에는 Stripe에 직접 입력한 카드를 받는다. Apple Pay·Google Pay 등은 같은 실물 카드도 지갑용 번호를 반환할 수 있어 직접 입력을 안내한다. 식별값이 없으면 등록을 다시 시도하게 한다. 카드번호가 달라진 재발급 카드까지 같은 카드로 판별할 수는 없다. 비교용으로 서버에서 계산한 HMAC만 저장하고 카드번호·CVC·원본 식별값은 로그나 응답에 쓰지 않는다. 3·6개월 유료 신청에는 체험용 카드 제한을 적용하지 않는다. [Stripe의 카드 식별 범위](https://docs.stripe.com/api/cards/object#card_object-fingerprint)
+**카드 판정 범위.** 월간 체험에는 Stripe에 직접 입력한 카드를 받는다. Apple Pay·Google Pay 등은 같은 실물 카드도 지갑용 번호를 반환할 수 있어 직접 입력을 안내한다. 식별값이 없으면 등록을 다시 시도하게 한다. 카드번호가 달라진 재발급 카드까지 같은 카드로 판별할 수는 없다. 비교용으로 서버에서 계산한 HMAC만 저장하고 카드번호·CVC·원본 식별값은 로그나 응답에 쓰지 않는다. 정가 Checkout에는 체험용 카드 제한을 적용하지 않는다. [Stripe의 카드 식별 범위](https://docs.stripe.com/api/cards/object#card_object-fingerprint)
 
 **중복과 중단 처리.** 다른 계정에서 사용한 카드라면 ‘이미 무료 체험에 사용한 카드입니다’라고 표시한다. 해당 계정 자체에 체험 이력이 없다면 다른 카드로 다시 시도할 수 있다. 카드 등록만 마쳤거나 최종 동의 전에 창을 닫은 경우에는 기회를 소진하지 않는다. 구독 생성 요청 후 응답을 잃으면 동일 주문으로 Stripe 결과부터 대조한다. 구독 생성이 끝내 실패한 것으로 확인된 경우에만 계정·카드에 걸어 둔 예약을 해제한다.
 
@@ -52,7 +52,7 @@
 | 영역 | 주요 수정 위치와 내용 |
 |---|---|
 | Django 모델·마이그레이션 | [models.py](../backend/accounts/models.py), [accounts 마이그레이션](../backend/migration/accounts/). 체험 테이블과 고유 제약, 열린 구독 제약을 Django 마이그레이션으로 배포한다. |
-| 결제·구독 수명주기 | [payments.py](../backend/accounts/payments.py), [subscriptions.py](../backend/accounts/subscriptions.py). 월간 카드 등록·신청 확정과 3·6개월 즉시 결제를 분기한다. 기존 웹훅에서 카드 등록 완료, 체험 취소, 첫 유료 결제, 결제 지연을 처리한다. |
+| 결제·구독 수명주기 | [payments.py](../backend/accounts/payments.py), [subscriptions.py](../backend/accounts/subscriptions.py). 월간 체험의 카드 등록·신청 확정과 월간 재가입 및 3·6개월 즉시 결제를 분기한다. 기존 웹훅에서 카드 등록 완료, 체험 취소, 첫 유료 결제, 결제 지연을 처리한다. |
 | Plus 권한·크레딧·환불 | [plans.py](../backend/accounts/plans.py), [views.py](../backend/accounts/views.py), [admin.py](../backend/accounts/admin.py)에서 이용 기간·등급을 일치시킨다. [credits.py](../backend/accounts/credits.py), [refunds.py](../backend/accounts/refunds.py), [plan_changes.py](../backend/accounts/plan_changes.py)에서 유료 회차 적립·환불과 체험 중 주기 변경 제한을 점검한다. |
 | TOPIQ 플랜 선택과 복귀 | [PlanOffers.tsx](../frontend-TOPIQ/src/components/credits/PlanOffers.tsx), [PlansAccount.tsx](../frontend-TOPIQ/src/components/credits/PlansAccount.tsx), [CreditPurchase.tsx](../frontend-TOPIQ/src/components/credits/CreditPurchase.tsx). 월간과 장기권의 가격·버튼을 구분하고 카드 확인 중, 동의 대기, 시작, 중복, 재시도 상태를 표시한다. |
 | TOPIQ 구독 관리와 공통 데이터 | [SubscriptionSettings.tsx](../frontend-TOPIQ/src/app/settings/subscription/SubscriptionSettings.tsx), [PlanChangeControls.tsx](../frontend-TOPIQ/src/components/credits/PlanChangeControls.tsx), [writing-api.ts](../frontend-TOPIQ/src/lib/writing/writing-api.ts). 첫 유료 전환과 해지 예약을 표시하고, 결제 포털에서 돌아오거나 체험이 끝날 때 실제 권한을 다시 조회한다. |
@@ -63,7 +63,7 @@
 | 기존 경로 | 계획 |
 |---|---|
 | `GET /api/plans/` | 요금제별 가입 조건과 계정의 월간 체험 가능 여부를 반환한다. 카드 자격은 등록 이후에 확정한다. |
-| `POST /api/plans/purchases/` | 월간은 같은 원주문으로 카드 등록과 최종 동의·체험 시작을 처리한다. 3·6개월은 기존 정가 Checkout을 생성한다. 요청 가격·상품·조건이 바뀌면 화면을 다시 확인하게 한다. |
+| `POST /api/plans/purchases/` | 월간 체험은 같은 원주문으로 카드 등록과 최종 동의·체험 시작을 처리한다. 월간 재가입과 3·6개월은 기존 정가 Checkout을 생성한다. 요청 가격·상품·조건이 바뀌면 화면을 다시 확인하게 한다. |
 | `GET /api/credits/purchases/<id>/?product=plan` | 복귀 화면이 카드 확인·중복 거절·체험 시작·결제 완료를 구분할 수 있도록 주문 결과를 확장한다. |
 | `GET /api/subscriptions/me/`, `GET /api/auth/me/` | 구독 조회에 체험 상태·종료일·첫 결제 예정액·해지 예약을 표시한다. 로그인 응답의 `plusEndsAt`에는 체험을 포함한 실제 이용 종료 시각을 반환한다. |
 | `POST /api/payments/stripe/webhook/`, `POST /api/credits/billing-portal/` | 기존 서명 검증과 포털을 재사용한다. 카드 등록 완료 알림은 체험 시작 동의와 구분하고, 포털 해지 예약은 체험 종료일까지 반영한다. |

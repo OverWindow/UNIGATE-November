@@ -3,16 +3,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
 import { creditsContent } from "@/lib/credits-content";
 import { localizedPath } from "@/lib/locale-path";
-import { planAmount, plansContent } from "@/lib/plans-content";
+import { plansContent } from "@/lib/plans-content";
 import { confirmMonthlyTrial, creditsRequest, startCreditPurchase, startPlanPurchase, trialQuote, WritingError, type CreditPrice,
-  type CreditPurchaseStatus, type PlanAccount, type ScheduledPlanChange, type TrialQuote } from "@/lib/writing/writing-api";
+  type CreditPurchaseStatus, type MonthlyPlanOffer, type PlanAccount, type ScheduledPlanChange, type TrialQuote } from "@/lib/writing/writing-api";
 import PlanChangeControls from "./PlanChangeControls";
 import PlanOffers from "./PlanOffers";
 import TrialConsent from "./TrialConsent";
 
 type Notice = keyof typeof creditsContent.ko.checkout | "planInUse" | "cardUsed" | "accountUsed" | "cardUnavailable" |
   "trialChecking" | "trialCreating" | "trialStarted" | "trialEnded" | "trialExit" | "trialDelayed";
-type CheckoutPrice = CreditPrice & { months?: number };
+type CheckoutPrice = CreditPrice & { months?: number; monthlyOffer?: MonthlyPlanOffer };
 interface Attempt { attemptId: string; price: CheckoutPrice; orderId?: string }
 
 function savedAttempt(key: string): Attempt | null {
@@ -25,8 +25,9 @@ function savedAttempt(key: string): Attempt | null {
   return null;
 }
 
-export default function CreditPurchase({ userId, returnId, cancelled, onFulfilled, planAccount, onPlanRefresh }: {
+export default function CreditPurchase({ userId, returnId, cancelled, onFulfilled, planAccount, onPlanRefresh, onCheckout }: {
   userId: number; returnId: string | null; cancelled: boolean; onFulfilled: (signal: AbortSignal) => void;
+  onCheckout?: () => void;
 } & ({ planAccount: PlanAccount | null; onPlanRefresh: (change?: ScheduledPlanChange | null) => void }
   | { planAccount?: undefined; onPlanRefresh?: undefined })) {
   const { language, setLanguage, refreshSession } = useApp();
@@ -164,12 +165,14 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
     setConsentNotice(null);
     try {
       const prior = attempt.current;
+      const priorOffer = prior?.price.monthlyOffer ?? (prior?.price.months === 1 ? "monthly_trial" : undefined);
       const current = prior && prior.price.priceId === selected.priceId && prior.price.months === offer?.months
+        && priorOffer === offer?.monthlyOffer
         ? prior : { attemptId: crypto.randomUUID(), price: selected };
       // Persist before sending the request so a lost response can be retried.
       remember(current);
       const order = offer?.months
-        ? await startPlanPurchase(current.attemptId, selected.priceId, offer.months, controller.signal)
+        ? await startPlanPurchase(current.attemptId, selected.priceId, offer.months, controller.signal, offer.monthlyOffer)
         : await startCreditPurchase(current.attemptId, selected.priceId, controller.signal);
       if (controller.signal.aborted) return;
       remember({ ...current, orderId: order.id });
@@ -177,6 +180,7 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
       else if (order.checkoutUrl) {
         // Stripe's shared return URL has no locale prefix.
         if (isPlan) setLanguage(language);
+        onCheckout?.();
         window.location.assign(order.checkoutUrl);
         setNotice(null);
       } else {
@@ -221,15 +225,13 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
       busy={notice === "trialCreating"} onConfirm={() => void confirmTrial()} />}
     {isPlan ? planAccount && !consent && (canSubscribe ? <PlanOffers language={language} account={planAccount}
       renderAction={({ months, priceId, currency, amount, bonusCredits, trialDays }) => {
-        const used = months === 1 && planAccount.trialEligible === false;
-        const available = priceId && (months !== 1 || trialDays === 7 && planAccount.trialEligible === true);
-        const label = used || !available ? p.unavailable : months === 1 ? p.trial.start : p.trial.pay(planAmount(language, amount));
-        return <>
-          <button type="button" className="button button-primary" disabled={blocked || !available}
-            aria-label={`${p.term(months)} · ${label}`} aria-describedby="plan-card-notice"
-            onClick={() => priceId && void buy({ priceId, currency, amount, credits: bonusCredits, months })}>{label}</button>
-          {used && <p className="text-sm">{p.trial.accountUsed}</p>}
-        </>;
+        const monthlyOffer = months !== 1 ? undefined : planAccount.trialEligible === false
+          ? "monthly_paid" : trialDays === 7 && planAccount.trialEligible === true ? "monthly_trial" : undefined;
+        const available = priceId && (months !== 1 || monthlyOffer);
+        const label = !available ? p.unavailable : monthlyOffer === "monthly_trial" ? p.trial.start : p.trial.pay;
+        return <button type="button" className={`button ${months === 1 ? "button-primary" : "plan-pay-button"}`} disabled={blocked || !available}
+          aria-label={`${p.term(months)} · ${label}`} aria-describedby="plan-card-notice"
+          onClick={() => available && priceId && void buy({ priceId, currency, amount, credits: bonusCredits, months, monthlyOffer })}>{label}</button>;
       }} /> : <PlanChangeControls account={planAccount} onRefresh={onPlanRefresh} />) : price === "unavailable" ? <>
       <p role="status">{t.priceUnavailable}</p>
       <button type="button" className="button credits-secondary" onClick={reloadPrice}>{t.retry}</button>

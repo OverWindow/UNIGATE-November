@@ -132,8 +132,11 @@ export function cancelPlanChange({ id, months, effectiveAt }: ScheduledPlanChang
   return mutateJson<{ scheduledChange: null }>("DELETE", "/api/subscriptions/me/plan-change/", { id, months, effectiveAt }, signal);
 }
 
-export function startPlanPurchase(attemptId: string, priceId: string, months: number, signal: AbortSignal) {
-  const body = months === 1 ? { attemptId, priceId, months, offer: "monthly_trial" } : { attemptId, priceId, months };
+export type MonthlyPlanOffer = "monthly_trial" | "monthly_paid";
+
+export function startPlanPurchase(attemptId: string, priceId: string, months: number, signal: AbortSignal,
+  offer: MonthlyPlanOffer = "monthly_trial") {
+  const body = months === 1 ? { attemptId, priceId, months, offer } : { attemptId, priceId, months };
   return mutateJson<CreditPurchaseStatus & { checkoutUrl: string | null }>("POST", "/api/plans/purchases/", body, signal);
 }
 

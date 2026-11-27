@@ -27,7 +27,7 @@ export default function PlanOffers({ language, account, renderAction }: {
       const { months, amount } = offer;
       const current = account?.currentPlanMonths === months;
       const trialOffer = offer.trialDays === 7 && !account?.active && !account?.subscription && account?.trialEligible !== false;
-      const benefits = [...p.benefits, p.trial.bonus(offer.bonusCredits)];
+      const benefits = [trialOffer ? p.trialStartsNow : p.paymentStartsNow, p.unlimitedAccess, p.trial.bonus(offer.bonusCredits)];
       const savings = monthlyAmount ? planSavingsPercent(amount, months, monthlyAmount) : 0;
       return <article className="plan-offer" key={months} aria-current={current || undefined}>
         <div className="plan-heading"><h2>{p.term(months)}</h2>{current && currentBadge}</div>

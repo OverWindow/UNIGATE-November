@@ -12,12 +12,16 @@ const require = createRequire(import.meta.url);
 const originalFetch = globalThis.fetch;
 const balance = { available: 73, balance: 83, reserved: 10 };
 const price = { priceId: "price_test_topiq", amount: 6700, currency: "krw", credits: 1000 };
-let path, session, requests, effects, search;
+let path, session, requests, effects, search, plansDialog;
 
 // Render actual component trees and run their mount effects without a browser.
 const imports = {
-  react: { ...React, useEffect: setup => effects.push(setup) },
-  "next/navigation": { usePathname: () => path, useSearchParams: () => search },
+  react: {
+    ...React,
+    useEffect: setup => effects.push(setup),
+    useRef: value => React.useRef(value === null && plansDialog ? plansDialog : value),
+  },
+  "next/navigation": { usePathname: () => path, useSearchParams: () => search, useRouter: () => ({}) },
   "next/image": { default: () => null },
   "next/link": { default: ({ href, children }) => React.createElement("a", { href }, children) },
   "@/app/providers": { useApp: () => session },
@@ -69,9 +73,12 @@ function mount(...components) {
 
 beforeEach(() => {
   effects = [];
+  plansDialog = null;
   search = new URLSearchParams();
   requests = [];
   globalThis.window = new EventTarget();
+  window.location = { href: "https://topiq.example/plans" };
+  window.history = { state: null, pushState(state) { this.state = state; } };
   globalThis.document = new EventTarget();
   globalThis.fetch = async (url, options) => {
     requests.push({ url, method: options.method });
@@ -165,8 +172,7 @@ test("Each Plus card lists benefits and savings and the selected purchase starts
   const tree = mount(() => {
     const ui = CreditPurchase({ planAccount: { plans, active: false, currentPlanMonths: null, trialEligible: true }, userId: 1, returnId: null, onFulfilled() {} });
     const [offers] = React.Children.toArray(ui.props.children);
-    const controls = offers.props.renderAction(plans[2]);
-    buy = React.Children.toArray(controls.props.children).find(item => item.type === "button").props.onClick;
+    buy = offers.props.renderAction(plans[2]).props.onClick;
     return ui;
   });
   const cards = tree.html.match(/<article\b[\s\S]*?<\/article>/g) ?? [];
@@ -183,8 +189,10 @@ test("Each Plus card lists benefits and savings and the selected purchase starts
     const card = cards[index];
     assert.ok(card.includes(`<h2>Plus ${months}개월</h2>`));
     assert.ok(card.includes(amount.toLocaleString("ko")));
-    const price = new Intl.NumberFormat("ko", { style: "currency", currency: "KRW" }).format(amount);
-    assert.ok(card.includes(`aria-label="Plus ${months}개월 · ${months === 1 ? "7일 무료 체험 시작" : price + " 결제하고 시작"}"`));
+    assert.ok(card.includes(`aria-label="Plus ${months}개월 · ${months === 1 ? "7일 무료 체험 시작" : "결제하고 시작"}"`));
+    assert.ok(card.includes(months === 1 ? "카드 등록 후 결제 없이 사용 시작, 7일 뒤 자동 결제" : "지금 바로 결제 후 사용 시작"));
+    assert.ok(card.includes("모든 모의고사 및 단어장 무제한 열람"));
+    assert.ok(card.includes(months === 1 ? "button button-primary" : "button plan-pay-button"));
     assert.equal((card.match(/<li>/g) ?? []).length, 3);
     if (months > 1) assert.ok(card.includes(`월간 결제 대비 ${months === 3 ? 20 : 26}% 절약`));
     else assert.doesNotMatch(card, /월간 결제 대비/);
@@ -236,13 +244,31 @@ test("guests can browse all plans and each Plus card returns them to plans after
       assert.ok(card.includes(price));
       assert.equal((card.match(/<li>/g) ?? []).length, 3);
       const prefix = language === "ko" ? "" : `/${language}`;
-      const label = index === 0 ? plansContent[language].trial.start : plansContent[language].trial.pay(price);
+      const label = index === 0 ? plansContent[language].trial.start : plansContent[language].trial.pay;
       assert.ok(card.includes(`href="${prefix}/login?next=${encodeURIComponent(prefix + "/plans")}">${label}</a>`));
     }
-    assert.doesNotMatch(page.html, /aria-current="true"|<button/);
+    assert.doesNotMatch(page.html, /aria-current="true"/);
+    assert.ok(page.html.includes(plansContent[language].exit.title));
     page.unmount();
   }
   assert.deepEqual(requests, []);
+});
+
+test("going back from the public plans page waits for confirmation", () => {
+  session.user = null;
+  session.status = "anonymous";
+  let opened = 0;
+  plansDialog = { showModal() { opened++; }, focus() {} };
+  const page = mount(PlansAccount);
+  assert.equal(window.history.state.topiqPlansExit, true);
+
+  window.history.state = null;
+  window.dispatchEvent(new Event("popstate"));
+  assert.equal(opened, 1);
+  assert.equal(window.history.state.topiqPlansExit, true);
+  assert.equal(window.dispatchEvent(new Event("beforeunload", { cancelable: true })), false);
+  page.unmount();
+  assert.equal(window.dispatchEvent(new Event("beforeunload", { cancelable: true })), true);
 });
 
 test("Plus links subscribers to their separate settings page below the offers", () => {
@@ -259,17 +285,39 @@ test("Plus links subscribers to their separate settings page below the offers", 
   page.unmount();
 });
 
-test("new monthly signups require an explicit trial offer and account eligibility; longer terms stay available", () => {
+test("monthly rejoining starts a paid checkout while eligible accounts require a trial offer", async () => {
   const { publicPlans } = require("../src/lib/plans-content.ts");
-  for (const [trialEligible, trialDays] of [[false, 7], [true, undefined]]) {
+  const posts = [];
+  window.location.assign = () => {};
+  globalThis.fetch = async (url, options) => {
+    if (url === "/api/csrf/") return Response.json({ csrfToken: "synthetic" });
+    posts.push([url, JSON.parse(options.body)]);
+    return Response.json({ id: "order", status: "pending", checkoutUrl: "https://checkout.stripe.com/example" });
+  };
+  for (const [trialEligible, trialDays] of [[false, 0], [true, undefined]]) {
     const plans = publicPlans.map(offer => ({ ...offer, priceId: "price-" + offer.months, trialDays: offer.months === 1 ? trialDays : 0 }));
-    const page = mount(() => React.createElement(CreditPurchase, { userId: 1, planAccount: { plans, active: false, trialEligible } }));
+    let button;
+    const page = mount(() => {
+      const ui = CreditPurchase({ userId: 1, planAccount: { plans, active: false, trialEligible } });
+      const [offers] = React.Children.toArray(ui.props.children);
+      button = offers.props.renderAction(plans[0]);
+      return ui;
+    });
     const [, monthly, quarterly, semiannual] = page.html.match(/<article\b[\s\S]*?<\/article>/g);
-    assert.match(monthly, /<button[^>]*disabled/);
-    assert.equal(monthly.includes("이미 월간 무료 체험을 사용"), !trialEligible);
+    assert.equal(button.props.disabled, trialEligible);
+    if (!trialEligible) {
+      assert.match(monthly, /₩9,900/);
+      assert.match(monthly, /button-primary[^>]+>결제하고 시작/);
+      assert.doesNotMatch(monthly, /7일 동안 0원/);
+      button.props.onClick();
+      await setImmediate();
+    }
     for (const term of [quarterly, semiannual]) assert.doesNotMatch(term, /<button[^>]*disabled/);
     page.unmount();
   }
+  assert.equal(posts.length, 1);
+  assert.equal(posts[0][0], "/api/plans/purchases/");
+  assert.deepEqual(posts[0][1], { attemptId: posts[0][1].attemptId, priceId: "price-1", months: 1, offer: "monthly_paid" });
 });
 
 test("trial consent is explicit and shows the quoted instant, amount, payment method and cancellation terms in every language", () => {

@@ -129,8 +129,8 @@ def plans(request):
     return api_response({
         **account, "trialEligible": eligible,
         "plans": [{"months": months, "priceId": (price_id_for(months) or None)
-                   if months != 1 or settings.STRIPE_TRIAL_FINGERPRINT_KEY else None, "amount": amount,
-                   "currency": "krw", "bonusCredits": PLAN_BONUS, "trialDays": 7 if months == 1 else 0}
+                   if months != 1 or not eligible or settings.STRIPE_TRIAL_FINGERPRINT_KEY else None, "amount": amount,
+                   "currency": "krw", "bonusCredits": PLAN_BONUS, "trialDays": 7 if months == 1 and eligible else 0}
                   for months, amount in PLAN_AMOUNTS.items()],
     })
 
@@ -348,7 +348,7 @@ def close_old_plan_checkout(purchase, sessions):
 
 
 @transaction.atomic
-def new_order(user_id, attempt_id, price, months, client):
+def new_order(user_id, attempt_id, price, months, client, monthly_trial=False):
     if months:
         locked_account(user_id)
         previous = CreditPurchase.objects.filter(user_id=user_id, attempt_id=attempt_id).first()
@@ -357,7 +357,7 @@ def new_order(user_id, attempt_id, price, months, client):
         pending = open_subscription(user_id)
         if current_plan_end(user_id) or (pending and pending.subscription_state != "checkout"):
             raise PlanConflict
-        if months == 1:
+        if monthly_trial:
             trial_checkout.require_trial_key()
             reserved = PlusFreeTrial.objects.filter(user_id=user_id, status="reserved").select_related("purchase").first()
             if reserved:
@@ -376,9 +376,9 @@ def new_order(user_id, attempt_id, price, months, client):
             close_old_plan_checkout(order, client.v1.checkout.sessions)
         if pending:
             trial = PlusFreeTrial.objects.filter(purchase=pending).first()
-            if pending.plan_months == 1 and not trial:
+            if monthly_trial and pending.plan_months == 1 and not trial:
                 close_old_plan_checkout(pending, client.v1.checkout.sessions)
-            elif pending.stripe_price_id == price["priceId"]:
+            elif pending.stripe_price_id == price["priceId"] and bool(trial) == monthly_trial:
                 return pending, False
             elif trial:
                 if trial.status == "reserved":
@@ -400,7 +400,7 @@ def new_order(user_id, attempt_id, price, months, client):
         "stripe_price_id": price["priceId"], "amount": price["amount"], "currency": price["currency"],
         "credits": price["credits"], "plan_months": months, "subscription_state": "checkout" if months else None,
     })
-    if created and months == 1:
+    if created and monthly_trial:
         PlusFreeTrial.objects.create(purchase=purchase, user_id=user_id)
     return purchase, created
 
@@ -470,8 +470,10 @@ def create_purchase(request, plan=False):
     months = data.get("months")
     if plan and months not in PLAN_AMOUNTS:
         return api_response({"error": "invalid_plan"}, 400)
-    if (months == 1 and data.get("offer") != "monthly_trial") or (months != 1 and "offer" in data):
+    offer = data.get("offer")
+    if (months == 1 and offer not in ("monthly_trial", "monthly_paid")) or (months != 1 and "offer" in data):
         return api_response({"error": "trial_offer_changed"}, 409)
+    monthly_trial = offer == "monthly_trial"
     try:
         attempt_id = UUID(data.get("attemptId", ""))
         if attempt_id.version != 4:
@@ -483,6 +485,8 @@ def create_purchase(request, plan=False):
         return api_response({"error": "invalid_price"}, 400)
 
     try:
+        if offer == "monthly_paid" and not PlusFreeTrial.objects.filter(user=request.user, status="started").exists():
+            return api_response({"error": "trial_offer_changed"}, 409)
         client = stripe_client()
         purchase = CreditPurchase.objects.filter(user=request.user, attempt_id=attempt_id).first()
         created = False
@@ -490,18 +494,12 @@ def create_purchase(request, plan=False):
             price = configured_price(client, months)
             if expected_price != price["priceId"]:
                 return api_response({"error": "price_changed"}, 409)
-            purchase, created = new_order(request.user.pk, attempt_id, price, months, client)
+            purchase, created = new_order(request.user.pk, attempt_id, price, months, client, monthly_trial)
         if (purchase.stripe_price_id != expected_price or purchase.plan_months != months
                 or (plan and purchase.subscription_state is None)):
             return api_response({"error": "price_changed"}, 409)
         trial = PlusFreeTrial.objects.filter(purchase=purchase).first() if months == 1 else None
-        if months == 1 and trial is None:
-            if purchase.status == "pending" and purchase.subscription_state == "checkout":
-                with transaction.atomic():
-                    locked_account(purchase.user_id)
-                    purchase.refresh_from_db()
-                    if purchase.status == "pending" and purchase.subscription_state == "checkout":
-                        close_old_plan_checkout(purchase, client.v1.checkout.sessions)
+        if bool(trial) != monthly_trial:
             return api_response({"error": "trial_offer_changed"}, 409)
         try:
             url = checkout(purchase, client, retry=not created)

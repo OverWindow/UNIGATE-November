@@ -28,13 +28,13 @@ TOPIQ는 Google Identity Services 팝업에서 받은 ID 토큰을 Django에서 
 
 | Plus 결제 주기 | 가입 시 | 주기당 결제액 | 백엔드 환경변수 |
 | --- | --- | --- | --- |
-| 매월 | 7일 무료 체험 | 9,900원 | `STRIPE_PLAN_PRICE_ID_1M` |
+| 매월 | 7일 무료 체험 또는 체험 이력이 있으면 즉시 결제 | 9,900원 | `STRIPE_PLAN_PRICE_ID_1M` |
 | 3개월마다 | 즉시 결제 | 23,900원 | `STRIPE_PLAN_PRICE_ID_3M` |
 | 6개월마다 | 즉시 결제 | 43,900원 | `STRIPE_PLAN_PRICE_ID_6M` |
 
 **월간 무료 체험.** Stripe에 카드를 직접 등록한 뒤 TOPIQ에서 유료 전환 예정 일시, 월 9,900원, 등록 카드 자동결제와 해지 방법을 확인하고 동의하면 Plus가 시작됩니다. 체험 중에는 Plus 모의시험·단어장을 이용합니다. 첫 실제 결제가 성공하면 첫 400크레딧을 지급합니다. 구독 관리에서 해지를 예약하면 체험 종료일까지 이용하고 첫 청구는 0원입니다. 첫 결제에 실패하면 체험 종료 시 권한이 만료되고 결제 성공 후 유료 기간이 반영됩니다.
 
-체험은 계정과 카드 각각 한 번입니다. 과거 3·6개월권을 사용한 회원도 기존 구독과 이용 기간이 끝났고 계정·카드에 체험 이력이 없으면 신청할 수 있습니다. 체험을 사용한 계정은 구독 해지 후 3·6개월권으로 재가입할 수 있습니다. 카드 등록을 중단했거나 최종 동의를 하지 않았다면 체험 기회를 유지합니다. Apple Pay·Google Pay 등 지갑형 결제수단은 체험 신청 시 카드 직접 입력으로 다시 등록해 주세요. [체험 정책과 가입 흐름](docs/topiq-plus-trial-plan.md)
+체험은 계정과 카드 각각 한 번입니다. 과거 3·6개월권을 사용한 회원도 기존 구독과 이용 기간이 끝났고 계정·카드에 체험 이력이 없으면 신청할 수 있습니다. 체험을 사용한 계정은 기존 구독과 이용 기간이 끝나면 월간 요금제를 즉시 결제하거나 3·6개월권을 선택할 수 있습니다. 카드 등록을 중단했거나 최종 동의를 하지 않았다면 체험 기회를 유지합니다. Apple Pay·Google Pay 등 지갑형 결제수단은 체험 신청 시 카드 직접 입력으로 다시 등록해 주세요. [체험 정책과 가입 흐름](docs/topiq-plus-trial-plan.md)
 
 동의 화면에 표시하는 전환 예정 시각은 다음 5분 경계에서 7일 뒤입니다. 같은 조건으로 확인할 수 있는 시간이 지나면 새 일시로 다시 동의를 받습니다. Stripe에는 사용자가 확인한 시각을 그대로 전달합니다.
 
@@ -43,7 +43,7 @@ TOPIQ는 Google Identity Services 팝업에서 받은 ID 토큰을 Django에서 
 1. 샌드박스와 운영의 비밀 설정에 환경마다 별도로 생성한 무작위 비밀값 `STRIPE_TRIAL_FINGERPRINT_KEY`를 등록합니다. 같은 환경의 모든 백엔드 인스턴스와 재배포에서 값을 유지해야 이전 카드 기록과 동일한 HMAC을 계산할 수 있습니다. 각 환경에서 Stripe 키와 세 가지 반복 가격이 같은 계정·모드에 속하는지도 확인합니다. 제한 키를 사용하면 Checkout 세션, SetupIntent·결제수단 조회, 구독 생성·조회와 기존 결제 권한이 필요합니다.
 2. 기존 Stripe 웹훅 주소에 `customer.subscription.created`를 추가하고 고객 포털의 취소 시점을 **현재 결제 기간 종료 시**로 설정합니다. 로컬 전달 명령은 아래 ‘로컬에서 테스트 결제하기’에 있습니다.
 3. 개발에서는 사용자가 `backend/`에서 서버 시작 전에 `.\.venv\Scripts\python.exe manage.py migrate`를 실행합니다. 운영은 기존 시작 스크립트가 Gunicorn 시작 전 자동 적용합니다. `accounts.0014_plus_free_trials`가 체험 원주문·계정·카드 비교값·상태·동의·체험 기간을 저장하는 `plus_free_trials`를 만들고 `credit_purchases`의 열린 구독 제약에 `trialing`을 포함합니다.
-4. **백엔드 교체가 끝나고 새 프론트를 공개하기 전**, 로컬에서는 `backend/`에서 `.\.venv\Scripts\python.exe manage.py expire_legacy_monthly_checkouts`, 운영에서는 배포된 백엔드 컨테이너의 `/app/backend`에서 `python manage.py expire_legacy_monthly_checkouts`를 **한 번 수동 실행**합니다. 구버전의 열려 있는 월간 즉시 결제창을 Stripe에서 만료시키고 해당 DB 주문을 만료 처리합니다. 이미 완료된 결제는 기존 웹훅으로 정산합니다. 중단 시 같은 명령으로 재시도할 수 있습니다. 새 체험 신청, 장기권, 이용 중인 구독에는 적용되지 않습니다.
+4. **월간 체험을 처음 도입할 때 백엔드 교체가 끝나고 새 프론트를 공개하기 전**, 로컬에서는 `backend/`에서 `.\.venv\Scripts\python.exe manage.py expire_legacy_monthly_checkouts`, 운영에서는 배포된 백엔드 컨테이너의 `/app/backend`에서 `python manage.py expire_legacy_monthly_checkouts`를 **한 번 수동 실행**합니다. 구버전의 열려 있는 월간 즉시 결제창을 Stripe에서 만료시키고 해당 DB 주문을 만료 처리합니다. 이미 완료된 결제는 기존 웹훅으로 정산합니다. 중단 시 같은 명령으로 재시도할 수 있습니다. 새 체험 신청, 체험을 마친 계정의 월간 반복 결제, 장기권, 이용 중인 구독에는 적용되지 않습니다.
 5. TOPIQ 프론트를 배포합니다. 샌드박스에서 월간 카드 등록 → 동의 → 구독 관리 → 첫 결제 또는 해지를 확인합니다. 두 계정에서 같은 카드를 등록하면 한 계정만 체험을 시작할 수 있습니다. [Stripe Billing 테스트](https://docs.stripe.com/billing/testing)
 
 - **Stripe 설정.** 샌드박스와 라이브 모드에서 각각 KRW 정액 반복 가격 3개를 생성합니다. 월 단위 간격을 각각 1·3·6으로 설정하고 새 Price ID를 위 환경변수에 지정합니다. 1,000크레딧 충전용 `STRIPE_PRICE_ID`는 일회성 가격을 사용합니다. 기본 고객 포털에서 결제 수단 변경, 청구서 조회, **현재 결제 기간 종료 시 구독 취소**를 활성화합니다. 포털의 상품·수량 변경은 끕니다. [Stripe 고객 포털 설정](https://docs.stripe.com/customer-management/configure-portal)
