@@ -166,10 +166,11 @@ class CreditPurchaseTests(TestCase):
             self.assertEqual((order.plan_months, order.amount, order.credits, order.plan_starts_at), (months, amount, 400, None))
             params = self.sessions.create.call_args.args[0]
             if months == 1:
-                self.assertEqual(params["mode"], "setup")
-                self.assertNotIn("allow_promotion_codes", params)
-                self.assertNotIn("line_items", params)
-                self.assertEqual(params["setup_intent_data"]["metadata"], {"credit_purchase_id": str(order.pk)})
+                self.assertEqual(params["mode"], "subscription")
+                self.assertIs(params["allow_promotion_codes"], True)
+                self.assertEqual(params["line_items"], [{"price": price_id, "quantity": 1}])
+                self.assertEqual(params["subscription_data"]["trial_period_days"], 7)
+                self.assertEqual(params["subscription_data"]["metadata"]["credit_purchase_id"], str(order.pk))
             else:
                 self.assertEqual(params["mode"], "subscription")
                 self.assertIs(params["allow_promotion_codes"], True)

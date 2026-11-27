@@ -39,5 +39,3 @@
 .trial-consent dl div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 16px; }
 .trial-consent dt { color: #52647e; }
 .trial-consent dd { font-weight: 600; }
-.trial-consent label { display: flex; align-items: baseline; gap: 8px; }
-.trial-consent input { flex-shrink: 0; }

@@ -22,7 +22,10 @@ from .plans import assign_plan_period, current_plan, current_plan_end, open_subs
 from .refunds import (
     RefundOrderNotReady, apply_refund, matches_checkout_amount, refund_state, reserve_refund, reserved_orders, submit_refund, topups,
 )
-from .subscriptions import apply_paid_invoice, cancel_order_subscription, close_revoked_checkout, matching_checkout, sync_subscription
+from .subscriptions import (
+    HOSTED_TRIAL, TrialCheckoutPending, apply_paid_invoice, cancel_order_subscription, close_revoked_checkout,
+    matching_checkout, sync_subscription,
+)
 from . import trial_checkout
 from .views import api_response, read_payload
 
@@ -261,14 +264,14 @@ def checkout(purchase, client, *, retry):
             trial = PlusFreeTrial.objects.get(purchase=purchase)
             if trial.status != "setup":
                 return None
-            url = checkout_session(purchase, client, retry=retry, setup=True)
+            url = checkout_session(purchase, client, retry=retry, trial=True)
             if purchase.status == "expired":
                 trial_checkout.close_trial(trial)
             return url
     return checkout_session(purchase, client, retry=retry)
 
 
-def checkout_session(purchase, client, *, retry, setup=False):
+def checkout_session(purchase, client, *, retry, trial=False):
     if purchase.status != "pending":
         return None
     sessions = client.v1.checkout.sessions
@@ -294,24 +297,22 @@ def checkout_session(purchase, client, *, retry, setup=False):
             "cancel_url": f"{return_url}&cancelled=1",
         }
         customer_id = checkout_customer(purchase.user_id, client.v1.customers)
-        if setup:
-            trial_checkout.require_trial_key()
-            session = create_subscription_session(purchase, sessions, {
-                "mode": "setup", "currency": purchase.currency, "allowed_payment_method_types": ["card"],
-                "wallet_options": {"link": {"display": "never"}},
-                "customer": customer_id, "metadata": params["metadata"],
-                "setup_intent_data": {"metadata": params["metadata"]},
-                "success_url": return_url, "cancel_url": params["cancel_url"],
-                "expires_at": int((purchase.created_at + timedelta(hours=24)).timestamp()),
-            }, retry=retry)
-            if session is None:
-                return None
-        elif purchase.subscription_state:
-            session = create_subscription_session(purchase, sessions, {
+        if purchase.subscription_state:
+            subscription_params = {
                 **params, "allow_promotion_codes": True, "customer": customer_id,
                 "subscription_data": {"metadata": params["metadata"]},
                 "expires_at": int((purchase.created_at + timedelta(hours=24)).timestamp()),
-            }, retry=retry)
+            }
+            if trial:
+                trial_checkout.require_trial_key()
+                metadata = {**params["metadata"], HOSTED_TRIAL: "1"}
+                subscription_params.update(
+                    metadata=metadata, payment_method_collection="always", allowed_payment_method_types=["card"],
+                    wallet_options={"link": {"display": "never"}},
+                    subscription_data={"metadata": metadata, "trial_period_days": trial_checkout.TRIAL_DAYS,
+                                       "trial_settings": {"end_behavior": {"missing_payment_method": "cancel"}}},
+                )
+            session = create_subscription_session(purchase, sessions, subscription_params, retry=retry)
             if session is None:
                 return None
         else:
@@ -399,6 +400,8 @@ def new_order(user_id, attempt_id, price, months, client, monthly_trial=False):
                     raise PlanConflict
                 sessions = client.v1.checkout.sessions
                 session = sessions.retrieve(pending.stripe_session_id) if pending.stripe_session_id else recover_plan_session(pending, sessions)
+                if session and session.status == "complete" and session.mode == "subscription":
+                    raise PlanConflict  # Let the completed trial verify the card before opening another plan.
                 if session and session.status == "open":
                     sessions.expire(session.id)
                 trial_checkout.close_trial(trial)
@@ -613,9 +616,9 @@ def purchase_status(request, purchase_id):
                     purchase.refresh_from_db()
                     trial.refresh_from_db()
                     if trial.status == "setup" and purchase.stripe_session_id:
-                        api = stripe_client().v1
-                        session = api.checkout.sessions.retrieve(purchase.stripe_session_id).to_dict()
-                        trial_checkout.receive_setup(purchase, trial, session, account.stripe_customer_id, api)
+                        client = stripe_client()
+                        session = client.v1.checkout.sessions.retrieve(purchase.stripe_session_id).to_dict()
+                        trial_checkout.receive_checkout(purchase, trial, session, account.stripe_customer_id, client)
                     trial_checkout.refresh_quote(trial)
             purchase.refresh_from_db()
             trial.refresh_from_db()
@@ -638,7 +641,7 @@ def apply_checkout_event(event_type, session, event_created=None):
     if purchase.plan_months == 1:
         trial = PlusFreeTrial.objects.filter(purchase=purchase).first()
         if trial:
-            trial_checkout.receive_setup(purchase, trial, session, account.stripe_customer_id, stripe_client().v1)
+            trial_checkout.receive_checkout(purchase, trial, session, account.stripe_customer_id, stripe_client())
             return 200
     revoked_legacy = purchase.subscription_state == "revoked" and session["mode"] == "payment"
     if purchase.subscription_state and not revoked_legacy:
@@ -713,6 +716,7 @@ def stripe_webhook(request):
     except (ValueError, TypeError, AttributeError, KeyError, stripe.SignatureVerificationError,
             CreditPurchase.DoesNotExist, RequestDataTooBig):
         return HttpResponse(status=400)
-    except (DatabaseError, PaymentsUnavailable, trial_checkout.TrialUnavailable, InvalidBillingState, RefundOrderNotReady, stripe.StripeError):
+    except (DatabaseError, PaymentsUnavailable, trial_checkout.TrialUnavailable, TrialCheckoutPending,
+            InvalidBillingState, RefundOrderNotReady, stripe.StripeError):
         return HttpResponse(status=503)
     return HttpResponse(status=status)

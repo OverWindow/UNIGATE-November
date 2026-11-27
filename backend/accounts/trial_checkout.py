@@ -10,12 +10,15 @@ from django.views.decorators.debug import sensitive_variables
 
 from .credits import locked_account
 from .models import CreditPurchase, PlusFreeTrial
+from .plan_changes import plan_item
 from .plans import current_plan_end
-from .subscriptions import sync_subscription
+from .subscriptions import HOSTED_TRIAL, cancel_refunded_subscription, live_order_subscription, sync_subscription
 
 
-CONSENT_VERSION = "monthly-trial-v1"
-TRIAL_DURATION = timedelta(days=7)
+CONSENT_VERSION = "monthly-trial-v2"
+HOSTED_CONSENT_VERSION = "monthly-trial-stripe-v1"
+TRIAL_DAYS = 7
+TRIAL_DURATION = timedelta(days=TRIAL_DAYS)
 CLAIMED = ("reserved", "started")
 
 
@@ -69,11 +72,22 @@ def purchase_result(purchase, trial=None):
     return result
 
 
-def check_session(session, order, customer_id):
-    if (session.get("mode") != "setup" or not customer_id or session.get("customer") != customer_id
+def check_session(session, order, customer_id, mode="setup"):
+    if (session.get("mode") != mode or not customer_id or session.get("customer") != customer_id
             or (session.get("metadata") or {}).get("credit_purchase_id") != str(order.pk)
             or not session.get("id") or order.stripe_session_id not in (None, session["id"])):
-        raise ValueError("Setup session does not match the order")
+        raise ValueError("Trial session does not match the order")
+
+
+@sensitive_variables()
+def card_digest(method, customer_id):
+    card = method.get("card") or {}
+    if (method.get("customer") != customer_id or method.get("type") != "card"
+            or card.get("wallet") or not card.get("fingerprint")):
+        return ""
+    require_trial_key()
+    return salted_hmac("topiq-plus-trial-card", card["fingerprint"],
+                       secret=settings.STRIPE_TRIAL_FINGERPRINT_KEY, algorithm="sha256").hexdigest()
 
 
 @sensitive_variables()
@@ -89,14 +103,65 @@ def setup_card(api, session, order, customer_id):
     method = intent.get("payment_method") or {}
     if not isinstance(method, dict) or not method.get("id"):
         raise ValueError("Invalid setup payment method")
-    card = method.get("card") or {}
-    if (method.get("customer") != customer_id or method.get("type") != "card"
-            or card.get("wallet") or not card.get("fingerprint")):
-        return None, ""
-    require_trial_key()
-    digest = salted_hmac("topiq-plus-trial-card", card["fingerprint"],
-                         secret=settings.STRIPE_TRIAL_FINGERPRINT_KEY, algorithm="sha256").hexdigest()
-    return method["id"], digest
+    digest = card_digest(method, customer_id)
+    return (method["id"], digest) if digest else (None, "")
+
+
+@sensitive_variables()
+def receive_checkout(order, trial, session, customer_id, client):
+    api = client.v1
+    if (session.get("metadata") or {}).get(HOSTED_TRIAL) != "1":
+        return receive_setup(order, trial, session, customer_id, api)
+    check_session(session, order, customer_id, "subscription")
+    if trial.user_id != order.user_id or trial.purchase_id != order.pk or order.plan_months != 1:
+        raise ValueError("Trial does not match the order")
+    if not order.stripe_session_id:
+        order.stripe_session_id = session["id"]
+        order.save(update_fields=["stripe_session_id"])
+    if session["status"] == "expired" and trial.status == "setup":
+        close_trial(trial)
+    if session["status"] != "complete" or trial.status in ("started", "rejected"):
+        return
+    subscription = live_order_subscription(api, order, customer_id, session.get("subscription"),
+                                           expand=["default_payment_method"])
+    if (subscription["metadata"].get(HOSTED_TRIAL) != "1"
+            or plan_item(subscription)["price"]["id"] != order.stripe_price_id):
+        raise ValueError("Subscription does not match the trial checkout")
+    if subscription["status"] in ("canceled", "incomplete_expired"):
+        close_trial(trial)
+        return
+    if order.status != "pending" or order.subscription_state != "checkout" or current_plan_end(order.user_id):
+        cancel_refunded_subscription(api, subscription)
+        close_trial(trial)
+        return
+    if trial.status != "setup":
+        raise ValueError("Trial checkout is not awaiting completion")
+    start = datetime.fromtimestamp(subscription["trial_start"], UTC)
+    end = datetime.fromtimestamp(subscription["trial_end"], UTC)
+    if end <= start:
+        raise ValueError("Invalid hosted trial period")
+    method = subscription.get("default_payment_method")
+    digest = card_digest(method, customer_id) if isinstance(method, dict) else ""
+    trial.card_fingerprint_digest = digest
+    if not digest:
+        cancel_refunded_subscription(api, subscription)
+        close_trial(trial, "rejected")
+        return
+    try:
+        with transaction.atomic():
+            trial.status = "reserved"
+            trial.consented_at, trial.agreed_trial_ends_at = start, end
+            trial.consent_version = HOSTED_CONSENT_VERSION
+            trial.save(update_fields=["status", "card_fingerprint_digest", "consented_at",
+                                      "agreed_trial_ends_at", "consent_version"])
+    except IntegrityError:
+        if not (claimed_trials().filter(user_id=trial.user_id).exists()
+                or claimed_trials().filter(card_fingerprint_digest=digest).exists()):
+            raise
+        cancel_refunded_subscription(api, subscription)
+        close_trial(trial, "rejected")
+        return
+    sync_subscription("trial.confirmed", subscription, lambda: client)
 
 
 def receive_setup(order, trial, session, customer_id, api):

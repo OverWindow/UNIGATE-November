@@ -14,7 +14,8 @@ from django.utils import timezone
 
 from accounts.models import CreditAccount, CreditPurchase, PlusFreeTrial
 from accounts.plans import has_active_plan
-from accounts.trial_checkout import CONSENT_VERSION, activate_reserved, prepare_confirmation
+from accounts.subscriptions import HOSTED_TRIAL
+from accounts.trial_checkout import CONSENT_VERSION, activate_reserved, card_digest, prepare_confirmation
 from .test_credit_purchases import TEST_SETTINGS, plan_invoice, plan_price, signed_event
 
 
@@ -38,13 +39,22 @@ class TrialCheckoutTests(TestCase):
         self.api.subscriptions.list.return_value.auto_paging_iter.return_value = []
         self.api.subscriptions.create.side_effect = self.subscription
 
-    def setup_order(self):
+    def start_checkout(self):
         response = self.client.post(PLANS, {
             "attemptId": str(uuid4()), "priceId": "price_one", "months": 1, "offer": "monthly_trial",
         }, content_type="application/json")
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["trial"]["status"], "awaiting_card")
         self.order = CreditPurchase.objects.get(pk=response.json()["id"])
+
+    def setup_order(self, *, hosted=False):
+        if hosted:
+            self.start_checkout()
+        else:
+            self.order = CreditPurchase.objects.create(user=self.user, attempt_id=uuid4(), amount=9900, credits=400,
+                plan_months=1, stripe_price_id="price_one", subscription_state="checkout",
+                stripe_session_id=self.api.checkout.sessions.create.return_value.id)
+            PlusFreeTrial.objects.create(purchase=self.order, user=self.user)
         self.details = f"/api/credits/purchases/{self.order.pk}/?product=plan"
         self.metadata = {"credit_purchase_id": str(self.order.pk)}
         self.session = {"object": "checkout.session", "id": self.order.stripe_session_id, "status": "complete", "mode": "setup",
@@ -56,6 +66,18 @@ class TrialCheckoutTests(TestCase):
             "id": "seti_trial", "status": "succeeded", "customer": self.customer,
             "metadata": self.metadata, "payment_method": self.method,
         }, None)
+        if hosted:
+            self.metadata[HOSTED_TRIAL] = "1"
+            self.session.update(mode="subscription", subscription=self.subscription_id)
+            self.session.pop("setup_intent")
+            self.api.checkout.sessions.retrieve.return_value = stripe.checkout.Session.construct_from(self.session, None)
+            self.start = timezone.now().replace(microsecond=0)
+            self.end = self.start + timedelta(days=7)
+            self.hosted_subscription = self.subscription({"trial_end": int(self.end.timestamp())}, options={}).to_dict()
+            self.hosted_subscription.update(object="subscription", trial_start=int(self.start.timestamp()),
+                                            default_payment_method=self.method)
+            self.hosted_subscription["items"]["data"][0]["price"].pop("unit_amount_decimal")
+            self.api.subscriptions.retrieve.return_value.to_dict.return_value = self.hosted_subscription
 
     def subscription(self, params, *, options):
         return stripe.Subscription.construct_from({
@@ -71,12 +93,6 @@ class TrialCheckoutTests(TestCase):
 
     def test_card_setup_does_not_consume_trial_and_confirmation_creates_once(self):
         self.setup_order()
-        params = self.api.checkout.sessions.create.call_args.args[0]
-        self.assertEqual((params["mode"], params["allowed_payment_method_types"], params["customer"]),
-                         ("setup", ["card"], self.customer))
-        self.assertEqual(params["setup_intent_data"]["metadata"], self.metadata)
-        self.assertNotIn("line_items", params)
-        self.assertNotIn("subscription_data", params)
         self.assertEqual(signed_event(self.client, "checkout.session.completed", self.session).status_code, 200)
         quote = self.client.get(self.details).json()["trial"]
         self.assertEqual((quote["status"], quote["consentVersion"]), ("awaiting_consent", CONSENT_VERSION))
@@ -100,6 +116,61 @@ class TrialCheckoutTests(TestCase):
         self.order.refresh_from_db()
         self.assertEqual((self.order.status, self.order.subscription_state, self.order.transaction_id),
                          ("pending", "trialing", None))
+
+    def test_hosted_checkout_reconciles_out_of_order_events_and_discounted_first_invoice(self):
+        self.setup_order(hosted=True)
+        params = self.api.checkout.sessions.create.call_args.args[0]
+        self.assertEqual((params["mode"], params["allowed_payment_method_types"], params["customer"]),
+                         ("subscription", ["card"], self.customer))
+        self.assertEqual(params["payment_method_collection"], "always")
+        self.assertTrue(params["allow_promotion_codes"])
+        self.assertEqual(params["metadata"], self.metadata)
+        self.assertEqual(params["subscription_data"]["metadata"], self.metadata)
+        self.assertEqual(params["subscription_data"]["trial_period_days"], 7)
+        self.assertEqual(signed_event(self.client, "customer.subscription.created", self.hosted_subscription).status_code, 200)
+        self.assertFalse(has_active_plan(self.user.pk))
+
+        def invoice(invoice_id, reason, start, end):
+            bill = plan_invoice(self.order, invoice_id, reason, int(start.timestamp()), int(end.timestamp()))
+            bill["customer"] = self.customer
+            bill["parent"]["subscription_details"].update(metadata=self.metadata, subscription=self.subscription_id)
+            bill["lines"]["data"][0]["parent"]["subscription_item_details"]["subscription"] = self.subscription_id
+            return bill
+
+        zero = invoice("in_hosted_trial", "subscription_create", self.start, self.end)
+        zero["amount_paid"] = zero["lines"]["data"][0]["amount"] = 0
+        self.assertEqual(signed_event(self.client, "invoice.paid", zero).status_code, 200)
+        paid = invoice("in_hosted_first", "subscription_cycle", self.end, self.end + timedelta(days=30))
+        paid.update(amount_paid=4950, total_discount_amounts=[{"amount": 4950}])
+        self.assertEqual(signed_event(self.client, "invoice.paid", paid).status_code, 503)
+        # The return page can validate Checkout before Stripe delivers the completion event.
+        self.assertEqual(self.client.get(self.details).json()["trial"]["status"], "started")
+        self.assertTrue(has_active_plan(self.user.pk))
+        self.assertEqual(signed_event(self.client, "checkout.session.completed", self.session).status_code, 200)
+        self.api.subscriptions.create.assert_not_called()
+        self.api.subscriptions.retrieve.assert_called_once_with(self.subscription_id, {"expand": ["default_payment_method"]})
+        self.assertEqual(CreditAccount.objects.get(user=self.user).balance, 0)
+        for _ in range(2):
+            self.assertEqual(signed_event(self.client, "invoice.paid", paid).status_code, 200)
+        self.order.refresh_from_db()
+        self.assertEqual((self.order.amount, self.order.stripe_invoice_id), (4950, paid["id"]))
+        self.assertEqual(CreditAccount.objects.get(user=self.user).balance, 400)
+
+    def test_hosted_checkout_cancels_duplicate_card_and_never_opens_access(self):
+        self.setup_order(hosted=True)
+        old_user = get_user_model().objects.create_user(username="original-card-holder")
+        old_order = CreditPurchase.objects.create(user=old_user, attempt_id=uuid4(), amount=9900, credits=400,
+                                                 plan_months=1, stripe_price_id="price_one")
+        PlusFreeTrial.objects.create(purchase=old_order, user=old_user, status="started",
+            card_fingerprint_digest=card_digest(self.method, self.customer), consent_version=CONSENT_VERSION,
+            consented_at=self.start, agreed_trial_ends_at=self.end, started_at=self.start, ends_at=self.end)
+        self.api.subscriptions.cancel.return_value.to_dict.return_value = {"id": self.subscription_id, "status": "canceled"}
+        for _ in range(2):
+            self.assertEqual(signed_event(self.client, "checkout.session.completed", self.session).status_code, 200)
+        self.assertEqual(self.client.get(self.details).json()["trial"]["status"], "card_used")
+        self.assertFalse(has_active_plan(self.user.pk))
+        self.assertTrue(self.client.get("/api/plans/").json()["trialEligible"])
+        self.api.subscriptions.cancel.assert_called_once_with(self.subscription_id, {"invoice_now": False, "prorate": False})
 
     def test_stale_quote_requires_fresh_consent(self):
         self.setup_order()
@@ -205,7 +276,7 @@ class TrialCheckoutTests(TestCase):
         retry = self.client.post(PLANS, {"attemptId": str(uuid4()), "priceId": "price_one", "months": 1,
                                         "offer": "monthly_trial"}, content_type="application/json")
         self.assertEqual((retry.status_code, retry.json()["error"]), (409, "trial_account_used"))
-        self.api.checkout.sessions.create.assert_called_once()
+        self.api.checkout.sessions.create.assert_not_called()
         self.api.subscriptions.create.assert_called_once()
 
         session = stripe.checkout.Session.construct_from({
@@ -222,7 +293,7 @@ class TrialCheckoutTests(TestCase):
             for attempt in (payload, {**payload, "attemptId": str(uuid4())}):
                 result_again = self.client.post(PLANS, attempt, content_type="application/json")
                 self.assertEqual((result_again.status_code, result_again.json()["id"]), (200, result.json()["id"]))
-        self.assertEqual(self.api.checkout.sessions.create.call_count, 2)
+        self.api.checkout.sessions.create.assert_called_once()
         params = self.api.checkout.sessions.create.call_args.args[0]
         self.assertEqual((params["mode"], params["line_items"]), ("subscription", [{"price": "price_one", "quantity": 1}]))
         self.assertNotIn("trial_period_days", params["subscription_data"])

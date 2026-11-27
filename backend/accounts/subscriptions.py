@@ -10,6 +10,13 @@ from .plan_changes import plan_item, release_applied_schedule
 from .plans import add_calendar_months
 
 
+HOSTED_TRIAL = "topiq_trial_checkout"
+
+
+class TrialCheckoutPending(Exception):
+    pass
+
+
 def invoice_subscription_details(invoice):
     return (invoice.get("parent") or {}).get("subscription_details") or invoice.get("subscription_details") or {}
 
@@ -71,10 +78,11 @@ def matching_checkout(sessions, order, customer_id):
     return None
 
 
-def live_order_subscription(api, order, customer_id, subscription_id):
+def live_order_subscription(api, order, customer_id, subscription_id, *, expand=None):
     if not customer_id or not subscription_id or order.stripe_subscription_id not in (None, subscription_id):
         raise ValueError("Subscription does not match order")
-    subscription = api.subscriptions.retrieve(subscription_id).to_dict()
+    subscription = (api.subscriptions.retrieve(subscription_id, {"expand": expand}) if expand
+                    else api.subscriptions.retrieve(subscription_id)).to_dict()
     if (subscription["id"] != subscription_id or subscription["customer"] != customer_id
             or (subscription.get("metadata") or {}).get("credit_purchase_id") != str(order.pk)):
         raise ValueError("Retrieved subscription does not match order")
@@ -103,14 +111,15 @@ def close_revoked_checkout(api, order):
         return
     if session is None:
         return
-    expected_mode = "setup" if getattr(order, "free_trial", None) else "subscription"
     session_id = session.id
 
     def checked(result):
         data = result.to_dict()
+        metadata = data.get("metadata") or {}
+        expected_mode = "setup" if getattr(order, "free_trial", None) and metadata.get(HOSTED_TRIAL) != "1" else "subscription"
         if (not customer_id or not session_id or data["id"] != session_id
                 or order.stripe_session_id not in (None, session_id) or data["customer"] != customer_id
-                or data["mode"] != expected_mode or (data.get("metadata") or {}).get("credit_purchase_id") != str(order.pk)):
+                or data["mode"] != expected_mode or metadata.get("credit_purchase_id") != str(order.pk)):
             raise ValueError("Checkout does not match revoked order")
         return data
 
@@ -128,7 +137,7 @@ def close_revoked_checkout(api, order):
     if not order.stripe_session_id:
         order.stripe_session_id = session_id
         order.save(update_fields=["stripe_session_id"])
-    if expected_mode == "subscription" and data["status"] == "complete":
+    if data["mode"] == "subscription" and data["status"] == "complete":
         cancel_order_subscription(api, order, customer_id, data["subscription"])
 
 
@@ -142,6 +151,11 @@ def apply_paid_invoice(invoice, *, get_api=None):
         return
     subscription_id = details.get("subscription") or invoice.get("subscription")
     order, account = subscription_order(order_id, invoice["customer"], subscription_id)
+    hosted_trial = metadata.get(HOSTED_TRIAL) == "1"
+    if hosted_trial and getattr(order, "free_trial", None) and order.free_trial.status != "started":
+        if order.free_trial.status in ("closed", "rejected") or (reason == "subscription_create" and invoice["amount_paid"] == 0):
+            return
+        raise TrialCheckoutPending
     trial = order_trial(order)
     if CreditPurchase.objects.filter(stripe_invoice_id=invoice["id"]).exists():
         return
@@ -164,7 +178,7 @@ def apply_paid_invoice(invoice, *, get_api=None):
     free_invoice = trial is not None and reason == "subscription_create" and invoice["amount_paid"] == 0
     if free_invoice:
         amount = 0
-    discount = sum(item["amount"] for item in (invoice.get("total_discount_amounts") or [])) if trial is None else 0
+    discount = sum(item["amount"] for item in (invoice.get("total_discount_amounts") or [])) if trial is None or hosted_trial else 0
     paid_amount = invoice["amount_paid"]
     if (invoice["status"] != "paid" or invoice["currency"] != order.currency or not 0 <= discount <= amount
             or paid_amount != amount - discount
@@ -219,10 +233,14 @@ def apply_paid_invoice(invoice, *, get_api=None):
 
 @transaction.atomic
 def sync_subscription(event_type, subscription, client_factory):
-    order_id = (subscription.get("metadata") or {}).get("credit_purchase_id")
+    metadata = subscription.get("metadata") or {}
+    order_id = metadata.get("credit_purchase_id")
     if not order_id:
         return
     order, account = subscription_order(order_id, subscription["customer"], subscription["id"])
+    if (metadata.get(HOSTED_TRIAL) == "1" and getattr(order, "free_trial", None)
+            and order.free_trial.status != "started" and event_type != "trial.confirmed"):
+        return  # Checkout completion verifies the card before granting access.
     trial = order_trial(order)
     terminal_order = order.subscription_state in ("ended", "revoked")
     if not trial and order.subscription_state != "revoked" and (event_type == "customer.subscription.created" or terminal_order):

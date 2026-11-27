@@ -32,8 +32,8 @@ interface PlanCopy {
   savings: (percent: number) => string;
   trial: {
     start: string; pay: string; after: (amount: string) => string;
-    cancel: string; bonus: (credits: number) => string; confirm: string; agree: string;
-    firstCharge: string; method: string; card: string; active: string; noCharge: string; accessEnds: string;
+    bonus: (credits: number) => string; confirm: string;
+    firstCharge: string; monthlyPrice: string; method: string; card: string; active: string; noCharge: string; accessEnds: string;
     checking: string; creating: string; started: string; cardUsed: string; accountUsed: string;
     cardUnavailable: string; termsChanged: string; delayed: string; retry: string; ended: string;
     changeAfter: string; billingPending: string; confirmAgain: string;
@@ -58,10 +58,9 @@ export const plansContent: Record<Language, PlanCopy> = {
     login: "로그인하기",
     trial: {
       start: "7일 무료 체험 시작", pay: "결제하고 시작", after: amount => `7일 동안 0원, 이후 매월 ${amount}`,
-      cancel: "첫 결제 전에 설정의 구독 관리에서 해지하면 체험 종료일까지 이용할 수 있고 구독료가 청구되지 않습니다.",
       bonus: credits => `첫 결제 성공 후부터 유료 이용 기간에 매월 쓰기용 ${credits}크레딧 지급`,
-      confirm: "무료 체험과 자동결제 확인", agree: "표시된 일시부터 등록 카드로 매월 자동 결제되는 데 동의합니다.",
-      firstCharge: "첫 유료 전환 예정 일시", method: "결제 수단", card: "Stripe에 등록한 카드", active: "무료 체험 중",
+      confirm: "무료 체험과 자동결제 확인",
+      firstCharge: "첫 유료 전환 예정 일시", monthlyPrice: "할인 전 월 요금", method: "결제 수단", card: "Stripe에 등록한 카드", active: "무료 체험 중",
       noCharge: "해지 예약됨 · 자동 결제 없음", accessEnds: "무료 체험 이용 종료", checking: "등록한 카드를 확인하고 있습니다.",
       creating: "무료 체험 시작을 확인하고 있습니다.", started: "무료 체험이 시작되었습니다. 지금 Plus 콘텐츠를 이용할 수 있습니다.",
       cardUsed: "이미 무료 체험에 사용한 카드입니다. 다른 카드로 다시 신청할 수 있습니다.",
@@ -113,10 +112,9 @@ export const plansContent: Record<Language, PlanCopy> = {
     login: "Log in",
     trial: {
       start: "Start 7-day free trial", pay: "Pay and get started", after: amount => `Free for 7 days, then ${amount} a month`,
-      cancel: "Cancel in Settings → Manage subscription before the first charge to keep access until the trial ends and pay nothing.",
       bonus: credits => `${credits} writing credits each paid month, starting with the first successful payment`,
-      confirm: "Confirm your trial and automatic payments", agree: "I agree to monthly charges to my registered card starting at the date and time shown.",
-      firstCharge: "First scheduled charge", method: "Payment method", card: "Card registered with Stripe", active: "Free trial",
+      confirm: "Confirm your trial and automatic payments",
+      firstCharge: "First scheduled charge", monthlyPrice: "Monthly price before discounts", method: "Payment method", card: "Card registered with Stripe", active: "Free trial",
       noCharge: "Cancellation scheduled · No automatic charge", accessEnds: "Trial access ends", checking: "Checking your registered card…",
       creating: "Confirming the start of your trial…", started: "Your free trial has started. You can use Plus now.",
       cardUsed: "This card has already been used for a free trial. You can try again with another card.",
@@ -168,10 +166,9 @@ export const plansContent: Record<Language, PlanCopy> = {
     login: "Masuk",
     trial: {
       start: "Mulai uji coba gratis 7 hari", pay: "Bayar dan mulai", after: amount => `Gratis 7 hari, lalu ${amount} per bulan`,
-      cancel: "Batalkan di Pengaturan → Kelola langganan sebelum tagihan pertama. Akses tetap berlaku hingga uji coba berakhir tanpa biaya langganan.",
       bonus: credits => `${credits} kredit menulis setiap bulan berbayar, mulai dari pembayaran pertama yang berhasil`,
-      confirm: "Konfirmasi uji coba dan pembayaran otomatis", agree: "Saya menyetujui tagihan bulanan otomatis pada kartu terdaftar mulai tanggal dan waktu yang tertera.",
-      firstCharge: "Jadwal tagihan pertama", method: "Metode pembayaran", card: "Kartu yang terdaftar di Stripe", active: "Uji coba gratis",
+      confirm: "Konfirmasi uji coba dan pembayaran otomatis",
+      firstCharge: "Jadwal tagihan pertama", monthlyPrice: "Harga bulanan sebelum diskon", method: "Metode pembayaran", card: "Kartu yang terdaftar di Stripe", active: "Uji coba gratis",
       noCharge: "Pembatalan dijadwalkan · Tanpa tagihan otomatis", accessEnds: "Akhir akses uji coba", checking: "Memeriksa kartu terdaftar…",
       creating: "Mengonfirmasi awal uji coba…", started: "Uji coba gratis sudah dimulai. Kamu bisa menggunakan Plus sekarang.",
       cardUsed: "Kartu ini sudah digunakan untuk uji coba gratis. Coba lagi dengan kartu lain.",

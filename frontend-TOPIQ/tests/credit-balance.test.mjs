@@ -347,20 +347,22 @@ test("monthly rejoining starts a paid checkout while eligible accounts require a
   assert.deepEqual(posts[0][1], { attemptId: posts[0][1].attemptId, priceId: "price-1", months: 1, offer: "monthly_paid" });
 });
 
-test("trial consent is explicit and shows the quoted instant, amount, payment method and cancellation terms in every language", () => {
+test("trial confirmation shows the quoted terms and can be submitted without a checkbox in every language", () => {
   const { plansContent, billingTime, planAmount } = require("../src/lib/plans-content.ts");
   const quote = { endsAt: "2099-09-20T01:45:16Z", consentVersion: "v1", priceId: "price-monthly", amount: 9900, currency: "krw" };
   for (const language of ["ko", "en", "id"]) {
     session.language = language;
-    const page = mount(() => React.createElement(imports["./TrialConsent"].default, { quote, busy: false, onConfirm() {} }));
+    const TrialConsent = imports["./TrialConsent"].default;
+    const page = mount(() => React.createElement(TrialConsent, { quote, busy: false, onConfirm() {} }));
     assert.ok(page.html.includes(billingTime(language, quote.endsAt)));
     assert.ok(page.html.includes(planAmount(language, quote.amount)));
     assert.ok(page.html.includes(plansContent[language].trial.card));
-    assert.ok(page.html.includes(plansContent[language].trial.cancel));
-    assert.match(page.html, /type="checkbox"[^>]*required/);
-    assert.doesNotMatch(page.html, /type="checkbox"[^>]*checked/);
-    assert.match(page.html, /type="submit"[^>]*disabled/);
+    assert.doesNotMatch(page.html, /type="checkbox"/);
+    assert.doesNotMatch(page.html, /type="submit"[^>]*disabled/);
     page.unmount();
+    const pending = mount(() => React.createElement(TrialConsent, { quote, busy: true, onConfirm() {} }));
+    assert.match(pending.html, /type="submit"[^>]*disabled/);
+    pending.unmount();
   }
 });
 

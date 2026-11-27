@@ -74,7 +74,7 @@ export function SubscriptionSummary({ account, onRefresh }: {
     { label: inTrial ? p.trial.accessEnds : p.until, value: endsAt ? <time dateTime={endsAt}>{billingTime(language, endsAt)}</time> : p.details.noPaidPeriod },
     ...(inTrial && !endingTrial && trialEndsAt && firstChargeAmount != null ? [
       { label: p.trial.firstCharge, value: <time dateTime={trialEndsAt}>{billingTime(language, trialEndsAt)}</time> },
-      { label: p.change.nextCharge, value: `${planAmount(language, firstChargeAmount)} · ${p.interval(1)}` },
+      { label: p.trial.monthlyPrice, value: planAmount(language, firstChargeAmount) },
     ] : []),
   ];
   return <section aria-labelledby="subscription-plan" className="max-w-2xl rounded-xl border border-slate-200 p-5 sm:p-7">
