@@ -86,6 +86,7 @@ UNFOLD = {
     "SITE_TITLE": "UNIGATE 관리",
     "SITE_HEADER": "UNIGATE 관리",
     "SITE_SYMBOL": "school",
+    "LOGIN": {"form": "accounts.forms.AdminEmailLoginForm"},
     "SIDEBAR": {"navigation": "config.admin_navigation.sidebar"},
     "DASHBOARD_CALLBACK": "config.admin_navigation.dashboard",
 }
