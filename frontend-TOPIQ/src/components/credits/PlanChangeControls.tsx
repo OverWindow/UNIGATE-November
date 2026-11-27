@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
+import { trackEvent } from "@/lib/analytics";
 import { authContent } from "@/lib/auth/auth-content";
 import { plansContent } from "@/lib/plans-content";
 import { cancelPlanChange, schedulePlanChange, WritingError, type PlanAccount,
@@ -58,6 +59,8 @@ export default function PlanChangeControls({ account, onRefresh }: {
     try {
       const { scheduledChange: change } = await send(controller.signal);
       if (controller.signal.aborted) return;
+      const months = change?.months ?? scheduledChange?.months;
+      if (months) trackEvent(change ? "plan_change_scheduled" : "plan_change_cancelled", { plan_months: months });
       if (!change) setNotice("cancelled");
       onRefresh(change);
     } catch (error) {

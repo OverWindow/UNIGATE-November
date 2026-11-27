@@ -17,6 +17,7 @@
 - Before making changes, explain the proposed steps, affected files or systems, expected API or database changes, and relevant verification. Ask for explicit approval and wait, unless the user explicitly waives this step. The initial task request alone is not approval of an unpresented plan.
 - Read-only inspection is allowed before approval. Do not edit files, install dependencies, or change database or service state until approved. Proceed within the approved scope without repeated approval requests; obtain approval for material scope changes.
 - Keep changes within the requested scope. Do not perform unrelated refactoring or modify unrelated files.
+- When adding or changing a user-facing feature, implement and verify GA4 events for its meaningful actions and confirmed outcomes in the same change. Use the site's existing GA4 property and standard event names when available. Confirm sensitive or transactional outcomes at the authoritative source, prevent duplicate events on retries, and exclude personal information and secrets from event payloads.
 - If instructions are unclear or open to multiple interpretations, ask for clarification and wait before proceeding with dependent work.
 - Evaluate existing functionality before adding a dependency. Reuse existing tables and relationships where possible; add tables only for a clear, current requirement.
 - DB 구조 변경은 `backend/migration/<기능명>/*.py`의 Django migration으로만 관리합니다. 별도 `.sql` 파일을 추가하거나 migration을 우회하여 DB에 SQL을 직접 실행하지 않습니다.

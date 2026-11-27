@@ -1,3 +1,4 @@
+import json
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
@@ -198,18 +199,30 @@ class CreditRefundTests(TestCase):
         history = self.client.get("/api/credits/transactions/").json()["transactions"]
         self.assertEqual([(e["kind"], e["amount"]) for e in history], [("refund", 999), ("refund", 1), ("purchase", 1000)])
 
+    @override_settings(TOPIQ_GA4_API_SECRET="test-only-secret")
     def test_early_refund_is_saved_and_reconciled_on_fulfillment(self):
+        self.order.ga_client_id = "1234.5678"
+        self.order.save(update_fields=["ga_client_id"])
         discounted = {"amount_subtotal": AMOUNT, "amount_total": 3000, "total_details": {"amount_discount": AMOUNT - 3000}}
         session = topup_session(self.order).to_dict() | discounted
         self.api.checkout.sessions.list.return_value.data = [stripe.checkout.Session.construct_from(session, None)]
         refund = refund_object("re_early", 3000)
-        self.notify(refund)
-        self.notify(refund, "refund.updated")
-        self.wallet(0)
-        self.assertFalse(CreditTransaction.objects.exists())
-        for _ in range(2):
-            self.assertEqual(post_webhook(self.client, self.order, payment_intent="pi_topup", **discounted).status_code, 200)
-        self.notify(refund)
+        with patch("accounts.analytics.send_event") as send:
+            with self.captureOnCommitCallbacks(execute=True):
+                self.notify(refund)
+                self.notify(refund, "refund.updated")
+                self.wallet(0)
+                self.assertFalse(CreditTransaction.objects.exists())
+            send.assert_not_called()
+            with self.captureOnCommitCallbacks(execute=True):
+                for _ in range(2):
+                    result = post_webhook(self.client, self.order, payment_intent="pi_topup", **discounted)
+                    self.assertEqual(result.status_code, 200)
+                self.notify(refund)
+        events = [json.loads(call.args[1])["events"][0] for call in send.call_args_list]
+        self.assertEqual([event["name"] for event in events], ["purchase", "refund"])
+        self.assertEqual(events[1]["params"]["transaction_id"], events[0]["params"]["transaction_id"])
+        self.assertEqual(events[1]["params"]["value"], 3000)
         self.wallet(0)
         self.assertEqual(self.states()[str(self.order.pk)], (0, "refunded"))
         self.assertEqual(list(self.order.refund_entries.values_list("kind", "amount")), [("refund", 1000)])

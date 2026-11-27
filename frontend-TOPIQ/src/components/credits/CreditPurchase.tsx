@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "@/app/providers";
+import { getAnalyticsClientId, trackEvent } from "@/lib/analytics";
 import { creditsContent } from "@/lib/credits-content";
 import { localizedPath } from "@/lib/locale-path";
 import { plansContent } from "@/lib/plans-content";
@@ -171,13 +172,19 @@ export default function CreditPurchase({ userId, returnId, cancelled, onFulfille
         ? prior : { attemptId: crypto.randomUUID(), price: selected };
       // Persist before sending the request so a lost response can be retried.
       remember(current);
+      const gaClientId = await getAnalyticsClientId();
       const order = offer?.months
-        ? await startPlanPurchase(current.attemptId, selected.priceId, offer.months, controller.signal, offer.monthlyOffer)
-        : await startCreditPurchase(current.attemptId, selected.priceId, controller.signal);
+        ? await startPlanPurchase(current.attemptId, selected.priceId, offer.months, controller.signal, offer.monthlyOffer, gaClientId)
+        : await startCreditPurchase(current.attemptId, selected.priceId, controller.signal, gaClientId);
       if (controller.signal.aborted) return;
       remember({ ...current, orderId: order.id });
       if (order.status !== "pending") applyOrder(order, controller.signal);
       else if (order.checkoutUrl) {
+        const value = offer?.monthlyOffer === "monthly_trial" ? 0 : selected.amount;
+        trackEvent("begin_checkout", {
+          currency: selected.currency.toUpperCase(), value,
+          items: [{ item_id: offer?.months ? `plus_${offer.months}m` : "credit_pack", price: value, quantity: 1 }],
+        });
         // Stripe's shared return URL has no locale prefix.
         if (isPlan) setLanguage(language);
         onCheckout?.();

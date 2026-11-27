@@ -79,6 +79,7 @@ class CreditPurchase(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, models.PROTECT)
     attempt_id = models.UUIDField()
+    ga_client_id = models.CharField(editable=False, max_length=41, null=True)
     stripe_price_id = models.CharField(max_length=255, null=True)
     amount = models.PositiveIntegerField()
     currency = models.CharField(max_length=3, default="krw")

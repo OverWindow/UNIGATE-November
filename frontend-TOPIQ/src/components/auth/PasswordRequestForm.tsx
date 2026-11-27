@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useApp } from "@/app/providers";
+import { trackEvent } from "@/lib/analytics";
 import { AuthError, requestPassword } from "@/lib/auth/auth-api";
 import { authContent } from "@/lib/auth/auth-content";
 import { emailContent } from "@/lib/auth/email-content";
@@ -77,6 +78,7 @@ function RequestFields({ purpose, email }: { purpose: Purpose; email?: string })
       const seconds = await requestPassword(change
         ? { purpose: "change", current_password: entry.value, language }
         : { purpose: "reset", email: entry.value.trim(), language });
+      trackEvent("password_request_accepted", { purpose });
       if (change) entry.value = "";
       setSent(true);
       waitToResend(seconds);

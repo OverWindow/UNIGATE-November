@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 import stripe
 from django.db import transaction
 
+from .analytics import track_after_commit, track_purchase
 from .credits import locked_account, reconcile_purchase_refunds, record
 from .models import PLAN_AMOUNTS, CreditPurchase
 from .plan_changes import plan_item, release_applied_schedule
@@ -215,7 +216,7 @@ def apply_paid_invoice(invoice, *, get_api=None):
             receipt.credited_months = 1
     else:
         # A renewal can arrive early. Its first month is due when the new period starts.
-        receipt = CreditPurchase(user_id=order.user_id, attempt_id=uuid4(), plan_months=months,
+        receipt = CreditPurchase(user_id=order.user_id, attempt_id=uuid4(), plan_months=months, ga_client_id=order.ga_client_id,
                                  stripe_price_id=price_id, currency=order.currency,
                                  credits=order.credits, credited_months=0)
     if order.subscription_state == "checkout" or (first_payment and order.subscription_state in ("trialing", "past_due")):
@@ -229,6 +230,8 @@ def apply_paid_invoice(invoice, *, get_api=None):
     receipt.status = "fulfilled"
     receipt.save()
     reconcile_purchase_refunds(account, receipt)
+    track_purchase(receipt, discount=discount, trial_conversion=trial is not None and first_payment,
+                   renewal=not first_payment)
 
 
 @transaction.atomic
@@ -254,7 +257,8 @@ def sync_subscription(event_type, subscription, client_factory):
         subscription = live_order_subscription(api, order, account.stripe_customer_id, subscription["id"])
         if not terminal_order and subscription["status"] == "active" and subscription.get("schedule"):
             release_applied_schedule(subscription, api)
-    if trial and trial.status == "reserved":
+    start_trial = trial is not None and trial.status == "reserved"
+    if start_trial:
         start = datetime.fromtimestamp(subscription["trial_start"], UTC)
         end = datetime.fromtimestamp(subscription["trial_end"], UTC)
         if (end != trial.agreed_trial_ends_at or end <= start
@@ -280,3 +284,5 @@ def sync_subscription(event_type, subscription, client_factory):
     elif status in ("active", "trialing"):
         order.subscription_state = "active"
     order.save(update_fields=["subscription_state", "status"])
+    if start_trial and order.subscription_state in ("trialing", "active", "ending"):
+        track_after_commit(order.ga_client_id, "trial_start", plan_months=order.plan_months)
