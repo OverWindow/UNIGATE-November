@@ -1,3 +1,4 @@
+import json
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from io import StringIO
@@ -117,8 +118,11 @@ class TrialCheckoutTests(TestCase):
         self.assertEqual((self.order.status, self.order.subscription_state, self.order.transaction_id),
                          ("pending", "trialing", None))
 
+    @override_settings(TOPIQ_GA4_API_SECRET="test-only-secret")
     def test_hosted_checkout_reconciles_out_of_order_events_and_discounted_first_invoice(self):
         self.setup_order(hosted=True)
+        self.order.ga_client_id = "1234.5678"
+        self.order.save(update_fields=["ga_client_id"])
         params = self.api.checkout.sessions.create.call_args.args[0]
         self.assertEqual((params["mode"], params["allowed_payment_method_types"], params["customer"]),
                          ("subscription", ["card"], self.customer))
@@ -139,19 +143,27 @@ class TrialCheckoutTests(TestCase):
 
         zero = invoice("in_hosted_trial", "subscription_create", self.start, self.end)
         zero["amount_paid"] = zero["lines"]["data"][0]["amount"] = 0
-        self.assertEqual(signed_event(self.client, "invoice.paid", zero).status_code, 200)
         paid = invoice("in_hosted_first", "subscription_cycle", self.end, self.end + timedelta(days=30))
         paid.update(amount_paid=4950, total_discount_amounts=[{"amount": 4950}])
-        self.assertEqual(signed_event(self.client, "invoice.paid", paid).status_code, 503)
-        # The return page can validate Checkout before Stripe delivers the completion event.
-        self.assertEqual(self.client.get(self.details).json()["trial"]["status"], "started")
-        self.assertTrue(has_active_plan(self.user.pk))
-        self.assertEqual(signed_event(self.client, "checkout.session.completed", self.session).status_code, 200)
-        self.api.subscriptions.create.assert_not_called()
-        self.api.subscriptions.retrieve.assert_called_once_with(self.subscription_id, {"expand": ["default_payment_method"]})
-        self.assertEqual(CreditAccount.objects.get(user=self.user).balance, 0)
-        for _ in range(2):
-            self.assertEqual(signed_event(self.client, "invoice.paid", paid).status_code, 200)
+        with patch("accounts.analytics.send_event") as send:
+            with self.captureOnCommitCallbacks(execute=True):
+                self.assertEqual(signed_event(self.client, "invoice.paid", zero).status_code, 200)
+                self.assertEqual(signed_event(self.client, "invoice.paid", paid).status_code, 503)
+            send.assert_not_called()
+            with self.captureOnCommitCallbacks(execute=True):
+                # The return page can validate Checkout before Stripe delivers the completion event.
+                self.assertEqual(self.client.get(self.details).json()["trial"]["status"], "started")
+                self.assertTrue(has_active_plan(self.user.pk))
+                self.assertEqual(signed_event(self.client, "checkout.session.completed", self.session).status_code, 200)
+                self.api.subscriptions.create.assert_not_called()
+                self.api.subscriptions.retrieve.assert_called_once_with(self.subscription_id, {"expand": ["default_payment_method"]})
+                self.assertEqual(CreditAccount.objects.get(user=self.user).balance, 0)
+                for _ in range(2):
+                    self.assertEqual(signed_event(self.client, "invoice.paid", paid).status_code, 200)
+        events = [json.loads(call.args[1])["events"][0] for call in send.call_args_list]
+        self.assertEqual([event["name"] for event in events], ["trial_start", "purchase", "trial_convert"])
+        self.assertEqual(events[1]["params"]["value"], 4950)
+        self.assertEqual(events[1]["params"]["discount_amount"], 4950)
         self.order.refresh_from_db()
         self.assertEqual((self.order.amount, self.order.stripe_invoice_id), (4950, paid["id"]))
         self.assertEqual(CreditAccount.objects.get(user=self.user).balance, 400)

@@ -119,8 +119,8 @@ class CreditPurchaseTests(TestCase):
         self.sessions.create.return_value = session
         self.sessions.retrieve.return_value = session
 
-    def post_attempt(self, price_id=PRICE_ID):
-        return self.client.post(PURCHASES, {"attemptId": self.attempt_id, "priceId": price_id},
+    def post_attempt(self, price_id=PRICE_ID, **extra):
+        return self.client.post(PURCHASES, {"attemptId": self.attempt_id, "priceId": price_id, **extra},
                                 content_type="application/json", HTTP_X_CSRFTOKEN=self.csrf)
 
     def new_order(self):
@@ -772,6 +772,30 @@ class CreditPurchaseTests(TestCase):
         self.assertEqual((entry.amount, entry.balance_after, entry.reserved_after), (1000, 1150, 20))
         self.assertEqual(self.client.get(f"{PURCHASES}{order.pk}/").json()["status"], "fulfilled")
         self.assertEqual(self.client.get("/api/credits/transactions/").json()["transactions"][0]["kind"], "purchase")
+
+    @override_settings(TOPIQ_GA4_API_SECRET="test-only-secret", TOPIQ_GA4_DEBUG=False)
+    def test_discounted_purchase_tracks_once_even_if_analytics_fails(self):
+        result = self.post_attempt(gaClientId="1234.5678")
+        self.assertEqual(result.status_code, 201)
+        order = CreditPurchase.objects.get(pk=result.json()["id"])
+        self.assertEqual(order.ga_client_id, "1234.5678")
+        with patch("accounts.analytics.urlopen", side_effect=TimeoutError) as send:
+            with self.assertLogs("accounts.analytics", level="WARNING"):
+                with self.captureOnCommitCallbacks(execute=True):
+                    for _ in range(2):
+                        response = post_webhook(self.client, order, amount_total=6000, amount_subtotal=AMOUNT,
+                                                total_details={"amount_discount": 1500})
+                        self.assertEqual(response.status_code, 200)
+        send.assert_called_once()
+        self.assertEqual(json.loads(send.call_args.args[0].data), {
+            "client_id": "1234.5678",
+            "events": [{"name": "purchase", "params": {
+                "transaction_id": str(order.pk), "currency": "KRW", "value": 6000, "purchase_type": "initial",
+                "coupon_applied": 1, "discount_amount": 1500,
+                "items": [{"item_id": "credit_pack", "price": 6000, "quantity": 1, "discount": 1500}],
+            }}],
+        })
+        self.assert_wallet(1150, 1)
 
     def test_two_separate_paid_orders_credit_the_same_wallet_twice(self):
         first = self.new_order()

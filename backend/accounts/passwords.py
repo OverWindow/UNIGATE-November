@@ -8,6 +8,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import sensitive_post_parameters, sensitive_variables
 from django.views.decorators.http import require_POST
 
+from .analytics import browser_client_id, track_after_commit
 from .email_delivery import EmailDeliveryError, send_password_email
 from .email_verification import LANGUAGES
 from .forms import normalize_email, users_for_email
@@ -187,4 +188,5 @@ def confirm_password(request):
         clear_login_failures(email)
     if purpose == "change":
         update_session_auth_hash(request, user)
+    track_after_commit(browser_client_id(request), "password_completed", purpose=purpose)
     return api_response({"purpose": purpose})

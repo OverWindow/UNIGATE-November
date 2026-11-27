@@ -6,6 +6,7 @@ from django.db.migrations.recorder import MigrationRecorder
 from django.db.models import Sum, Q
 from django.utils import timezone
 
+from .analytics import track_refund
 from .credits import collect_pending_refunds, locked_account, reconcile_purchase_refunds
 from .models import CreditPurchase, CreditPurchaseRefund
 from .subscriptions import (
@@ -193,6 +194,7 @@ def save_refund(account, purchase, refund, *, api=None, subscription=None):
     )
     if (row.purchase_id, row.amount, row.currency) != (purchase.pk, refund["amount"], refund["currency"]):
         raise ValueError("Refund identity changed")
+    newly_succeeded = refund["status"] == "succeeded" and (created or row.status != "succeeded")
     own_attempt = (refund.get("metadata") or {}).get("refund_attempt") == str(purchase.refund_attempt_id)
     from_hold = bool(purchase.refund_attempt_id and refund["status"] == "succeeded")
     if from_hold or (purchase.refund_attempt_id and own_attempt and refund["status"] in {"failed", "canceled"}):
@@ -207,6 +209,8 @@ def save_refund(account, purchase, refund, *, api=None, subscription=None):
             raise ValueError("Plan refund requires Stripe client")
         revoke_refunded_plan(account, purchase, api, subscription)
     reconcile_purchase_refunds(account, purchase, from_hold=from_hold, previous_refunded=previous_refunded)
+    if newly_succeeded and purchase.status == "fulfilled":
+        track_refund(purchase, row)
 
 
 def reserved_orders(account):

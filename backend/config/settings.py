@@ -26,6 +26,8 @@ if not SECRET_KEY:
 
 DEBUG = DJANGO_ENV == "development"
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+TOPIQ_GA4_API_SECRET = os.environ.get("TOPIQ_GA4_API_SECRET", "").strip()
+TOPIQ_GA4_DEBUG = os.environ.get("TOPIQ_GA4_DEBUG", "").strip() == "1"
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "").strip()
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "").strip()
 STRIPE_TRIAL_FINGERPRINT_KEY = os.environ.get("STRIPE_TRIAL_FINGERPRINT_KEY", "").strip()

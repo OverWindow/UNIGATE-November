@@ -22,6 +22,25 @@ TOPIQ는 Google Identity Services 팝업에서 받은 ID 토큰을 Django에서 
 
 인증 회귀 테스트는 `backend/`에서 `.\.venv\Scripts\python.exe manage.py test accounts --noinput`으로 실행합니다. Django가 별도 PostgreSQL 테스트 DB를 생성·삭제하며, Google 토큰 검증에는 테스트용 서명과 공개키를 사용합니다. 프론트엔드 검증은 `frontend-TOPIQ/`에서 `npm test`, `npm run lint`, `npm run typecheck`, `npm run build`를 실행합니다.
 
+### TOPIQ GA4 이벤트
+
+TOPIQ의 기존 웹 스트림 `G-MNFFKP03XD`에 브라우저 이벤트와 Django Measurement Protocol 이벤트를 보냅니다.
+
+| 이벤트 | 기준 |
+|---|---|
+| `begin_checkout` | 크레딧 또는 Plus 주문의 Stripe Checkout으로 이동 |
+| `purchase` | Stripe 결제 확정 또는 구독 송장 결제 확정. 실제 결제 금액과 통화, 적용된 할인액을 포함 |
+| `trial_start`, `trial_convert` | Plus 체험 활성화, 해당 체험 후 첫 결제 확정 |
+| `refund` | 원 결제에 대한 Stripe 환불 성공 |
+| `plan_change_scheduled`, `plan_change_cancelled` | 플랜 변경 예약 또는 예약 취소 성공 |
+| `password_request_accepted`, `password_completed` | 비밀번호 재설정·변경 요청 접수 또는 완료. 이벤트 데이터에는 작업 유형만 포함 |
+
+`purchase.coupon_applied`와 `purchase.discount_amount`로 할인을 확인할 수 있습니다. 쿠폰 문자열, 이메일, 비밀번호 및 확인 링크는 이벤트에 포함하지 않습니다. 비밀번호 확인 페이지의 Google 태그 제외를 유지하며, 완료 이벤트는 기존 GA 쿠키가 있을 때 서버가 보냅니다. 이전 주문과 GA4 클라이언트 ID를 얻지 못한 주문은 서버 집계에서 제외합니다. 이벤트 전송에 실패하면 결제·환불 결과는 유지되고, 해당 이벤트는 자동 재전송되지 않습니다.
+
+1. GA4의 **관리 → 데이터 스트림 → TOPIQ 웹 스트림 → Measurement Protocol API 비밀번호**에서 생성한 값을 백엔드 배포 환경의 `TOPIQ_GA4_API_SECRET`에 설정합니다. 빈 값이면 서버 이벤트 전송을 건너뜁니다.
+2. 개발에서는 백엔드를 시작하기 전에 사용자가 `backend/`에서 `python manage.py migrate`를 수동 실행합니다. 가상 환경을 활성화한 상태에서 실행합니다. `accounts.0015_credit_purchase_ga_client_id`는 `credit_purchases.ga_client_id`를 추가합니다. 운영에서는 Django와 TOPIQ를 배포하며 기존 `deploy/start.sh`가 Gunicorn 시작 전에 마이그레이션을 자동 적용합니다.
+3. 검증 환경에서 백엔드에 `TOPIQ_GA4_DEBUG=1`을 설정하고 재시작합니다. 브라우저는 Tag Assistant로 연결하고 Stripe 테스트 모드에서 결제·할인·체험·환불을 확인합니다. GA4 **DebugView**에서 이벤트 값과 송장별 결제 이벤트 수를 대조한 뒤 `TOPIQ_GA4_DEBUG=0`으로 복원합니다.
+
 ## TOPIQ Plus
 
 헤더의 닉네임 옆에서 Free 또는 Plus 상태를 확인합니다. **아이디 → Plus**에서 현재 카드는 ‘내 플랜’으로 표시되며 1·3·6개월 구독을 확인할 수 있습니다. Stripe는 선택한 주기마다 자동 결제하고, 결제한 이용 기간 동안 매월 400크레딧을 누적 지급합니다. Plus 회원은 모든 공개 PBT·IBT 읽기·듣기 모의고사에 응시할 수 있습니다. 쓰기는 Free·Plus 모두 세트당 100크레딧으로 해제하며, 해제한 세트에는 재열람과 문항당 최대 20회의 AI 첨삭이 포함됩니다.

@@ -112,8 +112,8 @@ export function unlockWriting(setId: string, signal: AbortSignal): Promise<{ set
   return mutateJson("POST", `/api/writing/sets/${setId}/unlock/`, {}, signal);
 }
 
-export function startCreditPurchase(attemptId: string, priceId: string, signal: AbortSignal) {
-  return mutateJson<CreditPurchaseStatus & { checkoutUrl: string | null }>("POST", "/api/credits/purchases/", { attemptId, priceId }, signal);
+export function startCreditPurchase(attemptId: string, priceId: string, signal: AbortSignal, gaClientId?: string) {
+  return mutateJson<CreditPurchaseStatus & { checkoutUrl: string | null }>("POST", "/api/credits/purchases/", { attemptId, priceId, gaClientId }, signal);
 }
 
 export function getPlans(signal: AbortSignal) {
@@ -135,8 +135,8 @@ export function cancelPlanChange({ id, months, effectiveAt }: ScheduledPlanChang
 export type MonthlyPlanOffer = "monthly_trial" | "monthly_paid";
 
 export function startPlanPurchase(attemptId: string, priceId: string, months: number, signal: AbortSignal,
-  offer: MonthlyPlanOffer = "monthly_trial") {
-  const body = months === 1 ? { attemptId, priceId, months, offer } : { attemptId, priceId, months };
+  offer: MonthlyPlanOffer = "monthly_trial", gaClientId?: string) {
+  const body = { attemptId, priceId, months, offer: months === 1 ? offer : undefined, gaClientId };
   return mutateJson<CreditPurchaseStatus & { checkoutUrl: string | null }>("POST", "/api/plans/purchases/", body, signal);
 }
 

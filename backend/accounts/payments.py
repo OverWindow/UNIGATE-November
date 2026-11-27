@@ -15,6 +15,7 @@ from django.views.decorators.http import require_GET, require_POST, require_http
 
 from writing.services import expire_for_user
 
+from .analytics import client_id, track_purchase, track_refund
 from .credits import locked_account, reconcile_purchase_refunds, record
 from .models import CREDIT_PURCHASE_QUANTITY, PLAN_AMOUNTS, PLAN_BONUS, CreditAccount, CreditPurchase, PlusFreeTrial
 from .plan_changes import InvalidBillingState, PlanChangeConflict, can_schedule, next_change, plan_item, read_subscription, update_change
@@ -363,7 +364,7 @@ def close_old_plan_checkout(purchase, sessions):
 
 
 @transaction.atomic
-def new_order(user_id, attempt_id, price, months, client, monthly_trial=False):
+def new_order(user_id, attempt_id, price, months, client, monthly_trial=False, ga_client_id=None):
     if months:
         locked_account(user_id)
         previous = CreditPurchase.objects.filter(user_id=user_id, attempt_id=attempt_id).first()
@@ -416,6 +417,7 @@ def new_order(user_id, attempt_id, price, months, client, monthly_trial=False):
     purchase, created = CreditPurchase.objects.get_or_create(user_id=user_id, attempt_id=attempt_id, defaults={
         "stripe_price_id": price["priceId"], "amount": price["amount"], "currency": price["currency"],
         "credits": price["credits"], "plan_months": months, "subscription_state": "checkout" if months else None,
+        "ga_client_id": ga_client_id,
     })
     if created and monthly_trial:
         PlusFreeTrial.objects.create(purchase=purchase, user_id=user_id)
@@ -477,12 +479,12 @@ def create_purchase(request, plan=False):
     if not request.user.is_authenticated:
         return api_response({"error": "authentication_required"}, 401)
     fields = {"attemptId", "priceId", "months", "offer", "action", "purchaseId", "consentVersion", "trialEndsAt"} if plan else {"attemptId", "priceId"}
-    data, error = read_payload(request, fields, integer_fields={"months"})
+    data, error = read_payload(request, fields | {"gaClientId"}, integer_fields={"months"})
     if error is not None:
         return error
     if plan and data.get("action") == "confirm_trial":
         return confirm_trial(request.user.pk, data)
-    if set(data) - {"attemptId", "priceId", "months", "offer"}:
+    if set(data) - {"attemptId", "priceId", "months", "offer", "gaClientId"}:
         return api_response({"error": "invalid_json"}, 400)
     months = data.get("months")
     if plan and months not in PLAN_AMOUNTS:
@@ -511,7 +513,8 @@ def create_purchase(request, plan=False):
             price = configured_price(client, months)
             if expected_price != price["priceId"]:
                 return api_response({"error": "price_changed"}, 409)
-            purchase, created = new_order(request.user.pk, attempt_id, price, months, client, monthly_trial)
+            purchase, created = new_order(request.user.pk, attempt_id, price, months, client, monthly_trial,
+                                          client_id(data.get("gaClientId")))
         if (purchase.stripe_price_id != expected_price or purchase.plan_months != months
                 or (plan and purchase.subscription_state is None)):
             return api_response({"error": "price_changed"}, 409)
@@ -679,6 +682,7 @@ def apply_checkout_event(event_type, session, event_created=None):
         if purchase.stripe_payment_intent_id and purchase.stripe_payment_intent_id != intent_id:
             return 400
         purchase.stripe_payment_intent_id = intent_id
+        discount = purchase.amount - session["amount_total"]
         purchase.amount = session["amount_total"]
         if purchase.plan_months:
             assign_plan_period(purchase, datetime.fromtimestamp(event_created, UTC))
@@ -691,6 +695,11 @@ def apply_checkout_event(event_type, session, event_created=None):
         purchase.save(update_fields=["transaction", "status", "amount", "plan_starts_at", "plan_ends_at", "credited_months",
                                      "stripe_payment_intent_id", "remaining_credits"])
         reconcile_purchase_refunds(account, purchase, previous_refunded=0 if purchase.plan_months is None else None)
+        track_purchase(purchase, discount=discount)
+        if purchase.ga_client_id and settings.TOPIQ_GA4_API_SECRET:
+            # Stripe can deliver a refund before its Checkout completion.
+            for refund in purchase.refunds.filter(status="succeeded"):
+                track_refund(purchase, refund)
     return 200
 
 
