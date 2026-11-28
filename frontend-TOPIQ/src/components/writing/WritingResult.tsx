@@ -6,10 +6,11 @@ import { useApp } from "@/app/providers";
 import type { Evaluation } from "@/lib/writing/writing-api";
 import { evaluationContent } from "@/lib/writing/writing-evaluation-content";
 import { visibleReviewReasons, writingScoreLimits, writingTaskLabel } from "@/lib/writing/writing-result";
+import WritingCorrection from "./WritingCorrection";
 
-export default function WritingResult({ entry, correctionId, activeCorrection, correctionsOpen, onToggleCorrections }: {
+export default function WritingResult({ entry, correctionId, activeCorrection, correctionsOpen, onToggleCorrections, onSelectCorrection }: {
   entry: Evaluation; correctionId: string; activeCorrection: number | null;
-  correctionsOpen: boolean; onToggleCorrections: () => void;
+  correctionsOpen: boolean; onToggleCorrections: () => void; onSelectCorrection: (index: number) => void;
 }) {
   const { language } = useApp();
   const t = evaluationContent[language];
@@ -67,13 +68,10 @@ export default function WritingResult({ entry, correctionId, activeCorrection, c
         <div id={`${correctionId}-panel`} className="writing-reveal" data-open={correctionsOpen} aria-hidden={!correctionsOpen} inert={!correctionsOpen}
           role="region" aria-labelledby={`${correctionId}-heading`}>
         <div><ol className="writing-correction-list">{result.corrections.map((correction, index) =>
-          <li key={index} id={`${correctionId}-${index}`} tabIndex={-1} data-active={activeCorrection === index || undefined}>
+          <li key={`${entry.id}-${index}`} id={`${correctionId}-${index}`} tabIndex={-1} data-active={activeCorrection === index || undefined}>
             <span className="writing-correction-number" aria-hidden="true">{index + 1}</span>
-            <div className="writing-correction-comparison">
-              <div><span lang={language}>{t.before}</span><p lang="ko"><del>{correction.original}</del></p></div>
-              <div><span lang={language}>{t.after}</span><p lang="ko"><ins>{correction.suggestion}</ins></p></div>
-            </div>
-            <p className="writing-correction-reason">{correction.reason}</p>
+            <WritingCorrection correction={correction} answer={entry.answer} typeSlot={entry.typeSlot} language={language}
+              onNext={index + 1 < result.corrections.length ? () => onSelectCorrection(index + 1) : undefined} />
           </li>)}</ol></div>
         </div>
       </section>}

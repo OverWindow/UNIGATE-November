@@ -22,13 +22,21 @@ const contextUrl = dataUrl(`let language = "ko";
 export const setLanguage = value => { language = value; };
 export const useApp = () => ({ language });`);
 const context = await import(contextUrl);
-const { default: WritingResult } = await import(await compile("../src/components/writing/WritingResult.tsx", {
+const sharedImports = {
   "react": pathToFileURL(require.resolve("react")).href,
   "react/jsx-runtime": pathToFileURL(require.resolve("react/jsx-runtime")).href,
+  "@/lib/writing/writing-evaluation-content": await compile("../src/lib/writing/writing-evaluation-content.ts"),
+};
+const { default: WritingResult } = await import(await compile("../src/components/writing/WritingResult.tsx", {
+  ...sharedImports,
   "lucide-react": dataUrl("export const ChevronDown = () => null;"),
   "@/app/providers": contextUrl,
-  "@/lib/writing/writing-evaluation-content": await compile("../src/lib/writing/writing-evaluation-content.ts"),
   "@/lib/writing/writing-result": await compile("../src/lib/writing/writing-result.ts"),
+  "./WritingCorrection": await compile("../src/components/writing/WritingCorrection.tsx", {
+    ...sharedImports,
+    "@/lib/analytics": await compile("../src/lib/analytics.ts"),
+    "@/lib/writing/writing-practice": await compile("../src/lib/writing/writing-practice.ts"),
+  }),
 }));
 
 function entry(feedbackLanguage) {
@@ -42,15 +50,15 @@ function entry(feedbackLanguage) {
 
 function render(value) {
   return renderToStaticMarkup(createElement(WritingResult, {
-    entry: value, correctionId: "correction", activeCorrection: null, correctionsOpen: true, onToggleCorrections() {},
+    entry: value, correctionId: "correction", activeCorrection: null, correctionsOpen: true, onToggleCorrections() {}, onSelectCorrection() {},
   }));
 }
 
 test("all three languages translate score and task labels while preserving Korean text", () => {
-  for (const [language, score, status] of [
-    ["ko", "내용 및 수행 과제", "부분 충족"],
-    ["en", "Content and task fulfillment", "Partially met"],
-    ["id", "Isi dan pemenuhan tugas", "Sebagian terpenuhi"],
+  for (const [language, score, status, practice] of [
+    ["ko", "내용 및 수행 과제", "부분 충족", "직접 써 보기"],
+    ["en", "Content and task fulfillment", "Partially met", "Try writing it"],
+    ["id", "Isi dan pemenuhan tugas", "Sebagian terpenuhi", "Coba tulis sendiri"],
   ]) {
     context.setLanguage(language);
     const html = render(entry(language));
@@ -61,6 +69,7 @@ test("all three languages translate score and task labels while preserving Korea
     assert.ok(html.includes('<p lang="ko"><del>한국어 원문</del></p>'));
     assert.ok(html.includes('<p lang="ko"><ins>한국어 수정문</ins></p>'));
     assert.ok(html.includes("Saved correction reason"));
+    assert.ok(html.includes(`>${practice}</button>`));
   }
 });
 

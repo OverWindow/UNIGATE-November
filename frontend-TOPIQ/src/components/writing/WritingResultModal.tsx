@@ -109,7 +109,7 @@ export default function WritingResultModal({ entry, setNumber, error, onRetry, o
 
   function containTabFocus(event: KeyboardEvent<HTMLDialogElement>) {
     if (event.key !== "Tab") return;
-    const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>("button, a[href], summary, [tabindex]"))
+    const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>("button, textarea, a[href], summary, [tabindex]"))
       .filter(element => element.tabIndex >= 0 && !element.matches(":disabled") && !element.closest("[inert]") && element.getClientRects().length > 0);
     const first = controls[0];
     const last = controls[controls.length - 1];
@@ -219,7 +219,7 @@ export default function WritingResultModal({ entry, setNumber, error, onRetry, o
         <section {...panelProps("evaluation")} className="writing-result-pane writing-result-evaluation">
           <h3 className="writing-result-pane-heading" id={`${prefix}-heading-evaluation`}>{t.result}</h3>
           <div className="writing-result-scroll" tabIndex={0}>
-            <WritingResult entry={entry} correctionId={`${prefix}-correction`} activeCorrection={activeCorrection}
+            <WritingResult entry={entry} correctionId={`${prefix}-correction`} activeCorrection={activeCorrection} onSelectCorrection={selectCorrection}
               correctionsOpen={correctionsOpen} onToggleCorrections={() => setCorrectionsOpen(open => !open)} />
           </div>
         </section>

@@ -9,6 +9,10 @@ interface Copy {
   processingShort: string; close: string; totalScore: string; points: string; details: string;
   reviewing: string; reviewHints: Record<"blanks" | "data" | "essay", [string, string]>; historyHint: string;
   before: string; after: string; viewResult: string; applyCorrection: string; undoCorrection: string; correctedAnswer: string;
+  practice: {
+    start: string; target: string; input: string; check: string; differences: string; missing: string; extra: string;
+    space: string; newline: string; complete: string; recall: string; recallHint: string; next: string;
+  };
   login: string; loginNotice: string;
   answerFormat: string; plainFormat: string; manuscriptFormat: string;
   errors: Record<string, string>;
@@ -39,6 +43,12 @@ export const evaluationContent: Record<Language, Copy> = {
     historyHint: "결과는 ‘내 평가 이력’에서도 확인할 수 있어요.",
     applyCorrection: "수정", undoCorrection: "되돌리기", correctedAnswer: "수정 미리보기",
     before: "수정 전", after: "수정 제안", viewResult: "평가 결과 보기",
+    practice: {
+      start: "직접 써 보기", target: "따라 쓸 내용", input: "내 연습 답안", check: "확인",
+      differences: "표시된 부분을 고쳐 보세요.", missing: "추가할 부분", extra: "지울 부분",
+      space: "공백", newline: "줄바꿈", complete: "연습 완료", recall: "가리고 다시 쓰기",
+      recallHint: "원래 답안과 수정 이유를 보고 다시 써 보세요.", next: "다음 수정 제안",
+    },
     login: "로그인", loginNotice: "로그인 후 열람한 세트의 쓰기 평가를 이용할 수 있습니다.",
     errors: {
       set_locked: "먼저 세트를 열어 주세요.", evaluation_limit_reached: "이 문항은 평가 한도 20회에 도달해 더 이상 평가를 요청할 수 없습니다.",
@@ -72,6 +82,12 @@ export const evaluationContent: Record<Language, Copy> = {
     historyHint: "You can also find your result in “My evaluations”.",
     applyCorrection: "Apply", undoCorrection: "Undo", correctedAnswer: "Correction preview",
     before: "Before", after: "Suggested change", viewResult: "View evaluation result",
+    practice: {
+      start: "Try writing it", target: "Text to copy", input: "Your practice answer", check: "Check",
+      differences: "Revise the highlighted parts.", missing: "Add", extra: "Remove",
+      space: "Space", newline: "Line break", complete: "Practice complete", recall: "Hide and try again",
+      recallHint: "Use your original answer and the feedback to write it again.", next: "Next suggestion",
+    },
     login: "Sign in", loginNotice: "Sign in to evaluate answers in sets you have opened.",
     errors: {
       set_locked: "Open this set first.", evaluation_limit_reached: "This question has reached the limit of 20 evaluations. No further evaluations can be requested.",
@@ -105,6 +121,12 @@ export const evaluationContent: Record<Language, Copy> = {
     historyHint: "Anda juga bisa melihat hasilnya di “Riwayat penilaian”.",
     applyCorrection: "Perbaiki", undoCorrection: "Urungkan", correctedAnswer: "Pratinjau perbaikan",
     before: "Sebelum", after: "Saran perubahan", viewResult: "Lihat hasil penilaian",
+    practice: {
+      start: "Coba tulis sendiri", target: "Teks untuk disalin", input: "Jawaban latihan Anda", check: "Periksa",
+      differences: "Perbaiki bagian yang ditandai.", missing: "Tambahkan", extra: "Hapus",
+      space: "Spasi", newline: "Baris baru", complete: "Latihan selesai", recall: "Sembunyikan dan tulis lagi",
+      recallHint: "Gunakan jawaban awal dan alasan perbaikannya untuk menulis ulang.", next: "Saran berikutnya",
+    },
     login: "Masuk", loginNotice: "Masuk untuk menilai jawaban pada paket yang sudah dibuka.",
     errors: {
       set_locked: "Buka paket ini terlebih dahulu.", evaluation_limit_reached: "Soal ini telah mencapai batas 20 penilaian. Penilaian tambahan tidak dapat diminta.",
