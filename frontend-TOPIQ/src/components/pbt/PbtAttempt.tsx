@@ -70,7 +70,7 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
   const receivedAt = useRef(0);
   const autoSubmitted = useRef(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const pressedBackdrop = useRef(false);
+  const pressedBackdrop = useRef<"passage" | "questions" | null>(null);
   const dialogDismissRef = useRef<HTMLButtonElement>(null);
   const paperRef = useRef<HTMLElement>(null);
   const sharedMaterialRef = useRef<HTMLDivElement>(null);
@@ -357,7 +357,10 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
           </section>}
           {!timedListening && <nav className="pbt-test-navigation" data-dev-tools={process.env.NODE_ENV === "development" || undefined} aria-label={t.questionNavigation}><div className="pbt-exam-width">
             <button className="button pbt-secondary" disabled={first.position <= 1 || busy || submitting || audioPlaying} onClick={() => go(first.position - 1)}><ArrowLeft size={16} aria-hidden="true" /> {t.previous}</button>
-            <button className="button pbt-secondary pbt-all-questions" aria-haspopup="dialog" onClick={() => setDialog("questions")} disabled={busy || submitting}>
+            <button className="button pbt-secondary pbt-all-questions" aria-haspopup="dialog" onClick={event => {
+              event.currentTarget.focus({ preventScroll: true });
+              setDialog("questions");
+            }} disabled={busy || submitting}>
               <Grid3x3 size={16} aria-hidden="true" />
               {t.allQuestions}
             </button>
@@ -370,14 +373,16 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
     </div>
     <dialog ref={dialogRef} className={`pbt-dialog${shownDialog === "questions" ? " pbt-navigator-dialog" : ""}`} aria-labelledby="pbt-dialog-title"
       onCancel={event => { event.preventDefault(); setDialog(null); }}
-      onPointerDown={event => { pressedBackdrop.current = dialog === "passage" && event.isPrimary && event.button === 0 && isDialogBackdrop(event); }}
-      onPointerCancel={() => { pressedBackdrop.current = false; }}
+      onPointerDown={event => {
+        pressedBackdrop.current = (dialog === "passage" || dialog === "questions") && event.isPrimary && event.button === 0 && isDialogBackdrop(event) ? dialog : null;
+      }}
+      onPointerCancel={() => { pressedBackdrop.current = null; }}
       onClick={event => {
-        const dismiss = pressedBackdrop.current && dialog === "passage" && isDialogBackdrop(event);
-        pressedBackdrop.current = false;
-        if (dismiss) {
+        const pressed = pressedBackdrop.current;
+        pressedBackdrop.current = null;
+        if (pressed && pressed === dialog && isDialogBackdrop(event)) {
           setDialog(null);
-          trackEvent("dismiss_passage", { method: "backdrop" });
+          trackEvent(pressed === "questions" ? "dismiss_question_navigator" : "dismiss_passage", { method: "backdrop" });
         }
       }}>
       {(shownDialog === "questions" || shownDialog === "passage") && <button ref={dialogDismissRef} className="pbt-dialog-close" type="button" aria-label={t.close} onClick={() => setDialog(null)}>

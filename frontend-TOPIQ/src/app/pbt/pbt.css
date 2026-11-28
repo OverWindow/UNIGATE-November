@@ -114,7 +114,7 @@
 .pbt-timer.is-urgent { color: #a93425; background: #fff2ec; border-color: #f4c0b3; }
 .pbt-exam-alerts { flex-shrink: 0; max-height: 25dvh; overflow-y: auto; }
 .pbt-exam-alerts .pbt-alert { margin-block: 8px; padding: 8px 12px; font-size: 12px; }
-.pbt-test-paper { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scroll-padding-block: 16px; margin-block: 8px; padding: 16px 24px 20px; border: 1px solid #e1e6ee; border-radius: 6px; background: #fff; box-shadow: 0 2px 6px #1c355408; }
+.pbt-test-paper { position: relative; flex: 1; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scroll-padding-block: 16px; margin-block: 8px; padding: 16px 24px 20px; border: 1px solid #e1e6ee; border-radius: 6px; background: #fff; box-shadow: 0 2px 6px #1c355408; }
 .pbt-paper-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 12px; margin-bottom: 16px; border-bottom: 1px solid #e7eaf0; }
 .pbt-paper-heading h2 { margin: 0; color: #234c92; font-size: 18px; font-weight: 650; }
 .pbt-paper-heading.has-audio { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
@@ -154,6 +154,8 @@
 .pbt-exam .pbt-audio audio { height: 32px; }
 .pbt-test-navigation { flex-shrink: 0; padding-bottom: env(safe-area-inset-bottom); border-top: 1px solid #b8cef3; background: #eaf2ff; }
 .pbt-test-navigation > div { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; min-height: calc(var(--pbt-navigation-height) - 1px); padding-block: 6px; }
+/* The local Next.js indicator can occupy either bottom corner. */
+.pbt-test-navigation[data-dev-tools] > div { width: min(1200px, calc(100% - 120px)); }
 .pbt-test-navigation .button { min-height: 32px; min-width: 84px; gap: 8px; padding: 5px 14px; border-radius: 5px; font-size: 12px; }
 .pbt-test-navigation .button:first-child { justify-self: start; }
 .pbt-test-navigation .button:last-child { justify-self: end; }
@@ -216,9 +218,8 @@ button.sentence-order-card { cursor: grab; }
   .pbt-passage-button[data-visible="false"] { visibility: hidden; }
   .pbt-passage-button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
   .pbt-exam-toolbar h1 { text-align: left; font-size: 13px; }
-  .pbt-test-paper { position: relative; padding: 14px 18px; }
-  /* The local Next.js indicator can occupy either bottom corner. */
-  .pbt-test-navigation[data-dev-tools] > div { width: calc(100% - 120px); display: flex; justify-content: space-between; gap: 4px; }
+  .pbt-test-paper { padding: 14px 18px; }
+  .pbt-test-navigation[data-dev-tools] > div { display: flex; justify-content: space-between; gap: 4px; }
   .pbt-test-navigation[data-dev-tools] .button { flex: 1 1 auto; min-width: 0; max-width: 120px; padding-inline: 4px; overflow-wrap: anywhere; }
   .pbt-question-split .pbt-question-body, .pbt-group-layout { grid-template-columns: 1fr; gap: 12px; }
   .pbt-number-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
