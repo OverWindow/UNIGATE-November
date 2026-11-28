@@ -11,8 +11,7 @@ from django.urls import reverse
 from django.utils.html import escape
 
 from accounts.models import RateLimit
-from pbt.models import Attempt, Exam
-from surveys.models import SurveyResponse
+from pbt.models import Attempt, Exam, ExamAttemptFeedback
 from writing.models import Evaluation
 
 
@@ -89,6 +88,8 @@ class AdminUiTests(TestCase):
         cases = (
             ("auth", "view_user", "회원·크레딧", "auth_user_changelist"),
             ("pbt", "add_exam", "시험·피드백", "pbt_exam_add"),
+            ("pbt", "view_attemptitem", "시험·피드백", "pbt_attemptitem_changelist"),
+            ("surveys", "view_surveyresponse", "신청·설문", "surveys_surveyresponse_changelist"),
         )
         for app, codename, heading, route in cases:
             with self.subTest(permission=codename):
@@ -143,7 +144,7 @@ class AdminUiTests(TestCase):
 
 
 class AdminDashboardTests(TestCase):
-    def test_today_and_week_use_seoul_dates_and_link_to_matching_rows(self):
+    def test_today_metrics_use_seoul_dates_and_link_to_matching_rows(self):
         start = datetime(2026, 11, 26, tzinfo=ZoneInfo("Asia/Seoul"))
         day = timedelta(days=1)
         tick = timedelta(microseconds=1)
@@ -154,10 +155,6 @@ class AdminDashboardTests(TestCase):
         for index, stamp in enumerate([before, start, tomorrow]):
             users.create_user(username=f"signup-{index}", date_joined=stamp)
 
-        surveys = [
-            SurveyResponse.objects.create(email="test@example.com", age=20, education_type="other", created_at=stamp)
-            for stamp in [start - 7 * day, start - 6 * day, before, start, tomorrow - tick, tomorrow]
-        ]
         exam = Exam.objects.create(source_set_id=uuid4(), title="읽기", section="reading", display_order=1)
         for stamp in [before, start, start + timedelta(minutes=1), start + timedelta(minutes=2), tomorrow, None]:
             Attempt.objects.create(
@@ -179,29 +176,25 @@ class AdminDashboardTests(TestCase):
         self.assertEqual(response.context["dashboard_date"], start.date())
         metrics = response.context["dashboard_metrics"]
         self.assertEqual([(item["label"], item["value"]) for item in metrics], [
-            ("PDF 신청", 2), ("신규 회원", 1), ("모의고사 응시 완료", 3), ("쓰기 평가 요청", 1),
+            ("신규 회원", 1), ("모의고사 응시 완료", 3), ("쓰기 평가 요청", 1),
         ])
-        self.assertIsNone(metrics[2]["url"])
-        week = response.context["pdf_week"]
-        expected_dates = [start.date() - n * day for n in range(6, -1, -1)]
-        self.assertEqual([entry["date"] for entry in week], expected_dates)
-        self.assertEqual([entry["count"] for entry in week], [1, 0, 0, 0, 0, 1, 2])
+        self.assertIsNone(metrics[1]["url"])
+        self.assertNotContains(response, "안내 PDF 신청 추이")
 
         for item, route in (
-            (metrics[0], "surveys_surveyresponse_changelist"),
-            (metrics[1], "auth_user_changelist"),
-            (metrics[3], "writing_evaluation_changelist"),
+            (metrics[0], "auth_user_changelist"),
+            (metrics[2], "writing_evaluation_changelist"),
         ):
             self.assertEqual(urlsplit(item["url"]).path, reverse(f"admin:{route}"))
             self.assertContains(response, f'href="{escape(item["url"])}"')
             listing = self.client.get(item["url"]).context["cl"]
             self.assertEqual(listing.result_count, item["value"])
-            if item["label"] == "PDF 신청":
-                self.assertCountEqual(listing.queryset, surveys[3:5])
 
     def test_dashboard_permissions_control_indicators_chart_and_shortcuts(self):
         cases = (
-            ("view_surveyresponse", ["PDF 신청"], ["surveys_surveyresponse_changelist"]),
+            ("view_surveyresponse", [], []),
+            ("view_attemptitem", [], []),
+            ("change_attemptitem", [], []),
             ("view_attempt", ["모의고사 응시 완료"], []),
             ("add_credittransaction", [], ["accounts_creditaccount_grant"]),
             ("view_examattemptfeedback", [], ["pbt_examattemptfeedback_changelist"]),
@@ -216,8 +209,15 @@ class AdminDashboardTests(TestCase):
                 self.assertEqual(response.status_code, 200)
                 context = response.context
                 self.assertEqual([item["label"] for item in context["dashboard_metrics"]], labels)
-                self.assertEqual(bool(context["pdf_week"]), codename == "view_surveyresponse")
-                self.assertEqual(context["stored_counts"], [])
+                can_view_items = codename == "view_attemptitem"
+                self.assertEqual(bool(context["response_week"]), can_view_items)
+                self.assertEqual(
+                    context["stored_counts"], [{"label": "문항별 응답 기록", "value": 0}] if can_view_items else [],
+                )
+                if not can_view_items:
+                    listing = reverse("admin:pbt_attemptitem_changelist")
+                    self.assertNotContains(response, f'href="{listing}"')
+                    self.assertEqual(self.client.get(listing).status_code, 403)
                 self.assertEqual(
                     [link["url"] for link in context["dashboard_links"]],
                     [reverse(f"admin:{route}") for route in shortcut_routes],
@@ -243,31 +243,125 @@ class AdminDashboardTests(TestCase):
             counts = self.client.get(url).context["stored_counts"]
         self.assertEqual(counts, [{"label": label, "value": 3, "active": 1, "expired": 2}])
 
-    def test_item_rows_include_partial_and_unanswered_questions_and_count_edits_once(self):
+    def test_item_chart_groups_latest_answer_by_seoul_day_and_keeps_all_rows_in_total(self):
         staff = get_user_model().objects.create_user(username="item-viewer", is_staff=True)
         staff.user_permissions.add(Permission.objects.get(codename="view_attemptitem"))
         self.client.force_login(staff)
         url = reverse("admin:index")
         label = "문항별 응답 기록"
-        self.assertEqual(self.client.get(url).context["stored_counts"], [{"label": label, "value": 0}])
+        empty = self.client.get(url)
+        self.assertEqual(empty.context["stored_counts"], [{"label": label, "value": 0}])
+        self.assertEqual([entry["count"] for entry in empty.context["response_week"]], [0] * 7)
 
-        old = datetime.now(timezone.utc) - timedelta(days=10)
+        start = datetime(2026, 11, 26, tzinfo=ZoneInfo("Asia/Seoul"))
+        day = timedelta(days=1)
+        tick = timedelta(microseconds=1)
+        first = start - 6 * day
+        tomorrow = start + day
         exam = Exam.objects.create(source_set_id=uuid4(), title="읽기", section="reading", display_order=1)
         attempt = Attempt.objects.create(
-            exam=exam, user=staff, title=exam.title, section=exam.section, mode="practice", started_at=old,
+            exam=exam, user=staff, title=exam.title, section=exam.section, mode="practice", started_at=first - day,
         )
         attempt.items.create(position=1, source_item_id=uuid4(), correct_answer=1, snapshot={})
-        attempt.items.create(
+        partial = attempt.items.create(
             position=2, source_item_id=uuid4(), correct_answer=2, snapshot={"answerMode": "sentence_order"},
-            selected_order=["가", None, None, None], answered_at=old,
+            selected_order=["가", None, None, None], answered_at=start - tick,
         )
-        edited = attempt.items.create(
-            position=3, source_item_id=uuid4(), correct_answer=3, snapshot={}, selected_option=1, answered_at=old,
-        )
-        edited.selected_option = 3
-        edited.save(update_fields=["selected_option"])
+        for position, stamp in enumerate([first - tick, first, start, tomorrow - tick, tomorrow], start=3):
+            attempt.items.create(
+                position=position, source_item_id=uuid4(), correct_answer=1, snapshot={},
+                selected_option=1, answered_at=stamp,
+            )
 
-        response = self.client.get(url)
-        self.assertEqual(response.context["stored_counts"], [{"label": label, "value": 3}])
-        self.assertContains(response, label)
+        with patch("django.utils.timezone.now", return_value=start + timedelta(minutes=30)):
+            response = self.client.get(url)
+            week = response.context["response_week"]
+            self.assertEqual([entry["date"] for entry in week], [first.date() + n * day for n in range(7)])
+            self.assertEqual([entry["count"] for entry in week], [1, 0, 0, 0, 0, 1, 2])
+            self.assertContains(response, "<polyline")
+
+            partial.selected_order = ["가", "나", None, None]
+            partial.answered_at = start + timedelta(minutes=20)
+            partial.save(update_fields=["selected_order", "answered_at"])
+            response = self.client.get(url)
+
+        self.assertEqual([entry["count"] for entry in response.context["response_week"]], [1, 0, 0, 0, 0, 0, 3])
+        self.assertEqual(response.context["stored_counts"], [{"label": label, "value": 7}])
         self.assertNotContains(response, "인증 시도 제한 기록")
+
+
+class AdminAttemptItemTests(TestCase):
+    def test_list_and_detail_identify_the_respondent_from_the_current_member_account(self):
+        users = get_user_model().objects
+        viewer = users.create_user(username="item-viewer", is_staff=True)
+        viewer.user_permissions.add(Permission.objects.get(codename="view_attemptitem"))
+        self.client.force_login(viewer)
+        member = users.create_user(username="respondent", email="previous@example.invalid")
+        no_email = users.create_user(username="respondent-without-email")
+        current_email = "current@example.invalid"
+        recipient = "delivery-only@example.invalid"
+        exam = Exam.objects.create(source_set_id=uuid4(), title="읽기", section="reading", display_order=1)
+        now = datetime.now(timezone.utc)
+        cases = []
+        for user, expected in [(member, current_email), (no_email, "이메일 미등록"), (None, "비회원")]:
+            attempt = Attempt.objects.create(
+                exam=exam, user=user, guest_id=uuid4() if user is None else None, title=exam.title,
+                section=exam.section, mode="practice", status="submitted", started_at=now, submitted_at=now,
+            )
+            item = attempt.items.create(position=1, source_item_id=uuid4(), correct_answer=1, snapshot={})
+            if user is None:
+                ExamAttemptFeedback.objects.create(
+                    attempt=attempt, email=recipient, rating=5, language="ko", nationality_code="KR",
+                    birth_year=2000, topik_reasons=[], target_topik_level=3,
+                    survey_completed_at=now, privacy_consented_at=now,
+                )
+            cases.append((item, expected))
+        users.filter(pk=member.pk).update(email=current_email)
+
+        listing = self.client.get(reverse("admin:pbt_attemptitem_changelist"))
+        self.assertContains(listing, "응답자 이메일")
+        self.assertNotContains(listing, member.email)
+        self.assertNotContains(listing, recipient)
+        for item, expected in cases:
+            with self.subTest(expected=expected):
+                self.assertContains(listing, expected)
+                detail = self.client.get(reverse("admin:pbt_attemptitem_change", args=[item.pk]))
+                self.assertContains(detail, "응답자 이메일")
+                self.assertContains(detail, expected)
+                self.assertNotContains(detail, recipient)
+
+    def test_list_shows_responses_supports_search_and_filter_and_denies_writes(self):
+        staff = get_user_model().objects.create_superuser(username="item-admin")
+        self.client.force_login(staff)
+        attempts = []
+        for exam_format, title in [("pbt", "종이 시험"), ("ibt", "컴퓨터 시험")]:
+            exam = Exam.objects.create(
+                source_set_id=uuid4(), exam_format=exam_format, title=title, section="reading", display_order=1,
+            )
+            attempts.append(Attempt.objects.create(
+                exam=exam, exam_format=exam_format, user=staff, title=title, section="reading",
+                mode="practice", started_at=datetime.now(timezone.utc),
+            ))
+        paper, computer = attempts
+        answered = paper.items.create(position=1, source_item_id=uuid4(), correct_answer=1,
+                                      selected_option=2, answered_at=paper.started_at, snapshot={})
+        partial = paper.items.create(position=2, source_item_id=uuid4(), correct_answer=1,
+                                     selected_order=["가", None, "다", None], answered_at=paper.started_at,
+                                     snapshot={"answerMode": "sentence_order"})
+        unanswered = computer.items.create(position=1, source_item_id=uuid4(), correct_answer=1, snapshot={})
+
+        listing = reverse("admin:pbt_attemptitem_changelist")
+        page = self.client.get(listing)
+        self.assertContains(page, "2번")
+        self.assertContains(page, "가 → — → 다 → —")
+        self.assertContains(page, "미응답")
+        self.assertCountEqual(page.context["cl"].result_list, [answered, partial, unanswered])
+        search = self.client.get(listing, {"q": "컴퓨터"})
+        self.assertCountEqual(search.context["cl"].result_list, [unanswered])
+        filtered = self.client.get(listing, {"attempt__exam_format__exact": "pbt"})
+        self.assertCountEqual(filtered.context["cl"].result_list, [answered, partial])
+
+        for endpoint, args in [("add", []), ("change", [answered.pk]), ("delete", [answered.pk])]:
+            with self.subTest(endpoint=endpoint):
+                url = reverse(f"admin:pbt_attemptitem_{endpoint}", args=args)
+                self.assertEqual(self.client.post(url, {"selected_option": 3, "post": "yes"}).status_code, 403)

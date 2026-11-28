@@ -104,50 +104,37 @@
       font-weight: 650;
       letter-spacing: -.025em;
     }
+    .admin-overview .response-line {
+      display: block;
+      width: 100%;
+      height: 8rem;
+      overflow: visible;
+      margin-top: 1.5rem;
+      color: var(--accent);
+      border-bottom: 1px solid var(--line);
+      background: repeating-linear-gradient(to top, transparent 0 calc(25% - 1px), var(--line) calc(25% - 1px) 25%);
+    }
     .admin-overview .chart {
       display: grid;
       grid-template-columns: repeat(7, minmax(0, 1fr));
       list-style: none;
       padding: 0;
-      margin: 1.5rem 0 0;
+      margin: .75rem 0 0;
     }
     .admin-overview .chart li {
       min-width: 0;
       text-align: center;
     }
-    .admin-overview .track {
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-      height: 9rem;
-      padding-inline: .125rem;
-      border-bottom: 1px solid var(--line);
-      background: repeating-linear-gradient(to top, transparent 0 calc(33.333% - 1px), var(--line) calc(33.333% - 1px) 33.333%);
-    }
-    .admin-overview .bar {
-      position: relative;
-      width: 48%;
-      max-width: 2.75rem;
-      border-radius: .3rem .3rem 0 0;
-      background: var(--color-primary-500);
-    }
-    .admin-overview .bar.has-count { min-height: 2px; }
-    .admin-overview .bar.today { background: var(--accent); }
-    .admin-overview .bar span {
-      position: absolute;
-      bottom: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      padding-bottom: .2rem;
+    .admin-overview .chart strong {
+      display: block;
       color: var(--ink);
       font-size: .75rem;
       font-weight: 600;
       font-variant-numeric: tabular-nums;
-      white-space: nowrap;
+      overflow-wrap: anywhere;
     }
     .admin-overview .chart time {
       display: block;
-      padding-top: .5rem;
       color: var(--muted);
       font-size: .75rem;
       word-break: keep-all;
@@ -252,29 +239,35 @@
       </section>
     {% endif %}
 
-    {% if pdf_week or dashboard_links %}
+    {% if response_week or dashboard_links %}
       <div class="panels">
-        {% if pdf_week %}
-          <section class="panel" aria-labelledby="pdf-heading">
+        {% if response_week %}
+          <section class="panel" aria-labelledby="responses-heading">
             <div class="chart-heading">
-              <h3 id="pdf-heading">안내 PDF 신청 추이</h3>
-              <span>최근 7일 · 건</span>
+              <h3 id="responses-heading">문항별 응답 기록</h3>
+              <span>최근 7일 · 마지막 응답일 기준</span>
             </div>
-            <ol class="chart" aria-label="날짜별 PDF 신청 건수">
-              {% for day in pdf_week %}
+            <svg class="response-line" viewBox="0 0 700 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+              <polyline points="{% for day in response_week %}{{ day.x|unlocalize }},{{ day.y|unlocalize }} {% endfor %}"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
+              {% for day in response_week %}
+                <circle cx="{{ day.x|unlocalize }}" cy="{{ day.y|unlocalize }}" r="2" fill="currentColor"
+                        stroke="currentColor" stroke-width="2" vector-effect="non-scaling-stroke" />
+              {% endfor %}
+            </svg>
+            <ol class="chart" aria-label="날짜별 문항 응답 기록 건수">
+              {% for day in response_week %}
                 <li>
-                  <span class="reader-only">{{ day.date|date:"Y년 n월 j일" }} 신청 {{ day.count }}건</span>
-                  <div class="track" aria-hidden="true">
-                    <div class="bar{% if day.count %} has-count{% endif %}{% if day.date == dashboard_date %} today{% endif %}" style="height: {{ day.height|unlocalize }}%">
-                      <span>{{ day.count }}</span>
-                    </div>
-                  </div>
-                  <time datetime="{{ day.date|date:'Y-m-d' }}" aria-hidden="true"{% if day.date == dashboard_date %} aria-current="date"{% endif %}>{{ day.date|date:"n월 j일" }}</time>
+                  <time datetime="{{ day.date|date:'Y-m-d' }}"{% if day.date == dashboard_date %} aria-current="date"{% endif %}>
+                    <span class="reader-only">{{ day.date|date:"Y년 n월 j일" }}</span>
+                    <span aria-hidden="true">{{ day.date|date:"n/j" }}</span>
+                  </time>
+                  <strong>{{ day.count|floatformat:"0g" }}건</strong>
                 </li>
               {% endfor %}
             </ol>
-            {% with busiest=pdf_week|dictsortreversed:"count"|first %}
-              {% if not busiest.count %}<p class="empty-week">최근 7일 동안 접수된 안내 PDF 신청이 없습니다.</p>{% endif %}
+            {% with busiest=response_week|dictsortreversed:"count"|first %}
+              {% if not busiest.count %}<p class="empty-week">최근 7일 동안 응답한 문항 기록이 없습니다.</p>{% endif %}
             {% endwith %}
           </section>
         {% endif %}
@@ -295,7 +288,7 @@
       </div>
     {% endif %}
 
-    <details class="directory"{% if not dashboard_metrics and not stored_counts and not dashboard_links and not pdf_week %} open{% endif %}>
+    <details class="directory"{% if not dashboard_metrics and not stored_counts and not dashboard_links and not response_week %} open{% endif %}>
       <summary>전체 관리 메뉴 및 최근 작업</summary>
       {% include "unfold/helpers/dashboard_default.html" %}
     </details>

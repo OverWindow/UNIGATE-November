@@ -11,7 +11,6 @@ from django.utils.http import urlencode
 from accounts.models import CreditAccount, RateLimit
 from pbt.models import Attempt, AttemptItem, ExamAttemptFeedback
 from surveys.csv_export import SEOUL
-from surveys.models import SurveyResponse
 from writing.models import Evaluation
 
 
@@ -28,6 +27,7 @@ MENU_GROUPS = {
     ],
     "시험·피드백": [
         ("pbt.exam", "모의고사", "quiz"),
+        ("pbt.attemptitem", "문항별 응답 기록", "list_alt"),
         ("pbt.examattemptfeedback", "시험 피드백", "rate_review"),
     ],
     "쓰기 평가": [
@@ -55,12 +55,12 @@ def sidebar(request):
     return groups
 
 
-def _pdf_week(responses, start, end):
+def _response_week(start, end):
     first_day = start - timedelta(days=6)
     daily_counts = dict(
-        responses.filter(created_at__gte=first_day, created_at__lt=end)
+        AttemptItem.objects.filter(answered_at__gte=first_day, answered_at__lt=end)
         .order_by()
-        .values(day=TruncDate("created_at", tzinfo=SEOUL))
+        .values(day=TruncDate("answered_at", tzinfo=SEOUL))
         .annotate(total=Count("pk"))
         .values_list("day", "total")
     )
@@ -69,8 +69,12 @@ def _pdf_week(responses, start, end):
     for offset in range(7):
         day = first_day.date() + timedelta(days=offset)
         count = daily_counts.get(day, 0)
-        height = max(1, round(100 * count / peak)) if count else 0
-        week.append({"date": day, "count": count, "height": height})
+        week.append({
+            "date": day,
+            "count": count,
+            "x": 50 + offset * 100,
+            "y": round(100 * (peak - count) / peak, 2),
+        })
     return week
 
 
@@ -112,9 +116,7 @@ def dashboard(request, context):
     start = timezone.localtime(timezone=SEOUL).replace(hour=0, minute=0, second=0, microsecond=0)
     end = start + timedelta(days=1)
     metrics = []
-    pdf_week = []
     for model, label, field in (
-        (SurveyResponse, "PDF 신청", "created_at"),
         (get_user_model(), "신규 회원", "date_joined"),
         (Attempt, "모의고사 응시 완료", "submitted_at"),
         (Evaluation, "쓰기 평가 요청", "created_at"),
@@ -131,16 +133,10 @@ def dashboard(request, context):
             queryset = admin.site.get_model_admin(model).get_queryset(request)
             url = f"{changelists[model]}?{urlencode(date_filter)}"
 
-        if model is SurveyResponse:
-            pdf_week = _pdf_week(queryset, start, end)
-            count = pdf_week[-1]["count"]
-        else:
-            count = queryset.filter(**date_filter).count()
+        count = queryset.filter(**date_filter).count()
         metrics.append({"label": label, "value": count, "url": url})
 
     links = []
-    if SurveyResponse in changelists:
-        links.append({"label": "신청 목록 보기", "url": changelists[SurveyResponse], "icon": "description"})
     if admin.site.get_model_admin(CreditAccount).has_grant_permission(request):
         links.append({"label": "크레딧 지급", "url": reverse("admin:accounts_creditaccount_grant"), "icon": "account_balance_wallet"})
     if ExamAttemptFeedback in changelists:
@@ -149,7 +145,7 @@ def dashboard(request, context):
         dashboard_date=start.date(),
         dashboard_metrics=metrics,
         stored_counts=_stored_counts(request.user),
-        pdf_week=pdf_week,
+        response_week=_response_week(start, end) if AttemptItem in changelists else [],
         dashboard_links=links,
     )
     return context
