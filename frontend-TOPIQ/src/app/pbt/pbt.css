@@ -82,6 +82,10 @@
 .pbt-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; }
 .pbt-navigator-dialog { width: min(680px, calc(100% - 32px)); }
 .pbt-navigator-dialog h2 { padding-right: 32px; }
+.pbt-dialog[open]:has(.pbt-dialog-material) { display: flex; flex-direction: column; overflow: hidden; }
+.pbt-dialog:has(.pbt-dialog-material) h2 { padding-right: 36px; }
+.pbt-dialog-material { margin-top: 16px; overflow-y: auto; overscroll-behavior: contain; }
+.pbt-exam .pbt-dialog-material > :last-child { margin-bottom: 0; }
 .pbt-dialog-close { position: absolute; top: 12px; right: 12px; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 6px; color: #657186; }
 .pbt-dialog-close:hover { background: #eef3fa; color: #253450; }
 .pbt-navigator-summary { display: flex; flex-wrap: wrap; gap: 8px; font-size: 14px; color: #657186; }
@@ -103,6 +107,7 @@
 .pbt-exam-back { display: inline-flex; align-items: center; gap: 6px; justify-self: start; min-height: 32px; font-size: 11px; }
 .pbt-exam-toolbar h1 { margin: 0; font-size: 14px; font-weight: 650; text-align: center; line-height: 1.4; overflow-wrap: anywhere; }
 .pbt-exam-toolbar a:focus-visible { outline-color: #fff; }
+.pbt-passage-button { display: none; }
 .pbt-timer { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; justify-self: end; gap: 3px 8px; padding: 3px 8px; border: 1px solid #ffffff80; border-radius: 5px; background: #fff; color: #2452ae; font-size: 14px; font-variant-numeric: tabular-nums; font-weight: 650; }
 .pbt-timer small { font-size: 11px; font-weight: 500; }
 .pbt-timer span { white-space: nowrap; }
@@ -206,8 +211,15 @@ button.sentence-order-card { cursor: grab; }
   .pbt-exam-back { display: none; }
   .pbt-exam-width { width: calc(100% - 32px); }
   .pbt-exam-toolbar-inner { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; }
+  .pbt-exam-toolbar-inner:has(.pbt-passage-button) { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .pbt-passage-button { display: block; min-height: 36px; padding: 4px 10px; border: 1px solid #ffffffa6; border-radius: 6px; color: #fff; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .pbt-passage-button[data-visible="false"] { visibility: hidden; }
+  .pbt-passage-button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
   .pbt-exam-toolbar h1 { text-align: left; font-size: 13px; }
-  .pbt-test-paper { padding: 14px 18px; }
+  .pbt-test-paper { position: relative; padding: 14px 18px; }
+  /* The local Next.js indicator can occupy either bottom corner. */
+  .pbt-test-navigation[data-dev-tools] > div { width: calc(100% - 120px); display: flex; justify-content: space-between; gap: 4px; }
+  .pbt-test-navigation[data-dev-tools] .button { flex: 1 1 auto; min-width: 0; max-width: 120px; padding-inline: 4px; overflow-wrap: anywhere; }
   .pbt-question-split .pbt-question-body, .pbt-group-layout { grid-template-columns: 1fr; gap: 12px; }
   .pbt-number-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .pbt-question, .pbt-shared { padding: 20px; } .pbt-passage, .pbt-auxiliary { padding: 18px; font-size: 16px; }

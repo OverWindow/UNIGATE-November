@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Grid3x3, X } from "lucide-react";
 import useRouter from "@/lib/use-navigation-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import { useApp } from "@/app/providers";
 import { answerText, isAnswered, clockText, pbtRequest, PbtError, remainingSeconds, questionGroup, submitOnPageExit, type Answer, type Attempt } from "@/lib/exam/pbt-api";
 import { guardTimedExit } from "@/lib/exam/timed-exit";
+import { trackEvent } from "@/lib/analytics";
 import { closeWithMotion } from "@/lib/modal-motion";
 import type { ExamFormat } from "@/lib/exam/exam-content";
 import { examCopy, pbtErrorMessage } from "@/lib/exam/pbt-content";
@@ -15,6 +16,15 @@ import PbtQuestion, { QuestionMaterial } from "./PbtQuestion";
 import ListeningPlayer, { type AudioProgress } from "./ListeningPlayer";
 import ListeningSession from "./ListeningSession";
 import { listeningCopy } from "@/lib/exam/listening";
+
+type AttemptDialog = "questions" | "submit" | "exit" | "passage" | null;
+
+function isDialogBackdrop(event: MouseEvent<HTMLDialogElement>) {
+  if (event.target !== event.currentTarget) return false;
+  // The native dialog receives taps on both its padding and its backdrop.
+  const { left, right, top, bottom } = event.currentTarget.getBoundingClientRect();
+  return event.clientX < left || event.clientX >= right || event.clientY < top || event.clientY >= bottom;
+}
 
 export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: { id: string; review?: boolean; examFormat?: ExamFormat }) {
   const basePath = `/${examFormat}`;
@@ -29,12 +39,13 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
   const busyRef = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
-  const [dialog, setDialog] = useState<"questions" | "submit" | "exit" | null>(null);
+  const [dialog, setDialog] = useState<AttemptDialog>(null);
+  const [showPassageButton, setShowPassageButton] = useState(false);
   const pageSession = useRef("");
   const attemptActive = useRef(false);
   const timedSessionActive = useRef(false);
   const exitAction = useRef<(() => void) | null>(null);
-  const visibleDialog = useRef<"questions" | "submit" | "exit" | null>(null);
+  const visibleDialog = useRef<AttemptDialog>(null);
   const closeAnimation = useRef<Animation | null>(null);
   const [position, setPosition] = useState(1);
   const [remaining, setRemaining] = useState<number | null>(null);
@@ -59,8 +70,11 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
   const receivedAt = useRef(0);
   const autoSubmitted = useRef(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const pressedBackdrop = useRef(false);
   const dialogDismissRef = useRef<HTMLButtonElement>(null);
   const paperRef = useRef<HTMLElement>(null);
+  const sharedMaterialRef = useRef<HTMLDivElement>(null);
+  const passageButtonRef = useRef<HTMLButtonElement>(null);
   const retry = () => setRevision(n => n + 1);
 
   const handleAccessError = useCallback((cause: unknown) => {
@@ -151,11 +165,15 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
       closeAnimation.current?.cancel();
       closeAnimation.current = null;
       visibleDialog.current = dialog;
-      if (!element.open) element.showModal();
+      if (!element.open) {
+        element.showModal();
+        if (dialog === "passage") trackEvent("select_content", { content_type: "pbt_reading_passage", content_id: "shared_passage" });
+      }
       dialogDismissRef.current?.focus({ preventScroll: true });
     } else if (element.open) {
       closeAnimation.current = closeWithMotion(element, () => {
         element.close();
+        if (visibleDialog.current === "passage") passageButtonRef.current?.focus({ preventScroll: true });
         visibleDialog.current = null;
         closeAnimation.current = null;
       });
@@ -216,11 +234,43 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
   const elapsedAudio = audioProgress?.playbackKey === playbackKey ? audioProgress.elapsed : 0;
   const audioDuration = audioProgress?.playbackKey === playbackKey ? audioProgress.duration : null;
   const audioTime = `${clockText(elapsedAudio)} / ${audioDuration === null ? "--:--" : clockText(audioDuration)}`;
-  const sharedMaterial = grouped && !!(first?.passage || first?.materialUrl || first?.auxiliary);
+  const sharedQuestion = grouped && (first.passage || first.materialUrl || first.auxiliary)
+    ? { ...first, highlight: group.find(item => item.highlight)?.highlight || "" } : null;
   const total = attempt?.items.length ?? 0;
+  const passageGroupStart = !review && examFormat === "pbt" && attempt?.section === "reading" ? sharedQuestion?.position : undefined;
   const answered = attempt?.items.filter(isAnswered).length ?? 0;
   const wrong = attempt?.items.filter(item => !item.isCorrect) ?? [];
   const disabled = busy || submitting || remaining === 0 || (timedListening && completedPosition === first?.position);
+
+  useEffect(() => {
+    const paper = paperRef.current;
+    const passage = sharedMaterialRef.current;
+    if (passageGroupStart === undefined || !paper || !passage) return;
+
+    const mobile = window.matchMedia("(max-width: 760px)");
+    const update = () => {
+      const bounds = passage.getBoundingClientRect();
+      const scrollAreaTop = paper.getBoundingClientRect().top + paper.clientTop;
+      setShowPassageButton(mobile.matches && bounds.height > 0 && bounds.top + bounds.height / 2 <= scrollAreaTop);
+    };
+    const onWidthChange = () => {
+      update();
+      if (!mobile.matches) setDialog(current => current === "passage" ? null : current);
+    };
+    const resize = new ResizeObserver(update);
+    resize.observe(paper);
+    resize.observe(passage);
+    update();
+    paper.addEventListener("scroll", update, { passive: true });
+    mobile.addEventListener("change", onWidthChange);
+    return () => {
+      resize.disconnect();
+      paper.removeEventListener("scroll", update);
+      mobile.removeEventListener("change", onWidthChange);
+      setShowPassageButton(false);
+    };
+  }, [passageGroupStart]);
+
   useEffect(() => {
     if (!timedListening || review || !first || !last || completedPosition !== first.position || busy || submitting || completionHandled.current === first.position) return;
     // Finish an in-flight answer save before moving or submitting.
@@ -241,15 +291,19 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
     });
   };
 
-  const questions = first && last && <div className={sharedMaterial ? "pbt-group-layout" : undefined}>
-    {sharedMaterial && <section className="pbt-shared"><p>{first.position}–{last.position} · {t.group}</p><QuestionMaterial question={{ ...first, highlight: group.map(item => item.highlight).find(Boolean) || "" }} /></section>}
+  const questions = first && last && <div className={sharedQuestion ? "pbt-group-layout" : undefined}>
+    {sharedQuestion && <section className="pbt-shared">
+      <p>{first.position}–{last.position} · {t.group}</p>
+      <div ref={sharedMaterialRef}><QuestionMaterial question={sharedQuestion} /></div>
+    </section>}
     <div className="pbt-group-questions">
-      {group.map(item => <PbtQuestion key={item.position} question={item} shared={sharedMaterial} disabled={disabled} onAnswer={(p, o) => void answer(p, o)} />)}
+      {group.map(item => <PbtQuestion key={item.position} question={item} shared={!!sharedQuestion} disabled={disabled} onAnswer={(p, o) => void answer(p, o)} />)}
     </div>
   </div>;
 
   const shownDialog = dialog ?? visibleDialog.current;
   const exitTimed = attempt?.mode === "timed";
+  const dialogTitles = { questions: t.allQuestions, passage: t.group, exit: exitTimed ? t.exitTitle : t.practiceExitTitle, submit: t.confirm };
 
   return <div className={!review && attempt ? "pbt-session" : undefined}><SiteHeader onBeforeLogout={inProgress ? action => requestExit(() => { router.replace(basePath); action(); }) : undefined} /><main id="main-content" className={`pbt-workspace${review ? "" : " pbt-exam"}`} tabIndex={-1}>
     <div className={review ? "page-container" : "pbt-exam-content"}>
@@ -266,6 +320,7 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
           <div className="pbt-exam-toolbar"><div className="pbt-exam-width pbt-exam-toolbar-inner">
             <Link className="pbt-exam-back" href={basePath} onClick={event => { if (busy || submitting) event.preventDefault(); }}><ArrowLeft size={14} aria-hidden="true" /> {t.back}</Link>
             <h1>{language === "ko" ? attempt.title.replace(/ (\d+)$/, " 모의고사 $1회") : attempt.title}</h1>
+            {passageGroupStart !== undefined && <button ref={passageButtonRef} type="button" className="pbt-passage-button" data-visible={showPassageButton} aria-haspopup="dialog" onClick={() => setDialog("passage")}>{t.viewPassage}</button>}
             {isListening ? <span className="ibt-timing-label">{timedListening ? listeningCopy[language].estimatedDuration[examFormat] : t.unlimited}</span> : <div className={`pbt-timer ${remaining !== null && remaining < 300 ? "is-urgent" : ""}`} role="timer" aria-label={remaining === null ? t.unlimited : `${t.remainingTime} ${clockText(remaining)}`} title={attempt.mode === "timed" ? undefined : t.practiceHint}>
               {remaining !== null && <small>{t.remainingTime}</small>}<span>{remaining === null ? t.unlimited : clockText(remaining)}</span>
             </div>}
@@ -300,7 +355,7 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
               playbackKey={playbackKey} stopped={submitting || remaining === 0} onPlayingChange={setAudioPlaying} onProgressChange={updateAudioProgress} />}
             {questions}
           </section>}
-          {!timedListening && <nav className="pbt-test-navigation" aria-label={t.questionNavigation}><div className="pbt-exam-width">
+          {!timedListening && <nav className="pbt-test-navigation" data-dev-tools={process.env.NODE_ENV === "development" || undefined} aria-label={t.questionNavigation}><div className="pbt-exam-width">
             <button className="button pbt-secondary" disabled={first.position <= 1 || busy || submitting || audioPlaying} onClick={() => go(first.position - 1)}><ArrowLeft size={16} aria-hidden="true" /> {t.previous}</button>
             <button className="button pbt-secondary pbt-all-questions" aria-haspopup="dialog" onClick={() => setDialog("questions")} disabled={busy || submitting}>
               <Grid3x3 size={16} aria-hidden="true" />
@@ -313,12 +368,25 @@ export default function PbtAttempt({ id, review = false, examFormat = "pbt" }: {
         </>}
       </>}
     </div>
-    <dialog ref={dialogRef} className={`pbt-dialog${shownDialog === "questions" ? " pbt-navigator-dialog" : ""}`} onCancel={event => { event.preventDefault(); setDialog(null); }} aria-labelledby="pbt-dialog-title">
-      {shownDialog === "questions" && <button ref={dialogDismissRef} className="pbt-dialog-close" type="button" aria-label={t.close} onClick={() => setDialog(null)}>
+    <dialog ref={dialogRef} className={`pbt-dialog${shownDialog === "questions" ? " pbt-navigator-dialog" : ""}`} aria-labelledby="pbt-dialog-title"
+      onCancel={event => { event.preventDefault(); setDialog(null); }}
+      onPointerDown={event => { pressedBackdrop.current = dialog === "passage" && event.isPrimary && event.button === 0 && isDialogBackdrop(event); }}
+      onPointerCancel={() => { pressedBackdrop.current = false; }}
+      onClick={event => {
+        const dismiss = pressedBackdrop.current && dialog === "passage" && isDialogBackdrop(event);
+        pressedBackdrop.current = false;
+        if (dismiss) {
+          setDialog(null);
+          trackEvent("dismiss_passage", { method: "backdrop" });
+        }
+      }}>
+      {(shownDialog === "questions" || shownDialog === "passage") && <button ref={dialogDismissRef} className="pbt-dialog-close" type="button" aria-label={t.close} onClick={() => setDialog(null)}>
         <X size={18} strokeWidth={1.7} aria-hidden="true" />
       </button>}
-      <h2 id="pbt-dialog-title">{shownDialog === "questions" ? t.allQuestions : shownDialog === "exit" ? (exitTimed ? t.exitTitle : t.practiceExitTitle) : t.confirm}</h2>
-      {shownDialog === "questions" ? <>
+      <h2 id="pbt-dialog-title">{shownDialog && dialogTitles[shownDialog]}</h2>
+      {shownDialog === "passage" ? sharedQuestion && <div className="pbt-dialog-material" role="region" aria-labelledby="pbt-dialog-title" tabIndex={0}>
+        <QuestionMaterial question={sharedQuestion} />
+      </div> : shownDialog === "questions" ? <>
         <p className="pbt-navigator-summary">{t.answered} <strong>{answered} / {total}</strong><span>{t.unanswered} <strong>{total - answered}</strong></span></p>
         <div className="pbt-number-grid">
           {attempt?.items.map(item => <button key={item.position} className={isAnswered(item) ? "is-answered" : ""} aria-current={group.some(q => q.position === item.position) ? "step" : undefined} aria-label={`${item.position}: ${isAnswered(item) ? `${t.yourAnswer} ${answerText(item)}` : t.noAnswer}`} disabled={busy || submitting || audioPlaying} onClick={() => go(item.position)}>{item.position}</button>)}
