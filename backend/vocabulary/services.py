@@ -27,11 +27,11 @@ def audio_url(word):
     return f"{settings.CLOUDFRONT_BASE_URL}/{path}"
 
 
-def split_words(word_ids):
-    """Balance once at registration; never recalculate existing membership."""
+def split_words(word_ids, *, minimum_sets=0):
+    """Balance ordered words across sets while retaining existing set numbers."""
     if not word_ids:
         return []
-    count = (len(word_ids) + 19) // 20
+    count = max(minimum_sets, (len(word_ids) + 19) // 20)
     size, extra = divmod(len(word_ids), count)
     groups, offset = [], 0
     for index in range(count):

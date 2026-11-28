@@ -1,4 +1,5 @@
 import io
+from unicodedata import normalize
 from unittest.mock import patch
 
 from django.core.management import call_command
@@ -97,10 +98,51 @@ class VocabularyTests(TransactionTestCase):
         self.assertEqual(list(VocabularySetItem.objects.order_by("pk").values()), memberships)
         self.assertEqual(list(Vocabulary.objects.order_by("pk").values()), source_before)
         self.assertFalse(Vocabulary._meta.managed)
+        original_sets = list(VocabularySet.objects.filter(topik_level=3).values_list("set_number", "pk"))
         self.add_words(3, 21, start=42)
         self.register()
-        self.assertEqual(list(VocabularySetItem.objects.order_by("pk").values())[:61], memberships)
-        self.assertEqual(VocabularySet.objects.filter(topik_level=3).count(), 5)
+        expanded_sets = list(VocabularySet.objects.filter(topik_level=3).values_list("set_number", "pk"))
+        self.assertEqual(expanded_sets[:-1], original_sets)
+        self.assertEqual(expanded_sets[-1][0], 4)
+
+    def test_legacy_sets_and_new_words_follow_korean_order_across_set_boundaries(self):
+        self.add_words(5, 5)
+        spellings = ["하늘", "나무", normalize("NFD", "나무"), "가방", "고기"]
+        for number, spelling in enumerate(spellings, start=1):
+            Vocabulary.objects.filter(pk=50000 + number).update(korean=spelling)
+        set_ids = []
+        for number, word_ids in enumerate(((50001, 50002), (50003, 50004), (50005,)), start=1):
+            group = VocabularySet.objects.create(topik_level=5, set_number=number)
+            set_ids.append(str(group.pk))
+            VocabularySetItem.objects.bulk_create([
+                VocabularySetItem(set=group, vocabulary_id=word_id, position=position)
+                for position, word_id in enumerate(word_ids, start=1)
+            ])
+
+        memberships = list(VocabularySetItem.objects.order_by("pk").values())
+        self.assertIn("Level 5: would add 0 sets / 0 words, would move 5 existing words.", self.register(check=True))
+        self.assertEqual(list(VocabularySetItem.objects.order_by("pk").values()), memberships)
+        self.assertEqual(VocabularySet.objects.count(), 3)
+
+        def assert_set_order(expected_groups):
+            catalog = self.client.get("/api/vocabulary/sets/?level=5").json()["sets"]
+            self.assertEqual([(group["number"], group["id"]) for group in catalog],
+                             list(enumerate(set_ids, start=1)))
+            for group, expected_ids in zip(catalog, expected_groups, strict=True):
+                words = self.client.get(f"/api/vocabulary/sets/{group['id']}/").json()["words"]
+                self.assertEqual([int(word["id"]) for word in words], expected_ids)
+                self.assertEqual(group["preview"], [word["korean"] for word in words[:3]])
+                self.assertEqual([word["position"] for word in words], list(range(1, len(words) + 1)))
+
+        self.register()
+        assert_set_order([[50004, 50005], [50002, 50003], [50001]])
+        self.assertEqual(dict(VocabularySetItem.objects.filter(set__topik_level=5).values_list("vocabulary_id", "pk")),
+                         {item["vocabulary_id"]: item["id"] for item in memberships})
+        self.add_words(5, 1, start=6)
+        Vocabulary.objects.filter(pk=50006).update(korean="가지")
+        self.register()
+        assert_set_order([[50004, 50006], [50005, 50002], [50003, 50001]])
+        self.assertEqual(Vocabulary.objects.get(pk=50003).korean, spellings[2])
 
     def test_missing_or_reclassified_source_stops_registration(self):
         self.register()
@@ -130,7 +172,7 @@ class VocabularyTests(TransactionTestCase):
         self.assertNotIn("sessionid", catalog.cookies)
         group = catalog.json()["sets"][0]
         self.assertEqual((group["number"], group["wordCount"]), (1, 14))
-        self.assertEqual(group["preview"], ["테스트1", "테스트2", "테스트3"])
+        self.assertEqual(group["preview"], ["테스트1", "테스트10", "테스트11"])
         path = f"/api/vocabulary/sets/{group['id']}/"
         detail = self.client.get(path)
         self.assertEqual(detail.status_code, 200)
