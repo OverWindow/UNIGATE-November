@@ -106,10 +106,6 @@ class WritingQuestion(WritingModel):
         return self
 
 
-class WritingPayload(WritingModel):
-    questions: list[WritingQuestion] = Field(min_length=1, max_length=10)
-
-
 class WritingReference(WritingModel):
     source_exam: int
     source_file: str = Field(pattern=r"^\d+_writing\.pdf$")

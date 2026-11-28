@@ -12,8 +12,6 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from .writing_models import WritingQuestion, WritingReference
 
 
-OPERATION = "writing_evaluation"
-EVALUATION_INPUT_VERSION = 2
 FEEDBACK_LANGUAGES = {"ko": "Korean (한국어)", "en": "English", "id": "Indonesian (Bahasa Indonesia)"}
 EMPTY_FEEDBACK = {
     "ko": ("미응답", "작성된 답안이 없어 0점으로 처리했습니다."),

@@ -6,7 +6,7 @@ export const paymentHistoryContent = {
   ko: {
     refundTitle: "일회성 크레딧 환불", orders: "내 충전 주문", loginForOrders: "로그인하고 내 주문 보기",
     policy: "일회성으로 충전한 크레딧이 해당 주문에 모두 남아 있으면 결제 금액 전액을 환불받을 수 있습니다. 일부를 사용했다면 해당 주문의 ‘고객 문의’로 남은 유료 크레딧의 환불을 문의해 주세요.",
-    back: "크레딧으로 돌아가기", receipts: "Stripe 영수증", empty: "아직 일회성 충전 결제가 없습니다.", refund: "전액 환불", contact: "고객 문의",
+    back: "크레딧으로 돌아가기", empty: "아직 일회성 충전 결제가 없습니다.", refund: "전액 환불", contact: "고객 문의",
     remaining: "잔여", held: "크레딧 보류 중", processing: "환불 처리 중", refunded: "전액 환불 완료", no_payment: "결제 금액 없음",
     confirming: "환불 접수 확인", error: "환불 상태를 확인하지 못했습니다. 내역을 다시 확인해 주세요.",
     failed: "환불이 완료되지 않았습니다. 다시 시도하거나 결제 문의를 이용해 주세요.",
@@ -21,7 +21,7 @@ export const paymentHistoryContent = {
   en: {
     refundTitle: "One-time credit refunds", orders: "My top-ups", loginForOrders: "Sign in to view my top-ups",
     policy: "You can get a full refund for a one-time top-up if all the credits from that order are unused. If you’ve used some, select “Contact billing” on the order to ask about a refund for the remaining paid credits.",
-    back: "Back to credits", receipts: "Stripe receipts", empty: "No one-time top-ups yet.", refund: "Full refund", contact: "Contact billing",
+    back: "Back to credits", empty: "No one-time top-ups yet.", refund: "Full refund", contact: "Contact billing",
     remaining: "Remaining", held: "Credits on hold", processing: "Refund processing", refunded: "Fully refunded", no_payment: "No payment",
     confirming: "Check refund request", error: "Couldn’t confirm the refund status. Refresh your payment history.",
     failed: "The refund did not complete. Try again or contact billing.",
@@ -36,7 +36,7 @@ export const paymentHistoryContent = {
   id: {
     refundTitle: "Pengembalian dana isi ulang satu kali", orders: "Pesanan isi ulang saya", loginForOrders: "Masuk untuk melihat pesanan saya",
     policy: "Kamu bisa meminta pengembalian dana penuh jika semua kredit dari pesanan isi ulang satu kali masih tersisa. Jika sebagian sudah digunakan, pilih “Hubungi layanan pembayaran” pada pesanan tersebut untuk menanyakan pengembalian dana atas sisa kredit berbayar.",
-    back: "Kembali ke kredit", receipts: "Kuitansi Stripe", empty: "Belum ada pembayaran isi ulang satu kali.", refund: "Pengembalian dana penuh", contact: "Hubungi layanan pembayaran",
+    back: "Kembali ke kredit", empty: "Belum ada pembayaran isi ulang satu kali.", refund: "Pengembalian dana penuh", contact: "Hubungi layanan pembayaran",
     remaining: "Sisa", held: "Kredit ditahan", processing: "Pengembalian dana diproses", refunded: "Dana dikembalikan penuh", no_payment: "Tidak ada pembayaran",
     confirming: "Periksa permintaan", error: "Status pengembalian dana belum terkonfirmasi. Muat ulang riwayat pembayaran.",
     failed: "Pengembalian dana belum selesai. Coba lagi atau hubungi layanan pembayaran.",
@@ -54,10 +54,10 @@ interface Copy {
   available: string; balance: string; reserved: string; unit: string;
   pendingRefund: (amount: string) => string;
   transactions: string; transactionNote: string; balanceAfter: string; reservedAfter: string;
-  result: string; history: string; empty: string; loading: string; error: string; retry: string; refresh: string;
+  empty: string; loading: string; error: string; retry: string; refresh: string;
   loginRequired: string; previous: string; next: string; page: string;
-  topup: string; buy: (credits: string) => string; checkAgain: string; priceLoading: string; priceUnavailable: string;
-  cardIssuerNotice: string; paymentHistory: string; portal: Record<"opening" | "empty" | "error", string>;
+  topup: string; checkAgain: string; priceLoading: string; priceUnavailable: string;
+  cardIssuerNotice: string; paymentHistory: string;
   checkout: Record<"opening" | "checking" | "delayed" | "fulfilled" | "expired" | "startError" | "checkError" | "unavailable" | "priceChanged", string>;
   kinds: Record<CreditEntry["kind"], string>;
 }
@@ -67,18 +67,14 @@ export const creditsContent: Record<Language, Copy> = {
     available: "사용 가능", balance: "남은 크레딧", reserved: "보류 크레딧", unit: "크레딧",
     pendingRefund: amount => `환불로 차감할 크레딧이 ${amount}개 남았습니다. 새로 적립되거나 보류가 해제될 때 자동으로 차감됩니다.`,
     transactions: "크레딧 내역", transactionNote: "가입하면 100크레딧을 받습니다. 쓰기 세트를 처음 열 때 100크레딧을 사용합니다. 한 번 연 세트는 다시 열 수 있고, 문항당 AI 첨삭을 최대 20회 받을 수 있습니다.",
-    balanceAfter: "남은 크레딧", reservedAfter: "보류 크레딧", result: "평가 보기", history: "내 평가 이력",
+    balanceAfter: "남은 크레딧", reservedAfter: "보류 크레딧",
     empty: "아직 크레딧 내역이 없습니다.", loading: "크레딧 정보를 불러오는 중입니다.",
     error: "크레딧 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.", retry: "다시 시도", refresh: "새로고침",
     loginRequired: "로그인하면 내 크레딧 내역을 확인할 수 있습니다.", previous: "이전", next: "다음", page: "페이지",
-    topup: "충전", buy: credits => `${credits} 크레딧 충전`, checkAgain: "결제 상태 다시 확인",
+    topup: "충전", checkAgain: "결제 상태 다시 확인",
     cardIssuerNotice: "결제 시 한국 밖에서 발급된 카드를 사용해 주세요.",
     priceLoading: "충전 가격을 불러오는 중입니다.", priceUnavailable: "충전 가격을 불러올 수 없습니다.",
-    paymentHistory: "결제 내역", portal: {
-      opening: "Stripe 결제 내역을 여는 중입니다.",
-      empty: "Stripe에서 볼 수 있는 결제 내역이 아직 없습니다. 이전 충전은 아래 크레딧 내역에서 확인해 주세요.",
-      error: "결제 내역을 열지 못했습니다. 잠시 후 다시 시도해 주세요.",
-    },
+    paymentHistory: "결제 내역",
     checkout: {
       opening: "Stripe 결제창을 여는 중입니다.", checking: "결제 확인 중입니다.",
       delayed: "결제 확인에 시간이 걸리고 있습니다. 잠시 후 상태를 다시 확인해 주세요.",
@@ -93,18 +89,14 @@ export const creditsContent: Record<Language, Copy> = {
     available: "Available", balance: "Remaining credits", reserved: "Credits on hold", unit: "credits",
     pendingRefund: amount => `${amount} credits are still due for a refund. They will be deducted as credits are added or released from hold.`,
     transactions: "Credit history", transactionNote: "Get 100 credits when you sign up. 100 credits unlock a writing set. You can reopen it anytime and get up to 20 AI reviews per question.",
-    balanceAfter: "Remaining credits", reservedAfter: "Credits on hold", result: "View evaluation", history: "My evaluations",
+    balanceAfter: "Remaining credits", reservedAfter: "Credits on hold",
     empty: "No credit activity yet.", loading: "Loading your credits…",
     error: "Unable to load your credits. Please try again shortly.", retry: "Try again", refresh: "Refresh",
     loginRequired: "Sign in to view your credit history.", previous: "Previous", next: "Next", page: "Page",
-    topup: "Top up", buy: credits => `Buy ${credits} credits`, checkAgain: "Check payment status",
+    topup: "Top up", checkAgain: "Check payment status",
     cardIssuerNotice: "Please use a card issued outside South Korea.",
     priceLoading: "Loading the purchase price…", priceUnavailable: "Couldn’t load the purchase price.",
-    paymentHistory: "Payment history", portal: {
-      opening: "Opening your Stripe payment history…",
-      empty: "You don’t have any invoices to view in Stripe yet. You can find past top-ups in your credit history below.",
-      error: "Couldn’t open your payment history. Please try again shortly.",
-    },
+    paymentHistory: "Payment history",
     checkout: {
       opening: "Opening Stripe Checkout…", checking: "Confirming your payment…",
       delayed: "Your payment is still being confirmed. Check its status again shortly.",
@@ -119,18 +111,14 @@ export const creditsContent: Record<Language, Copy> = {
     available: "Tersedia", balance: "Sisa kredit", reserved: "Kredit ditahan", unit: "kredit",
     pendingRefund: amount => `Masih ada ${amount} kredit yang perlu dipotong karena pengembalian dana. Kredit akan dipotong saat saldo bertambah atau kredit yang ditahan dilepas.`,
     transactions: "Riwayat kredit", transactionNote: "Dapatkan 100 kredit saat mendaftar. Gunakan 100 kredit untuk membuka satu paket menulis. Paket dapat dibuka kembali kapan saja dan mencakup hingga 20 ulasan AI per soal.",
-    balanceAfter: "Sisa kredit", reservedAfter: "Kredit ditahan", result: "Lihat penilaian", history: "Riwayat penilaian saya",
+    balanceAfter: "Sisa kredit", reservedAfter: "Kredit ditahan",
     empty: "Belum ada riwayat kredit.", loading: "Memuat informasi kredit…",
     error: "Informasi kredit tidak dapat dimuat. Silakan coba lagi sebentar.", retry: "Coba lagi", refresh: "Muat ulang",
     loginRequired: "Masuk untuk melihat riwayat kredit Anda.", previous: "Sebelumnya", next: "Berikutnya", page: "Halaman",
-    topup: "Isi ulang", buy: credits => `Beli ${credits} kredit`, checkAgain: "Periksa status pembayaran",
+    topup: "Isi ulang", checkAgain: "Periksa status pembayaran",
     cardIssuerNotice: "Gunakan kartu yang diterbitkan di luar Korea Selatan.",
     priceLoading: "Memuat harga kredit…", priceUnavailable: "Harga kredit tidak dapat dimuat.",
-    paymentHistory: "Riwayat pembayaran", portal: {
-      opening: "Membuka riwayat pembayaran Stripe…",
-      empty: "Belum ada faktur yang dapat dilihat di Stripe. Isi ulang sebelumnya dapat dilihat di riwayat kredit di bawah.",
-      error: "Riwayat pembayaran tidak dapat dibuka. Silakan coba lagi sebentar.",
-    },
+    paymentHistory: "Riwayat pembayaran",
     checkout: {
       opening: "Membuka halaman pembayaran Stripe…", checking: "Mengonfirmasi pembayaran…",
       delayed: "Pembayaran masih diproses. Periksa kembali statusnya sebentar lagi.",

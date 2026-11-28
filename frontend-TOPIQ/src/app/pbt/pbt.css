@@ -14,7 +14,6 @@
 .pbt-mode strong, .pbt-mode small { display: block; }
 .pbt-mode strong { font-size: 17px; margin-bottom: 5px; }
 .pbt-mode small { color: #657186; font-size: 12px; line-height: 1.7; }
-.pbt-mode-time { flex-shrink: 0; margin-left: auto; color: #2d5ec5; font-weight: 650; font-size: 18px; }
 .pbt-exam-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
 .pbt-exam-card { padding: 26px; border: 1px solid #e0e6ef; border-radius: 16px; background: #fff; box-shadow: 0 5px 18px #26467405; }
 .pbt-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -207,7 +206,7 @@ button.sentence-order-card { cursor: grab; }
   .pbt-exam .pbt-choice input { appearance: auto; }
   .pbt-exam .pbt-choice input::before { display: none; }
 }
-@media (max-width: 1000px) { .pbt-exam-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pbt-mode { padding: 18px; } .pbt-mode-time { font-size: 14px; } }
+@media (max-width: 1000px) { .pbt-exam-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pbt-mode { padding: 18px; } }
 @media (max-width: 760px) {
   .pbt-modes { grid-template-columns: 1fr; gap: 10px; }
   .pbt-exam-back { display: none; }

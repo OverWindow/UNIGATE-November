@@ -47,7 +47,7 @@ interface PlanCopy {
   };
   details: { myPlan: string; status: string; cycle: string; renewing: string; nonrenewing: string;
     noPaidPeriod: string; free: string; seePlans: string };
-  interval: (months: number) => string; manage: string; renewal: string; ending: string; pastDue: string; prepaid: string; inUse: string;
+  interval: (months: number) => string; manage: string; ending: string; pastDue: string; prepaid: string; inUse: string;
   checkout: Record<"fulfilled" | "expired" | "startError" | "priceChanged", string>;
 }
 
@@ -88,7 +88,7 @@ export const plansContent: Record<Language, PlanCopy> = {
       nonrenewing: "자동 갱신 없음", noPaidPeriod: "현재 적용된 유료 이용 기간이 없습니다.",
       free: "이용 중인 유료 구독이 없습니다.", seePlans: "요금제 보기" },
     portalUnavailable: "결제 관리를 열지 못했습니다. 잠시 후 다시 시도해 주세요.",
-    interval: n => n === 1 ? "매월" : `${n}개월마다`, manage: "결제 관리", renewal: "다음 결제 예정", ending: "자동 갱신 해지됨",
+    interval: n => n === 1 ? "매월" : `${n}개월마다`, manage: "결제 관리", ending: "자동 갱신 해지됨",
     pastDue: "결제 수단을 확인해 주세요.", prepaid: "자동 갱신이 없는 이용권입니다. 만료 후 새 요금제를 선택할 수 있습니다.",
     inUse: "이 계정의 기존 결제 또는 구독 상태를 확인해 주세요.",
     current: "내 플랜", until: "이용 가능 기한",
@@ -142,7 +142,7 @@ export const plansContent: Record<Language, PlanCopy> = {
       nonrenewing: "No automatic renewal", noPaidPeriod: "No paid access period is currently in effect.",
       free: "You have no paid subscription.", seePlans: "View plans" },
     portalUnavailable: "Couldn’t open the billing page. Please try again shortly.",
-    interval: n => n === 1 ? "Every month" : `Every ${n} months`, manage: "Manage billing", renewal: "Next billing date", ending: "Renewal cancelled",
+    interval: n => n === 1 ? "Every month" : `Every ${n} months`, manage: "Manage billing", ending: "Renewal cancelled",
     pastDue: "Please check your payment method.", prepaid: "Your pass doesn’t renew automatically. You can choose a new plan when it expires.",
     inUse: "Please check the existing payment or subscription for this account.",
     current: "My plan", until: "Access until",
@@ -196,7 +196,7 @@ export const plansContent: Record<Language, PlanCopy> = {
       nonrenewing: "Tanpa perpanjangan otomatis", noPaidPeriod: "Saat ini tidak ada masa akses berbayar yang aktif.",
       free: "Anda tidak memiliki langganan berbayar.", seePlans: "Lihat paket" },
     portalUnavailable: "Halaman pembayaran tidak dapat dibuka. Silakan coba lagi.",
-    interval: n => n === 1 ? "Setiap bulan" : `Setiap ${n} bulan`, manage: "Kelola pembayaran", renewal: "Tagihan berikutnya", ending: "Perpanjangan dibatalkan",
+    interval: n => n === 1 ? "Setiap bulan" : `Setiap ${n} bulan`, manage: "Kelola pembayaran", ending: "Perpanjangan dibatalkan",
     pastDue: "Periksa metode pembayaran Anda.", prepaid: "Paketmu tidak diperpanjang otomatis. Kamu bisa memilih paket baru setelah masa berlakunya berakhir.",
     inUse: "Periksa pembayaran atau langganan yang sudah ada untuk akun ini.",
     current: "Paket saya", until: "Akses hingga",

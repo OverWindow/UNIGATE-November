@@ -70,7 +70,7 @@ def allocate_transaction(account, kind, amount, purchase):
         purchase.save(update_fields=["refund_sources"])
 
 
-def collect_pending_refunds(account, *, held_purchase=None):
+def collect_pending_refunds(account):
     # Reconcile legacy pending deductions once, forgiving any unavailable balance.
     pending = CreditPurchase.objects.filter(user_id=account.pk, pending_refund_credits__gt=0).order_by("created_at", "pk")
     for purchase in pending:
@@ -98,7 +98,7 @@ def refund_credit_adjustment(account, purchase, refunded, previous_refunded):
     return min(difference, max(0, target - previous_target), max(0, account.balance - account.reserved))
 
 
-def reconcile_purchase_refunds(account, purchase, *, from_hold=False, previous_refunded=None):
+def reconcile_purchase_refunds(account, purchase, *, previous_refunded=None):
     if purchase.status != "fulfilled" or not purchase.refunds.exists():
         return
     refunded = purchase.refunds.filter(status="succeeded").aggregate(total=Sum("amount", default=0))["total"]

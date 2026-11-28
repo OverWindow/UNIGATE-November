@@ -1,17 +1,17 @@
 import type { Language } from "../landing-content";
 
 interface Copy {
-  answer: string; evaluate: string; history: string; credits: string; available: string; reserved: string;
-  cost: string; unavailable: string; loading: string; processing: string; succeeded: string; failed: string;
+  answer: string; evaluate: string; history: string;
+  unavailable: string; loading: string; processing: string; succeeded: string; failed: string;
   check: string; uncertain: string; retrySame: string; empty: string; result: string; original: string;
-  tasks: string; corrections: string; review: string; charged: string; transactions: string; next: string;
-  previous: string; count: string; savedQuestion: string; back: string;
+  tasks: string; corrections: string; review: string; next: string;
+  previous: string; count: string; savedQuestion: string;
   processingShort: string; close: string; totalScore: string; points: string; details: string;
   reviewing: string; reviewHints: Record<"blanks" | "data" | "essay", [string, string]>; historyHint: string;
   before: string; after: string; viewResult: string; applyCorrection: string; undoCorrection: string; correctedAnswer: string;
   login: string; loginNotice: string;
   answerFormat: string; plainFormat: string; manuscriptFormat: string;
-  errors: Record<string, string>; kinds: Record<string, string>;
+  errors: Record<string, string>;
   scoreLabels: Record<string, string>; shortScoreLabels: Record<string, string>; taskStatuses: Record<string, string>;
 }
 
@@ -21,14 +21,14 @@ export const evaluationContent: Record<Language, Copy> = {
     shortScoreLabels: { a: "㉠", b: "㉡", content: "내용 과제", organization: "구성", language: "언어" },
     taskStatuses: { "충족": "충족", "부분 충족": "부분 충족", "미충족": "미충족" },
     answerFormat: "답안 입력 형식", plainFormat: "일반", manuscriptFormat: "원고지",
-    answer: "내 답안", evaluate: "평가 요청", history: "내 평가 이력", credits: "크레딧", available: "사용 가능", reserved: "보류",
-    cost: "이번 평가", unavailable: "이 문항은 아직 평가를 이용할 수 없습니다.", loading: "불러오는 중입니다.",
+    answer: "내 답안", evaluate: "평가 요청", history: "내 평가 이력",
+    unavailable: "이 문항은 아직 평가를 이용할 수 없습니다.", loading: "불러오는 중입니다.",
     processing: "평가 중입니다. 결과는 평가 이력에서도 확인할 수 있습니다.", succeeded: "평가 완료", failed: "평가 실패 · 횟수 미차감",
     check: "처리 상태 확인", uncertain: "접수 또는 완료 여부를 확인하지 못했습니다. 상태를 확인하거나 같은 요청으로 다시 시도하세요.",
     retrySame: "같은 요청 다시 확인", empty: "아직 내역이 없습니다.", result: "평가 결과", original: "제출한 원본 답안",
-    tasks: "과제 수행", corrections: "수정 제안", review: "검토 사항", charged: "사용 크레딧", transactions: "크레딧 내역",
+    tasks: "과제 수행", corrections: "수정 제안", review: "검토 사항",
     next: "다음", previous: "이전",
-    count: "공백 포함 · 줄바꿈 제외", savedQuestion: "제출 당시 문제", back: "쓰기 세트",
+    count: "공백 포함 · 줄바꿈 제외", savedQuestion: "제출 당시 문제",
     processingShort: "평가 중…", close: "닫기", totalScore: "총점", points: "점", details: "상세히 보기",
     reviewing: "답안을 살펴보고 있어요",
     reviewHints: {
@@ -47,21 +47,21 @@ export const evaluationContent: Record<Language, Copy> = {
       evaluation_unavailable: "평가 서비스가 아직 준비되지 않았습니다.", question_unavailable: "문항 형식을 확인해야 해 평가할 수 없습니다.",
       invalid_submission: "답안 형식과 최대 길이를 확인해 주세요.", not_found: "저장된 평가 또는 문제를 찾지 못했습니다.",
       authentication_required: "다시 로그인해 주세요.", default: "불러오지 못했습니다. 잠시 후 다시 확인해 주세요.",
-    }, kinds: { grant: "지급", reserve: "보류", capture: "차감", release: "보류 해제" },
+    },
   },
   en: {
     scoreLabels: { a: "㉠", b: "㉡", content: "Content and task fulfillment", organization: "Organization", language: "Language use" },
     shortScoreLabels: { a: "㉠", b: "㉡", content: "Content", organization: "Structure", language: "Language" },
     taskStatuses: { "충족": "Met", "부분 충족": "Partially met", "미충족": "Not met" },
     answerFormat: "Answer format", plainFormat: "Plain", manuscriptFormat: "Manuscript",
-    answer: "Your answer", evaluate: "Request evaluation", history: "My evaluations", credits: "Credits", available: "Available", reserved: "On hold",
-    cost: "This evaluation", unavailable: "Evaluation is not yet available for this question.", loading: "Loading…",
+    answer: "Your answer", evaluate: "Request evaluation", history: "My evaluations",
+    unavailable: "Evaluation is not yet available for this question.", loading: "Loading…",
     processing: "Evaluation in progress. You can also check your history.", succeeded: "Completed", failed: "Evaluation failed · No attempt used",
     check: "Check status", uncertain: "Receipt or completion could not be confirmed. Check the status or retry the same request.",
     retrySame: "Retry the same request", empty: "No records yet.", result: "Evaluation result", original: "Submitted answer",
-    tasks: "Task completion", corrections: "Suggested corrections", review: "Review notes", charged: "Credits charged", transactions: "Credit history",
+    tasks: "Task completion", corrections: "Suggested corrections", review: "Review notes",
     next: "Next", previous: "Previous",
-    count: "Including spaces, excluding line breaks", savedQuestion: "Question at submission", back: "Writing sets",
+    count: "Including spaces, excluding line breaks", savedQuestion: "Question at submission",
     processingShort: "Evaluating…", close: "Close", totalScore: "Total score", points: "points", details: "View details",
     reviewing: "We’re reviewing your answer",
     reviewHints: {
@@ -80,21 +80,21 @@ export const evaluationContent: Record<Language, Copy> = {
       evaluation_unavailable: "Evaluation is not configured yet.", question_unavailable: "The question format needs to be checked.",
       invalid_submission: "Check the answer format and maximum length.", not_found: "The saved evaluation or question could not be found.",
       authentication_required: "Please sign in again.", default: "Unable to load. Please try again.",
-    }, kinds: { grant: "Granted", reserve: "Reserved", capture: "Charged", release: "Released" },
+    },
   },
   id: {
     scoreLabels: { a: "㉠", b: "㉡", content: "Isi dan pemenuhan tugas", organization: "Struktur tulisan", language: "Penggunaan bahasa" },
     shortScoreLabels: { a: "㉠", b: "㉡", content: "Isi", organization: "Struktur", language: "Bahasa" },
     taskStatuses: { "충족": "Terpenuhi", "부분 충족": "Sebagian terpenuhi", "미충족": "Belum terpenuhi" },
     answerFormat: "Format jawaban", plainFormat: "Biasa", manuscriptFormat: "Kertas kotak",
-    answer: "Jawaban Anda", evaluate: "Minta penilaian", history: "Riwayat penilaian", credits: "Kredit", available: "Tersedia", reserved: "Ditahan",
-    cost: "Penilaian ini", unavailable: "Penilaian belum tersedia untuk soal ini.", loading: "Memuat…",
+    answer: "Jawaban Anda", evaluate: "Minta penilaian", history: "Riwayat penilaian",
+    unavailable: "Penilaian belum tersedia untuk soal ini.", loading: "Memuat…",
     processing: "Penilaian berlangsung. Hasil juga tersedia di riwayat.", succeeded: "Selesai", failed: "Penilaian gagal · Jatah tidak berkurang",
     check: "Periksa status", uncertain: "Penerimaan atau penyelesaian belum dapat dipastikan. Periksa status atau ulangi permintaan yang sama.",
     retrySame: "Ulangi permintaan yang sama", empty: "Belum ada riwayat.", result: "Hasil penilaian", original: "Jawaban yang dikirim",
-    tasks: "Pemenuhan tugas", corrections: "Saran perbaikan", review: "Catatan tinjauan", charged: "Kredit terpakai", transactions: "Riwayat kredit",
+    tasks: "Pemenuhan tugas", corrections: "Saran perbaikan", review: "Catatan tinjauan",
     next: "Berikutnya", previous: "Sebelumnya",
-    count: "Termasuk spasi, tanpa baris baru", savedQuestion: "Soal saat dikirim", back: "Paket menulis",
+    count: "Termasuk spasi, tanpa baris baru", savedQuestion: "Soal saat dikirim",
     processingShort: "Menilai…", close: "Tutup", totalScore: "Skor total", points: "poin", details: "Lihat detail",
     reviewing: "Kami sedang menilai jawaban Anda",
     reviewHints: {
@@ -113,7 +113,7 @@ export const evaluationContent: Record<Language, Copy> = {
       evaluation_unavailable: "Layanan penilaian belum disiapkan.", question_unavailable: "Format soal perlu diperiksa.",
       invalid_submission: "Periksa format dan panjang maksimum jawaban.", not_found: "Penilaian atau soal tidak ditemukan.",
       authentication_required: "Silakan masuk kembali.", default: "Tidak dapat memuat. Silakan coba lagi.",
-    }, kinds: { grant: "Diberikan", reserve: "Dicadangkan", capture: "Dipotong", release: "Dilepas" },
+    },
   },
 };
 

@@ -208,7 +208,7 @@ def save_refund(account, purchase, refund, *, api=None, subscription=None):
         if api is None:
             raise ValueError("Plan refund requires Stripe client")
         revoke_refunded_plan(account, purchase, api, subscription)
-    reconcile_purchase_refunds(account, purchase, from_hold=from_hold, previous_refunded=previous_refunded)
+    reconcile_purchase_refunds(account, purchase, previous_refunded=previous_refunded)
     if newly_succeeded and purchase.status == "fulfilled":
         track_refund(purchase, row)
 
